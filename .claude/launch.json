@@ -1,0 +1,19 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "PANDA ENGINE (FastAPI)",
+      "runtimeExecutable": "uvicorn",
+      "runtimeArgs": ["app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"],
+      "port": 8000,
+      "cwd": "D:/qqqq"
+    },
+    {
+      "name": "PANDA Dashboard (Next.js)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3000,
+      "cwd": "C:/Users/Admin/panda-dashboard"
+    }
+  ]
+}
