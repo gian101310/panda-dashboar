@@ -40,6 +40,46 @@ function biasFromGap(gap) {
   return         { label:'WAIT', color:'var(--text-muted)', bg:'rgba(40,50,80,0.3)', border:'rgba(40,50,80,0.5)' };
 }
 function isValid(gap) { return gap >= 5 || gap <= -5; }
+
+// ===== CURRENCY STRENGTH MATCHUP LABEL =====
+// Score rules (from Panda Playbook): 4-6 = STRONG, 1-3 = NEUTRAL/WEAK, 0 = NEUTRAL
+function scoreLabel(score) {
+  const abs = Math.abs(score || 0);
+  if (abs >= 4) return 'STRONG';
+  if (abs >= 1) return 'WEAK';
+  return 'NEUTRAL';
+}
+function getMatchup(row) {
+  // row must have base_currency, quote_currency, base_d1..h1, quote_d1..h1 from Supabase v3
+  if (!row || row.hard_invalid) return null;
+  const gap = row.gap ?? 0;
+  if (Math.abs(gap) < 5) return null;
+
+  // Use the strongest individual TF score (same logic as cBot)
+  const baseVals  = [row.base_d1, row.base_h4, row.base_h1].filter(v => v != null);
+  const quoteVals = [row.quote_d1, row.quote_h4, row.quote_h1].filter(v => v != null);
+  if (!baseVals.length || !quoteVals.length) return null;
+
+  const baseScore  = gap > 0
+    ? Math.max(...baseVals.filter(v => v > 0), 0)
+    : Math.min(...baseVals.filter(v => v < 0), 0);
+  const quoteScore = gap > 0
+    ? Math.min(...quoteVals.filter(v => v < 0), 0)
+    : Math.max(...quoteVals.filter(v => v > 0), 0);
+
+  const bl = scoreLabel(baseScore);
+  const ql = scoreLabel(quoteScore);
+  const baseCur  = row.base_currency  || row.symbol?.slice(0,3) || '';
+  const quoteCur = row.quote_currency || row.symbol?.slice(3,6) || '';
+
+  if (bl === 'STRONG' && ql === 'STRONG') return { label: 'STRONG vs STRONG', color: '#ffd166', note: 'CONFLICT' };
+  if (bl === 'STRONG' && ql === 'WEAK')   return { label: `${baseCur} STRONG / ${quoteCur} WEAK`,   color: '#00ff9f', note: 'IDEAL' };
+  if (bl === 'WEAK'   && ql === 'STRONG') return { label: `${baseCur} WEAK / ${quoteCur} STRONG`,   color: '#ff4d6d', note: 'IDEAL' };
+  if (bl === 'STRONG' && ql === 'NEUTRAL')return { label: `${baseCur} STRONG / ${quoteCur} NEUTRAL`,color: '#66ffcc', note: 'GOOD' };
+  if (bl === 'NEUTRAL'&& ql === 'STRONG') return { label: `${baseCur} NEUTRAL / ${quoteCur} STRONG`,color: '#ff7090', note: 'GOOD' };
+  if (bl === 'WEAK'   && ql === 'WEAK')   return { label: 'WEAK vs WEAK',   color: '#ffaa44', note: 'AVOID' };
+  return { label: `${bl} / ${ql}`, color: 'var(--text-muted)', note: '' };
+}
 function signalLabel(signal, strength) {
   if (signal==='STRONG'||strength>=2) return { icon:'🔥', text:'STRONG', color:'#ffd166' };
   if (signal==='MODERATE'||strength>=1) return { icon:'⚡', text:'MOD',  color:'#00b4ff' };
@@ -675,7 +715,7 @@ function PairCard({ row, trend, cotBias }) {
         </div>
         <Sparkline data={t.history} color={sparkColor}/>
       </div>
-      {cotBias&&<div style={{display:'flex',alignItems:'center',gap:4}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>COT</span><span style={{fontFamily:mono,fontSize:9,color:cotBias.bias==='BULLISH'?'#00ff9f':'#ff4d6d',background:cotBias.bias==='BULLISH'?'rgba(0,255,159,0.08)':'rgba(255,77,109,0.08)',border:`1px solid ${cotBias.bias==='BULLISH'?'#00ff9f33':'#ff4d6d33'}`,borderRadius:3,padding:'1px 5px'}}>{cotBias.bias==='BULLISH'?'▲':'▼'} {cotBias.bias}</span></div>}
+      {(()=>{const mu=getMatchup(row);if(!mu)return null;return(<div style={{display:'flex',alignItems:'center',gap:6,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>MATCHUP</span><span style={{fontFamily:mono,fontSize:9,color:mu.color,background:mu.color+'12',border:`1px solid ${mu.color}30`,borderRadius:4,padding:'1px 7px',whiteSpace:'nowrap'}}>{mu.label}</span>{mu.note==='IDEAL'&&<span style={{fontFamily:mono,fontSize:7,color:mu.color,letterSpacing:1,opacity:0.8}}>IDEAL</span>}{mu.note==='AVOID'&&<span style={{fontFamily:mono,fontSize:7,color:'#ffaa44',letterSpacing:1,opacity:0.8}}>AVOID</span>}</div>);})()}{cotBias&&<div style={{display:'flex',alignItems:'center',gap:4}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>COT</span><span style={{fontFamily:mono,fontSize:9,color:cotBias.bias==='BULLISH'?'#00ff9f':'#ff4d6d',background:cotBias.bias==='BULLISH'?'rgba(0,255,159,0.08)':'rgba(255,77,109,0.08)',border:`1px solid ${cotBias.bias==='BULLISH'?'#00ff9f33':'#ff4d6d33'}`,borderRadius:3,padding:'1px 5px'}}>{cotBias.bias==='BULLISH'?'▲':'▼'} {cotBias.bias}</span></div>}
       <div style={{display:'flex',flexDirection:'column',gap:3}}>
         <div style={{display:'flex',alignItems:'center',gap:6}}>
           <span style={{fontFamily:mono,fontSize:10,color:t.momentumColor||'var(--text-muted)',background:(t.momentumColor||'var(--text-muted)')+'18',border:`1px solid ${(t.momentumColor||'var(--text-muted)')}30`,borderRadius:4,padding:'2px 8px',letterSpacing:1}}>{momIcons[t.momentum]||'▬'} {t.momentum||'NEUTRAL'}</span>
@@ -761,7 +801,7 @@ function ValidSetupsTab({ data, trends, cotMap }) {
             {/* MOMENTUM + ACTION */}
             <div style={{flex:1}}>
               <div style={{fontFamily:mono,fontSize:9,color:t.momentumColor||'var(--text-muted)',background:(t.momentumColor||'var(--text-muted)')+'18',border:`1px solid ${(t.momentumColor||'var(--text-muted)')}30`,borderRadius:4,padding:'2px 8px',display:'inline-block',marginBottom:4}}>{t.momentum||'NEUTRAL'}</div>
-              {g && <div style={{fontFamily:mono,fontSize:10,color:g.color,fontWeight:700}}>👉 {g.action}</div>}
+              {g && <div style={{fontFamily:mono,fontSize:10,color:g.color,fontWeight:700}}>👉 {g.action}</div>}{(()=>{const mu=getMatchup(row);if(!mu)return null;return(<div style={{fontFamily:mono,fontSize:9,color:mu.color,background:mu.color+'12',border:`1px solid ${mu.color}28`,borderRadius:4,padding:'2px 7px',display:'inline-block',marginTop:3,whiteSpace:'nowrap'}}>{mu.label}{mu.note&&<span style={{marginLeft:5,opacity:0.7,fontSize:8}}>{mu.note}</span>}</div>);})()}
             </div>
 
             {/* STRENGTH */}
@@ -849,7 +889,7 @@ function ValidPairsTab({ data, trends, cotMap }) {
             <div style={{flex:1,display:'flex',flexDirection:'column',gap:4}}>
               <div style={{display:'flex',alignItems:'center',gap:6}}>
                 <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:mc,background:mc+'18',border:`1px solid ${mc}30`,borderRadius:4,padding:'2px 8px'}}>{t.momentum}</span>
-                <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:mc,fontWeight:700}}>👉 {actions[t.momentum]||''}</span>
+                <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:mc,fontWeight:700}}>👉 {actions[t.momentum]||''}</span>{(()=>{const mu=getMatchup(row);if(!mu)return null;return(<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:mu.color,background:mu.color+'12',border:`1px solid ${mu.color}28`,borderRadius:4,padding:'1px 7px',marginLeft:6,whiteSpace:'nowrap'}}>{mu.label}</span>);})()}
               </div>
               <div style={{display:'flex',gap:8}}>
                 {[['1H',t.delta1h],['4H',t.delta4h],['8H',t.delta8h]].map(([l,v])=>{const val=v??0;const c=Math.abs(val)<0.1?'var(--text-muted)':val>0?'#00ff9f':'#ff4d6d';return(<div key={l} style={{display:'flex',alignItems:'center',gap:3}}><span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:'var(--text-muted)'}}>{l}</span><span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:c,fontWeight:700}}>{Math.abs(val)<0.1?'±0':(val>0?'+':'')+val}</span></div>);})}
@@ -877,7 +917,7 @@ function SpikeLogTab() {
   const [filter, setFilter] = useState('ALL');
 
   useEffect(() => {
-    fetch('/api/spikes?limit=200')
+    fetch('/api/spikes?limit=500')
       .then(r=>r.json())
       .then(d=>{ setLogs(Array.isArray(d)?d:[]); setLoading(false); })
       .catch(()=>setLoading(false));
@@ -908,11 +948,11 @@ function SpikeLogTab() {
             const momColors = {STRONG:'#00ff9f',BUILDING:'#66ffcc',SPARK:'#ffd166',CONSOLIDATING:'#00b4ff',COOLING:'#ffaa44',FADING:'#ff7744',REVERSING:'#ff4d6d'};
             const mc = momColors[s.momentum] || '#ffd166';
             return (
-              <div key={s.id||i} style={{display:'grid',gridTemplateColumns:'90px 55px 55px 100px 80px 1fr 80px',alignItems:'center',gap:10,padding:'9px 12px',background:i%2===0?'var(--bg-card)':'transparent',border:'1px solid var(--border)',borderLeft:`3px solid ${color}`,borderRadius:6}}>
+              <div key={s.id||i} style={{display:'grid',gridTemplateColumns:'90px 55px 55px 100px 80px 140px 1fr 80px',alignItems:'center',gap:10,padding:'9px 12px',background:i%2===0?'var(--bg-card)':'transparent',border:'1px solid var(--border)',borderLeft:`3px solid ${color}`,borderRadius:6}}>
                 <span style={{fontFamily:"'Orbitron',sans-serif",fontSize:11,fontWeight:700,color:'var(--text-primary)'}}>{s.symbol}</span>
                 <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:color,fontWeight:700,background:color+'15',borderRadius:3,padding:'1px 6px',textAlign:'center'}}>{s.bias||( (s.gap??0)>0?'BUY':'SELL')}</span>
                 <span style={{fontFamily:"'Orbitron',sans-serif",fontSize:12,fontWeight:700,color,textAlign:'center'}}>{(s.gap??0)>0?'+':''}{s.gap}</span>
-                <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:mc}}>{s.momentum}</span>
+                <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:mc}}>{s.momentum}</span><span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:(()=>{if(!s.base_score&&!s.quote_score)return'var(--text-muted)';const abs=(v)=>Math.abs(v||0);const bl=abs(s.base_score)>=4?'STRONG':abs(s.base_score)>=1?'WEAK':'NEUTRAL';const ql=abs(s.quote_score)>=4?'STRONG':abs(s.quote_score)>=1?'WEAK':'NEUTRAL';return bl==='STRONG'&&ql==='WEAK'?'#00ff9f':bl==='WEAK'&&ql==='STRONG'?'#ff4d6d':'var(--text-muted)';})()}}>{(()=>{if(!s.base_score&&!s.quote_score)return'—';const abs=(v)=>Math.abs(v||0);const bl=abs(s.base_score)>=4?'STR':abs(s.base_score)>=1?'WK':'N';const ql=abs(s.quote_score)>=4?'STR':abs(s.quote_score)>=1?'WK':'N';return bl+' vs '+ql;})()}</span>
                 <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:'var(--text-muted)',textAlign:'center'}}>{Number(s.strength??0).toFixed(2)}</span>
                 <div style={{display:'flex',gap:8}}>
                   {[['1H',s.delta_short],['4H',s.delta_mid]].map(([l,v])=>{const val=parseFloat(v??0);const c=Math.abs(val)<0.1?'var(--text-muted)':val>0?'#00ff9f':'#ff4d6d';return(<span key={l} style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:c}}>{l}:{val>0?'+':''}{val?.toFixed(1)}</span>);})}
@@ -1181,7 +1221,7 @@ export default function Dashboard() {
 ):tab==='TABLE'?(
             <div style={{overflowX:'auto'}}>
               <table style={{width:'100%',borderCollapse:'collapse',background:'var(--bg-secondary)',border:'1px solid var(--border)',borderRadius:10,overflow:'hidden'}}>
-                <thead><tr style={{background:'var(--bg-hover)'}}>{['#','SYMBOL','GAP','▲▼','BIAS','MOMENTUM','1H','4H','8H','CHART','STATE','STR','SIG','COT','⚠️'].map(h=><th key={h} style={hdr}>{h}</th>)}</tr></thead>
+                <thead><tr style={{background:'var(--bg-hover)'}}>{['#','SYMBOL','GAP','▲▼','BIAS','MOMENTUM','MATCHUP','1H','4H','8H','CHART','STATE','STR','SIG','COT','⚠️'].map(h=><th key={h} style={hdr}>{h}</th>)}</tr></thead>
                 <tbody>
                   {displayed.length===0?<tr><td colSpan={15} style={{textAlign:'center',padding:40,fontFamily:mono,fontSize:10,color:'var(--text-muted)'}}>NO DATA</td></tr>
                   :displayed.map((row,idx)=>{
@@ -1196,7 +1236,7 @@ export default function Dashboard() {
                         <td style={{...tdc,fontFamily:mono,fontSize:12,color:bias.color,fontWeight:700}}>{gap>0?'+':''}{Number(gap).toFixed(1)}</td>
                         <td style={tdc}><TrendArrow trend={gapTrend} size={14}/></td>
                         <td style={tdc}><span style={{border:`1px solid ${bias.border}`,borderRadius:3,padding:'1px 6px',fontFamily:mono,fontSize:9,color:bias.color,background:bias.bg}}>{bias.label}</span></td>
-                        <td style={{...tdc,fontFamily:mono,fontSize:9,color:t.momentumColor||'var(--text-muted)'}}>{t.momentum||'—'}</td>
+                        <td style={{...tdc,fontFamily:mono,fontSize:9,color:t.momentumColor||'var(--text-muted)'}}>{t.momentum||'—'}</td><td style={{...tdc}}>{(()=>{const mu=getMatchup(row);if(!mu)return <span style={{color:'var(--text-muted)'}}>—</span>;return <span style={{fontFamily:mono,fontSize:9,color:mu.color,background:mu.color+'12',border:`1px solid ${mu.color}28`,borderRadius:4,padding:'1px 6px',whiteSpace:'nowrap'}}>{mu.label}</span>;})()}</td>
                         {['delta1h','delta4h','delta8h'].map(k=><td key={k} style={{...tdc,fontFamily:mono,fontSize:10,color:(t[k]||0)>0?'#00ff9f':(t[k]||0)<0?'#ff4d6d':'var(--text-muted)'}}>{t[k]!==undefined?(t[k]>0?'+':'')+t[k]:'—'}</td>)}
                         <td style={tdc}><Sparkline data={t.history||[]} color={sc2} w={55} h={18}/></td>
                         <td style={{...tdc,fontFamily:mono,fontSize:9,color:stateColor(row.state)}}>{row.state||'—'}</td>

@@ -7,15 +7,21 @@ export default async function handler(req, res) {
   if (!session) return res.status(401).json({ error: 'Unauthorized' });
 
   if (req.method === 'GET') {
-    // Get spikes from last 20 minutes
-    const since = new Date(Date.now() - 20 * 60 * 1000).toISOString();
-    const { data, error } = await supabase
+    const limit  = Math.min(parseInt(req.query.limit  || '200'), 500);
+    const since  = req.query.since  || null;   // ISO string — optional filter
+    const symbol = req.query.symbol || null;   // optional symbol filter
+
+    let query = supabase
       .from('spike_events')
       .select('*')
-      .gte('fired_at', since)
       .order('fired_at', { ascending: false })
-      .limit(20);
+      .limit(limit);
 
+    // Only apply time filter when explicitly requested (SPIKE BANNER uses since=20min)
+    if (since) query = query.gte('fired_at', since);
+    if (symbol) query = query.eq('symbol', symbol);
+
+    const { data, error } = await query;
     if (error) return res.status(500).json({ error: error.message });
     return res.status(200).json(data || []);
   }
