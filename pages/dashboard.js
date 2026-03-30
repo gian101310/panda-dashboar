@@ -83,20 +83,6 @@ function getMatchup(row) {
   if (bl === 'NEUTRAL'&& ql === 'STRONG')  return { label: `${baseCur} NEUTRAL / ${quoteCur} STRONG`, color: '#ff7090', note: 'GOOD' };
   return { label: `${bl} / ${ql}`, color: 'var(--text-muted)', note: '' };
 }
-
-// ===== UTILS =====
-function stateColor(s) {
-  if (!s) return 'var(--text-muted)';
-  if (s.includes('EXPAND_BULL'))        return '#00ff9f';
-  if (s.includes('STABLE_BULL'))        return '#66ffcc';
-  if (s.includes('DEEP_PULLBACK_BULL')) return '#ffd166';
-  if (s.includes('PULLBACK_BULL'))      return '#ffaa44';
-  if (s.includes('EXPAND_BEAR'))        return '#ff4d6d';
-  if (s.includes('STABLE_BEAR'))        return '#ff7090';
-  if (s.includes('DEEP_PULLBACK_BEAR')) return '#ff9944';
-  if (s.includes('PULLBACK_BEAR'))      return '#ffbb66';
-  return 'var(--text-secondary)';
-}
 function biasFromGap(gap) {
   if (gap >= 5)  return { label:'BUY',  color:'#00ff9f', bg:'rgba(0,255,159,0.12)', border:'rgba(0,255,159,0.4)' };
   if (gap <= -5) return { label:'SELL', color:'#ff4d6d', bg:'rgba(255,77,109,0.12)', border:'rgba(255,77,109,0.4)' };
@@ -1084,7 +1070,7 @@ export default function Dashboard() {
 
   const fetchSpikes = useCallback(async () => {
     try {
-      const res = await fetch(`/api/spikes?since=${new Date(Date.now()-20*60*1000).toISOString()}&limit=50`);
+      const res = await fetch(`/api/spikes?since=${new Date(Date.now()-20*60*1000).toISOString()}&limit=10`);
       if(!res.ok) return;
       const newSpikes = await res.json();
       
