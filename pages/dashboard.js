@@ -116,7 +116,11 @@ function formatDt(dt) {
 function timeAgo(dt) {
   if (!dt) return '';
   try {
-    const parsed = new Date(dt.endsWith('Z') ? dt : dt + 'Z');
+    // Handle: "2026-03-31T00:07:31", "2026-03-31 00:07:31", "2026-03-31T00:07:31Z"
+    let s = String(dt).trim().replace(' ', 'T');
+    if (!s.endsWith('Z') && !s.includes('+')) s += 'Z';
+    const parsed = new Date(s);
+    if (isNaN(parsed.getTime())) return '';
     const diff = Math.floor((Date.now() - parsed.getTime()) / 1000);
     if (diff < 0) return 'just now';
     if (diff < 120) return `${diff}s ago`;
@@ -1198,8 +1202,8 @@ export default function Dashboard() {
         {/* TABS */}
         <div style={{display:'flex',alignItems:'center',gap:7,padding:'0 20px 10px',flexWrap:'wrap',zIndex:1}}>
           <div style={{display:'flex',background:'var(--bg-secondary)',border:'1px solid var(--border)',borderRadius:7,overflow:'hidden'}}>
-            {TABS.map((t,i)=><button key={t} onClick={()=>setTab(t)} style={{background:tab===t?'rgba(0,180,255,0.15)':'transparent',border:'none',borderRight:i<TABS.length-1?'1px solid var(--border)':'none',color:tab===t?'#00b4ff':'var(--text-muted)',fontFamily:mono,fontSize:9,letterSpacing:2,padding:'7px 12px',cursor:'pointer',whiteSpace:'nowrap'}}>{t}</button>)}
-            {isAdmin&&<button onClick={()=>setTab('ENGINE')} style={{background:tab==='ENGINE'?'rgba(255,209,102,0.15)':'transparent',border:'none',borderLeft:'1px solid var(--border)',color:tab==='ENGINE'?'#ffd166':'var(--text-muted)',fontFamily:mono,fontSize:9,letterSpacing:2,padding:'7px 12px',cursor:'pointer'}}>🏥 ENGINE</button>}
+            {TABS.map((t,i)=><button key={t} onClick={()=>setTab(t)} style={{background:tab===t?'rgba(0,180,255,0.15)':'transparent',border:'none',borderRight:i<TABS.length-1?'1px solid var(--border)':'none',color:tab===t?'#00b4ff':'rgba(180,205,240,0.80)',fontFamily:mono,fontSize:9,letterSpacing:2,padding:'7px 12px',cursor:'pointer',whiteSpace:'nowrap'}}>{t}</button>)}
+            {isAdmin&&<button onClick={()=>setTab('ENGINE')} style={{background:tab==='ENGINE'?'rgba(255,209,102,0.15)':'transparent',border:'none',borderLeft:'1px solid var(--border)',color:tab==='ENGINE'?'#ffd166':'rgba(180,205,240,0.80)',fontFamily:mono,fontSize:9,letterSpacing:2,padding:'7px 12px',cursor:'pointer'}}>🏥 ENGINE</button>}
           </div>
           {['PANELS','TABLE'].includes(tab)&&(
             <>
