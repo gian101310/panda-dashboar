@@ -202,6 +202,14 @@ function DeltaChip({ label, delta }) {
       <span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)'}}>{label}</span>
       <span style={{fontFamily:mono,fontSize:11,color,fontWeight:700}}>{Math.abs(v)<0.1?'±0':(v>0?'+':'')+v}</span>
     </div>
+    {selectedPair && (
+      <PairCardModal
+        row={selectedPair}
+        trend={trends[selectedPair.symbol]}
+        cotBias={getPairCotBias(selectedPair.symbol)}
+        onClose={()=>setSelectedPair(null)}
+      />
+    )}
   );
 }
 
@@ -781,6 +789,141 @@ function PairCard({ row, trend, cotBias }) {
 }
 
 
+// ===== PAIR CARD MODAL =====
+function PairCardModal({ row, trend, cotBias, onClose }) {
+  if (!row) return null;
+  const gap = row.gap ?? 0;
+  const bias = biasFromGap(gap);
+  const t = trend || {};
+  const mu = getMatchup(row);
+  const bc = boxConfirm(row.bias, row.box_h4_trend, row.box_h1_trend);
+  const bh4 = boxTrend(row.box_h4_trend);
+  const bh1 = boxTrend(row.box_h1_trend);
+  const af = atrFill(row.atr);
+  const sc = stateColor(row.state);
+  const strVal = row.strength ?? 0;
+  const g = MOMENTUM_GUIDE[t.momentum || row.momentum];
+  const momColor = t.momentumColor || 'var(--text-muted)';
+  const momIcons = {BUILDING:'🚀',EMERGING:'📈',FADING:'📉',COOLING:'🌡️',NEUTRAL:'▬',SPARK:'⚡',STRONG:'🔥',STABLE:'▬',CONSOLIDATING:'🔵',REVERSING:'⚠️'};
+
+  const TFRow = ({label, d1, h4, h1}) => (
+    <div style={{display:'flex',alignItems:'center',gap:8,padding:'6px 10px',background:'var(--bg-card)',borderRadius:6}}>
+      <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2,minWidth:50}}>{label}</span>
+      {[['D1',d1],['H4',h4],['H1',h1]].map(([tf,v])=>{
+        const val = v ?? 0;
+        const col = val >= 4 ? '#00ff9f' : val <= -4 ? '#ff4d6d' : Math.abs(val) >= 1 ? '#ffd166' : 'var(--text-muted)';
+        return (
+          <div key={tf} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:2,flex:1}}>
+            <span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)'}}>{tf}</span>
+            <span style={{fontFamily:mono,fontSize:13,fontWeight:700,color:col}}>{val > 0 ? '+' : ''}{val}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  return (
+    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',zIndex:3000,display:'flex',alignItems:'center',justifyContent:'center',padding:20,backdropFilter:'blur(4px)'}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:'var(--bg-card)',border:`2px solid ${bias.border}`,borderRadius:16,padding:28,width:'100%',maxWidth:560,maxHeight:'90vh',overflowY:'auto',display:'flex',flexDirection:'column',gap:14,boxShadow:`0 0 40px ${bias.color}33`,position:'relative'}}>
+
+        {/* Header */}
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+          <div style={{display:'flex',alignItems:'center',gap:12}}>
+            <span style={{fontFamily:orb,fontSize:22,fontWeight:900,letterSpacing:3,color:'var(--text-primary)'}}>{row.symbol}</span>
+            <span style={{fontFamily:mono,fontSize:11,color:bias.color,background:bias.bg,border:`1px solid ${bias.border}`,borderRadius:5,padding:'3px 10px',fontWeight:700}}>{bias.label}</span>
+            {row.execution && row.execution !== 'NONE' && (
+              <span style={{fontFamily:mono,fontSize:10,color:'#ffd166',background:'rgba(255,209,102,0.1)',border:'1px solid rgba(255,209,102,0.3)',borderRadius:5,padding:'3px 10px'}}>{row.execution}</span>
+            )}
+          </div>
+          <button onClick={onClose} style={{background:'transparent',border:'1px solid var(--border)',borderRadius:6,color:'var(--text-muted)',fontFamily:mono,fontSize:11,padding:'5px 12px',cursor:'pointer'}}>✕ ESC</button>
+        </div>
+
+        {/* GAP + Sparkline */}
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 16px',background:'rgba(0,0,0,0.2)',borderRadius:10,border:`1px solid ${bias.border}`}}>
+          <div>
+            <div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2,marginBottom:4}}>GAP SCORE</div>
+            <span style={{fontFamily:orb,fontSize:42,fontWeight:900,color:bias.color,textShadow:`0 0 20px ${bias.color}88`,lineHeight:1}}>{gap > 0 ? '+' : ''}{Number(gap).toFixed(1)}</span>
+          </div>
+          <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:8}}>
+            <Sparkline data={t.history} color={bias.color} w={120} h={40}/>
+            <div style={{display:'flex',gap:6}}>
+              {[['1H',t.delta1h],['4H',t.delta4h],['8H',t.delta8h]].map(([l,v])=>{
+                const val = v ?? 0; const col = Math.abs(val)<0.1?'var(--text-muted)':val>0?'#00ff9f':'#ff4d6d';
+                return <span key={l} style={{fontFamily:mono,fontSize:10,color:col}}>{l}: {val>0?'+':''}{val}</span>;
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Box Confirm + Matchup row */}
+        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+          {bc && <span style={{fontFamily:mono,fontSize:11,color:bc.color,background:bc.bg,border:`1px solid ${bc.border}`,borderRadius:6,padding:'4px 12px',fontWeight:700}}>{bc.label}</span>}
+          {mu && <span style={{fontFamily:mono,fontSize:10,color:mu.color,background:mu.color+'12',border:`1px solid ${mu.color}30`,borderRadius:6,padding:'4px 12px'}}>{mu.label}</span>}
+        </div>
+
+        {/* BOX Trend row */}
+        {(bh4 || bh1) && (
+          <div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',background:'rgba(0,0,0,0.15)',borderRadius:8}}>
+            <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2}}>BOX STRUCTURE</span>
+            {bh4 && <span style={{fontFamily:mono,fontSize:10,color:bh4.color,background:bh4.bg,border:`1px solid ${bh4.border}`,borderRadius:4,padding:'2px 10px'}}>H4 {bh4.label}</span>}
+            {bh1 && <span style={{fontFamily:mono,fontSize:10,color:bh1.color,background:bh1.bg,border:`1px solid ${bh1.border}`,borderRadius:4,padding:'2px 10px'}}>H1 {bh1.label}</span>}
+          </div>
+        )}
+
+        {/* Momentum */}
+        <div style={{padding:'10px 14px',background:'rgba(0,0,0,0.15)',borderRadius:8,display:'flex',flexDirection:'column',gap:6}}>
+          <div style={{display:'flex',alignItems:'center',gap:8}}>
+            <span style={{fontFamily:mono,fontSize:11,color:momColor,background:momColor+'18',border:`1px solid ${momColor}30`,borderRadius:5,padding:'3px 10px'}}>{momIcons[t.momentum||row.momentum]||'▬'} {t.momentum||row.momentum||'NEUTRAL'}</span>
+            {row.state && <span style={{fontFamily:mono,fontSize:9,color:sc}}>● {row.state}</span>}
+          </div>
+          {g && <span style={{fontFamily:mono,fontSize:11,color:g.color,fontWeight:700}}>👉 {g.action}</span>}
+        </div>
+
+        {/* TF Scores */}
+        <div style={{display:'flex',flexDirection:'column',gap:6}}>
+          <div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2,marginBottom:2}}>CURRENCY SCORES</div>
+          <TFRow label={row.base_currency||'BASE'} d1={row.base_d1} h4={row.base_h4} h1={row.base_h1}/>
+          <TFRow label={row.quote_currency||'QUOTE'} d1={row.quote_d1} h4={row.quote_h4} h1={row.quote_h1}/>
+        </div>
+
+        {/* ADV Scores */}
+        <div style={{display:'flex',flexDirection:'column',gap:6}}>
+          <div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2,marginBottom:2}}>ADVANCE SCORES</div>
+          <TFRow label={'ADV '+( row.base_currency||'BASE')} d1={row.adv_base_d1} h4={row.adv_base_h4} h1={row.adv_base_h1}/>
+          <TFRow label={'ADV '+(row.quote_currency||'QUOTE')} d1={row.adv_quote_d1} h4={row.adv_quote_h4} h1={row.adv_quote_h1}/>
+        </div>
+
+        {/* ATR + Strength */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10}}>
+          {[
+            {label:'STRENGTH', value: Number(strVal).toFixed(2), color: strColor(strVal)},
+            {label:'ATR (pts)',  value: row.atr ? Number(row.atr).toFixed(0) : '—', color:'#00b4ff'},
+            {label:'ATR/HR',    value: af ? af.pipsPerHour+'p' : '—', color:'var(--text-secondary)'},
+          ].map(s=>(
+            <div key={s.label} style={{background:'rgba(0,0,0,0.2)',borderRadius:8,padding:'10px 12px'}}>
+              <div style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:2,marginBottom:4}}>{s.label}</div>
+              <div style={{fontFamily:orb,fontSize:16,fontWeight:700,color:s.color}}>{s.value}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* COT + Updated */}
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',borderTop:'1px solid var(--border)',paddingTop:10}}>
+          {cotBias ? (
+            <div style={{display:'flex',alignItems:'center',gap:6}}>
+              <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2}}>COT</span>
+              <span style={{fontFamily:mono,fontSize:10,color:cotBias.bias==='BULLISH'?'#00ff9f':'#ff4d6d',background:cotBias.bias==='BULLISH'?'rgba(0,255,159,0.08)':'rgba(255,77,109,0.08)',border:`1px solid ${cotBias.bias==='BULLISH'?'#00ff9f33':'#ff4d6d33'}`,borderRadius:4,padding:'2px 8px'}}>{cotBias.bias==='BULLISH'?'▲':'▼'} {cotBias.bias}</span>
+            </div>
+          ) : <span/>}
+          <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>Updated: {formatDt(row.updated_at)}</span>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+
 // ===== VALID SETUPS TAB =====
 function ValidSetupsTab({ data, trends, cotMap }) {
   const MOMENTUM_GUIDE = {
@@ -1058,6 +1201,7 @@ export default function Dashboard() {
   const [prefs,      setPrefs]      = useState(null);
   const [loading,    setLoading]    = useState(true);
   const [cotLoading, setCotLoading] = useState(false);
+  const [selectedPair, setSelectedPair] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
   const [filter,     setFilter]     = useState('ALL');
   const [sort,       setSort]       = useState('symbol_asc');
@@ -1285,7 +1429,7 @@ export default function Dashboard() {
               ?<div style={{textAlign:'center',padding:60,fontFamily:mono,fontSize:11,letterSpacing:3,color:'var(--text-muted)'}}>NO PAIRS MATCH</div>
               :<><div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2,marginBottom:10}}>{filter==='ALL'?`${displayed.length} PAIRS · ${buyCount} BUY · ${sellCount} SELL`:`${displayed.length} PAIRS`}</div>
               <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(195px,1fr))',gap:10}}>
-                {displayed.map(row=><PairCard key={row.symbol} row={row} trend={trends[row.symbol]} cotBias={getPairCotBias(row.symbol)}/>)}
+                {displayed.map(row=><div key={row.symbol} onClick={()=>setSelectedPair(row)} style={{cursor:'pointer'}}><PairCard row={row} trend={trends[row.symbol]} cotBias={getPairCotBias(row.symbol)}/></div>)}
               </div></>
           ):tab==='SETUPS'?(<ValidSetupsTab data={data} trends={trends} cotMap={cotMap}/>
 ):tab==='VALID PAIRS'?(<ValidPairsTab data={data} trends={trends} cotMap={cotMap}/>
