@@ -42,55 +42,6 @@ function biasFromGap(gap) {
 function isValid(gap) { return gap >= 5 || gap <= -5; }
 
 // ===== CURRENCY STRENGTH MATCHUP LABEL =====
-// STRONG = +4,+5,+6  |  WEAK = -4,-5,-6  |  NEUTRAL = -3 to +3
-function scoreLabel(score) {
-  const v = score || 0;
-  if (v >= 4)  return 'STRONG';   // +4, +5, +6
-  if (v <= -4) return 'WEAK';     // -4, -5, -6
-  return 'NEUTRAL';               // -3 to +3
-}
-function getMatchup(row) {
-  if (!row || row.hard_invalid) return null;
-  const gap = row.gap ?? 0;
-  if (Math.abs(gap) < 5) return null;
-  if (row.base_d1 == null && row.base_h4 == null) return null;
-
-  const baseCur  = row.base_currency  || row.symbol?.slice(0,3) || '';
-  const quoteCur = row.quote_currency || row.symbol?.slice(3,6) || '';
-
-  // Find strongest individual TF value for each currency
-  // We use the raw stored values (same as cBot strongest logic)
-  const baseVals  = [row.base_d1,  row.base_h4,  row.base_h1 ].filter(v => v != null);
-  const quoteVals = [row.quote_d1, row.quote_h4, row.quote_h1].filter(v => v != null);
-  if (!baseVals.length || !quoteVals.length) return null;
-
-  // Pick the value with the largest absolute magnitude for each currency
-  const baseScore  = baseVals.reduce( (a,b) => Math.abs(b) > Math.abs(a) ? b : a, 0);
-  const quoteScore = quoteVals.reduce((a,b) => Math.abs(b) > Math.abs(a) ? b : a, 0);
-
-  const bl = scoreLabel(baseScore);
-  const ql = scoreLabel(quoteScore);
-
-  // Color and note based on combination
-  if (bl === 'STRONG' && ql === 'WEAK')    return { label: `${baseCur} STRONG / ${quoteCur} WEAK`,    color: '#00ff9f', note: 'IDEAL' };
-  if (bl === 'WEAK'   && ql === 'STRONG')  return { label: `${baseCur} WEAK / ${quoteCur} STRONG`,    color: '#ff4d6d', note: 'IDEAL' };
-  if (bl === 'STRONG' && ql === 'NEUTRAL') return { label: `${baseCur} STRONG / ${quoteCur} NEUTRAL`, color: '#66ffcc', note: 'GOOD'  };
-  if (bl === 'NEUTRAL'&& ql === 'WEAK')    return { label: `${baseCur} NEUTRAL / ${quoteCur} WEAK`,   color: '#ff7090', note: 'GOOD'  };
-  if (bl === 'STRONG' && ql === 'STRONG')  return { label: `${baseCur} STRONG / ${quoteCur} STRONG`,  color: '#ffd166', note: 'STRONG BOTH' };
-  if (bl === 'WEAK'   && ql === 'WEAK')    return { label: `${baseCur} WEAK / ${quoteCur} WEAK`,      color: '#ffaa44', note: 'AVOID' };
-  if (bl === 'NEUTRAL'&& ql === 'NEUTRAL') return { label: 'NEUTRAL / NEUTRAL',                        color: 'var(--text-muted)', note: '' };
-  if (bl === 'WEAK'   && ql === 'NEUTRAL') return { label: `${baseCur} WEAK / ${quoteCur} NEUTRAL`,   color: '#ff9944', note: '' };
-  if (bl === 'NEUTRAL'&& ql === 'STRONG')  return { label: `${baseCur} NEUTRAL / ${quoteCur} STRONG`, color: '#ff7090', note: 'GOOD' };
-  return { label: `${bl} / ${ql}`, color: 'var(--text-muted)', note: '' };
-}
-function biasFromGap(gap) {
-  if (gap >= 5)  return { label:'BUY',  color:'#00ff9f', bg:'rgba(0,255,159,0.12)', border:'rgba(0,255,159,0.4)' };
-  if (gap <= -5) return { label:'SELL', color:'#ff4d6d', bg:'rgba(255,77,109,0.12)', border:'rgba(255,77,109,0.4)' };
-  return         { label:'WAIT', color:'var(--text-muted)', bg:'rgba(40,50,80,0.3)', border:'rgba(40,50,80,0.5)' };
-}
-function isValid(gap) { return gap >= 5 || gap <= -5; }
-
-// ===== CURRENCY STRENGTH MATCHUP LABEL =====
 // Score rules (from Panda Playbook): 4-6 = STRONG, 1-3 = NEUTRAL/WEAK, 0 = NEUTRAL
 function scoreLabel(score) {
   const abs = Math.abs(score || 0);
