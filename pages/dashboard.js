@@ -41,7 +41,7 @@ function biasFromGap(gap) {
 }
 function isValid(gap) { return gap >= 5 || gap <= -5; }
 
-// ===== CURRENCY STRENGTH MATCHUP LABEL =====
+// ===== CURRENCY STRENGTH MATCHUP LABEL (v2) =====
 // Score rules (from Panda Playbook): 4-6 = STRONG, 1-3 = NEUTRAL/WEAK, 0 = NEUTRAL
 function scoreLabel(score) {
   const abs = Math.abs(score || 0);
