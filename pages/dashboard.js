@@ -52,6 +52,27 @@ function boxTrend(trend) {
   return map[trend] || null;
 }
 
+// ===== BOX CONFIRMATION + ATR FILL HELPERS =====
+function boxConfirm(bias, h4Trend, h1Trend) {
+  if (!h4Trend || h4Trend === 'UNKNOWN') return null;
+  const isBuy  = bias === 'BUY';
+  const good   = isBuy ? 'UPTREND'   : 'DOWNTREND';
+  const bad    = isBuy ? 'DOWNTREND' : 'UPTREND';
+  if (h4Trend === good  && h1Trend === good)  return { label:'✅ CONFIRMED', color:'#00ff9f', bg:'rgba(0,255,159,0.10)', border:'rgba(0,255,159,0.35)' };
+  if (h4Trend === good  && h1Trend !== bad)   return { label:'⚠️ WAIT H1',  color:'#ffd166', bg:'rgba(255,209,102,0.10)', border:'rgba(255,209,102,0.35)' };
+  if (h4Trend === bad)                         return { label:'❌ SKIP',     color:'#ff4d6d', bg:'rgba(255,77,109,0.10)',  border:'rgba(255,77,109,0.35)' };
+  return { label:'⚠️ RANGING', color:'#ffd166', bg:'rgba(255,209,102,0.10)', border:'rgba(255,209,102,0.35)' };
+}
+function atrFill(atrPoints, currentPrice, entryPrice) {
+  // atrPoints from Supabase is in points (e.g. 776 = 7.76 pips for non-JPY, 776 = 776 pips for JPY)
+  // We just show ATR/24 = pips per hour as context
+  if (!atrPoints || atrPoints <= 0) return null;
+  const atrPips = atrPoints / 100; // convert points to pips
+  const pipsPerHour = atrPips / 24;
+  if (pipsPerHour <= 0) return null;
+  return { pipsPerHour: pipsPerHour.toFixed(1), atrPips: atrPips.toFixed(0) };
+}
+
 // ===== CURRENCY STRENGTH MATCHUP LABEL (v2) =====
 // Score rules (from Panda Playbook): 4-6 = STRONG, 1-3 = NEUTRAL/WEAK, 0 = NEUTRAL
 function scoreLabel(score) {
@@ -731,7 +752,15 @@ function PairCard({ row, trend, cotBias }) {
         <Sparkline data={t.history} color={sparkColor}/>
       </div>
       {(()=>{const mu=getMatchup(row);if(!mu)return null;return(<div style={{display:'flex',alignItems:'center',gap:6,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>MATCHUP</span><span style={{fontFamily:mono,fontSize:9,color:mu.color,background:mu.color+'12',border:`1px solid ${mu.color}30`,borderRadius:4,padding:'1px 7px',whiteSpace:'nowrap'}}>{mu.label}</span>{mu.note==='IDEAL'&&<span style={{fontFamily:mono,fontSize:7,color:mu.color,letterSpacing:1,opacity:0.8}}>IDEAL</span>}{mu.note==='AVOID'&&<span style={{fontFamily:mono,fontSize:7,color:'#ffaa44',letterSpacing:1,opacity:0.8}}>AVOID</span>}</div>);})()}
-      {(()=>{const bh1=boxTrend(row.box_h1_trend),bh4=boxTrend(row.box_h4_trend);if(!bh1&&!bh4)return null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>BOX</span>{bh4&&<span style={{fontFamily:mono,fontSize:8,color:bh4.color,background:bh4.bg,border:`1px solid ${bh4.border}`,borderRadius:3,padding:'1px 6px'}}>H4 {bh4.label}</span>}{bh1&&<span style={{fontFamily:mono,fontSize:8,color:bh1.color,background:bh1.bg,border:`1px solid ${bh1.border}`,borderRadius:3,padding:'1px 6px'}}>H1 {bh1.label}</span>}</div>);})()}{cotBias&&<div style={{display:'flex',alignItems:'center',gap:4}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>COT</span><span style={{fontFamily:mono,fontSize:9,color:cotBias.bias==='BULLISH'?'#00ff9f':'#ff4d6d',background:cotBias.bias==='BULLISH'?'rgba(0,255,159,0.08)':'rgba(255,77,109,0.08)',border:`1px solid ${cotBias.bias==='BULLISH'?'#00ff9f33':'#ff4d6d33'}`,borderRadius:3,padding:'1px 5px'}}>{cotBias.bias==='BULLISH'?'▲':'▼'} {cotBias.bias}</span></div>}
+      {(()=>{const bh1=boxTrend(row.box_h1_trend),bh4=boxTrend(row.box_h4_trend);if(!bh1&&!bh4)return null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>BOX</span>{bh4&&<span style={{fontFamily:mono,fontSize:8,color:bh4.color,background:bh4.bg,border:`1px solid ${bh4.border}`,borderRadius:3,padding:'1px 6px'}}>H4 {bh4.label}</span>}{bh1&&<span style={{fontFamily:mono,fontSize:8,color:bh1.color,background:bh1.bg,border:`1px solid ${bh1.border}`,borderRadius:3,padding:'1px 6px'}}>H1 {bh1.label}</span>}</div>);})()}{(()=>{
+  const bc=boxConfirm(row.bias,row.box_h4_trend,row.box_h1_trend);
+  const af=atrFill(row.atr);
+  if(!bc&&!af)return null;
+  return(<div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap',marginTop:2}}>
+    {bc&&<span style={{fontFamily:mono,fontSize:8,color:bc.color,background:bc.bg,border:`1px solid ${bc.border}`,borderRadius:4,padding:'1px 7px',fontWeight:700}}>{bc.label}</span>}
+    {af&&<span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:0.5}}>ATR {af.atrPips}p · {af.pipsPerHour}p/hr</span>}
+  </div>);
+})()}{cotBias&&<div style={{display:'flex',alignItems:'center',gap:4}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>COT</span><span style={{fontFamily:mono,fontSize:9,color:cotBias.bias==='BULLISH'?'#00ff9f':'#ff4d6d',background:cotBias.bias==='BULLISH'?'rgba(0,255,159,0.08)':'rgba(255,77,109,0.08)',border:`1px solid ${cotBias.bias==='BULLISH'?'#00ff9f33':'#ff4d6d33'}`,borderRadius:3,padding:'1px 5px'}}>{cotBias.bias==='BULLISH'?'▲':'▼'} {cotBias.bias}</span></div>}
       <div style={{display:'flex',flexDirection:'column',gap:3}}>
         <div style={{display:'flex',alignItems:'center',gap:6}}>
           <span style={{fontFamily:mono,fontSize:10,color:t.momentumColor||'var(--text-muted)',background:(t.momentumColor||'var(--text-muted)')+'18',border:`1px solid ${(t.momentumColor||'var(--text-muted)')}30`,borderRadius:4,padding:'2px 8px',letterSpacing:1}}>{momIcons[t.momentum]||'▬'} {t.momentum||'NEUTRAL'}</span>
@@ -819,6 +848,15 @@ function ValidSetupsTab({ data, trends, cotMap }) {
               <div style={{fontFamily:mono,fontSize:9,color:t.momentumColor||'var(--text-muted)',background:(t.momentumColor||'var(--text-muted)')+'18',border:`1px solid ${(t.momentumColor||'var(--text-muted)')}30`,borderRadius:4,padding:'2px 8px',display:'inline-block',marginBottom:4}}>{t.momentum||'NEUTRAL'}</div>
               {g && <div style={{fontFamily:mono,fontSize:10,color:g.color,fontWeight:700}}>👉 {g.action}</div>}{(()=>{const mu=getMatchup(row);if(!mu)return null;return(<div style={{fontFamily:mono,fontSize:9,color:mu.color,background:mu.color+'12',border:`1px solid ${mu.color}28`,borderRadius:4,padding:'2px 7px',display:'inline-block',marginTop:3,whiteSpace:'nowrap'}}>{mu.label}{mu.note&&<span style={{marginLeft:5,opacity:0.7,fontSize:8}}>{mu.note}</span>}</div>);})()}
               {(()=>{const bh4=boxTrend(row.box_h4_trend),bh1=boxTrend(row.box_h1_trend);if(!bh4&&!bh1)return null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>BOX</span>{bh4&&<span style={{fontFamily:mono,fontSize:8,color:bh4.color,background:bh4.bg,border:`1px solid ${bh4.border}`,borderRadius:3,padding:'1px 6px'}}>H4 {bh4.label}</span>}{bh1&&<span style={{fontFamily:mono,fontSize:8,color:bh1.color,background:bh1.bg,border:`1px solid ${bh1.border}`,borderRadius:3,padding:'1px 6px'}}>H1 {bh1.label}</span>}</div>);})()}
+              {(()=>{
+                const bc=boxConfirm(row.bias,row.box_h4_trend,row.box_h1_trend);
+                const af=atrFill(row.atr);
+                if(!bc&&!af)return null;
+                return(<div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap',marginTop:3}}>
+                  {bc&&<span style={{fontFamily:mono,fontSize:9,color:bc.color,background:bc.bg,border:`1px solid ${bc.border}`,borderRadius:4,padding:'2px 8px',fontWeight:700}}>{bc.label}</span>}
+                  {af&&<span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:0.5}}>ATR {af.atrPips}p · {af.pipsPerHour}p/hr</span>}
+                </div>);
+              })()}
             </div>
 
             {/* STRENGTH */}
@@ -907,6 +945,17 @@ function ValidPairsTab({ data, trends, cotMap }) {
               <div style={{display:'flex',alignItems:'center',gap:6}}>
                 <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:mc,background:mc+'18',border:`1px solid ${mc}30`,borderRadius:4,padding:'2px 8px'}}>{t.momentum}</span>
                 <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:mc,fontWeight:700}}>👉 {actions[t.momentum]||''}</span>{(()=>{const mu=getMatchup(row);if(!mu)return null;return(<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:mu.color,background:mu.color+'12',border:`1px solid ${mu.color}28`,borderRadius:4,padding:'1px 7px',marginLeft:6,whiteSpace:'nowrap'}}>{mu.label}</span>);})()}
+                {(()=>{
+                  const bh4=boxTrend(row.box_h4_trend),bh1=boxTrend(row.box_h1_trend);
+                  const bc=boxConfirm(row.bias,row.box_h4_trend,row.box_h1_trend);
+                  if(!bh4&&!bh1&&!bc)return null;
+                  return(<div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap',marginTop:3}}>
+                    <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>BOX</span>
+                    {bh4&&<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:bh4.color,background:bh4.bg,border:`1px solid ${bh4.border}`,borderRadius:3,padding:'1px 6px'}}>H4 {bh4.label}</span>}
+                    {bh1&&<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:bh1.color,background:bh1.bg,border:`1px solid ${bh1.border}`,borderRadius:3,padding:'1px 6px'}}>H1 {bh1.label}</span>}
+                    {bc&&<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:bc.color,background:bc.bg,border:`1px solid ${bc.border}`,borderRadius:4,padding:'1px 7px',fontWeight:700,marginLeft:4}}>{bc.label}</span>}
+                  </div>);
+                })()}
               </div>
               <div style={{display:'flex',gap:8}}>
                 {[['1H',t.delta1h],['4H',t.delta4h],['8H',t.delta8h]].map(([l,v])=>{const val=v??0;const c=Math.abs(val)<0.1?'var(--text-muted)':val>0?'#00ff9f':'#ff4d6d';return(<div key={l} style={{display:'flex',alignItems:'center',gap:3}}><span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:'var(--text-muted)'}}>{l}</span><span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:c,fontWeight:700}}>{Math.abs(val)<0.1?'±0':(val>0?'+':'')+val}</span></div>);})}
@@ -916,6 +965,12 @@ function ValidPairsTab({ data, trends, cotMap }) {
               <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:'var(--text-muted)',letterSpacing:2,marginBottom:2}}>STR</div>
               <div style={{fontFamily:"'Orbitron',sans-serif",fontSize:14,fontWeight:700,color:(row.strength??0)>=2?'#ffd166':(row.strength??0)>=1?'#00b4ff':'var(--text-muted)'}}>{Number(row.strength??0).toFixed(2)}</div>
             </div>
+            {(()=>{const af=atrFill(row.atr);if(!af)return null;return(
+              <div style={{minWidth:70,textAlign:'center'}}>
+                <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:'var(--text-muted)',letterSpacing:2,marginBottom:2}}>ATR/HR</div>
+                <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:'var(--text-secondary)'}}>{af.pipsPerHour}p</div>
+              </div>
+            );})()}
             {cotBias&&<div style={{minWidth:60,textAlign:'center'}}>
               <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:'var(--text-muted)',letterSpacing:2,marginBottom:2}}>COT</div>
               <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:cotBias==='BULLISH'?'#00ff9f':'#ff4d6d',fontWeight:700}}>{cotBias==='BULLISH'?'▲':'▼'} {cotBias}</div>
