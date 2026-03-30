@@ -202,14 +202,6 @@ function DeltaChip({ label, delta }) {
       <span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)'}}>{label}</span>
       <span style={{fontFamily:mono,fontSize:11,color,fontWeight:700}}>{Math.abs(v)<0.1?'±0':(v>0?'+':'')+v}</span>
     </div>
-    {selectedPair && (
-      <PairCardModal
-        row={selectedPair}
-        trend={trends[selectedPair.symbol]}
-        cotBias={getPairCotBias(selectedPair.symbol)}
-        onClose={()=>setSelectedPair(null)}
-      />
-    )}
   );
 }
 
