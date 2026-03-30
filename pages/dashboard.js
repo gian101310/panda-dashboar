@@ -797,7 +797,7 @@ function ValidSetupsTab({ data, trends, cotMap }) {
 
   const valid = data
     .filter(r => Math.abs(r.gap ?? 0) >= 5)
-    .sort((a,b) => Math.abs(b.gap??0) - Math.abs(a.gap??0));
+    .sort((a,b) => a.symbol.localeCompare(b.symbol));
 
   if (valid.length === 0) return (
     <div style={{textAlign:'center',padding:80,fontFamily:mono,fontSize:11,letterSpacing:3,color:'var(--text-muted)'}}>
