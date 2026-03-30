@@ -44,9 +44,9 @@ function isValid(gap) { return gap >= 5 || gap <= -5; }
 // ===== CURRENCY STRENGTH MATCHUP LABEL (v2) =====
 // Score rules (from Panda Playbook): 4-6 = STRONG, 1-3 = NEUTRAL/WEAK, 0 = NEUTRAL
 function scoreLabel(score) {
-  const abs = Math.abs(score || 0);
-  if (abs >= 4) return 'STRONG';
-  if (abs >= 1) return 'WEAK';
+  const v = score || 0;
+  if (v >= 4)  return 'STRONG';
+  if (v <= -4) return 'WEAK';
   return 'NEUTRAL';
 }
 function getMatchup(row) {
