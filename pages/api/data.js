@@ -1,20 +1,27 @@
-﻿import { supabase } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase';
 
 export default async function handler(req, res) {
   try {
-    // Return ALL pairs, sorted: valid first (by strength), then invalid (by abs gap)
     const { data, error } = await supabase
       .from('dashboard')
-      .select('symbol, gap, state, strength, signal, updated_at');
+      .select(`
+        symbol, gap, state, strength, signal, updated_at,
+        momentum, delta_short, delta_mid, delta_long, close_alert,
+        hard_invalid, bias, execution, confidence, conflict_detail,
+        base_currency, base_d1, base_h4, base_h1,
+        quote_currency, quote_d1, quote_h4, quote_h1,
+        adv_base_d1, adv_base_h4, adv_base_h1,
+        adv_quote_d1, adv_quote_h4, adv_quote_h1,
+        atr, atr_reference, spread
+      `);
 
     if (error) return res.status(500).json({ error: error.message });
 
     const rows = data || [];
 
-    // Sort: valid pairs first (gap >= 5 or <= -5), then by strength desc, then invalid by abs gap
     rows.sort((a, b) => {
-      const aValid = Math.abs(a.gap || 0) >= 5;
-      const bValid = Math.abs(b.gap || 0) >= 5;
+      const aValid = Math.abs(a.gap || 0) >= 5 && !a.hard_invalid;
+      const bValid = Math.abs(b.gap || 0) >= 5 && !b.hard_invalid;
       if (aValid && !bValid) return -1;
       if (!aValid && bValid) return 1;
       if (aValid && bValid) return (b.strength || 0) - (a.strength || 0);
