@@ -12,7 +12,8 @@ export default async function handler(req, res) {
         quote_currency, quote_d1, quote_h4, quote_h1,
         adv_base_d1, adv_base_h4, adv_base_h1,
         adv_quote_d1, adv_quote_h4, adv_quote_h1,
-        atr, atr_reference, spread
+        atr, atr_reference, spread,
+        box_h1_trend, box_h4_trend
       `);
 
     if (error) return res.status(500).json({ error: error.message });
