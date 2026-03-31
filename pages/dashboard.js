@@ -1165,6 +1165,146 @@ function ValidPairsTab({ data, trends, cotMap }) {
   );
 }
 
+// ===== OPEN TRADES PANEL (admin only) =====
+function OpenTradesPanel() {
+  const [trades, setTrades] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [lastUpdate, setLastUpdate] = useState(null);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch('/api/open-trades');
+      if (res.ok) {
+        setTrades(await res.json());
+        setLastUpdate(new Date());
+      }
+    } catch {}
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    load();
+    const t = setInterval(load, 30000);
+    return () => clearInterval(t);
+  }, [load]);
+
+  const totalPL = trades.reduce((s, t) => s + (parseFloat(t.profit_loss) || 0), 0);
+
+  if (loading) return (
+    <div style={{textAlign:'center',padding:60,fontFamily:mono,fontSize:11,color:'var(--text-muted)',letterSpacing:3}}>
+      LOADING OPEN TRADES...
+    </div>
+  );
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:12}}>
+      {/* Header row */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:8}}>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <span style={{fontFamily:orb,fontSize:13,fontWeight:700,color:'#ffd166',letterSpacing:3}}>🔴 OPEN TRADES</span>
+          <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>{trades.length} position{trades.length!==1?'s':''}</span>
+          {lastUpdate&&<span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)'}}>· {lastUpdate.toLocaleTimeString()}</span>}
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <div style={{fontFamily:mono,fontSize:11,color:totalPL>=0?'#00ff9f':'#ff4d6d',fontWeight:700}}>
+            Unrealized P/L: {totalPL>=0?'+':''}{totalPL.toFixed(2)}
+          </div>
+          <button onClick={load} style={{background:'transparent',border:'1px solid var(--border)',borderRadius:4,color:'var(--text-muted)',fontFamily:mono,fontSize:9,padding:'4px 10px',cursor:'pointer'}}>⟳ REFRESH</button>
+        </div>
+      </div>
+
+      {trades.length === 0 ? (
+        <div style={{textAlign:'center',padding:60,fontFamily:mono,fontSize:11,color:'var(--text-muted)',letterSpacing:3}}>
+          NO OPEN POSITIONS — Run ctrader_journal.py to sync
+        </div>
+      ) : (
+        <div style={{display:'flex',flexDirection:'column',gap:6}}>
+          {trades.map((t, i) => {
+            const isBuy = t.direction === 'BUY';
+            const biasColor = isBuy ? '#00ff9f' : '#ff4d6d';
+            const pl = parseFloat(t.profit_loss) || 0;
+            const plColor = pl > 0 ? '#00ff9f' : pl < 0 ? '#ff4d6d' : 'var(--text-muted)';
+            const gapOk = t.current_gap != null && Math.abs(t.current_gap) >= 5;
+            const gapAligned = isBuy ? (t.current_gap||0) >= 5 : (t.current_gap||0) <= -5;
+            const bh4 = boxTrend(t.box_h4_trend);
+            const bh1 = boxTrend(t.box_h1_trend);
+            const momColor = t.current_momentum==='STRONG'?'#00ff9f':t.current_momentum==='BUILDING'?'#66ffcc':t.current_momentum==='SPARK'?'#ffd166':t.current_momentum==='FADING'?'#ff7744':t.current_momentum==='REVERSING'?'#ff4d6d':'var(--text-muted)';
+
+            return (
+              <div key={t.position_id||i} style={{background:'var(--bg-card)',border:`2px solid ${biasColor}22`,borderLeft:`3px solid ${biasColor}`,borderRadius:10,padding:'14px 18px',display:'grid',gridTemplateColumns:'110px 60px 70px 1fr 120px 120px 120px',alignItems:'center',gap:12,position:'relative',overflow:'hidden'}}>
+                <div style={{position:'absolute',top:0,left:0,right:0,height:2,background:`linear-gradient(90deg,transparent,${biasColor}55,transparent)`}}/>
+
+                {/* Pair + Direction */}
+                <div>
+                  <div style={{fontFamily:orb,fontSize:14,fontWeight:900,letterSpacing:2,color:'var(--text-primary)'}}>{t.symbol}</div>
+                  <span style={{fontFamily:mono,fontSize:10,color:biasColor,background:biasColor+'15',border:`1px solid ${biasColor}33`,borderRadius:4,padding:'1px 8px',fontWeight:700}}>{t.direction}</span>
+                </div>
+
+                {/* Volume */}
+                <div>
+                  <div style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:2}}>LOTS</div>
+                  <div style={{fontFamily:mono,fontSize:12,color:'var(--text-secondary)'}}>{t.volume}</div>
+                </div>
+
+                {/* Entry */}
+                <div>
+                  <div style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:2}}>ENTRY</div>
+                  <div style={{fontFamily:mono,fontSize:11,color:'var(--text-secondary)'}}>{t.entry_price||'—'}</div>
+                </div>
+
+                {/* Current Engine Status */}
+                <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                  <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                    {t.current_gap!=null && (
+                      <span style={{fontFamily:mono,fontSize:11,fontWeight:700,color:gapAligned?'#00ff9f':'#ff4d6d'}}>
+                        GAP {t.current_gap>0?'+':''}{t.current_gap}
+                      </span>
+                    )}
+                    {!gapAligned && gapOk && (
+                      <span style={{fontFamily:mono,fontSize:9,color:'#ff4d6d',background:'rgba(255,77,109,0.1)',border:'1px solid rgba(255,77,109,0.3)',borderRadius:3,padding:'1px 5px'}}>⚠️ GAP FLIPPED</span>
+                    )}
+                    {!gapOk && t.current_gap!=null && (
+                      <span style={{fontFamily:mono,fontSize:9,color:'#ff4d6d',background:'rgba(255,77,109,0.1)',border:'1px solid rgba(255,77,109,0.3)',borderRadius:3,padding:'1px 5px'}}>❌ GAP INVALID</span>
+                    )}
+                  </div>
+                  {t.current_momentum && (
+                    <span style={{fontFamily:mono,fontSize:9,color:momColor}}>{t.current_momentum}</span>
+                  )}
+                  {(bh4||bh1) && (
+                    <div style={{display:'flex',gap:4}}>
+                      {bh4&&<span style={{fontFamily:mono,fontSize:8,color:bh4.color,background:bh4.bg,border:`1px solid ${bh4.border}`,borderRadius:3,padding:'1px 5px'}}>H4 {bh4.label}</span>}
+                      {bh1&&<span style={{fontFamily:mono,fontSize:8,color:bh1.color,background:bh1.bg,border:`1px solid ${bh1.border}`,borderRadius:3,padding:'1px 5px'}}>H1 {bh1.label}</span>}
+                    </div>
+                  )}
+                </div>
+
+                {/* P/L */}
+                <div style={{textAlign:'center'}}>
+                  <div style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:2,marginBottom:2}}>P/L</div>
+                  <div style={{fontFamily:orb,fontSize:15,fontWeight:700,color:plColor}}>{pl>0?'+':''}{pl.toFixed(2)}</div>
+                </div>
+
+                {/* Account */}
+                <div style={{textAlign:'center'}}>
+                  <div style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:2,marginBottom:2}}>ACCOUNT</div>
+                  <div style={{fontFamily:mono,fontSize:9,color:'var(--text-secondary)'}}>{t.broker_name||t.account_id||'—'}</div>
+                </div>
+
+                {/* Entry Time */}
+                <div style={{textAlign:'right'}}>
+                  <div style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:2,marginBottom:2}}>OPENED</div>
+                  <div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>{t.entry_time ? new Date(t.entry_time).toLocaleDateString('en-GB',{day:'2-digit',month:'short'})+' '+new Date(t.entry_time).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) : '—'}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 // ===== SPIKE LOG TAB — full history =====
 function SpikeLogTab() {
   const [logs, setLogs] = useState([]);
@@ -1442,7 +1582,7 @@ export default function Dashboard() {
         <div style={{display:'flex',alignItems:'center',gap:7,padding:'0 20px 10px',flexWrap:'wrap',zIndex:1}}>
           <div style={{display:'flex',background:'var(--bg-secondary)',border:'1px solid var(--border)',borderRadius:7,overflow:'hidden'}}>
             {TABS.map((t,i)=><button key={t} onClick={()=>setTab(t)} style={{background:tab===t?'rgba(0,180,255,0.15)':'transparent',border:'none',borderRight:i<TABS.length-1?'1px solid var(--border)':'none',color:tab===t?'#00b4ff':'rgba(180,205,240,0.80)',fontFamily:mono,fontSize:9,letterSpacing:2,padding:'7px 12px',cursor:'pointer',whiteSpace:'nowrap'}}>{t}</button>)}
-            {isAdmin&&<button onClick={()=>setTab('ENGINE')} style={{background:tab==='ENGINE'?'rgba(255,209,102,0.15)':'transparent',border:'none',borderLeft:'1px solid var(--border)',color:tab==='ENGINE'?'#ffd166':'rgba(180,205,240,0.80)',fontFamily:mono,fontSize:9,letterSpacing:2,padding:'7px 12px',cursor:'pointer'}}>🏥 ENGINE</button>}
+            {isAdmin&&<><button onClick={()=>setTab('OPEN TRADES')} style={{background:tab==='OPEN TRADES'?'rgba(255,77,109,0.15)':'transparent',border:'none',borderLeft:'1px solid var(--border)',color:tab==='OPEN TRADES'?'#ff4d6d':'rgba(180,205,240,0.80)',fontFamily:mono,fontSize:9,letterSpacing:2,padding:'7px 12px',cursor:'pointer',whiteSpace:'nowrap'}}>🔴 LIVE</button><button onClick={()=>setTab('ENGINE')} style={{background:tab==='ENGINE'?'rgba(255,209,102,0.15)':'transparent',border:'none',borderLeft:'1px solid var(--border)',color:tab==='ENGINE'?'#ffd166':'rgba(180,205,240,0.80)',fontFamily:mono,fontSize:9,letterSpacing:2,padding:'7px 12px',cursor:'pointer'}}>🏥 ENGINE</button></>}
           </div>
           {['PANELS','TABLE'].includes(tab)&&(
             <>
@@ -1510,6 +1650,7 @@ export default function Dashboard() {
            :tab==='CALENDAR'?<EconomicCalendar pairs={validPairs}/>
            :tab==='CALCULATOR'?<PositionCalculator/>
            :tab==='ENGINE'?<EngineHealth/>
+           :tab==='OPEN TRADES'?<OpenTradesPanel/>
            :tab==='COT REPORT'?(
             <div style={{maxWidth:860,margin:'0 auto'}}>
               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
