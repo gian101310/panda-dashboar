@@ -73,6 +73,33 @@ function atrFill(atrPoints, currentPrice, entryPrice) {
   return { pipsPerHour: pipsPerHour.toFixed(1), atrPips: atrPips.toFixed(0) };
 }
 
+// ===== ADVANCE SCORE WARNING =====
+// ADV scores project: H1=tomorrow, H4=next week, D1=next month
+// If ADV gap < 5 → trend may be weakening → warn trader
+function advScore(row) {
+  if (!row) return null;
+  const bD1 = row.adv_base_d1 ?? 0, bH4 = row.adv_base_h4 ?? 0, bH1 = row.adv_base_h1 ?? 0;
+  const qD1 = row.adv_quote_d1 ?? 0, qH4 = row.adv_quote_h4 ?? 0, qH1 = row.adv_quote_h1 ?? 0;
+  // Pick strongest per currency (same as main scoring — largest abs)
+  const baseAdv  = [bD1, bH4, bH1].reduce((a,b) => Math.abs(b) > Math.abs(a) ? b : a, 0);
+  const quoteAdv = [qD1, qH4, qH1].reduce((a,b) => Math.abs(b) > Math.abs(a) ? b : a, 0);
+  const advGap   = baseAdv - quoteAdv;
+  // H1 ADV = most recent shift (tomorrow)
+  const h1BaseAdv  = bH1, h1QuoteAdv = qH1;
+  const advGapH1   = h1BaseAdv - h1QuoteAdv;
+  // H4 ADV = weekly shift
+  const h4BaseAdv  = bH4, h4QuoteAdv = qH4;
+  const advGapH4   = h4BaseAdv - h4QuoteAdv;
+  const isBuy = (row.gap ?? 0) > 0;
+  const ok1 = isBuy ? advGapH1 >= 5 : advGapH1 <= -5;
+  const ok4 = isBuy ? advGapH4 >= 5 : advGapH4 <= -5;
+  const okD = isBuy ? advGap   >= 5 : advGap   <= -5;
+  if (ok1 && ok4) return { label:'🟢 ADV OK', color:'#00ff9f', bg:'rgba(0,255,159,0.08)', border:'rgba(0,255,159,0.25)', detail:`H1:${advGapH1>0?'+':''}${advGapH1} H4:${advGapH4>0?'+':''}${advGapH4}`, level:'OK' };
+  if (!ok4)       return { label:'🔴 ADV H4 WEAK', color:'#ff4d6d', bg:'rgba(255,77,109,0.10)', border:'rgba(255,77,109,0.35)', detail:`Next week gap may flip. H4:${advGapH4>0?'+':''}${advGapH4}`, level:'BAD' };
+  if (!ok1)       return { label:'🟡 ADV H1 WEAK', color:'#ffd166', bg:'rgba(255,209,102,0.10)', border:'rgba(255,209,102,0.35)', detail:`Tomorrow gap uncertain. H1:${advGapH1>0?'+':''}${advGapH1}`, level:'WARN' };
+  return null;
+}
+
 // ===== CURRENCY STRENGTH MATCHUP LABEL (v2) =====
 // Score rules (from Panda Playbook): 4-6 = STRONG, 1-3 = NEUTRAL/WEAK, 0 = NEUTRAL
 function scoreLabel(score) {
@@ -760,7 +787,8 @@ function PairCard({ row, trend, cotBias }) {
     {bc&&<span style={{fontFamily:mono,fontSize:8,color:bc.color,background:bc.bg,border:`1px solid ${bc.border}`,borderRadius:4,padding:'1px 7px',fontWeight:700}}>{bc.label}</span>}
     {af&&<span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:0.5}}>ATR {af.atrPips}p · {af.pipsPerHour}p/hr</span>}
   </div>);
-})()}{cotBias&&<div style={{display:'flex',alignItems:'center',gap:4}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>COT</span><span style={{fontFamily:mono,fontSize:9,color:cotBias.bias==='BULLISH'?'#00ff9f':'#ff4d6d',background:cotBias.bias==='BULLISH'?'rgba(0,255,159,0.08)':'rgba(255,77,109,0.08)',border:`1px solid ${cotBias.bias==='BULLISH'?'#00ff9f33':'#ff4d6d33'}`,borderRadius:3,padding:'1px 5px'}}>{cotBias.bias==='BULLISH'?'▲':'▼'} {cotBias.bias}</span></div>}
+})()}
+{(()=>{const adv=advScore(row);if(!adv||adv.level==='OK')return null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:adv.color,background:adv.bg,border:`1px solid ${adv.border}`,borderRadius:4,padding:'1px 7px',fontWeight:700}}>{adv.label}</span><span style={{fontFamily:mono,fontSize:7,color:'var(--text-muted)'}}>{adv.detail}</span></div>);})()}{cotBias&&<div style={{display:'flex',alignItems:'center',gap:4}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>COT</span><span style={{fontFamily:mono,fontSize:9,color:cotBias.bias==='BULLISH'?'#00ff9f':'#ff4d6d',background:cotBias.bias==='BULLISH'?'rgba(0,255,159,0.08)':'rgba(255,77,109,0.08)',border:`1px solid ${cotBias.bias==='BULLISH'?'#00ff9f33':'#ff4d6d33'}`,borderRadius:3,padding:'1px 5px'}}>{cotBias.bias==='BULLISH'?'▲':'▼'} {cotBias.bias}</span></div>}
       <div style={{display:'flex',flexDirection:'column',gap:3}}>
         <div style={{display:'flex',alignItems:'center',gap:6}}>
           <span style={{fontFamily:mono,fontSize:10,color:t.momentumColor||'var(--text-muted)',background:(t.momentumColor||'var(--text-muted)')+'18',border:`1px solid ${(t.momentumColor||'var(--text-muted)')}30`,borderRadius:4,padding:'2px 8px',letterSpacing:1}}>{momIcons[t.momentum]||'▬'} {t.momentum||'NEUTRAL'}</span>
@@ -852,6 +880,19 @@ function PairCardModal({ row, trend, cotBias, onClose }) {
           {bc && <span style={{fontFamily:mono,fontSize:11,color:bc.color,background:bc.bg,border:`1px solid ${bc.border}`,borderRadius:6,padding:'4px 12px',fontWeight:700}}>{bc.label}</span>}
           {mu && <span style={{fontFamily:mono,fontSize:10,color:mu.color,background:mu.color+'12',border:`1px solid ${mu.color}30`,borderRadius:6,padding:'4px 12px'}}>{mu.label}</span>}
         </div>
+
+        {/* ADV Score Warning */}
+        {(()=>{const adv=advScore(row);if(!adv)return null;return(
+          <div style={{display:'flex',alignItems:'center',gap:8,padding:'10px 14px',background:adv.bg,borderRadius:8,border:`1px solid ${adv.border}`}}>
+            <span style={{fontFamily:mono,fontSize:13,color:adv.color,fontWeight:700}}>{adv.label}</span>
+            <div style={{display:'flex',flexDirection:'column',gap:2}}>
+              <span style={{fontFamily:mono,fontSize:10,color:adv.color}}>{adv.detail}</span>
+              <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>
+                {adv.level==='OK'?'Advance scoring intact — hold or enter':adv.level==='BAD'?'⚠️ Cancel pending or tighten SL — next week gap may flip':'⚠️ Tomorrow uncertain — consider reducing risk'}
+              </span>
+            </div>
+          </div>
+        );})()}
 
         {/* BOX Trend row */}
         {(bh4 || bh1) && (
@@ -992,6 +1033,7 @@ function ValidSetupsTab({ data, trends, cotMap }) {
                   {af&&<span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:0.5}}>ATR {af.atrPips}p · {af.pipsPerHour}p/hr</span>}
                 </div>);
               })()}
+              {(()=>{const adv=advScore(row);if(!adv||adv.level==='OK')return null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}><span style={{fontFamily:mono,fontSize:9,color:adv.color,background:adv.bg,border:`1px solid ${adv.border}`,borderRadius:4,padding:'2px 8px',fontWeight:700}}>{adv.label}</span><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)'}}>{adv.detail}</span></div>);})()}
             </div>
 
             {/* STRENGTH */}
@@ -1104,6 +1146,12 @@ function ValidPairsTab({ data, trends, cotMap }) {
               <div style={{minWidth:70,textAlign:'center'}}>
                 <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:'var(--text-muted)',letterSpacing:2,marginBottom:2}}>ATR/HR</div>
                 <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:'var(--text-secondary)'}}>{af.pipsPerHour}p</div>
+              </div>
+            );})()}
+            {(()=>{const adv=advScore(row);if(!adv||adv.level==='OK')return null;return(
+              <div style={{minWidth:90,textAlign:'center'}}>
+                <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:'var(--text-muted)',letterSpacing:2,marginBottom:2}}>ADV</div>
+                <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:adv.color,background:adv.bg,border:`1px solid ${adv.border}`,borderRadius:4,padding:'2px 6px',fontWeight:700}}>{adv.label}</div>
               </div>
             );})()}
             {cotBias&&<div style={{minWidth:60,textAlign:'center'}}>
