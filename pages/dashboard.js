@@ -63,6 +63,22 @@ function boxConfirm(bias, h4Trend, h1Trend) {
   if (h4Trend === bad)                         return { label:'❌ SKIP',     color:'#ff4d6d', bg:'rgba(255,77,109,0.10)',  border:'rgba(255,77,109,0.35)' };
   return { label:'⚠️ RANGING', color:'#ffd166', bg:'rgba(255,209,102,0.10)', border:'rgba(255,209,102,0.35)' };
 }
+// ===== TBG ZONE BADGE (G1 Intraday validity) =====
+// BUY  valid = price ABOVE both SuperTrend + FollowLine
+// SELL valid = price BELOW both SuperTrend + FollowLine
+// BETWEEN   = not valid for intra game
+function tbgZoneBadge(zone, bias) {
+  if (!zone) return null;
+  const isBuy  = bias === 'BUY';
+  const isSell = bias === 'SELL';
+  if (zone === 'ABOVE')   return isBuy  ? { label:'🟢 ABOVE LINES', color:'#00ff9f', bg:'rgba(0,255,159,0.10)',  border:'rgba(0,255,159,0.35)',  valid:true  }
+                                        : { label:'⬆️ ABOVE LINES', color:'#ffd166', bg:'rgba(255,209,102,0.10)', border:'rgba(255,209,102,0.35)', valid:false };
+  if (zone === 'BELOW')   return isSell ? { label:'🔴 BELOW LINES', color:'#ff4d6d', bg:'rgba(255,77,109,0.10)',  border:'rgba(255,77,109,0.35)',  valid:true  }
+                                        : { label:'⬇️ BELOW LINES', color:'#ffd166', bg:'rgba(255,209,102,0.10)', border:'rgba(255,209,102,0.35)', valid:false };
+  if (zone === 'BETWEEN') return         { label:'↔️ BETWEEN',      color:'#ffaa44', bg:'rgba(255,170,68,0.10)',  border:'rgba(255,170,68,0.35)',  valid:false };
+  return null;
+}
+
 function atrFill(atrPoints, currentPrice, entryPrice) {
   // atrPoints from Supabase is in points (e.g. 776 = 7.76 pips for non-JPY, 776 = 776 pips for JPY)
   // We just show ATR/24 = pips per hour as context
@@ -779,7 +795,8 @@ function PairCard({ row, trend, cotBias }) {
         <Sparkline data={t.history} color={sparkColor}/>
       </div>
       {(()=>{const mu=getMatchup(row);if(!mu)return null;return(<div style={{display:'flex',alignItems:'center',gap:6,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>MATCHUP</span><span style={{fontFamily:mono,fontSize:9,color:mu.color,background:mu.color+'12',border:`1px solid ${mu.color}30`,borderRadius:4,padding:'1px 7px',whiteSpace:'nowrap'}}>{mu.label}</span>{mu.note==='IDEAL'&&<span style={{fontFamily:mono,fontSize:7,color:mu.color,letterSpacing:1,opacity:0.8}}>IDEAL</span>}{mu.note==='AVOID'&&<span style={{fontFamily:mono,fontSize:7,color:'#ffaa44',letterSpacing:1,opacity:0.8}}>AVOID</span>}</div>);})()}
-      {(()=>{const bh1=boxTrend(row.box_h1_trend),bh4=boxTrend(row.box_h4_trend);if(!bh1&&!bh4)return null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>BOX</span>{bh4&&<span style={{fontFamily:mono,fontSize:8,color:bh4.color,background:bh4.bg,border:`1px solid ${bh4.border}`,borderRadius:3,padding:'1px 6px'}}>H4 {bh4.label}</span>}{bh1&&<span style={{fontFamily:mono,fontSize:8,color:bh1.color,background:bh1.bg,border:`1px solid ${bh1.border}`,borderRadius:3,padding:'1px 6px'}}>H1 {bh1.label}</span>}</div>);})()}{(()=>{
+      {(()=>{const bh1=boxTrend(row.box_h1_trend),bh4=boxTrend(row.box_h4_trend);if(!bh1&&!bh4)return null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>BOX</span>{bh4&&<span style={{fontFamily:mono,fontSize:8,color:bh4.color,background:bh4.bg,border:`1px solid ${bh4.border}`,borderRadius:3,padding:'1px 6px'}}>H4 {bh4.label}</span>}{bh1&&<span style={{fontFamily:mono,fontSize:8,color:bh1.color,background:bh1.bg,border:`1px solid ${bh1.border}`,borderRadius:3,padding:'1px 6px'}}>H1 {bh1.label}</span>}</div>);})()}
+      {(()=>{ const tbg=tbgZoneBadge(row.tbg_zone,row.bias); if(!tbg)return null; return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>TBG</span><span style={{fontFamily:mono,fontSize:8,color:tbg.color,background:tbg.bg,border:`1px solid ${tbg.border}`,borderRadius:3,padding:'1px 6px',fontWeight:700}}>{tbg.label}</span>{tbg.valid&&<span style={{fontFamily:mono,fontSize:7,color:'#00ff9f',letterSpacing:1}}>G1✅</span>}{!tbg.valid&&<span style={{fontFamily:mono,fontSize:7,color:'#ff7744',letterSpacing:1}}>G1⛔</span>}</div>);})()}{(()=>{
   const bc=boxConfirm(row.bias,row.box_h4_trend,row.box_h1_trend);
   const af=atrFill(row.atr);
   if(!bc&&!af)return null;
@@ -903,6 +920,16 @@ function PairCardModal({ row, trend, cotBias, onClose }) {
           </div>
         )}
 
+        {/* TBG Zone — G1 Intraday validity */}
+        {(()=>{ const tbg = tbgZoneBadge(row.tbg_zone, row.bias); if (!tbg) return null; return (
+          <div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',background:'rgba(0,0,0,0.15)',borderRadius:8}}>
+            <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2}}>TBG LINES</span>
+            <span style={{fontFamily:mono,fontSize:10,color:tbg.color,background:tbg.bg,border:`1px solid ${tbg.border}`,borderRadius:4,padding:'2px 10px',fontWeight:700}}>{tbg.label}</span>
+            {tbg.valid && <span style={{fontFamily:mono,fontSize:9,color:'#00ff9f',letterSpacing:1}}>✅ G1 INTRA VALID</span>}
+            {!tbg.valid && <span style={{fontFamily:mono,fontSize:9,color:'#ff7744',letterSpacing:1}}>⛔ NOT VALID</span>}
+          </div>
+        ); })()}
+
         {/* Momentum */}
         <div style={{padding:'10px 14px',background:'rgba(0,0,0,0.15)',borderRadius:8,display:'flex',flexDirection:'column',gap:6}}>
           <div style={{display:'flex',alignItems:'center',gap:8}}>
@@ -1024,6 +1051,7 @@ function ValidSetupsTab({ data, trends, cotMap }) {
               <div style={{fontFamily:mono,fontSize:9,color:t.momentumColor||'var(--text-muted)',background:(t.momentumColor||'var(--text-muted)')+'18',border:`1px solid ${(t.momentumColor||'var(--text-muted)')}30`,borderRadius:4,padding:'2px 8px',display:'inline-block',marginBottom:4}}>{t.momentum||'NEUTRAL'}</div>
               {g && <div style={{fontFamily:mono,fontSize:10,color:g.color,fontWeight:700}}>👉 {g.action}</div>}{(()=>{const mu=getMatchup(row);if(!mu)return null;return(<div style={{fontFamily:mono,fontSize:9,color:mu.color,background:mu.color+'12',border:`1px solid ${mu.color}28`,borderRadius:4,padding:'2px 7px',display:'inline-block',marginTop:3,whiteSpace:'nowrap'}}>{mu.label}{mu.note&&<span style={{marginLeft:5,opacity:0.7,fontSize:8}}>{mu.note}</span>}</div>);})()}
               {(()=>{const bh4=boxTrend(row.box_h4_trend),bh1=boxTrend(row.box_h1_trend);if(!bh4&&!bh1)return null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>BOX</span>{bh4&&<span style={{fontFamily:mono,fontSize:8,color:bh4.color,background:bh4.bg,border:`1px solid ${bh4.border}`,borderRadius:3,padding:'1px 6px'}}>H4 {bh4.label}</span>}{bh1&&<span style={{fontFamily:mono,fontSize:8,color:bh1.color,background:bh1.bg,border:`1px solid ${bh1.border}`,borderRadius:3,padding:'1px 6px'}}>H1 {bh1.label}</span>}</div>);})()}
+              {(()=>{ const tbg=tbgZoneBadge(row.tbg_zone,row.bias); if(!tbg)return null; return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>TBG</span><span style={{fontFamily:mono,fontSize:9,color:tbg.color,background:tbg.bg,border:`1px solid ${tbg.border}`,borderRadius:4,padding:'1px 8px',fontWeight:700}}>{tbg.label}</span>{tbg.valid&&<span style={{fontFamily:mono,fontSize:8,color:'#00ff9f',fontWeight:700}}>G1 ✅</span>}{!tbg.valid&&<span style={{fontFamily:mono,fontSize:8,color:'#ff7744'}}>G1 ⛔</span>}</div>);})()}
               {(()=>{
                 const bc=boxConfirm(row.bias,row.box_h4_trend,row.box_h1_trend);
                 const af=atrFill(row.atr);
@@ -1133,6 +1161,14 @@ function ValidPairsTab({ data, trends, cotMap }) {
                     {bc&&<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:bc.color,background:bc.bg,border:`1px solid ${bc.border}`,borderRadius:4,padding:'1px 7px',fontWeight:700,marginLeft:4}}>{bc.label}</span>}
                   </div>);
                 })()}
+                {(()=>{ const tbg=tbgZoneBadge(row.tbg_zone,row.bias); if(!tbg)return null; return(
+                  <div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}>
+                    <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>TBG</span>
+                    <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:tbg.color,background:tbg.bg,border:`1px solid ${tbg.border}`,borderRadius:4,padding:'1px 8px',fontWeight:700}}>{tbg.label}</span>
+                    {tbg.valid&&<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:'#00ff9f',letterSpacing:1,fontWeight:700}}>G1 INTRA ✅</span>}
+                    {!tbg.valid&&<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:'#ff7744',letterSpacing:1}}>G1 INTRA ⛔</span>}
+                  </div>
+                );})()}
               </div>
               <div style={{display:'flex',gap:8}}>
                 {[['1H',t.delta1h],['4H',t.delta4h],['8H',t.delta8h]].map(([l,v])=>{const val=v??0;const c=Math.abs(val)<0.1?'var(--text-muted)':val>0?'#00ff9f':'#ff4d6d';return(<div key={l} style={{display:'flex',alignItems:'center',gap:3}}><span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:'var(--text-muted)'}}>{l}</span><span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:c,fontWeight:700}}>{Math.abs(val)<0.1?'±0':(val>0?'+':'')+val}</span></div>);})}
