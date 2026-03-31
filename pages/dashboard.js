@@ -1493,5 +1493,13 @@ export default function Dashboard() {
         ::-webkit-scrollbar-thumb{background:var(--border-bright);border-radius:2px;}
       `}</style>
     </>
+    {selectedPair && (
+      <PairCardModal
+        row={selectedPair}
+        trend={trends[selectedPair.symbol]}
+        cotBias={getPairCotBias(selectedPair.symbol)}
+        onClose={()=>setSelectedPair(null)}
+      />
+    )}
   );
 }
