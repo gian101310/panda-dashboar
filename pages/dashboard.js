@@ -1492,7 +1492,6 @@ export default function Dashboard() {
         ::-webkit-scrollbar-track{background:var(--bg-primary);}
         ::-webkit-scrollbar-thumb{background:var(--border-bright);border-radius:2px;}
       `}</style>
-    </>
     {selectedPair && (
       <PairCardModal
         row={selectedPair}
@@ -1501,5 +1500,6 @@ export default function Dashboard() {
         onClose={()=>setSelectedPair(null)}
       />
     )}
+    </>
   );
 }
