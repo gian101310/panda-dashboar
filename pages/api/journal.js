@@ -23,12 +23,15 @@ export default async function handler(req, res) {
 
   // ================= GET =================
   if (req.method === 'GET') {
-    const { symbol, direction, status, limit = 200 } = req.query;
+    const { symbol, direction, status, limit = 500, from_date } = req.query;
 
-    // ✅ FIXED: REMOVED WRONG FILTER
+    // Default: Jan 1 2026 onwards unless overridden
+    const defaultFrom = from_date || '2026-01-01T00:00:00Z';
+
     let ctQuery = supabase
       .from('trade_journal')
       .select('*')
+      .gte('entry_time', defaultFrom)
       .order('entry_time', { ascending: false })
       .limit(parseInt(limit));
 
@@ -36,11 +39,12 @@ export default async function handler(req, res) {
     if (direction) ctQuery = ctQuery.eq('direction', direction);
     if (status) ctQuery = ctQuery.eq('status', status);
 
-    // Manual trades (user-specific)
+    // Manual trades (user-specific) — also from Jan 2026
     let manQuery = supabase
       .from('manual_trades')
       .select('*')
       .eq('user_id', userId)
+      .gte('entry_time', defaultFrom)
       .order('entry_time', { ascending: false })
       .limit(parseInt(limit));
 
