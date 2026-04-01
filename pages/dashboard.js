@@ -1399,7 +1399,22 @@ function SpikeLogTab() {
 }
 
 // ===== MAIN DASHBOARD =====
-const TABS = ['PANELS','TABLE','GAP CHART','CALENDAR','CALCULATOR','COT REPORT','SETUPS','VALID PAIRS','SPIKE LOG'];
+const TABS = ['PANELS','SIGNALS','TABLE','GAP CHART','CALENDAR','CALCULATOR','COT REPORT','SETUPS','VALID PAIRS','SPIKE LOG'];
+// Maps each tab to the feature_access key that controls it
+const TAB_FEATURE = {
+  'PANELS':      'dashboard',
+  'SIGNALS':     'signals',
+  'TABLE':       'dashboard',
+  'GAP CHART':   'dashboard',
+  'CALENDAR':    'calendar',
+  'CALCULATOR':  'calculator',
+  'COT REPORT':  'cot',
+  'SETUPS':      'dashboard',
+  'VALID PAIRS': 'dashboard',
+  'SPIKE LOG':   'dashboard',
+  'LIVE':        'dashboard',
+  'ENGINE':      'engine',
+};
 const FILTERS = ['ALL','BUY','SELL','STRONG','⚠️ CLOSE'];
 const SORTS   = [
   {label:'SYMBOL A-Z',value:'symbol_asc'},
@@ -1617,7 +1632,7 @@ export default function Dashboard() {
         {/* TABS */}
         <div style={{display:'flex',alignItems:'center',gap:7,padding:'0 20px 10px',flexWrap:'wrap',zIndex:1}}>
           <div style={{display:'flex',background:'var(--bg-secondary)',border:'1px solid var(--border)',borderRadius:7,overflow:'hidden'}}>
-            {TABS.map((t,i)=><button key={t} onClick={()=>setTab(t)} style={{background:tab===t?'rgba(0,180,255,0.15)':'transparent',border:'none',borderRight:i<TABS.length-1?'1px solid var(--border)':'none',color:tab===t?'#00b4ff':'rgba(180,205,240,0.80)',fontFamily:mono,fontSize:9,letterSpacing:2,padding:'7px 12px',cursor:'pointer',whiteSpace:'nowrap'}}>{t}</button>)}
+            {TABS.filter(t=>{ const feat=TAB_FEATURE[t]; if(!feat) return true; if(isAdmin) return true; const fa=user?.feature_access||[]; return fa.includes(feat)||fa.includes('dashboard');}).map((t,i,arr)=><button key={t} onClick={()=>setTab(t)} style={{background:tab===t?'rgba(0,180,255,0.15)':'transparent',border:'none',borderRight:i<TABS.length-1?'1px solid var(--border)':'none',color:tab===t?'#00b4ff':'rgba(180,205,240,0.80)',fontFamily:mono,fontSize:9,letterSpacing:2,padding:'7px 12px',cursor:'pointer',whiteSpace:'nowrap'}}>{t}</button>)}
             {isAdmin&&<><button onClick={()=>setTab('OPEN TRADES')} style={{background:tab==='OPEN TRADES'?'rgba(255,77,109,0.15)':'transparent',border:'none',borderLeft:'1px solid var(--border)',color:tab==='OPEN TRADES'?'#ff4d6d':'rgba(180,205,240,0.80)',fontFamily:mono,fontSize:9,letterSpacing:2,padding:'7px 12px',cursor:'pointer',whiteSpace:'nowrap'}}>🔴 LIVE</button><button onClick={()=>setTab('ENGINE')} style={{background:tab==='ENGINE'?'rgba(255,209,102,0.15)':'transparent',border:'none',borderLeft:'1px solid var(--border)',color:tab==='ENGINE'?'#ffd166':'rgba(180,205,240,0.80)',fontFamily:mono,fontSize:9,letterSpacing:2,padding:'7px 12px',cursor:'pointer'}}>🏥 ENGINE</button></>}
           </div>
           {['PANELS','TABLE'].includes(tab)&&(
@@ -1650,7 +1665,24 @@ export default function Dashboard() {
           ):tab==='SETUPS'?(<ValidSetupsTab data={data} trends={trends} cotMap={cotMap}/>
 ):tab==='VALID PAIRS'?(<ValidPairsTab data={data} trends={trends} cotMap={cotMap}/>
 ):tab==='SPIKE LOG'?(<SpikeLogTab/>
+):tab==='SIGNALS'?(
+<div>
+  <div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2,marginBottom:12}}>
+    {displayed.filter(r=>r.bias==='BUY'||r.bias==='SELL').length} ACTIVE SIGNALS
+    {' · '}{displayed.filter(r=>r.bias==='BUY').length} BUY
+    {' · '}{displayed.filter(r=>r.bias==='SELL').length} SELL
+  </div>
+  {displayed.filter(r=>r.bias==='BUY'||r.bias==='SELL').length===0
+    ?<div style={{textAlign:'center',padding:60,fontFamily:mono,fontSize:11,letterSpacing:3,color:'var(--text-muted)'}}>NO ACTIVE SIGNALS</div>
+    :<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))',gap:14}}>
+      {displayed.filter(r=>r.bias==='BUY'||r.bias==='SELL').sort((a,b)=>Math.abs(b.gap)-Math.abs(a.gap)).map(row=>(
+        <PairCard key={row.symbol} row={row} trends={trends} cotMap={cotMap} onClick={()=>setModal(row)}/>
+      ))}
+    </div>
+  }
+</div>
 ):tab==='TABLE'?(
+
             <div style={{overflowX:'auto'}}>
               <table style={{width:'100%',borderCollapse:'collapse',background:'var(--bg-secondary)',border:'1px solid var(--border)',borderRadius:10,overflow:'hidden'}}>
                 <thead><tr style={{background:'var(--bg-hover)'}}>{['#','SYMBOL','GAP','▲▼','BIAS','MOMENTUM','MATCHUP','1H','4H','8H','CHART','STATE','STR','SIG','COT','⚠️'].map(h=><th key={h} style={hdr}>{h}</th>)}</tr></thead>

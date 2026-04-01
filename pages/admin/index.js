@@ -2,21 +2,21 @@ import { useState, useEffect, useCallback } from 'react';
 import Head from 'next/head';
 
 const mono = "'Share Tech Mono', monospace";
-const ALL_FEATURES = ['dashboard','cot','calendar','calculator','journal','signals','engine','accuracy'];
+const ALL_FEATURES = ['dashboard','signals','cot','calendar','calculator','journal','engine','accuracy'];
 const FEATURE_LABELS = {
-  dashboard:  '📊 Dashboard',
-  cot:        '📈 COT Report',
-  calendar:   '📰 Calendar',
-  calculator: '🧮 Calculator',
-  journal:    '📓 Journal',
-  signals:    '⚡ Signals',
-  engine:     '🏥 Engine',
+  dashboard:  '📊 Panels / Table / Setups / Valid Pairs / Spike Log',
+  signals:    '⚡ Signals Tab',
+  cot:        '📈 COT Report Tab',
+  calendar:   '📰 Calendar Tab',
+  calculator: '🧮 Calculator Tab',
+  journal:    '📓 Journal Page',
+  engine:     '🏥 Engine Tab (Admin)',
   accuracy:   '🎯 Accuracy',
 };
 const ROLE_DEFAULTS = {
   user:  ['dashboard','cot','calendar','calculator'],
-  vip:   ['dashboard','cot','calendar','calculator','journal','signals'],
-  admin: ['dashboard','cot','calendar','calculator','journal','signals','engine','accuracy'],
+  vip:   ['dashboard','signals','cot','calendar','calculator','journal'],
+  admin: ['dashboard','signals','cot','calendar','calculator','journal','engine','accuracy'],
 };
 const orb = "'Orbitron', sans-serif";
 const raj = "'Rajdhani', sans-serif";
