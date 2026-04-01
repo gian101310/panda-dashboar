@@ -796,7 +796,7 @@ function PairCard({ row, trend, cotBias }) {
       </div>
       {(()=>{const mu=getMatchup(row);if(!mu)return null;return(<div style={{display:'flex',alignItems:'center',gap:6,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>MATCHUP</span><span style={{fontFamily:mono,fontSize:9,color:mu.color,background:mu.color+'12',border:`1px solid ${mu.color}30`,borderRadius:4,padding:'1px 7px',whiteSpace:'nowrap'}}>{mu.label}</span>{mu.note==='IDEAL'&&<span style={{fontFamily:mono,fontSize:7,color:mu.color,letterSpacing:1,opacity:0.8}}>IDEAL</span>}{mu.note==='AVOID'&&<span style={{fontFamily:mono,fontSize:7,color:'#ffaa44',letterSpacing:1,opacity:0.8}}>AVOID</span>}</div>);})()}
       {(()=>{const bh1=boxTrend(row.box_h1_trend),bh4=boxTrend(row.box_h4_trend);if(!bh1&&!bh4)return null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>BOX</span>{bh4&&<span style={{fontFamily:mono,fontSize:8,color:bh4.color,background:bh4.bg,border:`1px solid ${bh4.border}`,borderRadius:3,padding:'1px 6px'}}>H4 {bh4.label}</span>}{bh1&&<span style={{fontFamily:mono,fontSize:8,color:bh1.color,background:bh1.bg,border:`1px solid ${bh1.border}`,borderRadius:3,padding:'1px 6px'}}>H1 {bh1.label}</span>}</div>);})()}
-      {(()=>{ const tbg=tbgZoneBadge(row.tbg_zone,row.bias); if(!tbg)return null; return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>TBG</span><span style={{fontFamily:mono,fontSize:8,color:tbg.color,background:tbg.bg,border:`1px solid ${tbg.border}`,borderRadius:3,padding:'1px 6px',fontWeight:700}}>{tbg.label}</span>{tbg.valid&&<span style={{fontFamily:mono,fontSize:7,color:'#00ff9f',letterSpacing:1}}>G1✅</span>}{!tbg.valid&&<span style={{fontFamily:mono,fontSize:7,color:'#ff7744',letterSpacing:1}}>G1⛔</span>}</div>);})()}{(()=>{
+      {(()=>{ const tbg=tbgZoneBadge(row.tbg_zone,row.bias); if(!tbg)return null; return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>TBG</span><span style={{fontFamily:mono,fontSize:8,color:tbg.color,background:tbg.bg,border:`1px solid ${tbg.border}`,borderRadius:3,padding:'1px 6px',fontWeight:700}}>{tbg.label}</span>{tbg.valid&&<span style={{fontFamily:mono,fontSize:7,color:'#00ff9f',letterSpacing:1}}>✅</span>}{!tbg.valid&&<span style={{fontFamily:mono,fontSize:7,color:'#ff7744',letterSpacing:1}}>⛔</span>}</div>);})()}{(()=>{
   const bc=boxConfirm(row.bias,row.box_h4_trend,row.box_h1_trend);
   const af=atrFill(row.atr);
   if(!bc&&!af)return null;
@@ -925,7 +925,7 @@ function PairCardModal({ row, trend, cotBias, onClose }) {
           <div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',background:'rgba(0,0,0,0.15)',borderRadius:8}}>
             <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2}}>TBG LINES</span>
             <span style={{fontFamily:mono,fontSize:10,color:tbg.color,background:tbg.bg,border:`1px solid ${tbg.border}`,borderRadius:4,padding:'2px 10px',fontWeight:700}}>{tbg.label}</span>
-            {tbg.valid && <span style={{fontFamily:mono,fontSize:9,color:'#00ff9f',letterSpacing:1}}>✅ G1 INTRA VALID</span>}
+            {tbg.valid && <span style={{fontFamily:mono,fontSize:9,color:'#00ff9f',letterSpacing:1}}>✅ VALID</span>}
             {!tbg.valid && <span style={{fontFamily:mono,fontSize:9,color:'#ff7744',letterSpacing:1}}>⛔ NOT VALID</span>}
           </div>
         ); })()}
@@ -1667,17 +1667,35 @@ export default function Dashboard() {
 ):tab==='SPIKE LOG'?(<SpikeLogTab/>
 ):tab==='SIGNALS'?(
 <div>
-  <div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2,marginBottom:12}}>
-    {displayed.filter(r=>r.bias==='BUY'||r.bias==='SELL').length} ACTIVE SIGNALS
-    {' · '}{displayed.filter(r=>r.bias==='BUY').length} BUY
-    {' · '}{displayed.filter(r=>r.bias==='SELL').length} SELL
+  <div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2,marginBottom:16}}>
+    {data.filter(r=>r.bias==='BUY'||r.bias==='SELL').length} ACTIVE SIGNALS
+    {' · '}{data.filter(r=>r.bias==='BUY').length} BUY
+    {' · '}{data.filter(r=>r.bias==='SELL').length} SELL
   </div>
-  {displayed.filter(r=>r.bias==='BUY'||r.bias==='SELL').length===0
+  {data.filter(r=>r.bias==='BUY'||r.bias==='SELL').length===0
     ?<div style={{textAlign:'center',padding:60,fontFamily:mono,fontSize:11,letterSpacing:3,color:'var(--text-muted)'}}>NO ACTIVE SIGNALS</div>
-    :<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))',gap:14}}>
-      {displayed.filter(r=>r.bias==='BUY'||r.bias==='SELL').sort((a,b)=>Math.abs(b.gap)-Math.abs(a.gap)).map(row=>(
-        <PairCard key={row.symbol} row={row} trends={trends} cotMap={cotMap} onClick={()=>setModal(row)}/>
-      ))}
+    :<div style={{display:'flex',flexWrap:'wrap',gap:10}}>
+      {data.filter(r=>r.bias==='BUY'||r.bias==='SELL').sort((a,b)=>Math.abs(b.gap)-Math.abs(a.gap)).map(row=>{
+        const isBuy=row.bias==='BUY';
+        return(
+          <div key={row.symbol} style={{
+            display:'flex',alignItems:'center',gap:10,
+            padding:'12px 18px',borderRadius:8,
+            background:isBuy?'rgba(0,255,159,0.07)':'rgba(255,77,109,0.07)',
+            border:`1px solid ${isBuy?'rgba(0,255,159,0.25)':'rgba(255,77,109,0.25)'}`,
+            minWidth:160,
+          }}>
+            <span style={{fontFamily:orb,fontSize:14,fontWeight:700,color:'#e8eaf0',letterSpacing:2}}>{row.symbol}</span>
+            <span style={{
+              fontFamily:mono,fontSize:11,fontWeight:700,letterSpacing:2,
+              color:isBuy?'#00ff9f':'#ff4d6d',
+              background:isBuy?'rgba(0,255,159,0.12)':'rgba(255,77,109,0.12)',
+              border:`1px solid ${isBuy?'#00ff9f44':'#ff4d6d44'}`,
+              borderRadius:4,padding:'2px 8px',
+            }}>{row.bias}</span>
+          </div>
+        );
+      })}
     </div>
   }
 </div>
