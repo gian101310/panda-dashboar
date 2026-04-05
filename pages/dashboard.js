@@ -383,7 +383,7 @@ function MomentumHeatmap({ data, heatmapData, visible, onToggle }) {
                 const momColor = momentum==='STRONG'?'#00ff9f':momentum==='BUILDING'?'#66ffcc':momentum==='SPARK'?'#ffd166':momentum==='CONSOLIDATING'?'#00b4ff':momentum==='COOLING'?'#ffaa44':momentum==='FADING'?'#ff7744':momentum==='REVERSING'?'#ff4d6d':'var(--text-muted)';
 
                 return (
-                  <tr key={symbol} style={{borderBottom:'1px solid var(--border)',opacity:valid?1:0.35}}>
+                  <tr key={symbol} style={{borderBottom:'1px solid var(--border)'}}>
                     <td style={{padding:'5px 8px',fontFamily:orb,fontSize:11,fontWeight:700,color:valid?'var(--text-primary)':'var(--text-muted)'}}>{symbol}</td>
                     <td style={{padding:'5px 8px',textAlign:'center',fontFamily:mono,fontSize:11,color:bias.color,fontWeight:700}}>{gap>0?'+':''}{gap}</td>
                     {[hRow.h1, hRow.h4, hRow.h8].map((v,i)=>(
@@ -1644,18 +1644,18 @@ export default function Dashboard() {
   function toggleSpikeBanner() { setPrefs(p=>({...p,spike_banner_visible:!p?.spike_banner_visible})); }
 
   const validPairs=data.filter(r=>isValid(r.gap??0));
-  let displayed=(filter==='ALL')?[...data]:(filter==='VALID')?[...validPairs]:[...validPairs];
+  let displayed=(filter==='ALL')?[...data].sort((a,b)=>(a.symbol||'').localeCompare(b.symbol||'')):[...validPairs].sort((a,b)=>(a.symbol||'').localeCompare(b.symbol||''));
   if(search) displayed=displayed.filter(r=>r.symbol?.toLowerCase().includes(search.toLowerCase()));
   if(filter==='BUY') displayed=displayed.filter(r=>(r.gap??0)>=5);
   if(filter==='SELL') displayed=displayed.filter(r=>(r.gap??0)<=-5);
   if(filter==='STRONG') displayed=displayed.filter(r=>r.signal==='STRONG'||r.strength>=2);
   if(filter==='⚠️ CLOSE') displayed=displayed.filter(r=>trends[r.symbol]?.closeAlert);
 
-  if(sort==='symbol_asc') displayed.sort((a,b)=>(a.symbol||'').localeCompare(b.symbol||''));
-  if(sort==='strength_desc') displayed.sort((a,b)=>(b.strength||0)-(a.strength||0));
-  if(sort==='gap_desc') displayed.sort((a,b)=>Math.abs(b.gap||0)-Math.abs(a.gap||0));
-  if(sort==='delta1h') displayed.sort((a,b)=>(trends[b.symbol]?.delta1h||0)-(trends[a.symbol]?.delta1h||0));
-  if(sort==='momentum'){const ord={BUILDING:0,SPARK:0,STRONG:0,EMERGING:1,STABLE:2,NEUTRAL:3,CONSOLIDATING:3,COOLING:4,FADING:5,REVERSING:6};displayed.sort((a,b)=>(ord[trends[a.symbol]?.momentum]??3)-(ord[trends[b.symbol]?.momentum]??3));}
+  if(sort==='symbol_asc'||filter==='VALID'||filter==='ALL') displayed.sort((a,b)=>(a.symbol||'').localeCompare(b.symbol||''));
+  else if(sort==='strength_desc') displayed.sort((a,b)=>(b.strength||0)-(a.strength||0));
+  else if(sort==='gap_desc') displayed.sort((a,b)=>Math.abs(b.gap||0)-Math.abs(a.gap||0));
+  else if(sort==='delta1h') displayed.sort((a,b)=>(trends[b.symbol]?.delta1h||0)-(trends[a.symbol]?.delta1h||0));
+  else if(sort==='momentum'){const ord={BUILDING:0,SPARK:0,STRONG:0,EMERGING:1,STABLE:2,NEUTRAL:3,CONSOLIDATING:3,COOLING:4,FADING:5,REVERSING:6};displayed.sort((a,b)=>(ord[trends[a.symbol]?.momentum]??3)-(ord[trends[b.symbol]?.momentum]??3));}
 
   const buyCount=validPairs.filter(r=>(r.gap??0)>=5).length;
   const sellCount=validPairs.filter(r=>(r.gap??0)<=-5).length;
@@ -1905,7 +1905,7 @@ export default function Dashboard() {
                     const gapTrend=(row.delta_short??0)>0.5?'STRONGER':(row.delta_short??0)<-0.5?'WEAKER':'STABLE';
                     const cotB=getPairCotBias(row.symbol);
                     return(
-                      <tr key={row.symbol} style={{borderBottom:'1px solid var(--border)',opacity:valid?1:0.4}}>
+                      <tr key={row.symbol} style={{borderBottom:'1px solid var(--border)'}}>
                         <td style={{...tdc,fontFamily:mono,fontSize:9,color:'var(--text-muted)',textAlign:'center'}}>{idx+1}</td>
                         <td style={{...tdc,fontFamily:orb,fontSize:11,fontWeight:700,color:valid?'var(--text-primary)':'var(--text-muted)'}}>{row.symbol}</td>
                         <td style={{...tdc,fontFamily:mono,fontSize:12,color:bias.color,fontWeight:700}}>{gap>0?'+':''}{Number(gap).toFixed(1)}</td>
