@@ -845,41 +845,17 @@ function PairCard({ row, trend, cotBias }) {
 
 // ===== TRADINGVIEW CHART EMBED =====
 function TradingViewChart({ symbol, bias }) {
-  const containerId = `tv_${symbol}`;
-  const theme = 'dark';
   const color = bias?.label === 'BUY' ? '#00ff9f' : bias?.label === 'SELL' ? '#ff4d6d' : '#00b4ff';
-
-  React.useEffect(() => {
-    const container = document.getElementById(containerId);
-    if (!container) return;
-    container.innerHTML = '';
-    const script = document.createElement('script');
-    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
-    script.type = 'text/javascript';
-    script.async = true;
-    script.innerHTML = JSON.stringify({
-      autosize: true,
-      symbol: symbol,
-      interval: 'H1',
-      timezone: 'Asia/Dubai',
-      theme: theme,
-      style: '1',
-      locale: 'en',
-      enable_publishing: false,
-      hide_top_toolbar: false,
-      hide_legend: false,
-      save_image: false,
-      container_id: containerId,
-      backgroundColor: '#0d1117',
-      gridColor: 'rgba(255,255,255,0.04)',
-    });
-    container.appendChild(script);
-    return () => { container.innerHTML = ''; };
-  }, [symbol]);
-
+  const src = `https://www.tradingview.com/widgetembed/?frameElementId=tv_${symbol}&symbol=${encodeURIComponent(symbol)}&interval=60&hidesidetoolbar=0&symboledit=1&saveimage=0&toolbarbg=0d1117&studies=[]&theme=dark&style=1&timezone=Asia%2FDubai&studies_overrides={}&overrides={}&enabled_features=[]&disabled_features=[]&locale=en`;
   return (
-    <div style={{position:'relative',width:'100%',height:420,borderRadius:10,overflow:'hidden',border:`1px solid ${color}33`,background:'#0d1117'}}>
-      <div className="tradingview-widget-container" id={containerId} style={{height:'100%',width:'100%'}}/>
+    <div style={{position:'relative',width:'100%',height:450,borderRadius:10,overflow:'hidden',border:`1px solid ${color}33`,background:'#0d1117'}}>
+      <iframe
+        key={symbol}
+        src={src}
+        style={{width:'100%',height:'100%',border:'none'}}
+        allowFullScreen
+        loading="lazy"
+      />
     </div>
   );
 }
