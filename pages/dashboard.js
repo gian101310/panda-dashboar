@@ -843,30 +843,11 @@ function PairCard({ row, trend, cotBias }) {
 }
 
 
-// ===== TRADINGVIEW CHART EMBED =====
-function TradingViewChart({ symbol, bias }) {
-  const color = bias?.label === 'BUY' ? '#00ff9f' : bias?.label === 'SELL' ? '#ff4d6d' : '#00b4ff';
-  const src = `https://www.tradingview.com/widgetembed/?frameElementId=tv_${symbol}&symbol=${encodeURIComponent(symbol)}&interval=60&hidesidetoolbar=0&symboledit=1&saveimage=0&toolbarbg=0d1117&studies=[]&theme=dark&style=1&timezone=Asia%2FDubai&studies_overrides={}&overrides={}&enabled_features=[]&disabled_features=[]&locale=en`;
-  return (
-    <div style={{position:'relative',width:'100%',height:450,borderRadius:10,overflow:'hidden',border:`1px solid ${color}33`,background:'#0d1117'}}>
-      <iframe
-        key={symbol}
-        src={src}
-        style={{width:'100%',height:'100%',border:'none'}}
-        allowFullScreen
-        loading="lazy"
-      />
-    </div>
-  );
-}
-
 // ===== PAIR CARD MODAL =====
 function PairCardModal({ row, trend, cotBias, onClose }) {
-  const [modalTab, setModalTab] = React.useState('OVERVIEW');
-  // ALL hooks must be called before any conditional return
-  const gap = row ? (row.gap ?? 0) : 0;
-  const bias = biasFromGap(gap);
   if (!row) return null;
+  const gap = row.gap ?? 0;
+  const bias = biasFromGap(gap);
   const t = trend || {};
   const mu = getMatchup(row);
   const bc = boxConfirm(row.bias, row.box_h4_trend, row.box_h1_trend);
@@ -910,33 +891,6 @@ function PairCardModal({ row, trend, cotBias, onClose }) {
           </div>
           <button onClick={onClose} style={{background:'transparent',border:'1px solid var(--border)',borderRadius:6,color:'var(--text-muted)',fontFamily:mono,fontSize:11,padding:'5px 12px',cursor:'pointer'}}>✕ ESC</button>
         </div>
-
-        {/* Modal Tab Switcher */}
-        <div style={{display:'flex',gap:6,borderBottom:'1px solid var(--border)',paddingBottom:10}}>
-          {['OVERVIEW','CHART'].map(tab => (
-            <button key={tab} onClick={()=>setModalTab(tab)} style={{
-              fontFamily:mono, fontSize:10, letterSpacing:2, padding:'5px 16px',
-              borderRadius:6, border:`1px solid ${modalTab===tab ? bias.border : 'var(--border)'}`,
-              background: modalTab===tab ? bias.bg : 'transparent',
-              color: modalTab===tab ? bias.color : 'var(--text-muted)',
-              cursor:'pointer', fontWeight: modalTab===tab ? 700 : 400,
-            }}>{tab}</button>
-          ))}
-        </div>
-
-        {/* CHART TAB */}
-        {modalTab === 'CHART' && (
-          <div style={{display:'flex',flexDirection:'column',gap:10}}>
-            <div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2}}>TRADINGVIEW · {row.symbol} · H1</div>
-            <TradingViewChart symbol={row.symbol} bias={bias}/>
-            <div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:1,textAlign:'center',opacity:0.5}}>
-              Powered by TradingView · Click chart to interact
-            </div>
-          </div>
-        )}
-
-        {/* OVERVIEW TAB */}
-        {modalTab === 'OVERVIEW' && (<>
 
         {/* GAP + Sparkline */}
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 16px',background:'rgba(0,0,0,0.2)',borderRadius:10,border:`1px solid ${bias.border}`}}>
@@ -1040,7 +994,6 @@ function PairCardModal({ row, trend, cotBias, onClose }) {
           ) : <span/>}
           <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>Updated: {formatDt(row.updated_at)}</span>
         </div>
-        </>)}
 
       </div>
     </div>
@@ -1463,7 +1416,53 @@ function SpikeLogTab() {
 }
 
 // ===== MAIN DASHBOARD =====
-const TABS = ['PANELS','SIGNALS','TABLE','GAP CHART','CALENDAR','CALCULATOR','COT REPORT','SETUPS','VALID PAIRS','SPIKE LOG'];
+// ===== CHART TAB =====
+function ChartTab({ data }) {
+  const mono = "'Share Tech Mono',monospace";
+  const orb  = "'Orbitron',sans-serif";
+  const pairs = (data||[]).filter(r => Math.abs(r.gap??0) >= 5).sort((a,b)=>Math.abs(b.gap??0)-Math.abs(a.gap??0));
+  const [selected, setSelected] = React.useState(pairs[0]?.symbol || 'EURUSD');
+  const [tf, setTf] = React.useState('60');
+  const bias = pairs.find(r=>r.symbol===selected) ? biasFromGap(pairs.find(r=>r.symbol===selected).gap??0) : {color:'#00b4ff',border:'rgba(0,180,255,0.4)',bg:'rgba(0,180,255,0.1)',label:'—'};
+  const src = `https://www.tradingview.com/widgetembed/?frameElementId=tv_chart_tab&symbol=${encodeURIComponent(selected)}&interval=${tf}&hidesidetoolbar=0&symboledit=1&saveimage=0&toolbarbg=0d1117&theme=dark&style=1&timezone=Asia%2FDubai&locale=en`;
+  const TFS = [{'label':'M15','v':'15'},{'label':'H1','v':'60'},{'label':'H4','v':'240'},{'label':'D1','v':'D'}];
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:12}}>
+      <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+        <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2}}>PAIR:</span>
+        <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+          {(pairs.length > 0 ? pairs.map(r=>r.symbol) : ALL_PAIRS).map(sym => {
+            const b = pairs.find(r=>r.symbol===sym) ? biasFromGap(pairs.find(r=>r.symbol===sym).gap??0) : null;
+            return (
+              <button key={sym} onClick={()=>setSelected(sym)} style={{fontFamily:mono,fontSize:9,padding:'4px 10px',borderRadius:5,cursor:'pointer',
+                border:`1px solid ${selected===sym?(b?.border||'rgba(0,180,255,0.4)'):'var(--border)'}`,
+                background:selected===sym?(b?.bg||'rgba(0,180,255,0.1)'):'transparent',
+                color:selected===sym?(b?.color||'#00b4ff'):'var(--text-muted)',fontWeight:selected===sym?700:400}}>{sym}</button>
+            );
+          })}
+        </div>
+        <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2,marginLeft:8}}>TF:</span>
+        {TFS.map(t=>(
+          <button key={t.v} onClick={()=>setTf(t.v)} style={{fontFamily:mono,fontSize:9,padding:'4px 10px',borderRadius:5,cursor:'pointer',
+            border:`1px solid ${tf===t.v?'rgba(0,180,255,0.5)':'var(--border)'}`,
+            background:tf===t.v?'rgba(0,180,255,0.12)':'transparent',
+            color:tf===t.v?'#00b4ff':'var(--text-muted)',fontWeight:tf===t.v?700:400}}>{t.label}</button>
+        ))}
+      </div>
+      <div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2}}>
+        {selected} · {TFS.find(t=>t.v===tf)?.label} · Dubai timezone
+      </div>
+      <div style={{width:'100%',height:600,borderRadius:10,overflow:'hidden',border:`1px solid ${bias.border}`,background:'#0d1117'}}>
+        <iframe key={selected+tf} src={src} style={{width:'100%',height:'100%',border:'none'}} allowFullScreen loading="lazy"/>
+      </div>
+      <div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:1,textAlign:'center',opacity:0.4}}>
+        Powered by TradingView
+      </div>
+    </div>
+  );
+}
+
+const TABS = ['PANELS','SIGNALS','TABLE','GAP CHART','CALENDAR','CALCULATOR','COT REPORT','SETUPS','VALID PAIRS','SPIKE LOG','CHART'];
 // Maps each tab to the feature_access key that controls it
 const TAB_FEATURE = {
   'PANELS':      'panels',
@@ -1477,6 +1476,7 @@ const TAB_FEATURE = {
   'VALID PAIRS': 'valid_pairs',
   'SPIKE LOG':   'spike_log',
   'ENGINE':      'engine',
+  'CHART':       'panels',
 };
 const FILTERS = ['VALID','ALL','BUY','SELL','STRONG','⚠️ CLOSE'];
 const SORTS   = [
@@ -1837,6 +1837,7 @@ export default function Dashboard() {
           ):tab==='SETUPS'?(<ValidSetupsTab data={data} trends={trends} cotMap={cotMap}/>
 ):tab==='VALID PAIRS'?(<ValidPairsTab data={data} trends={trends} cotMap={cotMap}/>
 ):tab==='SPIKE LOG'?(<SpikeLogTab/>
+):tab==='CHART'?(<ChartTab data={data}/>
 ):tab==='SIGNALS'?(
 <div style={{display:'flex',flexDirection:'column',gap:24}}>
 
