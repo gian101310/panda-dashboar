@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Head from 'next/head';
 import ThemeToggle from '../components/ThemeToggle';
 
@@ -63,7 +63,7 @@ function boxConfirm(bias, h4Trend, h1Trend) {
   if (h4Trend === bad)                         return { label:'❌ SKIP',     color:'#ff4d6d', bg:'rgba(255,77,109,0.10)',  border:'rgba(255,77,109,0.35)' };
   return { label:'⚠️ RANGING', color:'#ffd166', bg:'rgba(255,209,102,0.10)', border:'rgba(255,209,102,0.35)' };
 }
-// ===== TBG ZONE BADGE (G1 Intraday validity) =====
+// ===== FL-ST ZONE BADGE (G1 Intraday validity) =====
 // BUY  valid = price ABOVE both SuperTrend + FollowLine
 // SELL valid = price BELOW both SuperTrend + FollowLine
 // BETWEEN   = not valid for intra game
@@ -284,9 +284,7 @@ function SpikeBanner({ spikes, prefs, onToggle }) {
                 <span style={{fontFamily:orb,fontSize:18,fontWeight:900,color:bias.color,lineHeight:1}}>{s.gap>0?'+':''}{s.gap}</span>
                 <span style={{fontFamily:mono,fontSize:9,color:momColor}}>{s.momentum}</span>
               </div>
-              {(() => { const g = MOMENTUM_GUIDE[s.momentum]; return g ? (
-                <span style={{fontFamily:mono,fontSize:9,color:g.color,fontWeight:700}}>👉 {g.action}</span>
-              ) : null; })()}
+
               <span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)'}}>{timeAgo(s.fired_at)}</span>
             </div>
           );
@@ -541,8 +539,23 @@ function GapChart() {
   const [charts,setCharts]=useState({});
   const [loading,setLoading]=useState(false);
   const [hover,setHover]=useState(null);
+  const [showAllPairs,setShowAllPairs]=useState(false);
   const svgRef=useRef(null);
-  const COLORS=['#00b4ff','#00ff9f','#ffd166','#ff4d6d','#ff9944','#cc77ff'];
+  const COLORS=['#00b4ff','#00ff9f','#ffd166','#ff4d6d','#ff9944','#cc77ff','#ff77cc','#77ffcc','#ffcc77','#4499ff','#ff9977','#99ff77'];
+
+  async function loadAllPairs() {
+    setShowAllPairs(true);setLoading(true);setCharts({});
+    const allTf='ALL';
+    await Promise.all(ALL_PAIRS.map(async(sym)=>{
+      try{
+        const res=await fetch(`/api/gap-chart?symbol=${sym}&timeframe=${allTf}`);
+        if(!res.ok) return;
+        const d=await res.json();
+        setCharts(prev=>({...prev,[sym]:d}));
+      }catch{}
+    }));
+    setLoading(false);
+  }
 
   async function loadSymbol(sym) {
     try {
@@ -587,25 +600,29 @@ function GapChart() {
     <div style={{background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:10,padding:'16px 18px',display:'flex',flexDirection:'column',gap:12}}>
       <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
         <div style={{fontFamily:orb,fontSize:12,fontWeight:700,color:'#00b4ff',letterSpacing:3}}>GAP HISTORY CHART</div>
-        <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>UP TO 3 PAIRS</span>
+        <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>SELECT PAIRS · OR LOAD ALL HISTORY</span>
         <div style={{display:'flex',gap:4,marginLeft:'auto'}}>
           {TFS.map(t=><button key={t} onClick={()=>setTf(t)} style={{background:tf===t?'rgba(0,180,255,0.15)':'transparent',border:`1px solid ${tf===t?'#00b4ff':'var(--border)'}`,borderRadius:4,color:tf===t?'#00b4ff':'var(--text-muted)',fontFamily:mono,fontSize:9,padding:'4px 9px',cursor:'pointer'}}>{t}</button>)}
         </div>
       </div>
+      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:2}}>
+        <button onClick={loadAllPairs} style={{background:showAllPairs?'rgba(255,209,102,0.15)':'rgba(0,180,255,0.06)',border:`1px solid ${showAllPairs?'#ffd166':'rgba(0,180,255,0.4)'}`,borderRadius:5,color:showAllPairs?'#ffd166':'#00b4ff',fontFamily:mono,fontSize:9,letterSpacing:1,padding:'5px 12px',cursor:'pointer',fontWeight:700}}>ALL PAIRS (FULL HISTORY)</button>
+        {showAllPairs&&<button onClick={()=>{setShowAllPairs(false);setCharts({});}} style={{background:'transparent',border:'1px solid var(--border)',borderRadius:5,color:'var(--text-muted)',fontFamily:mono,fontSize:8,padding:'4px 10px',cursor:'pointer'}}>CLEAR</button>}
+      </div>
       <div style={{display:'flex',flexWrap:'wrap',gap:5}}>
-        {ALL_PAIRS.map((s,i)=>{const active=symbols.includes(s);const ci=symbols.indexOf(s);const col=active?COLORS[ci]:'var(--border)';return <button key={s} onClick={()=>toggleSymbol(s)} style={{background:active?col+'18':'transparent',border:`1px solid ${col}`,borderRadius:4,color:active?col:'var(--text-muted)',fontFamily:mono,fontSize:9,padding:'3px 8px',cursor:'pointer',fontWeight:active?700:400}}>{s}</button>;})}
+        {ALL_PAIRS.map((s,i)=>{const active=symbols.includes(s);const ci=symbols.indexOf(s);const col=active?COLORS[ci]:'var(--border)';return <button key={s} onClick={()=>{setShowAllPairs(false);toggleSymbol(s);}} style={{background:active?col+'18':'transparent',border:`1px solid ${col}`,borderRadius:4,color:active?col:'var(--text-muted)',fontFamily:mono,fontSize:9,padding:'3px 8px',cursor:'pointer',fontWeight:active?700:400}}>{s}</button>;})}
       </div>
       <div style={{display:'flex',gap:14,flexWrap:'wrap'}}>
-        {symbols.map((s,i)=>{const trend=charts[s]?.trend||'STABLE';return(<div key={s} style={{display:'flex',alignItems:'center',gap:6}}><div style={{width:18,height:3,background:COLORS[i],borderRadius:2}}/><span style={{fontFamily:orb,fontSize:11,fontWeight:700,color:COLORS[i]}}>{s}</span><TrendArrow trend={trend} size={13}/><span style={{fontFamily:mono,fontSize:9,color:trend==='STRONGER'?'#00ff9f':trend==='WEAKER'?'#ff4d6d':'var(--text-muted)'}}>{trend}</span></div>);})}
+        {(showAllPairs?ALL_PAIRS.filter(s=>charts[s]?.data?.length>0):symbols).map((s,i)=>{const trend=charts[s]?.trend||'STABLE';return(<div key={s} style={{display:'flex',alignItems:'center',gap:6}}><div style={{width:18,height:3,background:COLORS[i],borderRadius:2}}/><span style={{fontFamily:orb,fontSize:11,fontWeight:700,color:COLORS[i]}}>{s}</span><TrendArrow trend={trend} size={13}/><span style={{fontFamily:mono,fontSize:9,color:trend==='STRONGER'?'#00ff9f':trend==='WEAKER'?'#ff4d6d':'var(--text-muted)'}}>{trend}</span></div>);})}
       </div>
-      {hover&&<div style={{display:'flex',gap:16,padding:'6px 10px',background:'var(--bg-card)',borderRadius:6,border:'1px solid var(--border)',flexWrap:'wrap'}}><span style={{fontFamily:mono,fontSize:10,color:'var(--text-muted)'}}>{hover.ts}</span>{Object.entries(hover.vals).map(([s,v],i)=><span key={s} style={{fontFamily:mono,fontSize:10,color:COLORS[symbols.indexOf(s)],fontWeight:700}}>{s}: {v>0?'+':''}{v.toFixed(0)}</span>)}</div>}
+      {hover&&<div style={{display:'flex',gap:16,padding:'6px 10px',background:'var(--bg-card)',borderRadius:6,border:'1px solid var(--border)',flexWrap:'wrap'}}><span style={{fontFamily:mono,fontSize:10,color:'var(--text-muted)'}}>{hover.ts}</span>{Object.entries(hover.vals).map(([s,v],i)=>{const arr=showAllPairs?ALL_PAIRS:symbols;return <span key={s} style={{fontFamily:mono,fontSize:10,color:COLORS[arr.indexOf(s)%COLORS.length],fontWeight:700}}>{s}: {v>0?'+':''}{v.toFixed(0)}</span>;})}</div>}
       {loading?<div style={{display:'flex',alignItems:'center',justifyContent:'center',height:H}}><span style={{fontFamily:mono,fontSize:11,color:'var(--text-muted)',letterSpacing:2}}>LOADING...</span></div>:(
         <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} style={{width:'100%',height:'auto',cursor:'crosshair'}} onMouseMove={handleMouseMove} onMouseLeave={()=>setHover(null)}>
           {gridVals.map(g=><g key={g}><line x1={PAD.left} y1={toY(g)} x2={W-PAD.right} y2={toY(g)} stroke={g===0?'var(--text-muted)':g===5||g===-5?'#223344':'var(--border)'} strokeWidth={g===0?1.5:0.5} strokeDasharray={g===5||g===-5?'4,4':g===0?undefined:'2,4'}/><text x={PAD.left-5} y={toY(g)+4} fill={g===0?'var(--text-muted)':g===5?'#00ff9f66':g===-5?'#ff4d6d66':'var(--text-muted)'} fontSize={9} textAnchor="end" fontFamily={mono}>{g>0?'+':''}{g}</text></g>)}
           <rect x={PAD.left} y={toY(12)} width={cW} height={toY(5)-toY(12)} fill="rgba(0,255,159,0.03)"/>
           <rect x={PAD.left} y={toY(-5)} width={cW} height={toY(-12)-toY(-5)} fill="rgba(255,77,109,0.03)"/>
-          {symbols.map((s,ci)=>{const cd=charts[s]?.data;if(!cd||cd.length<2) return null;const col=COLORS[ci];const linePath=cd.map((d,i)=>`${i===0?'M':'L'}${toX(i,cd.length).toFixed(1)},${toY(parseFloat(d.gap)||0).toFixed(1)}`).join(' ');const fX=toX(0,cd.length).toFixed(1),lX=toX(cd.length-1,cd.length).toFixed(1);const aP=cd.map((d,i)=>`${i===0?'M':'L'}${toX(i,cd.length).toFixed(1)},${toY(Math.max(parseFloat(d.gap)||0,0)).toFixed(1)}`).join(' ')+` L${lX},${zeroY.toFixed(1)} L${fX},${zeroY.toFixed(1)} Z`;const bP=cd.map((d,i)=>`${i===0?'M':'L'}${toX(i,cd.length).toFixed(1)},${toY(Math.min(parseFloat(d.gap)||0,0)).toFixed(1)}`).join(' ')+` L${lX},${zeroY.toFixed(1)} L${fX},${zeroY.toFixed(1)} Z`;return(<g key={s}><path d={aP} fill={col+'14'}/><path d={bP} fill="#ff4d6d0a"/><path d={linePath} fill="none" stroke={col} strokeWidth="2" strokeLinejoin="round"/></g>);})}
-          {hover&&xData.length>0&&<><line x1={toX(hover.idx,xData.length)} y1={PAD.top} x2={toX(hover.idx,xData.length)} y2={H-PAD.bottom} stroke="#ffffff22" strokeWidth={1} strokeDasharray="3,3"/>{symbols.map((s,ci)=>{const cd=charts[s]?.data;if(!cd) return null;const ri=Math.round(hover.idx*(cd.length-1)/(xData.length-1||1));const g=parseFloat(cd[Math.min(ri,cd.length-1)]?.gap)||0;return <circle key={s} cx={toX(hover.idx,xData.length)} cy={toY(g)} r={4} fill={COLORS[ci]} stroke="#fff" strokeWidth={1.5}/>;})}</>}
+          {(showAllPairs?ALL_PAIRS:symbols).map((s,ci)=>{const cd=charts[s]?.data;if(!cd||cd.length<2) return null;const col=COLORS[ci];const linePath=cd.map((d,i)=>`${i===0?'M':'L'}${toX(i,cd.length).toFixed(1)},${toY(parseFloat(d.gap)||0).toFixed(1)}`).join(' ');const fX=toX(0,cd.length).toFixed(1),lX=toX(cd.length-1,cd.length).toFixed(1);const aP=cd.map((d,i)=>`${i===0?'M':'L'}${toX(i,cd.length).toFixed(1)},${toY(Math.max(parseFloat(d.gap)||0,0)).toFixed(1)}`).join(' ')+` L${lX},${zeroY.toFixed(1)} L${fX},${zeroY.toFixed(1)} Z`;const bP=cd.map((d,i)=>`${i===0?'M':'L'}${toX(i,cd.length).toFixed(1)},${toY(Math.min(parseFloat(d.gap)||0,0)).toFixed(1)}`).join(' ')+` L${lX},${zeroY.toFixed(1)} L${fX},${zeroY.toFixed(1)} Z`;return(<g key={s}><path d={aP} fill={col+'14'}/><path d={bP} fill="#ff4d6d0a"/><path d={linePath} fill="none" stroke={col} strokeWidth="2" strokeLinejoin="round"/></g>);})}
+          {hover&&xData.length>0&&<><line x1={toX(hover.idx,xData.length)} y1={PAD.top} x2={toX(hover.idx,xData.length)} y2={H-PAD.bottom} stroke="#ffffff22" strokeWidth={1} strokeDasharray="3,3"/>{(showAllPairs?ALL_PAIRS:symbols).map((s,ci)=>{const cd=charts[s]?.data;if(!cd) return null;const ri=Math.round(hover.idx*(cd.length-1)/(xData.length-1||1));const g=parseFloat(cd[Math.min(ri,cd.length-1)]?.gap)||0;return <circle key={s} cx={toX(hover.idx,xData.length)} cy={toY(g)} r={4} fill={COLORS[ci]} stroke="#fff" strokeWidth={1.5}/>;})}</>}
           {xData.filter((_,i)=>{const step=Math.max(1,Math.floor(xData.length/7));return i%step===0||i===xData.length-1;}).map(d=>{const i=xData.indexOf(d);return <text key={i} x={toX(i,xData.length)} y={H-PAD.bottom+14} fill="var(--text-muted)" fontSize={8} textAnchor="middle" fontFamily={mono}>{(d.timestamp||'').slice(5,16)}</text>;})}
         </svg>
       )}
@@ -796,7 +813,7 @@ function PairCard({ row, trend, cotBias }) {
       </div>
       {(()=>{const mu=getMatchup(row);if(!mu)return null;return(<div style={{display:'flex',alignItems:'center',gap:6,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>MATCHUP</span><span style={{fontFamily:mono,fontSize:9,color:mu.color,background:mu.color+'12',border:`1px solid ${mu.color}30`,borderRadius:4,padding:'1px 7px',whiteSpace:'nowrap'}}>{mu.label}</span>{mu.note==='IDEAL'&&<span style={{fontFamily:mono,fontSize:7,color:mu.color,letterSpacing:1,opacity:0.8}}>IDEAL</span>}{mu.note==='AVOID'&&<span style={{fontFamily:mono,fontSize:7,color:'#ffaa44',letterSpacing:1,opacity:0.8}}>AVOID</span>}</div>);})()}
       {(()=>{const bh1=boxTrend(row.box_h1_trend),bh4=boxTrend(row.box_h4_trend);if(!bh1&&!bh4)return null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>BOX</span>{bh4&&<span style={{fontFamily:mono,fontSize:8,color:bh4.color,background:bh4.bg,border:`1px solid ${bh4.border}`,borderRadius:3,padding:'1px 6px'}}>H4 {bh4.label}</span>}{bh1&&<span style={{fontFamily:mono,fontSize:8,color:bh1.color,background:bh1.bg,border:`1px solid ${bh1.border}`,borderRadius:3,padding:'1px 6px'}}>H1 {bh1.label}</span>}</div>);})()}
-      {(()=>{ const tbg=tbgZoneBadge(row.tbg_zone,row.bias); if(!tbg)return null; return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>TBG</span><span style={{fontFamily:mono,fontSize:8,color:tbg.color,background:tbg.bg,border:`1px solid ${tbg.border}`,borderRadius:3,padding:'1px 6px',fontWeight:700}}>{tbg.label}</span>{tbg.valid&&<span style={{fontFamily:mono,fontSize:7,color:'#00ff9f',letterSpacing:1}}>✅</span>}{!tbg.valid&&<span style={{fontFamily:mono,fontSize:7,color:'#ff7744',letterSpacing:1}}>⛔</span>}</div>);})()}{(()=>{
+      {(()=>{ const tbg=tbgZoneBadge(row.tbg_zone,row.bias); if(!tbg)return null; return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>FL-ST</span><span style={{fontFamily:mono,fontSize:8,color:tbg.color,background:tbg.bg,border:`1px solid ${tbg.border}`,borderRadius:3,padding:'1px 6px',fontWeight:700}}>{tbg.label}</span>{tbg.valid&&<span style={{fontFamily:mono,fontSize:7,color:'#00ff9f',letterSpacing:1}}>✅</span>}{!tbg.valid&&<span style={{fontFamily:mono,fontSize:7,color:'#ff7744',letterSpacing:1}}>⛔</span>}</div>);})()}{(()=>{
   const bc=boxConfirm(row.bias,row.box_h4_trend,row.box_h1_trend);
   const af=atrFill(row.atr);
   if(!bc&&!af)return null;
@@ -920,10 +937,10 @@ function PairCardModal({ row, trend, cotBias, onClose }) {
           </div>
         )}
 
-        {/* TBG Zone — G1 Intraday validity */}
+        {/* FL-ST Zone — G1 Intraday validity */}
         {(()=>{ const tbg = tbgZoneBadge(row.tbg_zone, row.bias); if (!tbg) return null; return (
           <div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',background:'rgba(0,0,0,0.15)',borderRadius:8}}>
-            <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2}}>TBG LINES</span>
+            <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2}}>FL-ST LINES</span>
             <span style={{fontFamily:mono,fontSize:10,color:tbg.color,background:tbg.bg,border:`1px solid ${tbg.border}`,borderRadius:4,padding:'2px 10px',fontWeight:700}}>{tbg.label}</span>
             {tbg.valid && <span style={{fontFamily:mono,fontSize:9,color:'#00ff9f',letterSpacing:1}}>✅ VALID</span>}
             {!tbg.valid && <span style={{fontFamily:mono,fontSize:9,color:'#ff7744',letterSpacing:1}}>⛔ NOT VALID</span>}
@@ -1051,7 +1068,7 @@ function ValidSetupsTab({ data, trends, cotMap }) {
               <div style={{fontFamily:mono,fontSize:9,color:t.momentumColor||'var(--text-muted)',background:(t.momentumColor||'var(--text-muted)')+'18',border:`1px solid ${(t.momentumColor||'var(--text-muted)')}30`,borderRadius:4,padding:'2px 8px',display:'inline-block',marginBottom:4}}>{t.momentum||'NEUTRAL'}</div>
               {g && <div style={{fontFamily:mono,fontSize:10,color:g.color,fontWeight:700}}>👉 {g.action}</div>}{(()=>{const mu=getMatchup(row);if(!mu)return null;return(<div style={{fontFamily:mono,fontSize:9,color:mu.color,background:mu.color+'12',border:`1px solid ${mu.color}28`,borderRadius:4,padding:'2px 7px',display:'inline-block',marginTop:3,whiteSpace:'nowrap'}}>{mu.label}{mu.note&&<span style={{marginLeft:5,opacity:0.7,fontSize:8}}>{mu.note}</span>}</div>);})()}
               {(()=>{const bh4=boxTrend(row.box_h4_trend),bh1=boxTrend(row.box_h1_trend);if(!bh4&&!bh1)return null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>BOX</span>{bh4&&<span style={{fontFamily:mono,fontSize:8,color:bh4.color,background:bh4.bg,border:`1px solid ${bh4.border}`,borderRadius:3,padding:'1px 6px'}}>H4 {bh4.label}</span>}{bh1&&<span style={{fontFamily:mono,fontSize:8,color:bh1.color,background:bh1.bg,border:`1px solid ${bh1.border}`,borderRadius:3,padding:'1px 6px'}}>H1 {bh1.label}</span>}</div>);})()}
-              {(()=>{ const tbg=tbgZoneBadge(row.tbg_zone,row.bias); if(!tbg)return null; return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>TBG</span><span style={{fontFamily:mono,fontSize:9,color:tbg.color,background:tbg.bg,border:`1px solid ${tbg.border}`,borderRadius:4,padding:'1px 8px',fontWeight:700}}>{tbg.label}</span>{tbg.valid&&<span style={{fontFamily:mono,fontSize:8,color:'#00ff9f',fontWeight:700}}>G1 ✅</span>}{!tbg.valid&&<span style={{fontFamily:mono,fontSize:8,color:'#ff7744'}}>G1 ⛔</span>}</div>);})()}
+              {(()=>{ const tbg=tbgZoneBadge(row.tbg_zone,row.bias); if(!tbg)return null; return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>FL-ST</span><span style={{fontFamily:mono,fontSize:9,color:tbg.color,background:tbg.bg,border:`1px solid ${tbg.border}`,borderRadius:4,padding:'1px 8px',fontWeight:700}}>{tbg.label}</span>{tbg.valid&&<span style={{fontFamily:mono,fontSize:8,color:'#00ff9f',fontWeight:700}}>G1 ✅</span>}{!tbg.valid&&<span style={{fontFamily:mono,fontSize:8,color:'#ff7744'}}>G1 ⛔</span>}</div>);})()}
               {(()=>{
                 const bc=boxConfirm(row.bias,row.box_h4_trend,row.box_h1_trend);
                 const af=atrFill(row.atr);
@@ -1163,7 +1180,7 @@ function ValidPairsTab({ data, trends, cotMap }) {
                 })()}
                 {(()=>{ const tbg=tbgZoneBadge(row.tbg_zone,row.bias); if(!tbg)return null; return(
                   <div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}>
-                    <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>TBG</span>
+                    <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>FL-ST</span>
                     <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:tbg.color,background:tbg.bg,border:`1px solid ${tbg.border}`,borderRadius:4,padding:'1px 8px',fontWeight:700}}>{tbg.label}</span>
                     {tbg.valid&&<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:'#00ff9f',letterSpacing:1,fontWeight:700}}>G1 INTRA ✅</span>}
                     {!tbg.valid&&<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:'#ff7744',letterSpacing:1}}>G1 INTRA ⛔</span>}
@@ -1633,7 +1650,7 @@ export default function Dashboard() {
         <div style={{display:'flex',alignItems:'center',gap:7,padding:'0 20px 10px',flexWrap:'wrap',zIndex:1}}>
           <div style={{display:'flex',background:'var(--bg-secondary)',border:'1px solid var(--border)',borderRadius:7,overflow:'hidden'}}>
             {TABS.filter(t=>{ const feat=TAB_FEATURE[t]; if(!feat) return true; if(isAdmin) return true; const fa=user?.feature_access||[]; return fa.includes(feat)||fa.includes('dashboard');}).map((t,i,arr)=><button key={t} onClick={()=>setTab(t)} style={{background:tab===t?'rgba(0,180,255,0.15)':'transparent',border:'none',borderRight:i<TABS.length-1?'1px solid var(--border)':'none',color:tab===t?'#00b4ff':'rgba(180,205,240,0.80)',fontFamily:mono,fontSize:9,letterSpacing:2,padding:'7px 12px',cursor:'pointer',whiteSpace:'nowrap'}}>{t}</button>)}
-            {isAdmin&&<><button onClick={()=>setTab('OPEN TRADES')} style={{background:tab==='OPEN TRADES'?'rgba(255,77,109,0.15)':'transparent',border:'none',borderLeft:'1px solid var(--border)',color:tab==='OPEN TRADES'?'#ff4d6d':'rgba(180,205,240,0.80)',fontFamily:mono,fontSize:9,letterSpacing:2,padding:'7px 12px',cursor:'pointer',whiteSpace:'nowrap'}}>🔴 LIVE</button><button onClick={()=>setTab('ENGINE')} style={{background:tab==='ENGINE'?'rgba(255,209,102,0.15)':'transparent',border:'none',borderLeft:'1px solid var(--border)',color:tab==='ENGINE'?'#ffd166':'rgba(180,205,240,0.80)',fontFamily:mono,fontSize:9,letterSpacing:2,padding:'7px 12px',cursor:'pointer'}}>🏥 ENGINE</button></>}
+            {isAdmin&&<><button onClick={()=>setTab('ENGINE')} style={{background:tab==='ENGINE'?'rgba(255,209,102,0.15)':'transparent',border:'none',borderLeft:'1px solid var(--border)',color:tab==='ENGINE'?'#ffd166':'rgba(180,205,240,0.80)',fontFamily:mono,fontSize:9,letterSpacing:2,padding:'7px 12px',cursor:'pointer'}}>🏥 ENGINE</button></>}
           </div>
           {['PANELS','TABLE'].includes(tab)&&(
             <>
@@ -1666,38 +1683,97 @@ export default function Dashboard() {
 ):tab==='VALID PAIRS'?(<ValidPairsTab data={data} trends={trends} cotMap={cotMap}/>
 ):tab==='SPIKE LOG'?(<SpikeLogTab/>
 ):tab==='SIGNALS'?(
-<div>
-  <div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2,marginBottom:16}}>
-    {data.filter(r=>r.bias==='BUY'||r.bias==='SELL').length} ACTIVE SIGNALS
-    {' · '}{data.filter(r=>r.bias==='BUY').length} BUY
-    {' · '}{data.filter(r=>r.bias==='SELL').length} SELL
-  </div>
-  {data.filter(r=>r.bias==='BUY'||r.bias==='SELL').length===0
-    ?<div style={{textAlign:'center',padding:60,fontFamily:mono,fontSize:11,letterSpacing:3,color:'var(--text-muted)'}}>NO ACTIVE SIGNALS</div>
-    :<div style={{display:'flex',flexWrap:'wrap',gap:10}}>
-      {data.filter(r=>r.bias==='BUY'||r.bias==='SELL').sort((a,b)=>Math.abs(b.gap)-Math.abs(a.gap)).map(row=>{
-        const isBuy=row.bias==='BUY';
-        return(
-          <div key={row.symbol} style={{
-            display:'flex',alignItems:'center',gap:10,
-            padding:'12px 18px',borderRadius:8,
-            background:isBuy?'rgba(0,255,159,0.07)':'rgba(255,77,109,0.07)',
-            border:`1px solid ${isBuy?'rgba(0,255,159,0.25)':'rgba(255,77,109,0.25)'}`,
-            minWidth:160,
-          }}>
-            <span style={{fontFamily:orb,fontSize:14,fontWeight:700,color:'#e8eaf0',letterSpacing:2}}>{row.symbol}</span>
-            <span style={{
-              fontFamily:mono,fontSize:11,fontWeight:700,letterSpacing:2,
-              color:isBuy?'#00ff9f':'#ff4d6d',
-              background:isBuy?'rgba(0,255,159,0.12)':'rgba(255,77,109,0.12)',
-              border:`1px solid ${isBuy?'#00ff9f44':'#ff4d6d44'}`,
-              borderRadius:4,padding:'2px 8px',
-            }}>{row.bias}</span>
-          </div>
-        );
-      })}
+<div style={{display:'flex',flexDirection:'column',gap:20}}>
+  {/* SECTION 4 — Live Banner + Market Session */}
+  <div style={{display:'flex',flexDirection:'column',gap:8}}>
+    <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 16px',background:'rgba(0,255,159,0.07)',border:'1px solid rgba(0,255,159,0.35)',borderRadius:8}}>
+      <div style={{width:8,height:8,borderRadius:'50%',background:'#00ff9f',boxShadow:'0 0 8px #00ff9f',animation:'blink 1s infinite'}}/>
+      <span style={{fontFamily:mono,fontSize:11,color:'#00ff9f',letterSpacing:2,fontWeight:700}}>&#x1F7E2; LIVE | Auto Signals Active | Updates in Real-Time</span>
     </div>
-  }
+    {(()=>{
+      const now=new Date();
+      const utcH=now.getUTCHours(),utcM=now.getUTCMinutes();
+      const utcTotal=utcH*60+utcM;
+      const sessions=[
+        {name:'SYDNEY',   color:'#00b4ff', open:21*60, close:6*60,  icon:'\uD83C\uDDE6\uD83C\uDDFA'},
+        {name:'TOKYO',    color:'#ffd166', open:23*60, close:8*60,  icon:'\uD83C\uDDEF\uD83C\uDDF5'},
+        {name:'LONDON',   color:'#cc77ff', open:7*60,  close:16*60, icon:'\uD83C\uDDEC\uD83C\uDDE7'},
+        {name:'NEW YORK', color:'#00ff9f', open:12*60, close:21*60, icon:'\uD83C\uDDFA\uD83C\uDDF8'},
+      ];
+      const isOpen=(s)=>{if(s.open>s.close) return utcTotal>=s.open||utcTotal<s.close; return utcTotal>=s.open&&utcTotal<s.close;};
+      const active=sessions.filter(isOpen);
+      return(
+        <div style={{display:'flex',alignItems:'center',gap:6,padding:'8px 16px',background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:8,flexWrap:'wrap'}}>
+          <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2,marginRight:4}}>MARKET NOW:</span>
+          {sessions.map(s=>{const on=isOpen(s);return(
+            <span key={s.name} style={{fontFamily:mono,fontSize:9,padding:'3px 10px',borderRadius:4,background:on?s.color+'18':'transparent',border:`1px solid ${on?s.color:'var(--border)'}`,color:on?s.color:'var(--text-muted)',fontWeight:on?700:400}}>
+              {s.icon} {s.name} {on?'&#x25CF;':'&#x25CB;'}
+            </span>
+          );})}
+          {active.length===0&&<span style={{fontFamily:mono,fontSize:9,color:'#ff4d6d'}}>ALL SESSIONS CLOSED</span>}
+          {active.length>1&&<span style={{fontFamily:mono,fontSize:9,color:'#ffd166',marginLeft:6}}>&#x26A1; OVERLAP ACTIVE</span>}
+        </div>
+      );
+    })()}
+  </div>
+
+  {/* SECTION 1 — TOP 3 SIGNALS (gap >= 8) */}
+  {(()=>{
+    const top3=data.filter(r=>(r.bias==='BUY'||r.bias==='SELL')&&Math.abs(r.gap||0)>=8).sort((a,b)=>Math.abs(b.gap)-Math.abs(a.gap)).slice(0,3);
+    if(top3.length===0) return null;
+    return(
+      <div>
+        <div style={{fontFamily:mono,fontSize:9,color:'#ffd166',letterSpacing:3,marginBottom:8,fontWeight:700}}>&#x1F3C6; TOP SIGNALS &mdash; GAP &#x2265; 8</div>
+        <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+          {top3.map((row,i)=>{
+            const isBuy=row.bias==='BUY';const gap=row.gap||0;const bc=isBuy?'#00ff9f':'#ff4d6d';const medal=i===0?'#1 \uD83E\uDD47':i===1?'#2 \uD83E\uDD48':'#3 \uD83E\uDD49';
+            return(
+              <div key={row.symbol} style={{display:'flex',flexDirection:'column',gap:6,padding:'14px 20px',borderRadius:10,background:isBuy?'rgba(0,255,159,0.09)':'rgba(255,77,109,0.09)',border:`2px solid ${bc}55`,minWidth:180,position:'relative',overflow:'hidden'}}>
+                <div style={{position:'absolute',top:0,left:0,right:0,height:2,background:`linear-gradient(90deg,transparent,${bc},transparent)`}}/>
+                <div style={{fontFamily:mono,fontSize:9,color:'#ffd166',fontWeight:700,marginBottom:2}}>{medal}</div>
+                <div style={{display:'flex',alignItems:'center',gap:10}}>
+                  <span style={{fontFamily:orb,fontSize:16,fontWeight:900,letterSpacing:2,color:'var(--text-primary)'}}>{row.symbol}</span>
+                  <span style={{fontFamily:mono,fontSize:10,color:bc,background:bc+'18',border:`1px solid ${bc}44`,borderRadius:4,padding:'2px 8px',fontWeight:700}}>{row.bias}</span>
+                </div>
+                <div style={{display:'flex',alignItems:'baseline',gap:6}}>
+                  <span style={{fontFamily:orb,fontSize:30,fontWeight:900,color:bc,lineHeight:1,textShadow:`0 0 16px ${bc}66`}}>{gap>0?'+':''}{Number(gap).toFixed(0)}</span>
+                  <span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:2}}>GAP SCORE</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  })()}
+
+  {/* SECTION 2 — ALL VALID SIGNALS */}
+  <div>
+    <div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2,marginBottom:8}}>
+      ALL VALID SIGNALS &bull; {data.filter(r=>r.bias==='BUY'||r.bias==='SELL').length} TOTAL &bull; {data.filter(r=>r.bias==='BUY').length} BUY &bull; {data.filter(r=>r.bias==='SELL').length} SELL
+    </div>
+    {data.filter(r=>r.bias==='BUY'||r.bias==='SELL').length===0
+      ?<div style={{textAlign:'center',padding:40,fontFamily:mono,fontSize:11,letterSpacing:3,color:'var(--text-muted)'}}>NO ACTIVE SIGNALS</div>
+      :<div style={{display:'flex',flexWrap:'wrap',gap:8}}>
+        {data.filter(r=>r.bias==='BUY'||r.bias==='SELL').sort((a,b)=>Math.abs(b.gap)-Math.abs(a.gap)).map(row=>{
+          const isBuy=row.bias==='BUY';const bc=isBuy?'#00ff9f':'#ff4d6d';
+          return(
+            <div key={row.symbol} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 16px',borderRadius:8,background:isBuy?'rgba(0,255,159,0.06)':'rgba(255,77,109,0.06)',border:`1px solid ${isBuy?'rgba(0,255,159,0.25)':'rgba(255,77,109,0.25)'}`,minWidth:150}}>
+              <span style={{fontFamily:orb,fontSize:13,fontWeight:700,color:'var(--text-primary)',letterSpacing:2}}>{row.symbol}</span>
+              <span style={{fontFamily:mono,fontSize:10,fontWeight:700,color:bc,background:bc+'12',border:`1px solid ${bc}44`,borderRadius:4,padding:'2px 8px'}}>{row.bias}</span>
+              <span style={{fontFamily:mono,fontSize:11,fontWeight:700,color:bc}}>{row.gap>0?'+':''}{Number(row.gap||0).toFixed(0)}</span>
+            </div>
+          );
+        })}
+      </div>
+    }
+  </div>
+
+  {/* SECTION 3 — Disclaimer */}
+  <div style={{padding:'8px 14px',background:'rgba(255,209,102,0.04)',border:'1px solid rgba(255,209,102,0.15)',borderRadius:6,display:'flex',alignItems:'center',gap:8}}>
+    <span style={{fontSize:14}}>&#x26A0;&#xFE0F;</span>
+    <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:1}}>For educational purposes only &mdash; not financial advice. Watch. Analyze. Decide.</span>
+  </div>
 </div>
 ):tab==='TABLE'?(
 
@@ -1736,7 +1812,7 @@ export default function Dashboard() {
            :tab==='CALENDAR'?<EconomicCalendar pairs={validPairs}/>
            :tab==='CALCULATOR'?<PositionCalculator/>
            :tab==='ENGINE'?<EngineHealth/>
-           :tab==='OPEN TRADES'?<OpenTradesPanel/>
+           :tab==='OPEN TRADES'?null
            :tab==='COT REPORT'?(
             <div style={{maxWidth:860,margin:'0 auto'}}>
               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
