@@ -1419,44 +1419,62 @@ function SpikeLogTab() {
 // ===== CHART TAB =====
 function ChartTab({ data }) {
   const mono = "'Share Tech Mono',monospace";
-  const orb  = "'Orbitron',sans-serif";
-  const pairs = (data||[]).filter(r => Math.abs(r.gap??0) >= 5).sort((a,b)=>Math.abs(b.gap??0)-Math.abs(a.gap??0));
-  const [selected, setSelected] = React.useState(pairs[0]?.symbol || 'EURUSD');
+  const ALL_SYMS = ALL_PAIRS;
+  const validPairs = (data||[]).filter(r => Math.abs(r.gap??0) >= 5).sort((a,b)=>Math.abs(b.gap??0)-Math.abs(a.gap??0));
+  const displayPairs = validPairs.length > 0 ? validPairs.map(r=>r.symbol) : ALL_SYMS;
+  const [selected, setSelected] = React.useState('EURUSD');
   const [tf, setTf] = React.useState('60');
-  const bias = pairs.find(r=>r.symbol===selected) ? biasFromGap(pairs.find(r=>r.symbol===selected).gap??0) : {color:'#00b4ff',border:'rgba(0,180,255,0.4)',bg:'rgba(0,180,255,0.1)',label:'—'};
-  const src = `https://www.tradingview.com/widgetembed/?frameElementId=tv_chart_tab&symbol=${encodeURIComponent(selected)}&interval=${tf}&hidesidetoolbar=0&symboledit=1&saveimage=0&toolbarbg=0d1117&theme=dark&style=1&timezone=Asia%2FDubai&locale=en`;
-  const TFS = [{'label':'M15','v':'15'},{'label':'H1','v':'60'},{'label':'H4','v':'240'},{'label':'D1','v':'D'}];
+  const TFS = [{label:'M15',v:'15'},{label:'H1',v:'60'},{label:'H4',v:'240'},{label:'D1',v:'D'}];
+  const rowData = validPairs.find(r=>r.symbol===selected);
+  const bias = rowData ? biasFromGap(rowData.gap??0) : {color:'#00b4ff',border:'rgba(0,180,255,0.4)',bg:'rgba(0,180,255,0.1)',label:'—'};
+
+  // Build srcdoc HTML — avoids X-Frame-Options block entirely
+  const srcdoc = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>*{margin:0;padding:0;box-sizing:border-box;}body{background:#0d1117;}</style></head><body><div class="tradingview-widget-container" style="height:100vh;width:100%"><div id="tv_widget" style="height:100%;width:100%"></div><script type="text/javascript" src="https://s3.tradingview.com/tv.js"><\/script><script type="text/javascript">new TradingView.widget({autosize:true,symbol:"${selected}",interval:"${tf}",timezone:"Asia/Dubai",theme:"dark",style:"1",locale:"en",toolbar_bg:"#0d1117",enable_publishing:false,hide_side_toolbar:false,allow_symbol_change:true,container_id:"tv_widget"});<\/script></div></body></html>`;
+
   return (
     <div style={{display:'flex',flexDirection:'column',gap:12}}>
-      <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-        <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2}}>PAIR:</span>
-        <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
-          {(pairs.length > 0 ? pairs.map(r=>r.symbol) : ALL_PAIRS).map(sym => {
-            const b = pairs.find(r=>r.symbol===sym) ? biasFromGap(pairs.find(r=>r.symbol===sym).gap??0) : null;
-            return (
-              <button key={sym} onClick={()=>setSelected(sym)} style={{fontFamily:mono,fontSize:9,padding:'4px 10px',borderRadius:5,cursor:'pointer',
-                border:`1px solid ${selected===sym?(b?.border||'rgba(0,180,255,0.4)'):'var(--border)'}`,
-                background:selected===sym?(b?.bg||'rgba(0,180,255,0.1)'):'transparent',
-                color:selected===sym?(b?.color||'#00b4ff'):'var(--text-muted)',fontWeight:selected===sym?700:400}}>{sym}</button>
-            );
-          })}
-        </div>
-        <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2,marginLeft:8}}>TF:</span>
+      {/* Pair selector */}
+      <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+        <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2,flexShrink:0}}>PAIR:</span>
+        {displayPairs.map(sym => {
+          const b = validPairs.find(r=>r.symbol===sym);
+          const bc = b ? biasFromGap(b.gap??0) : null;
+          const active = selected===sym;
+          return (
+            <button key={sym} onClick={()=>setSelected(sym)} style={{
+              fontFamily:mono,fontSize:9,padding:'4px 10px',borderRadius:5,cursor:'pointer',
+              border:`1px solid ${active?(bc?.border||'rgba(0,180,255,0.4)'):'var(--border)'}`,
+              background:active?(bc?.bg||'rgba(0,180,255,0.1)'):'transparent',
+              color:active?(bc?.color||'#00b4ff'):'var(--text-muted)',
+              fontWeight:active?700:400,
+            }}>{sym}</button>
+          );
+        })}
+      </div>
+      {/* TF selector */}
+      <div style={{display:'flex',alignItems:'center',gap:6}}>
+        <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2}}>TF:</span>
         {TFS.map(t=>(
-          <button key={t.v} onClick={()=>setTf(t.v)} style={{fontFamily:mono,fontSize:9,padding:'4px 10px',borderRadius:5,cursor:'pointer',
+          <button key={t.v} onClick={()=>setTf(t.v)} style={{
+            fontFamily:mono,fontSize:9,padding:'4px 14px',borderRadius:5,cursor:'pointer',
             border:`1px solid ${tf===t.v?'rgba(0,180,255,0.5)':'var(--border)'}`,
             background:tf===t.v?'rgba(0,180,255,0.12)':'transparent',
-            color:tf===t.v?'#00b4ff':'var(--text-muted)',fontWeight:tf===t.v?700:400}}>{t.label}</button>
+            color:tf===t.v?'#00b4ff':'var(--text-muted)',fontWeight:tf===t.v?700:400,
+          }}>{t.label}</button>
         ))}
+        <span style={{fontFamily:mono,fontSize:9,color:bias.color,marginLeft:8,fontWeight:700}}>{selected} · {bias.label}</span>
       </div>
-      <div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2}}>
-        {selected} · {TFS.find(t=>t.v===tf)?.label} · Dubai timezone
-      </div>
-      <div style={{width:'100%',height:600,borderRadius:10,overflow:'hidden',border:`1px solid ${bias.border}`,background:'#0d1117'}}>
-        <iframe key={selected+tf} src={src} style={{width:'100%',height:'100%',border:'none'}} allowFullScreen loading="lazy"/>
+      {/* Chart iframe using srcdoc — bypasses X-Frame-Options */}
+      <div style={{width:'100%',height:580,borderRadius:10,overflow:'hidden',border:`1px solid ${bias.border}`}}>
+        <iframe
+          key={selected+tf}
+          srcDoc={srcdoc}
+          sandbox="allow-scripts allow-same-origin"
+          style={{width:'100%',height:'100%',border:'none'}}
+        />
       </div>
       <div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:1,textAlign:'center',opacity:0.4}}>
-        Powered by TradingView
+        Powered by TradingView · Dubai timezone
       </div>
     </div>
   );
