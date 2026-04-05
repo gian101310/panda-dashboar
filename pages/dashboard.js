@@ -1441,6 +1441,117 @@ const SORTS   = [
   {label:'1H CHANGE',value:'delta1h'},
 ];
 
+
+// ===== SIGNAL FLASHCARD COMPONENT =====
+function SignalFlashcard({ data, trends }) {
+  const mono = "'Share Tech Mono',monospace";
+  const orb  = "'Orbitron',sans-serif";
+  const allSigs = (data||[]).filter(r=>r.bias==='BUY'||r.bias==='SELL').sort((a,b)=>Math.abs(b.gap||0)-Math.abs(a.gap||0));
+  const [cardIdx, setCardIdx] = useState(0);
+  const [flipping, setFlipping] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const timerRef = useRef(null);
+
+  function goTo(idx) {
+    if (flipping || allSigs.length === 0) return;
+    setFlipping(true);
+    setTimeout(() => { setCardIdx((idx + allSigs.length) % allSigs.length); setFlipping(false); }, 240);
+  }
+  function next() { goTo(cardIdx + 1); }
+  function prev() { goTo(cardIdx - 1); }
+
+  useEffect(() => {
+    if (paused || allSigs.length === 0) return;
+    timerRef.current = setInterval(next, 3500);
+    return () => clearInterval(timerRef.current);
+  }, [cardIdx, paused, allSigs.length]);
+
+  if (allSigs.length === 0) return (
+    <div style={{textAlign:'center',padding:40,fontFamily:mono,fontSize:11,letterSpacing:3,color:'var(--text-muted)'}}>NO ACTIVE SIGNALS</div>
+  );
+
+  const row = allSigs[cardIdx];
+  const isBuy = row.bias === 'BUY';
+  const bc = isBuy ? '#00ff9f' : '#ff4d6d';
+  const bgc = isBuy ? 'rgba(0,255,159,0.08)' : 'rgba(255,77,109,0.08)';
+  const t = trends[row.symbol] || {};
+  const momColor = t.momentum==='STRONG'?'#00ff9f':t.momentum==='BUILDING'?'#66ffcc':t.momentum==='SPARK'?'#ffd166':'#ffd166';
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:10}}>
+      {/* Header row */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+        <span style={{fontFamily:orb,fontSize:10,color:'#00b4ff',letterSpacing:4,fontWeight:700}}>&#x26A1; SIGNAL FLASHCARD</span>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>{cardIdx+1} / {allSigs.length}</span>
+          <button onClick={()=>setPaused(p=>!p)} style={{background:paused?'rgba(255,209,102,0.12)':'rgba(0,180,255,0.08)',border:`1px solid ${paused?'#ffd166':'rgba(0,180,255,0.4)'}`,borderRadius:4,color:paused?'#ffd166':'#00b4ff',fontFamily:mono,fontSize:8,padding:'3px 10px',cursor:'pointer',letterSpacing:1}}>
+            {paused ? '▶ PLAY' : '⏸ PAUSE'}
+          </button>
+        </div>
+      </div>
+
+      {/* Main card */}
+      <div style={{position:'relative',height:200,cursor:'pointer'}} onClick={next}>
+        <div style={{
+          position:'absolute',inset:0,
+          background:bgc,
+          border:`2px solid ${bc}77`,
+          borderRadius:18,
+          padding:'28px 36px',
+          display:'flex',flexDirection:'column',justifyContent:'space-between',
+          overflow:'hidden',
+          opacity:flipping?0:1,
+          transform:flipping?'scale(0.96) translateY(4px)':'scale(1) translateY(0)',
+          transition:'opacity 0.22s ease, transform 0.22s ease',
+          boxShadow:`0 0 40px ${bc}18, inset 0 0 60px ${bc}05`,
+        }}>
+          {/* Decorative big bg text */}
+          <div style={{position:'absolute',bottom:-8,right:12,fontFamily:orb,fontSize:80,fontWeight:900,color:bc+'07',pointerEvents:'none',lineHeight:1,userSelect:'none'}}>{row.bias}</div>
+          {/* Top section */}
+          <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between'}}>
+            <div style={{display:'flex',flexDirection:'column',gap:6}}>
+              <span style={{fontFamily:orb,fontSize:38,fontWeight:900,letterSpacing:4,color:'var(--text-primary)',lineHeight:1}}>{row.symbol}</span>
+              <span style={{fontFamily:mono,fontSize:10,color:'var(--text-muted)',letterSpacing:2}}>
+                {isBuy ? 'BASE STRONG / QUOTE WEAK' : 'BASE WEAK / QUOTE STRONG'}
+              </span>
+            </div>
+            <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:8}}>
+              <span style={{fontFamily:mono,fontSize:16,fontWeight:700,color:bc,background:bc+'18',border:`1px solid ${bc}55`,borderRadius:8,padding:'6px 20px',letterSpacing:3}}>{row.bias}</span>
+              {t.momentum && <span style={{fontFamily:mono,fontSize:11,color:momColor,background:momColor+'12',border:`1px solid ${momColor}30`,borderRadius:5,padding:'3px 10px'}}>{t.momentum}</span>}
+            </div>
+          </div>
+          {/* Pulse bar */}
+          <div style={{height:3,borderRadius:2,background:`linear-gradient(90deg,transparent,${bc},transparent)`,opacity:0.55,animation:'pulse 2s ease-in-out infinite'}}/>
+        </div>
+      </div>
+
+      {/* Prev / dots / next */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10}}>
+        <button onClick={(e)=>{e.stopPropagation();prev();}} style={{background:'transparent',border:'1px solid var(--border)',borderRadius:'50%',width:28,height:28,color:'var(--text-muted)',fontFamily:mono,fontSize:16,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1}}>&lsaquo;</button>
+        <div style={{display:'flex',gap:5,flexWrap:'wrap',justifyContent:'center',maxWidth:420}}>
+          {allSigs.map((_,i) => (
+            <div key={i} onClick={()=>goTo(i)} style={{width:i===cardIdx?20:6,height:6,borderRadius:3,background:i===cardIdx?bc:'var(--border)',cursor:'pointer',transition:'all 0.3s',flexShrink:0}}/>
+          ))}
+        </div>
+        <button onClick={(e)=>{e.stopPropagation();next();}} style={{background:'transparent',border:'1px solid var(--border)',borderRadius:'50%',width:28,height:28,color:'var(--text-muted)',fontFamily:mono,fontSize:16,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1}}>&rsaquo;</button>
+      </div>
+
+      {/* Mini ticker strip */}
+      <div style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:4,scrollbarWidth:'thin'}}>
+        {allSigs.map((r,i) => {
+          const b = r.bias==='BUY'; const c = b?'#00ff9f':'#ff4d6d';
+          return (
+            <div key={r.symbol} onClick={()=>goTo(i)} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:2,padding:'5px 10px',borderRadius:6,background:i===cardIdx?(b?'rgba(0,255,159,0.12)':'rgba(255,77,109,0.12)'):'transparent',border:`1px solid ${i===cardIdx?c:'var(--border)'}`,cursor:'pointer',flexShrink:0,transition:'all 0.2s',minWidth:58}}>
+              <span style={{fontFamily:orb,fontSize:10,fontWeight:700,color:i===cardIdx?'var(--text-primary)':'var(--text-muted)',letterSpacing:1}}>{r.symbol}</span>
+              <span style={{fontFamily:mono,fontSize:8,color:c,fontWeight:700}}>{r.bias}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const [data,       setData]       = useState([]);
   const [trends,     setTrends]     = useState({});
@@ -1685,109 +1796,8 @@ export default function Dashboard() {
 ):tab==='SIGNALS'?(
 <div style={{display:'flex',flexDirection:'column',gap:24}}>
 
-  {/* ── FLASHCARD CAROUSEL ── */}
-  {(()=>{
-    const allSigs=data.filter(r=>r.bias==='BUY'||r.bias==='SELL').sort((a,b)=>Math.abs(b.gap)-Math.abs(a.gap));
-    const [cardIdx,setCardIdx]=React.useState(0);
-    const [flipping,setFlipping]=React.useState(false);
-    const [paused,setPaused]=React.useState(false);
-    const timerRef=React.useRef(null);
-
-    function goTo(idx,dir){
-      if(flipping||allSigs.length===0) return;
-      setFlipping(true);
-      setTimeout(()=>{setCardIdx((idx+allSigs.length)%allSigs.length);setFlipping(false);},260);
-    }
-    function next(){goTo(cardIdx+1);}
-    function prev(){goTo(cardIdx-1);}
-
-    React.useEffect(()=>{
-      if(paused||allSigs.length===0) return;
-      timerRef.current=setInterval(next,3500);
-      return()=>clearInterval(timerRef.current);
-    },[cardIdx,paused,allSigs.length]);
-
-    if(allSigs.length===0) return(
-      <div style={{textAlign:'center',padding:60,fontFamily:mono,fontSize:11,letterSpacing:3,color:'var(--text-muted)'}}>NO ACTIVE SIGNALS</div>
-    );
-
-    const row=allSigs[cardIdx];
-    const isBuy=row.bias==='BUY';
-    const bc=isBuy?'#00ff9f':'#ff4d6d';
-    const bgc=isBuy?'rgba(0,255,159,0.09)':'rgba(255,77,109,0.09)';
-    const t2=trends[row.symbol]||{};
-    const momColor=t2.momentum==='STRONG'?'#00ff9f':t2.momentum==='BUILDING'?'#66ffcc':t2.momentum==='SPARK'?'#ffd166':'#ffd166';
-
-    return(
-      <div style={{display:'flex',flexDirection:'column',gap:10}}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-          <span style={{fontFamily:orb,fontSize:10,color:'#00b4ff',letterSpacing:4,fontWeight:700}}>&#x26A1; SIGNAL FLASHCARD</span>
-          <div style={{display:'flex',alignItems:'center',gap:8}}>
-            <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>{cardIdx+1} / {allSigs.length}</span>
-            <button onClick={()=>setPaused(p=>!p)} style={{background:paused?'rgba(255,209,102,0.12)':'rgba(0,180,255,0.08)',border:`1px solid ${paused?'#ffd166':'#00b4ff44'}`,borderRadius:4,color:paused?'#ffd166':'#00b4ff',fontFamily:mono,fontSize:8,padding:'3px 9px',cursor:'pointer',letterSpacing:1}}>
-              {paused?'&#x25B6; PLAY':'&#x23F8; PAUSE'}
-            </button>
-          </div>
-        </div>
-
-        {/* Card */}
-        <div style={{position:'relative',height:200,cursor:'pointer'}} onClick={next}>
-          <div style={{
-            position:'absolute',inset:0,
-            background:bgc,
-            border:`2px solid ${bc}88`,
-            borderRadius:18,
-            padding:'28px 36px',
-            display:'flex',flexDirection:'column',justifyContent:'space-between',
-            overflow:'hidden',
-            opacity:flipping?0:1,
-            transform:flipping?'scale(0.96)':'scale(1)',
-            transition:'opacity 0.25s ease, transform 0.25s ease',
-            boxShadow:`0 0 40px ${bc}22, inset 0 0 60px ${bc}06`,
-          }}>
-            {/* Decorative bg text */}
-            <div style={{position:'absolute',bottom:-10,right:10,fontFamily:orb,fontSize:80,fontWeight:900,color:bc+'07',pointerEvents:'none',lineHeight:1,userSelect:'none'}}>{row.bias}</div>
-            {/* Top row */}
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-              <div style={{display:'flex',flexDirection:'column',gap:4}}>
-                <span style={{fontFamily:orb,fontSize:36,fontWeight:900,letterSpacing:4,color:'var(--text-primary)',lineHeight:1}}>{row.symbol}</span>
-                <span style={{fontFamily:mono,fontSize:10,color:'var(--text-muted)',letterSpacing:2}}>
-                  {isBuy?'BASE STRONG / QUOTE WEAK':'BASE WEAK / QUOTE STRONG'}
-                </span>
-              </div>
-              <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:6}}>
-                <span style={{fontFamily:mono,fontSize:16,fontWeight:700,color:bc,background:bc+'18',border:`1px solid ${bc}55`,borderRadius:8,padding:'6px 18px',letterSpacing:3}}>{row.bias}</span>
-                {t2.momentum&&<span style={{fontFamily:mono,fontSize:11,color:momColor,background:momColor+'12',border:`1px solid ${momColor}30`,borderRadius:5,padding:'3px 10px'}}>{t2.momentum}</span>}
-              </div>
-            </div>
-            {/* Bottom pulse bar */}
-            <div style={{height:4,borderRadius:2,background:`linear-gradient(90deg,transparent,${bc},transparent)`,opacity:0.6,animation:'pulse 2s ease-in-out infinite'}}/>
-          </div>
-        </div>
-
-        {/* Dot nav + arrows */}
-        <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10}}>
-          <button onClick={(e)=>{e.stopPropagation();prev();}} style={{background:'transparent',border:'1px solid var(--border)',borderRadius:'50%',width:28,height:28,color:'var(--text-muted)',fontFamily:mono,fontSize:13,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>&#x2039;</button>
-          <div style={{display:'flex',gap:5,flexWrap:'wrap',justifyContent:'center',maxWidth:400}}>
-            {allSigs.slice(0,Math.min(allSigs.length,21)).map((_,i)=>(
-              <div key={i} onClick={()=>goTo(i)} style={{width:i===cardIdx?20:6,height:6,borderRadius:3,background:i===cardIdx?bc:'var(--border)',cursor:'pointer',transition:'all 0.3s',flexShrink:0}}/>
-            ))}
-          </div>
-          <button onClick={(e)=>{e.stopPropagation();next();}} style={{background:'transparent',border:'1px solid var(--border)',borderRadius:'50%',width:28,height:28,color:'var(--text-muted)',fontFamily:mono,fontSize:13,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>&#x203A;</button>
-        </div>
-
-        {/* Mini ticker strip below */}
-        <div style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:4}}>
-          {allSigs.map((r,i)=>{const b=r.bias==='BUY';const c=b?'#00ff9f':'#ff4d6d';return(
-            <div key={r.symbol} onClick={()=>goTo(i)} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:2,padding:'6px 10px',borderRadius:6,background:i===cardIdx?(b?'rgba(0,255,159,0.12)':'rgba(255,77,109,0.12)'):'transparent',border:`1px solid ${i===cardIdx?c:'var(--border)'}`,cursor:'pointer',flexShrink:0,transition:'all 0.2s'}}>
-              <span style={{fontFamily:orb,fontSize:10,fontWeight:700,color:i===cardIdx?'var(--text-primary)':'var(--text-muted)'}}>{r.symbol}</span>
-              <span style={{fontFamily:mono,fontSize:8,color:c,fontWeight:700}}>{r.bias}</span>
-            </div>
-          );})}
-        </div>
-      </div>
-    );
-  })()}
+  {/* FLASHCARD */}
+  <SignalFlashcard data={data} trends={trends}/>
 
   {/* LIVE BANNER + MARKET SESSION */}
   <div style={{display:'flex',flexDirection:'column',gap:8}}>
@@ -1822,7 +1832,7 @@ export default function Dashboard() {
     })()}
   </div>
 
-  {/* TOP 3 SIGNALS */}
+  {/* TOP 3 */}
   {(()=>{
     const top3=data.filter(r=>(r.bias==='BUY'||r.bias==='SELL')&&Math.abs(r.gap||0)>=8).sort((a,b)=>Math.abs(b.gap)-Math.abs(a.gap)).slice(0,3);
     if(top3.length===0) return null;
@@ -1853,13 +1863,10 @@ export default function Dashboard() {
     );
   })()}
 
-  {/* ALL VALID SIGNALS */}
+  {/* ALL SIGNALS GRID */}
   <div>
     <div style={{fontFamily:orb,fontSize:11,color:'var(--text-secondary)',letterSpacing:3,marginBottom:12}}>
-      ALL SIGNALS &nbsp;
-      <span style={{color:'#00ff9f'}}>{data.filter(r=>r.bias==='BUY').length} BUY</span>
-      <span style={{color:'var(--text-muted)'}}> / </span>
-      <span style={{color:'#ff4d6d'}}>{data.filter(r=>r.bias==='SELL').length} SELL</span>
+      ALL SIGNALS &nbsp;<span style={{color:'#00ff9f'}}>{data.filter(r=>r.bias==='BUY').length} BUY</span><span style={{color:'var(--text-muted)'}}> / </span><span style={{color:'#ff4d6d'}}>{data.filter(r=>r.bias==='SELL').length} SELL</span>
     </div>
     {data.filter(r=>r.bias==='BUY'||r.bias==='SELL').length===0
       ?<div style={{textAlign:'center',padding:40,fontFamily:mono,fontSize:11,letterSpacing:3,color:'var(--text-muted)'}}>NO ACTIVE SIGNALS</div>
