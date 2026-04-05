@@ -1417,19 +1417,30 @@ function SpikeLogTab() {
 
 // ===== MAIN DASHBOARD =====
 // ===== CHART TAB =====
+function buildTVDoc(symbol, interval) {
+  var cfg = JSON.stringify({autosize:true,symbol:symbol,interval:interval,timezone:'Asia/Dubai',theme:'dark',style:'1',locale:'en',toolbar_bg:'#0d1117',enable_publishing:false,hide_side_toolbar:false,allow_symbol_change:true,container_id:'tv_widget'});
+  return [
+    '<!DOCTYPE html><html><head><meta charset="utf-8">',
+    '<style>*{margin:0;padding:0;box-sizing:border-box;}body{background:#0d1117;}</style>',
+    '</head><body>',
+    '<div class="tradingview-widget-container" style="height:100vh;width:100%">',
+    '<div id="tv_widget" style="height:100%;width:100%"></div>',
+    '<scr'+'ipt src="https://s3.tradingview.com/tv.js"></scr'+'ipt>',
+    '<scr'+'ipt>new TradingView.widget('+cfg+');</scr'+'ipt>',
+    '</div></body></html>'
+  ].join('');
+}
+
 function ChartTab({ data }) {
   const mono = "'Share Tech Mono',monospace";
-  const ALL_SYMS = ALL_PAIRS;
   const validPairs = (data||[]).filter(r => Math.abs(r.gap??0) >= 5).sort((a,b)=>Math.abs(b.gap??0)-Math.abs(a.gap??0));
-  const displayPairs = validPairs.length > 0 ? validPairs.map(r=>r.symbol) : ALL_SYMS;
+  const displayPairs = validPairs.length > 0 ? validPairs.map(r=>r.symbol) : ALL_PAIRS;
   const [selected, setSelected] = React.useState('EURUSD');
   const [tf, setTf] = React.useState('60');
   const TFS = [{label:'M15',v:'15'},{label:'H1',v:'60'},{label:'H4',v:'240'},{label:'D1',v:'D'}];
   const rowData = validPairs.find(r=>r.symbol===selected);
   const bias = rowData ? biasFromGap(rowData.gap??0) : {color:'#00b4ff',border:'rgba(0,180,255,0.4)',bg:'rgba(0,180,255,0.1)',label:'—'};
-
-  // Build srcdoc HTML — avoids X-Frame-Options block entirely
-  const srcdoc = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>*{margin:0;padding:0;box-sizing:border-box;}body{background:#0d1117;}</style></head><body><div class="tradingview-widget-container" style="height:100vh;width:100%"><div id="tv_widget" style="height:100%;width:100%"></div><script type="text/javascript" src="https://s3.tradingview.com/tv.js"><\/script><script type="text/javascript">new TradingView.widget({autosize:true,symbol:"${selected}",interval:"${tf}",timezone:"Asia/Dubai",theme:"dark",style:"1",locale:"en",toolbar_bg:"#0d1117",enable_publishing:false,hide_side_toolbar:false,allow_symbol_change:true,container_id:"tv_widget"});<\/script></div></body></html>`;
+  const srcdoc = buildTVDoc(selected, tf);
 
   return (
     <div style={{display:'flex',flexDirection:'column',gap:12}}>
