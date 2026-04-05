@@ -1481,7 +1481,7 @@ function SignalFlashcard({ data, trends }) {
     <div style={{display:'flex',flexDirection:'column',gap:10}}>
       {/* Header row */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-        <span style={{fontFamily:orb,fontSize:10,color:'#00b4ff',letterSpacing:4,fontWeight:700}}>&#x26A1; SIGNAL FLASHCARD</span>
+        <span style={{fontFamily:orb,fontSize:10,color:'#00b4ff',letterSpacing:4,fontWeight:700}}>{'⚡ SIGNAL FLASHCARD'}</span>
         <div style={{display:'flex',alignItems:'center',gap:8}}>
           <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>{cardIdx+1} / {allSigs.length}</span>
           <button onClick={()=>setPaused(p=>!p)} style={{background:paused?'rgba(255,209,102,0.12)':'rgba(0,180,255,0.08)',border:`1px solid ${paused?'#ffd166':'rgba(0,180,255,0.4)'}`,borderRadius:4,color:paused?'#ffd166':'#00b4ff',fontFamily:mono,fontSize:8,padding:'3px 10px',cursor:'pointer',letterSpacing:1}}>
@@ -1525,13 +1525,13 @@ function SignalFlashcard({ data, trends }) {
 
       {/* Prev / dots / next */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10}}>
-        <button onClick={(e)=>{e.stopPropagation();prev();}} style={{background:'transparent',border:'1px solid var(--border)',borderRadius:'50%',width:28,height:28,color:'var(--text-muted)',fontFamily:mono,fontSize:16,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1}}>&lsaquo;</button>
+        <button onClick={(e)=>{e.stopPropagation();prev();}} style={{background:'transparent',border:'1px solid var(--border)',borderRadius:'50%',width:28,height:28,color:'var(--text-muted)',fontFamily:mono,fontSize:16,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1}}>‹</button>
         <div style={{display:'flex',gap:5,flexWrap:'wrap',justifyContent:'center',maxWidth:420}}>
           {allSigs.map((_,i) => (
             <div key={i} onClick={()=>goTo(i)} style={{width:i===cardIdx?20:6,height:6,borderRadius:3,background:i===cardIdx?bc:'var(--border)',cursor:'pointer',transition:'all 0.3s',flexShrink:0}}/>
           ))}
         </div>
-        <button onClick={(e)=>{e.stopPropagation();next();}} style={{background:'transparent',border:'1px solid var(--border)',borderRadius:'50%',width:28,height:28,color:'var(--text-muted)',fontFamily:mono,fontSize:16,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1}}>&rsaquo;</button>
+        <button onClick={(e)=>{e.stopPropagation();next();}} style={{background:'transparent',border:'1px solid var(--border)',borderRadius:'50%',width:28,height:28,color:'var(--text-muted)',fontFamily:mono,fontSize:16,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1}}>›</button>
       </div>
 
       {/* Mini ticker strip */}
@@ -1801,30 +1801,31 @@ export default function Dashboard() {
   <div style={{display:'flex',flexDirection:'column',gap:8}}>
     <div style={{display:'flex',alignItems:'center',gap:12,padding:'10px 18px',background:'rgba(0,255,159,0.07)',border:'1px solid rgba(0,255,159,0.35)',borderRadius:10}}>
       <div style={{width:8,height:8,borderRadius:'50%',background:'#00ff9f',boxShadow:'0 0 10px #00ff9f',animation:'blink 1s infinite',flexShrink:0}}/>
-      <span style={{fontFamily:mono,fontSize:12,color:'#00ff9f',letterSpacing:2,fontWeight:700}}>&#x1F7E2; LIVE | Auto Signals Active | Updates in Real-Time</span>
+      <span style={{fontFamily:mono,fontSize:12,color:'#00ff9f',letterSpacing:2,fontWeight:700}}>{'🟢 LIVE | Auto Signals Active | Updates in Real-Time'}</span>
     </div>
     {(()=>{
       const now=new Date();
       const utcH=now.getUTCHours(),utcM=now.getUTCMinutes();
       const utcTotal=utcH*60+utcM;
       const sessions=[
-        {name:'SYDNEY',   color:'#00b4ff', open:21*60, close:6*60},
-        {name:'TOKYO',    color:'#ffd166', open:23*60, close:8*60},
-        {name:'LONDON',   color:'#cc77ff', open:7*60,  close:16*60},
-        {name:'NEW YORK', color:'#00ff9f', open:12*60, close:21*60},
+        {name:'SYDNEY',   flag:'AU', color:'#00b4ff', open:21*60, close:6*60},
+        {name:'TOKYO',    flag:'JP', color:'#ffd166', open:23*60, close:8*60},
+        {name:'LONDON',   flag:'GB', color:'#cc77ff', open:7*60,  close:16*60},
+        {name:'NEW YORK', flag:'US', color:'#00ff9f', open:12*60, close:21*60},
       ];
       const isOpen=(s)=>{if(s.open>s.close) return utcTotal>=s.open||utcTotal<s.close; return utcTotal>=s.open&&utcTotal<s.close;};
       const active=sessions.filter(isOpen);
       return(
-        <div style={{display:'flex',alignItems:'center',gap:8,padding:'9px 16px',background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:10,flexWrap:'wrap'}}>
-          <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2,marginRight:4}}>MARKET SESSION:</span>
+        <div style={{display:'flex',alignItems:'center',gap:10,padding:'12px 18px',background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:10,flexWrap:'wrap'}}>
+          <span style={{fontFamily:mono,fontSize:10,color:'var(--text-muted)',letterSpacing:2,marginRight:6,flexShrink:0}}>SESSION:</span>
           {sessions.map(s=>{const on=isOpen(s);return(
-            <span key={s.name} style={{fontFamily:mono,fontSize:9,padding:'4px 12px',borderRadius:5,background:on?s.color+'20':'transparent',border:`1px solid ${on?s.color:'var(--border)'}`,color:on?s.color:'var(--text-muted)',fontWeight:on?700:400}}>
-              {s.name} {on?'&#x25CF;':'&#x25CB;'}
-            </span>
+            <div key={s.name} style={{display:'flex',alignItems:'center',gap:6,padding:'7px 16px',borderRadius:7,background:on?s.color+'18':'rgba(255,255,255,0.02)',border:`1px solid ${on?s.color:'rgba(255,255,255,0.07)'}`,transition:'all 0.3s'}}>
+              <div style={{width:8,height:8,borderRadius:'50%',background:on?s.color:'rgba(255,255,255,0.15)',boxShadow:on?`0 0 8px ${s.color}`:'none',flexShrink:0,transition:'all 0.3s'}}/>
+              <span style={{fontFamily:mono,fontSize:11,fontWeight:on?700:400,color:on?s.color:'rgba(255,255,255,0.3)',letterSpacing:1,whiteSpace:'nowrap'}}>{s.name}</span>
+            </div>
           );})}
-          {active.length===0&&<span style={{fontFamily:mono,fontSize:9,color:'#ff4d6d',fontWeight:700}}>ALL SESSIONS CLOSED</span>}
-          {active.length>1&&<span style={{fontFamily:mono,fontSize:9,color:'#ffd166',fontWeight:700,marginLeft:4}}>&#x26A1; OVERLAP ACTIVE</span>}
+          {active.length===0&&<span style={{fontFamily:mono,fontSize:11,color:'#ff4d6d',fontWeight:700,padding:'7px 14px',background:'rgba(255,77,109,0.08)',border:'1px solid rgba(255,77,109,0.3)',borderRadius:7}}>CLOSED</span>}
+          {active.length>1&&<span style={{fontFamily:mono,fontSize:11,color:'#ffd166',fontWeight:700,padding:'7px 14px',background:'rgba(255,209,102,0.08)',border:'1px solid rgba(255,209,102,0.3)',borderRadius:7}}>OVERLAP</span>}
         </div>
       );
     })()}
@@ -1837,7 +1838,7 @@ export default function Dashboard() {
     const medals=['\uD83E\uDD47 #1','\uD83E\uDD48 #2','\uD83E\uDD49 #3'];
     return(
       <div>
-        <div style={{fontFamily:orb,fontSize:11,color:'#ffd166',letterSpacing:4,marginBottom:12,fontWeight:700}}>&#x1F3C6; TOP SIGNALS &mdash; STRONGEST</div>
+        <div style={{fontFamily:orb,fontSize:11,color:'#ffd166',letterSpacing:4,marginBottom:12,fontWeight:700}}>{'🏆 TOP SIGNALS — STRONGEST'}</div>
         <div style={{display:'flex',gap:14,flexWrap:'wrap'}}>
           {top3.map((row,i)=>{
             const isBuy=row.bias==='BUY';const bc=isBuy?'#00ff9f':'#ff4d6d';
@@ -1864,7 +1865,7 @@ export default function Dashboard() {
   {/* ALL SIGNALS GRID */}
   <div>
     <div style={{fontFamily:orb,fontSize:11,color:'var(--text-secondary)',letterSpacing:3,marginBottom:12}}>
-      ALL SIGNALS &nbsp;<span style={{color:'#00ff9f'}}>{data.filter(r=>r.bias==='BUY').length} BUY</span><span style={{color:'var(--text-muted)'}}> / </span><span style={{color:'#ff4d6d'}}>{data.filter(r=>r.bias==='SELL').length} SELL</span>
+      ALL SIGNALS  <span style={{color:'#00ff9f'}}>{data.filter(r=>r.bias==='BUY').length} BUY</span><span style={{color:'var(--text-muted)'}}> / </span><span style={{color:'#ff4d6d'}}>{data.filter(r=>r.bias==='SELL').length} SELL</span>
     </div>
     {data.filter(r=>r.bias==='BUY'||r.bias==='SELL').length===0
       ?<div style={{textAlign:'center',padding:40,fontFamily:mono,fontSize:11,letterSpacing:3,color:'var(--text-muted)'}}>NO ACTIVE SIGNALS</div>
@@ -1887,8 +1888,8 @@ export default function Dashboard() {
 
   {/* DISCLAIMER */}
   <div style={{padding:'14px 20px',background:'rgba(255,209,102,0.08)',border:'1px solid rgba(255,209,102,0.35)',borderRadius:10,display:'flex',alignItems:'center',gap:12}}>
-    <span style={{fontSize:20,flexShrink:0}}>&#x26A0;&#xFE0F;</span>
-    <span style={{fontFamily:raj,fontSize:16,color:'rgba(255,209,102,0.9)',letterSpacing:1,fontWeight:600}}>For educational purposes only &mdash; not financial advice.&nbsp;&nbsp;Watch. Analyze. Decide.</span>
+    <span style={{fontSize:20,flexShrink:0}}>{'⚠️'}</span>
+    <span style={{fontFamily:raj,fontSize:16,color:'rgba(255,209,102,0.9)',letterSpacing:1,fontWeight:600}}>For educational purposes only — not financial advice.  Watch. Analyze. Decide.</span>
   </div>
 
 </div>
