@@ -1419,17 +1419,16 @@ function SpikeLogTab() {
 const TABS = ['PANELS','SIGNALS','TABLE','GAP CHART','CALENDAR','CALCULATOR','COT REPORT','SETUPS','VALID PAIRS','SPIKE LOG'];
 // Maps each tab to the feature_access key that controls it
 const TAB_FEATURE = {
-  'PANELS':      'dashboard',
+  'PANELS':      'panels',
   'SIGNALS':     'signals',
-  'TABLE':       'dashboard',
-  'GAP CHART':   'dashboard',
+  'TABLE':       'table',
+  'GAP CHART':   'gap_chart',
   'CALENDAR':    'calendar',
   'CALCULATOR':  'calculator',
   'COT REPORT':  'cot',
-  'SETUPS':      'dashboard',
-  'VALID PAIRS': 'dashboard',
-  'SPIKE LOG':   'dashboard',
-  'LIVE':        'dashboard',
+  'SETUPS':      'setups',
+  'VALID PAIRS': 'valid_pairs',
+  'SPIKE LOG':   'spike_log',
   'ENGINE':      'engine',
 };
 const FILTERS = ['ALL','BUY','SELL','STRONG','⚠️ CLOSE'];
@@ -1748,10 +1747,10 @@ export default function Dashboard() {
         </div>
 
         {/* SPIKE BANNER */}
-        <SpikeBanner spikes={spikes} prefs={prefs} onToggle={toggleSpikeBanner}/>
+        {(isAdmin||(user?.feature_access||[]).includes('spike_banner'))&&<SpikeBanner spikes={spikes} prefs={prefs} onToggle={toggleSpikeBanner}/>}
 
         {/* HEATMAP — always visible on panels/table */}
-        {['PANELS','TABLE'].includes(tab) && (
+        {['PANELS','TABLE'].includes(tab) && (isAdmin||(user?.feature_access||[]).includes('heatmap')) && (
           <MomentumHeatmap data={data} visible={prefs?.heatmap_visible!==false} onToggle={toggleHeatmap}/>
         )}
 

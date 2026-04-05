@@ -2,21 +2,37 @@ import { useState, useEffect, useCallback } from 'react';
 import Head from 'next/head';
 
 const mono = "'Share Tech Mono', monospace";
-const ALL_FEATURES = ['dashboard','signals','cot','calendar','calculator','journal','engine','accuracy'];
+// ── TAB ACCESS ──
+const ALL_FEATURES = [
+  'panels','table','setups','valid_pairs','spike_log',
+  'signals','gap_chart',
+  'cot','calendar','calculator','journal','engine',
+  'heatmap','spike_banner',
+];
+const FEATURE_GROUPS = {
+  'TABS': ['panels','table','setups','valid_pairs','spike_log','signals','gap_chart','cot','calendar','calculator','journal','engine'],
+  'WIDGETS': ['heatmap','spike_banner'],
+};
 const FEATURE_LABELS = {
-  dashboard:  '📊 Panels / Table / Setups / Valid Pairs / Spike Log',
-  signals:    '⚡ Signals Tab',
-  cot:        '📈 COT Report Tab',
-  calendar:   '📰 Calendar Tab',
-  calculator: '🧮 Calculator Tab',
-  journal:    '📓 Journal Page',
-  engine:     '🏥 Engine Tab (Admin)',
-  accuracy:   '🎯 Accuracy',
+  panels:       '📊 PANELS tab',
+  table:        '📋 TABLE tab',
+  setups:       '🎯 SETUPS tab',
+  valid_pairs:  '✅ VALID PAIRS tab',
+  spike_log:    '⚡ SPIKE LOG tab',
+  signals:      '🔔 SIGNALS tab',
+  gap_chart:    '📈 GAP CHART tab',
+  cot:          '📰 COT REPORT tab',
+  calendar:     '🗓️ CALENDAR tab',
+  calculator:   '🧮 CALCULATOR tab',
+  journal:      '📓 JOURNAL page',
+  engine:       '🏥 ENGINE tab',
+  heatmap:      '🗺️ Heatmap widget',
+  spike_banner: '🔔 Spike Banner widget',
 };
 const ROLE_DEFAULTS = {
-  user:  ['dashboard','cot','calendar','calculator'],
-  vip:   ['dashboard','signals','cot','calendar','calculator','journal'],
-  admin: ['dashboard','signals','cot','calendar','calculator','journal','engine','accuracy'],
+  user:  ['panels','gap_chart','cot','calendar','calculator','heatmap','spike_banner'],
+  vip:   ['panels','table','setups','valid_pairs','spike_log','signals','gap_chart','cot','calendar','calculator','heatmap','spike_banner'],
+  admin: ['panels','table','setups','valid_pairs','spike_log','signals','gap_chart','cot','calendar','calculator','journal','engine','heatmap','spike_banner'],
 };
 const orb = "'Orbitron', sans-serif";
 const raj = "'Rajdhani', sans-serif";
@@ -225,22 +241,34 @@ function EditUserModal({ user, onClose, onSaved }) {
 
           {/* Feature Access */}
           <div>
-            <label style={{...lbl, marginBottom:6}}>FEATURE ACCESS</label>
-            <div style={{display:'flex',flexWrap:'wrap',gap:5}}>
-              {ALL_FEATURES.map(f => {
-                const active = (form.feature_access || []).includes(f);
-                return (
-                  <button key={f} type="button" onClick={() => setForm(prev => ({
-                    ...prev,
-                    feature_access: active
-                      ? (prev.feature_access || []).filter(x => x !== f)
-                      : [...(prev.feature_access || []), f]
-                  }))} style={{background:active?'rgba(0,255,159,0.1)':'transparent',border:`1px solid ${active?'#00ff9f':'#1a2540'}`,borderRadius:4,color:active?'#00ff9f':'#2a3550',fontFamily:mono,fontSize:8,padding:'3px 8px',cursor:'pointer'}}>
-                    {FEATURE_LABELS[f]}
-                  </button>
-                );
-              })}
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+              <label style={{...lbl,marginBottom:0}}>FEATURE ACCESS</label>
+              <div style={{display:'flex',gap:5}}>
+                <button type="button" onClick={()=>setForm(f=>({...f,feature_access:[...ALL_FEATURES]}))} style={{background:'rgba(0,255,159,0.08)',border:'1px solid #00ff9f44',borderRadius:4,color:'#00ff9f',fontFamily:mono,fontSize:7,padding:'2px 7px',cursor:'pointer'}}>ALL ON</button>
+                <button type="button" onClick={()=>setForm(f=>({...f,feature_access:[]}))} style={{background:'rgba(255,77,109,0.08)',border:'1px solid #ff4d6d44',borderRadius:4,color:'#ff4d6d',fontFamily:mono,fontSize:7,padding:'2px 7px',cursor:'pointer'}}>ALL OFF</button>
+                {Object.keys(ROLE_DEFAULTS).map(r=>(
+                  <button key={r} type="button" onClick={()=>setForm(f=>({...f,feature_access:[...ROLE_DEFAULTS[r]]}))} style={{background:'rgba(0,180,255,0.08)',border:'1px solid #00b4ff44',borderRadius:4,color:'#00b4ff',fontFamily:mono,fontSize:7,padding:'2px 7px',cursor:'pointer'}}>{r.toUpperCase()}</button>
+                ))}
+              </div>
             </div>
+            {Object.entries(FEATURE_GROUPS).map(([groupName, features])=>(
+              <div key={groupName} style={{marginBottom:8}}>
+                <div style={{fontFamily:mono,fontSize:8,color:'#445566',letterSpacing:2,marginBottom:4}}>{groupName}</div>
+                <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
+                  {features.map(f=>{
+                    const active=(form.feature_access||[]).includes(f);
+                    return(
+                      <button key={f} type="button" onClick={()=>setForm(prev=>({
+                        ...prev,
+                        feature_access:active?(prev.feature_access||[]).filter(x=>x!==f):[...(prev.feature_access||[]),f]
+                      }))} style={{background:active?'rgba(0,255,159,0.1)':'transparent',border:`1px solid ${active?'#00ff9f':'#1a2540'}`,borderRadius:4,color:active?'#00ff9f':'#334466',fontFamily:mono,fontSize:8,padding:'4px 9px',cursor:'pointer',transition:'all 0.15s'}}>
+                        {FEATURE_LABELS[f]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
 
           <div>
