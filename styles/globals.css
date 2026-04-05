@@ -3,16 +3,16 @@
 /* ===== DARK THEME (default) ===== */
 :root,
 [data-theme="dark"] {
-  --bg-primary:    #050810;
-  --bg-secondary:  #0a0e1a;
-  --bg-card:       #0e1525;
-  --bg-hover:      #141c30;
-  --border:        #1a2540;
-  --border-bright: #1e3060;
+  --bg-primary:    #0d1117;
+  --bg-secondary:  #141b27;
+  --bg-card:       #1a2235;
+  --bg-hover:      #1e2840;
+  --border:        #253050;
+  --border-bright: #2e3d70;
 
   --text-primary:  #e8eaf0;
   --text-secondary:#8892aa;
-  --text-muted:    #445566;
+  --text-muted:    #556677;
 
   --accent:        #00ff9f;
   --accent-dim:    rgba(0,255,159,0.15);
@@ -24,12 +24,12 @@
   --invalid:       #ff7744;
   --hard-invalid:  #ff9944;
 
-  --scrollbar-track: #050810;
-  --scrollbar-thumb: #1e3060;
+  --scrollbar-track: #0d1117;
+  --scrollbar-thumb: #2e3d70;
 
-  --shadow:        0 4px 24px rgba(0,0,0,0.6);
-  --shadow-card:   0 2px 12px rgba(0,0,0,0.4);
-  --grid-line:     rgba(0,180,255,0.04);
+  --shadow:        0 4px 24px rgba(0,0,0,0.5);
+  --shadow-card:   0 2px 12px rgba(0,0,0,0.3);
+  --grid-line:     rgba(0,180,255,0.05);
   --glow-green:    radial-gradient(circle, rgba(0,255,159,0.06) 0%, transparent 70%);
 }
 
@@ -87,7 +87,6 @@ html, body {
 ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
 
 /* ===== GLOBAL TRANSITIONS ===== */
-/* Smooth theme switch for common elements */
 div, section, nav, header, main, aside, table, tr, td, th, input, button, a {
   transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
 }

@@ -72,7 +72,7 @@ function Badge({ label, color }) {
 
 function StatCard({ label, value, color }) {
   return (
-    <div style={{ background: '#0a0e1a', border: '1px solid #1a2540', borderRadius: 8, padding: '12px 18px', flex: 1, minWidth: 100 }}>
+    <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 18px', flex: 1, minWidth: 100 }}>
       <div style={{ fontFamily: mono, fontSize: 9, letterSpacing: 2, color: '#445566', marginBottom: 4 }}>{label}</div>
       <div style={{ fontFamily: orb, fontSize: 22, fontWeight: 700, color, textShadow: `0 0 10px ${color}55` }}>{value}</div>
     </div>
@@ -117,12 +117,12 @@ function CreateUserModal({ onClose, onCreated }) {
     onCreated();
   }
 
-  const inp = { background: '#06080f', border: '1px solid #1a2540', borderRadius: 5, padding: '8px 10px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, width: '100%', boxSizing: 'border-box' };
+  const inp = { background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: 5, padding: '8px 10px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, width: '100%', boxSizing: 'border-box' };
   const lbl = { fontFamily: mono, fontSize: 9, letterSpacing: 2, color: '#445566', display: 'block', marginBottom: 5 };
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ background: '#0a0e1a', border: '1px solid #1e3060', borderRadius: 12, padding: 28, width: 400, display: 'flex', flexDirection: 'column', gap: 14, maxHeight: '90vh', overflowY: 'auto' }}>
+      <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-bright)', borderRadius: 12, padding: 28, width: 400, display: 'flex', flexDirection: 'column', gap: 14, maxHeight: '90vh', overflowY: 'auto' }}>
         <div style={{ fontFamily: orb, fontSize: 14, fontWeight: 700, color: '#00ff9f', letterSpacing: 3 }}>+ CREATE USER</div>
         <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div><label style={lbl}>USERNAME</label><input style={inp} value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value }))} placeholder="e.g. trader01" required /></div>
@@ -158,7 +158,7 @@ function CreateUserModal({ onClose, onCreated }) {
           <div><label style={lbl}>NOTES (optional)</label><input style={inp} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="e.g. VIP member, 1 month access" /></div>
           {error && <div style={{ fontFamily: mono, fontSize: 10, color: '#ff4d6d', background: 'rgba(255,77,109,0.08)', border: '1px solid rgba(255,77,109,0.3)', borderRadius: 5, padding: '8px 10px' }}>⚠ {error}</div>}
           <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-            <button type="button" onClick={onClose} style={{ flex: 1, background: 'transparent', border: '1px solid #1a2540', borderRadius: 5, color: '#445566', fontFamily: mono, fontSize: 10, padding: '8px', cursor: 'pointer' }}>CANCEL</button>
+            <button type="button" onClick={onClose} style={{ flex: 1, background: 'transparent', border: '1px solid var(--border)', borderRadius: 5, color: '#445566', fontFamily: mono, fontSize: 10, padding: '8px', cursor: 'pointer' }}>CANCEL</button>
             <button type="submit" disabled={loading} style={{ flex: 1, background: 'rgba(0,255,159,0.1)', border: '1px solid #00ff9f', borderRadius: 5, color: '#00ff9f', fontFamily: mono, fontSize: 10, letterSpacing: 2, padding: '8px', cursor: 'pointer' }}>{loading ? 'CREATING...' : 'CREATE'}</button>
           </div>
         </form>
@@ -186,16 +186,16 @@ function EditUserModal({ user, onClose, onSaved }) {
 
   function copyPass() { navigator.clipboard.writeText(user.plain_password); setCopied(true); setTimeout(() => setCopied(false), 1500); }
 
-  const inp = { background: '#06080f', border: '1px solid #1a2540', borderRadius: 5, padding: '8px 10px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, width: '100%', boxSizing: 'border-box' };
+  const inp = { background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: 5, padding: '8px 10px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, width: '100%', boxSizing: 'border-box' };
   const lbl = { fontFamily: mono, fontSize: 9, letterSpacing: 2, color: '#445566', display: 'block', marginBottom: 5 };
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ background: '#0a0e1a', border: '1px solid #1e3060', borderRadius: 12, padding: 28, width: 420, display: 'flex', flexDirection: 'column', gap: 14, maxHeight: '90vh', overflowY: 'auto' }}>
+      <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-bright)', borderRadius: 12, padding: 28, width: 420, display: 'flex', flexDirection: 'column', gap: 14, maxHeight: '90vh', overflowY: 'auto' }}>
         <div style={{ fontFamily: orb, fontSize: 14, fontWeight: 700, color: '#00b4ff', letterSpacing: 3 }}>EDIT: {user.username.toUpperCase()}</div>
 
         {/* Current password */}
-        <div style={{ background: '#060810', border: '1px solid #1a2540', borderRadius: 8, padding: '10px 14px' }}>
+        <div style={{ background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px' }}>
           <div style={{ fontFamily: mono, fontSize: 9, letterSpacing: 2, color: '#445566', marginBottom: 6 }}>CURRENT PASSWORD</div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontFamily: raj, fontSize: 16, fontWeight: 600, color: user.plain_password ? '#ffd166' : '#2a3550' }}>
@@ -280,7 +280,7 @@ function EditUserModal({ user, onClose, onSaved }) {
           </div>
           {error && <div style={{ fontFamily: mono, fontSize: 10, color: '#ff4d6d', background: 'rgba(255,77,109,0.08)', border: '1px solid rgba(255,77,109,0.3)', borderRadius: 5, padding: '8px 10px' }}>⚠ {error}</div>}
           <div style={{ display: 'flex', gap: 8 }}>
-            <button type="button" onClick={onClose} style={{ flex: 1, background: 'transparent', border: '1px solid #1a2540', borderRadius: 5, color: '#445566', fontFamily: mono, fontSize: 10, padding: '8px', cursor: 'pointer' }}>CANCEL</button>
+            <button type="button" onClick={onClose} style={{ flex: 1, background: 'transparent', border: '1px solid var(--border)', borderRadius: 5, color: '#445566', fontFamily: mono, fontSize: 10, padding: '8px', cursor: 'pointer' }}>CANCEL</button>
             <button type="submit" disabled={loading} style={{ flex: 1, background: 'rgba(0,180,255,0.1)', border: '1px solid #00b4ff', borderRadius: 5, color: '#00b4ff', fontFamily: mono, fontSize: 10, letterSpacing: 2, padding: '8px', cursor: 'pointer' }}>{loading ? 'SAVING...' : 'SAVE'}</button>
           </div>
         </form>
@@ -357,7 +357,7 @@ export default function AdminPanel() {
   const tc = { padding: '10px 12px', fontFamily: raj, fontSize: 13, color: '#8892aa', verticalAlign: 'middle' };
 
   if (loading) return (
-    <div style={{ minHeight: '100vh', background: '#050810', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <span style={{ fontFamily: mono, fontSize: 12, letterSpacing: 3, color: '#445566' }}>LOADING...</span>
     </div>
   );
@@ -368,7 +368,7 @@ export default function AdminPanel() {
       {showCreate && <CreateUserModal onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); loadUsers(); }} />}
       {editUser && <EditUserModal user={editUser} onClose={() => setEditUser(null)} onSaved={() => { setEditUser(null); loadUsers(); }} />}
 
-      <div style={{ minHeight: '100vh', background: '#050810', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column' }}>
         <div style={{ position: 'fixed', inset: 0, backgroundImage: 'linear-gradient(rgba(0,180,255,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(0,180,255,0.02) 1px,transparent 1px)', backgroundSize: '40px 40px', pointerEvents: 'none', zIndex: 0 }} />
 
         <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 24px', background: '#080c18', borderBottom: '1px solid #1a2540', position: 'sticky', top: 0, zIndex: 100 }}>
@@ -397,19 +397,19 @@ export default function AdminPanel() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 24px 12px', zIndex: 1 }}>
-          <div style={{ display: 'flex', background: '#080c18', border: '1px solid #1a2540', borderRadius: 7, overflow: 'hidden' }}>
+          <div style={{ display: 'flex', background: '#080c18', border: '1px solid var(--border)', borderRadius: 7, overflow: 'hidden' }}>
             {['USERS', 'SESSIONS', 'LOGS'].map((t, i) => (
               <button key={t} onClick={() => setTab(t)} style={{ background: tab === t ? 'rgba(255,209,102,0.12)' : 'transparent', border: 'none', borderRight: i < 2 ? '1px solid #1a2540' : 'none', color: tab === t ? '#ffd166' : '#445566', fontFamily: mono, fontSize: 9, letterSpacing: 2, padding: '7px 16px', cursor: 'pointer' }}>{t}</button>
             ))}
           </div>
           {tab === 'USERS' && <button onClick={() => setShowCreate(true)} style={{ background: 'rgba(0,255,159,0.1)', border: '1px solid #00ff9f', borderRadius: 5, color: '#00ff9f', fontFamily: mono, fontSize: 9, letterSpacing: 2, padding: '7px 16px', cursor: 'pointer' }}>+ CREATE USER</button>}
-          {tab === 'LOGS' && <input style={{ background: '#080c18', border: '1px solid #1a2540', borderRadius: 5, padding: '6px 10px', color: '#e8eaf0', fontFamily: raj, fontSize: 13, width: 200 }} placeholder="Filter by username..." value={logFilter} onChange={e => { setLogFilter(e.target.value); loadLogs(e.target.value); }} />}
-          {tab === 'SESSIONS' && <button onClick={loadSessions} style={{ background: 'transparent', border: '1px solid #1a2540', borderRadius: 5, color: '#00b4ff', fontFamily: mono, fontSize: 9, padding: '7px 12px', cursor: 'pointer' }}>⟳ REFRESH</button>}
+          {tab === 'LOGS' && <input style={{ background: '#080c18', border: '1px solid var(--border)', borderRadius: 5, padding: '6px 10px', color: '#e8eaf0', fontFamily: raj, fontSize: 13, width: 200 }} placeholder="Filter by username..." value={logFilter} onChange={e => { setLogFilter(e.target.value); loadLogs(e.target.value); }} />}
+          {tab === 'SESSIONS' && <button onClick={loadSessions} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 5, color: '#00b4ff', fontFamily: mono, fontSize: 9, padding: '7px 12px', cursor: 'pointer' }}>⟳ REFRESH</button>}
         </div>
 
         <div style={{ flex: 1, padding: '0 24px 24px', zIndex: 1, overflowX: 'auto' }}>
           {tab === 'USERS' && (
-            <table style={{ width: '100%', borderCollapse: 'collapse', background: '#080c18', border: '1px solid #1a2540', borderRadius: 10, overflow: 'hidden' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', background: '#080c18', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
               <thead>
                 <tr style={{ background: '#0e1525' }}>
                   {['USERNAME', 'ROLE', 'STATUS', 'PASSWORD', 'DEVICES', 'EXPIRY', 'LAST SEEN', 'NOTES', 'ACTIONS'].map(h => <th key={h} style={hdr}>{h}</th>)}
@@ -456,7 +456,7 @@ export default function AdminPanel() {
           )}
 
           {tab === 'SESSIONS' && (
-            <table style={{ width: '100%', borderCollapse: 'collapse', background: '#080c18', border: '1px solid #1a2540', borderRadius: 10, overflow: 'hidden' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', background: '#080c18', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
               <thead><tr style={{ background: '#0e1525' }}>{['USERNAME', 'DEVICE ID', 'IP ADDRESS', 'LAST SEEN', 'CREATED', 'USER AGENT', 'ACTION'].map(h => <th key={h} style={hdr}>{h}</th>)}</tr></thead>
               <tbody>
                 {sessions.length === 0
@@ -477,7 +477,7 @@ export default function AdminPanel() {
           )}
 
           {tab === 'LOGS' && (
-            <table style={{ width: '100%', borderCollapse: 'collapse', background: '#080c18', border: '1px solid #1a2540', borderRadius: 10, overflow: 'hidden' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', background: '#080c18', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
               <thead><tr style={{ background: '#0e1525' }}>{['TIME', 'USERNAME', 'ACTION', 'STATUS', 'IP', 'DETAIL'].map(h => <th key={h} style={hdr}>{h}</th>)}</tr></thead>
               <tbody>
                 {logs.length === 0
