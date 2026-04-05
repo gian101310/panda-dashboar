@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+﻿import { useState, useEffect, useCallback, useRef } from 'react';
 import Head from 'next/head';
 import ThemeToggle from '../components/ThemeToggle';
 
@@ -63,7 +63,7 @@ function boxConfirm(bias, h4Trend, h1Trend) {
   if (h4Trend === bad)                         return { label:'❌ SKIP',     color:'#ff4d6d', bg:'rgba(255,77,109,0.10)',  border:'rgba(255,77,109,0.35)' };
   return { label:'⚠️ RANGING', color:'#ffd166', bg:'rgba(255,209,102,0.10)', border:'rgba(255,209,102,0.35)' };
 }
-// ===== FL-ST ZONE BADGE (CONTINUATIONday validity) =====
+// ===== TBG ZONE BADGE (G1 Intraday validity) =====
 // BUY  valid = price ABOVE both SuperTrend + FollowLine
 // SELL valid = price BELOW both SuperTrend + FollowLine
 // BETWEEN   = not valid for intra game
@@ -284,7 +284,9 @@ function SpikeBanner({ spikes, prefs, onToggle }) {
                 <span style={{fontFamily:orb,fontSize:18,fontWeight:900,color:bias.color,lineHeight:1}}>{s.gap>0?'+':''}{s.gap}</span>
                 <span style={{fontFamily:mono,fontSize:9,color:momColor}}>{s.momentum}</span>
               </div>
-
+              {(() => { const g = MOMENTUM_GUIDE[s.momentum]; return g ? (
+                <span style={{fontFamily:mono,fontSize:9,color:g.color,fontWeight:700}}>👉 {g.action}</span>
+              ) : null; })()}
               <span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)'}}>{timeAgo(s.fired_at)}</span>
             </div>
           );
@@ -383,7 +385,7 @@ function MomentumHeatmap({ data, heatmapData, visible, onToggle }) {
                 const momColor = momentum==='STRONG'?'#00ff9f':momentum==='BUILDING'?'#66ffcc':momentum==='SPARK'?'#ffd166':momentum==='CONSOLIDATING'?'#00b4ff':momentum==='COOLING'?'#ffaa44':momentum==='FADING'?'#ff7744':momentum==='REVERSING'?'#ff4d6d':'var(--text-muted)';
 
                 return (
-                  <tr key={symbol} style={{borderBottom:'1px solid var(--border)'}}>
+                  <tr key={symbol} style={{borderBottom:'1px solid var(--border)',opacity:valid?1:0.35}}>
                     <td style={{padding:'5px 8px',fontFamily:orb,fontSize:11,fontWeight:700,color:valid?'var(--text-primary)':'var(--text-muted)'}}>{symbol}</td>
                     <td style={{padding:'5px 8px',textAlign:'center',fontFamily:mono,fontSize:11,color:bias.color,fontWeight:700}}>{gap>0?'+':''}{gap}</td>
                     {[hRow.h1, hRow.h4, hRow.h8].map((v,i)=>(
@@ -539,23 +541,8 @@ function GapChart() {
   const [charts,setCharts]=useState({});
   const [loading,setLoading]=useState(false);
   const [hover,setHover]=useState(null);
-  const [showAllPairs,setShowAllPairs]=useState(false);
   const svgRef=useRef(null);
-  const COLORS=['#00b4ff','#00ff9f','#ffd166','#ff4d6d','#ff9944','#cc77ff','#ff77cc','#77ffcc','#ffcc77','#4499ff','#ff9977','#99ff77'];
-
-  async function loadAllPairs() {
-    setShowAllPairs(true);setLoading(true);setCharts({});
-    const allTf='ALL';
-    await Promise.all(ALL_PAIRS.map(async(sym)=>{
-      try{
-        const res=await fetch(`/api/gap-chart?symbol=${sym}&timeframe=${allTf}`);
-        if(!res.ok) return;
-        const d=await res.json();
-        setCharts(prev=>({...prev,[sym]:d}));
-      }catch{}
-    }));
-    setLoading(false);
-  }
+  const COLORS=['#00b4ff','#00ff9f','#ffd166','#ff4d6d','#ff9944','#cc77ff'];
 
   async function loadSymbol(sym) {
     try {
@@ -600,29 +587,25 @@ function GapChart() {
     <div style={{background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:10,padding:'16px 18px',display:'flex',flexDirection:'column',gap:12}}>
       <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
         <div style={{fontFamily:orb,fontSize:12,fontWeight:700,color:'#00b4ff',letterSpacing:3}}>GAP HISTORY CHART</div>
-        <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>SELECT PAIRS · OR LOAD ALL HISTORY</span>
+        <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>UP TO 3 PAIRS</span>
         <div style={{display:'flex',gap:4,marginLeft:'auto'}}>
           {TFS.map(t=><button key={t} onClick={()=>setTf(t)} style={{background:tf===t?'rgba(0,180,255,0.15)':'transparent',border:`1px solid ${tf===t?'#00b4ff':'var(--border)'}`,borderRadius:4,color:tf===t?'#00b4ff':'var(--text-muted)',fontFamily:mono,fontSize:9,padding:'4px 9px',cursor:'pointer'}}>{t}</button>)}
         </div>
       </div>
-      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:2}}>
-        <button onClick={loadAllPairs} style={{background:showAllPairs?'rgba(255,209,102,0.15)':'rgba(0,180,255,0.06)',border:`1px solid ${showAllPairs?'#ffd166':'rgba(0,180,255,0.4)'}`,borderRadius:5,color:showAllPairs?'#ffd166':'#00b4ff',fontFamily:mono,fontSize:9,letterSpacing:1,padding:'5px 12px',cursor:'pointer',fontWeight:700}}>ALL PAIRS (FULL HISTORY)</button>
-        {showAllPairs&&<button onClick={()=>{setShowAllPairs(false);setCharts({});}} style={{background:'transparent',border:'1px solid var(--border)',borderRadius:5,color:'var(--text-muted)',fontFamily:mono,fontSize:8,padding:'4px 10px',cursor:'pointer'}}>CLEAR</button>}
-      </div>
       <div style={{display:'flex',flexWrap:'wrap',gap:5}}>
-        {ALL_PAIRS.map((s,i)=>{const active=symbols.includes(s);const ci=symbols.indexOf(s);const col=active?COLORS[ci]:'var(--border)';return <button key={s} onClick={()=>{setShowAllPairs(false);toggleSymbol(s);}} style={{background:active?col+'18':'transparent',border:`1px solid ${col}`,borderRadius:4,color:active?col:'var(--text-muted)',fontFamily:mono,fontSize:9,padding:'3px 8px',cursor:'pointer',fontWeight:active?700:400}}>{s}</button>;})}
+        {ALL_PAIRS.map((s,i)=>{const active=symbols.includes(s);const ci=symbols.indexOf(s);const col=active?COLORS[ci]:'var(--border)';return <button key={s} onClick={()=>toggleSymbol(s)} style={{background:active?col+'18':'transparent',border:`1px solid ${col}`,borderRadius:4,color:active?col:'var(--text-muted)',fontFamily:mono,fontSize:9,padding:'3px 8px',cursor:'pointer',fontWeight:active?700:400}}>{s}</button>;})}
       </div>
       <div style={{display:'flex',gap:14,flexWrap:'wrap'}}>
-        {(showAllPairs?ALL_PAIRS.filter(s=>charts[s]?.data?.length>0):symbols).map((s,i)=>{const trend=charts[s]?.trend||'STABLE';return(<div key={s} style={{display:'flex',alignItems:'center',gap:6}}><div style={{width:18,height:3,background:COLORS[i],borderRadius:2}}/><span style={{fontFamily:orb,fontSize:11,fontWeight:700,color:COLORS[i]}}>{s}</span><TrendArrow trend={trend} size={13}/><span style={{fontFamily:mono,fontSize:9,color:trend==='STRONGER'?'#00ff9f':trend==='WEAKER'?'#ff4d6d':'var(--text-muted)'}}>{trend}</span></div>);})}
+        {symbols.map((s,i)=>{const trend=charts[s]?.trend||'STABLE';return(<div key={s} style={{display:'flex',alignItems:'center',gap:6}}><div style={{width:18,height:3,background:COLORS[i],borderRadius:2}}/><span style={{fontFamily:orb,fontSize:11,fontWeight:700,color:COLORS[i]}}>{s}</span><TrendArrow trend={trend} size={13}/><span style={{fontFamily:mono,fontSize:9,color:trend==='STRONGER'?'#00ff9f':trend==='WEAKER'?'#ff4d6d':'var(--text-muted)'}}>{trend}</span></div>);})}
       </div>
-      {hover&&<div style={{display:'flex',gap:16,padding:'6px 10px',background:'var(--bg-card)',borderRadius:6,border:'1px solid var(--border)',flexWrap:'wrap'}}><span style={{fontFamily:mono,fontSize:10,color:'var(--text-muted)'}}>{hover.ts}</span>{Object.entries(hover.vals).map(([s,v],i)=>{const arr=showAllPairs?ALL_PAIRS:symbols;return <span key={s} style={{fontFamily:mono,fontSize:10,color:COLORS[arr.indexOf(s)%COLORS.length],fontWeight:700}}>{s}: {v>0?'+':''}{v.toFixed(0)}</span>;})}</div>}
+      {hover&&<div style={{display:'flex',gap:16,padding:'6px 10px',background:'var(--bg-card)',borderRadius:6,border:'1px solid var(--border)',flexWrap:'wrap'}}><span style={{fontFamily:mono,fontSize:10,color:'var(--text-muted)'}}>{hover.ts}</span>{Object.entries(hover.vals).map(([s,v],i)=><span key={s} style={{fontFamily:mono,fontSize:10,color:COLORS[symbols.indexOf(s)],fontWeight:700}}>{s}: {v>0?'+':''}{v.toFixed(0)}</span>)}</div>}
       {loading?<div style={{display:'flex',alignItems:'center',justifyContent:'center',height:H}}><span style={{fontFamily:mono,fontSize:11,color:'var(--text-muted)',letterSpacing:2}}>LOADING...</span></div>:(
         <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} style={{width:'100%',height:'auto',cursor:'crosshair'}} onMouseMove={handleMouseMove} onMouseLeave={()=>setHover(null)}>
           {gridVals.map(g=><g key={g}><line x1={PAD.left} y1={toY(g)} x2={W-PAD.right} y2={toY(g)} stroke={g===0?'var(--text-muted)':g===5||g===-5?'#223344':'var(--border)'} strokeWidth={g===0?1.5:0.5} strokeDasharray={g===5||g===-5?'4,4':g===0?undefined:'2,4'}/><text x={PAD.left-5} y={toY(g)+4} fill={g===0?'var(--text-muted)':g===5?'#00ff9f66':g===-5?'#ff4d6d66':'var(--text-muted)'} fontSize={9} textAnchor="end" fontFamily={mono}>{g>0?'+':''}{g}</text></g>)}
           <rect x={PAD.left} y={toY(12)} width={cW} height={toY(5)-toY(12)} fill="rgba(0,255,159,0.03)"/>
           <rect x={PAD.left} y={toY(-5)} width={cW} height={toY(-12)-toY(-5)} fill="rgba(255,77,109,0.03)"/>
-          {(showAllPairs?ALL_PAIRS:symbols).map((s,ci)=>{const cd=charts[s]?.data;if(!cd||cd.length<2) return null;const col=COLORS[ci];const linePath=cd.map((d,i)=>`${i===0?'M':'L'}${toX(i,cd.length).toFixed(1)},${toY(parseFloat(d.gap)||0).toFixed(1)}`).join(' ');const fX=toX(0,cd.length).toFixed(1),lX=toX(cd.length-1,cd.length).toFixed(1);const aP=cd.map((d,i)=>`${i===0?'M':'L'}${toX(i,cd.length).toFixed(1)},${toY(Math.max(parseFloat(d.gap)||0,0)).toFixed(1)}`).join(' ')+` L${lX},${zeroY.toFixed(1)} L${fX},${zeroY.toFixed(1)} Z`;const bP=cd.map((d,i)=>`${i===0?'M':'L'}${toX(i,cd.length).toFixed(1)},${toY(Math.min(parseFloat(d.gap)||0,0)).toFixed(1)}`).join(' ')+` L${lX},${zeroY.toFixed(1)} L${fX},${zeroY.toFixed(1)} Z`;return(<g key={s}><path d={aP} fill={col+'14'}/><path d={bP} fill="#ff4d6d0a"/><path d={linePath} fill="none" stroke={col} strokeWidth="2" strokeLinejoin="round"/></g>);})}
-          {hover&&xData.length>0&&<><line x1={toX(hover.idx,xData.length)} y1={PAD.top} x2={toX(hover.idx,xData.length)} y2={H-PAD.bottom} stroke="#ffffff22" strokeWidth={1} strokeDasharray="3,3"/>{(showAllPairs?ALL_PAIRS:symbols).map((s,ci)=>{const cd=charts[s]?.data;if(!cd) return null;const ri=Math.round(hover.idx*(cd.length-1)/(xData.length-1||1));const g=parseFloat(cd[Math.min(ri,cd.length-1)]?.gap)||0;return <circle key={s} cx={toX(hover.idx,xData.length)} cy={toY(g)} r={4} fill={COLORS[ci]} stroke="#fff" strokeWidth={1.5}/>;})}</>}
+          {symbols.map((s,ci)=>{const cd=charts[s]?.data;if(!cd||cd.length<2) return null;const col=COLORS[ci];const linePath=cd.map((d,i)=>`${i===0?'M':'L'}${toX(i,cd.length).toFixed(1)},${toY(parseFloat(d.gap)||0).toFixed(1)}`).join(' ');const fX=toX(0,cd.length).toFixed(1),lX=toX(cd.length-1,cd.length).toFixed(1);const aP=cd.map((d,i)=>`${i===0?'M':'L'}${toX(i,cd.length).toFixed(1)},${toY(Math.max(parseFloat(d.gap)||0,0)).toFixed(1)}`).join(' ')+` L${lX},${zeroY.toFixed(1)} L${fX},${zeroY.toFixed(1)} Z`;const bP=cd.map((d,i)=>`${i===0?'M':'L'}${toX(i,cd.length).toFixed(1)},${toY(Math.min(parseFloat(d.gap)||0,0)).toFixed(1)}`).join(' ')+` L${lX},${zeroY.toFixed(1)} L${fX},${zeroY.toFixed(1)} Z`;return(<g key={s}><path d={aP} fill={col+'14'}/><path d={bP} fill="#ff4d6d0a"/><path d={linePath} fill="none" stroke={col} strokeWidth="2" strokeLinejoin="round"/></g>);})}
+          {hover&&xData.length>0&&<><line x1={toX(hover.idx,xData.length)} y1={PAD.top} x2={toX(hover.idx,xData.length)} y2={H-PAD.bottom} stroke="#ffffff22" strokeWidth={1} strokeDasharray="3,3"/>{symbols.map((s,ci)=>{const cd=charts[s]?.data;if(!cd) return null;const ri=Math.round(hover.idx*(cd.length-1)/(xData.length-1||1));const g=parseFloat(cd[Math.min(ri,cd.length-1)]?.gap)||0;return <circle key={s} cx={toX(hover.idx,xData.length)} cy={toY(g)} r={4} fill={COLORS[ci]} stroke="#fff" strokeWidth={1.5}/>;})}</>}
           {xData.filter((_,i)=>{const step=Math.max(1,Math.floor(xData.length/7));return i%step===0||i===xData.length-1;}).map(d=>{const i=xData.indexOf(d);return <text key={i} x={toX(i,xData.length)} y={H-PAD.bottom+14} fill="var(--text-muted)" fontSize={8} textAnchor="middle" fontFamily={mono}>{(d.timestamp||'').slice(5,16)}</text>;})}
         </svg>
       )}
@@ -634,7 +617,7 @@ function GapChart() {
 function EconomicCalendar({ pairs }) {
   const [events,setEvents]=useState([]);
   const [loading,setLoading]=useState(false);
-  const [filter,setFilter]=useState('VALID');
+  const [filter,setFilter]=useState('ALL');
   const activeCurrencies=new Set();
   (pairs||[]).forEach(p=>{if(p.symbol?.length>=6){activeCurrencies.add(p.symbol.slice(0,3));activeCurrencies.add(p.symbol.slice(3,6));}});
   async function load(){setLoading(true);try{const res=await fetch('/api/calendar');setEvents(await res.json());}catch{}setLoading(false);}
@@ -794,7 +777,7 @@ function PairCard({ row, trend, cotBias }) {
   const momIcons={BUILDING:'🚀',EMERGING:'📈',FADING:'📉',COOLING:'🌡️',REVERSAL:'⚠️',NEUTRAL:'▬',SPARK:'⚡',STRONG:'🔥',STABLE:'▬',CONSOLIDATING:'🔵',REVERSING:'⚠️'};
   const gapTrend=(row.delta_short??0)>0.5?'STRONGER':(row.delta_short??0)<-0.5?'WEAKER':'STABLE';
   if(!valid) return (
-    <div style={{background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:10,padding:'12px 14px',display:'flex',flexDirection:'column',gap:7,height:'100%',boxSizing:'border-box',flex:1}}>
+    <div style={{background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:10,padding:'12px 14px',display:'flex',flexDirection:'column',gap:7,opacity:0.4}}>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}><span style={{fontFamily:orb,fontSize:12,fontWeight:700,letterSpacing:2,color:'var(--border)'}}>{row.symbol}</span><span style={{fontFamily:mono,fontSize:9,color:'var(--border)',background:'var(--border)',border:'1px solid var(--border)',borderRadius:4,padding:'2px 7px'}}>WAIT</span></div>
       <div style={{display:'flex',alignItems:'baseline',gap:4}}><span style={{fontFamily:orb,fontSize:22,fontWeight:900,color:'#1e2840',lineHeight:1}}>{gap>0?'+':''}{Number(gap).toFixed(1)}</span><span style={{fontFamily:mono,fontSize:9,color:'var(--border)'}}>GAP</span></div>
     </div>
@@ -813,7 +796,7 @@ function PairCard({ row, trend, cotBias }) {
       </div>
       {(()=>{const mu=getMatchup(row);if(!mu)return null;return(<div style={{display:'flex',alignItems:'center',gap:6,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>MATCHUP</span><span style={{fontFamily:mono,fontSize:9,color:mu.color,background:mu.color+'12',border:`1px solid ${mu.color}30`,borderRadius:4,padding:'1px 7px',whiteSpace:'nowrap'}}>{mu.label}</span>{mu.note==='IDEAL'&&<span style={{fontFamily:mono,fontSize:7,color:mu.color,letterSpacing:1,opacity:0.8}}>IDEAL</span>}{mu.note==='AVOID'&&<span style={{fontFamily:mono,fontSize:7,color:'#ffaa44',letterSpacing:1,opacity:0.8}}>AVOID</span>}</div>);})()}
       {(()=>{const bh1=boxTrend(row.box_h1_trend),bh4=boxTrend(row.box_h4_trend);if(!bh1&&!bh4)return null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>BOX</span>{bh4&&<span style={{fontFamily:mono,fontSize:8,color:bh4.color,background:bh4.bg,border:`1px solid ${bh4.border}`,borderRadius:3,padding:'1px 6px'}}>H4 {bh4.label}</span>}{bh1&&<span style={{fontFamily:mono,fontSize:8,color:bh1.color,background:bh1.bg,border:`1px solid ${bh1.border}`,borderRadius:3,padding:'1px 6px'}}>H1 {bh1.label}</span>}</div>);})()}
-      {(()=>{ const tbg=tbgZoneBadge(row.tbg_zone,row.bias); if(!tbg)return null; return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>FL-ST</span><span style={{fontFamily:mono,fontSize:8,color:tbg.color,background:tbg.bg,border:`1px solid ${tbg.border}`,borderRadius:3,padding:'1px 6px',fontWeight:700}}>{tbg.label}</span>{tbg.valid&&<span style={{fontFamily:mono,fontSize:7,color:'#00ff9f',letterSpacing:1}}>✅</span>}{!tbg.valid&&<span style={{fontFamily:mono,fontSize:7,color:'#ff7744',letterSpacing:1}}>⛔</span>}</div>);})()}{(()=>{
+      {(()=>{ const tbg=tbgZoneBadge(row.tbg_zone,row.bias); if(!tbg)return null; return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>TBG</span><span style={{fontFamily:mono,fontSize:8,color:tbg.color,background:tbg.bg,border:`1px solid ${tbg.border}`,borderRadius:3,padding:'1px 6px',fontWeight:700}}>{tbg.label}</span>{tbg.valid&&<span style={{fontFamily:mono,fontSize:7,color:'#00ff9f',letterSpacing:1}}>✅</span>}{!tbg.valid&&<span style={{fontFamily:mono,fontSize:7,color:'#ff7744',letterSpacing:1}}>⛔</span>}</div>);})()}{(()=>{
   const bc=boxConfirm(row.bias,row.box_h4_trend,row.box_h1_trend);
   const af=atrFill(row.atr);
   if(!bc&&!af)return null;
@@ -843,50 +826,8 @@ function PairCard({ row, trend, cotBias }) {
 }
 
 
-// ===== TRADINGVIEW CHART EMBED =====
-function TradingViewChart({ symbol, bias }) {
-  const containerId = `tv_${symbol}`;
-  const theme = 'dark';
-  const color = bias?.label === 'BUY' ? '#00ff9f' : bias?.label === 'SELL' ? '#ff4d6d' : '#00b4ff';
-
-  React.useEffect(() => {
-    const container = document.getElementById(containerId);
-    if (!container) return;
-    container.innerHTML = '';
-    const script = document.createElement('script');
-    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
-    script.type = 'text/javascript';
-    script.async = true;
-    script.innerHTML = JSON.stringify({
-      autosize: true,
-      symbol: symbol,
-      interval: 'H1',
-      timezone: 'Asia/Dubai',
-      theme: theme,
-      style: '1',
-      locale: 'en',
-      enable_publishing: false,
-      hide_top_toolbar: false,
-      hide_legend: false,
-      save_image: false,
-      container_id: containerId,
-      backgroundColor: '#0d1117',
-      gridColor: 'rgba(255,255,255,0.04)',
-    });
-    container.appendChild(script);
-    return () => { container.innerHTML = ''; };
-  }, [symbol]);
-
-  return (
-    <div style={{position:'relative',width:'100%',height:420,borderRadius:10,overflow:'hidden',border:`1px solid ${color}33`,background:'#0d1117'}}>
-      <div className="tradingview-widget-container" id={containerId} style={{height:'100%',width:'100%'}}/>
-    </div>
-  );
-}
-
 // ===== PAIR CARD MODAL =====
 function PairCardModal({ row, trend, cotBias, onClose }) {
-  const [modalTab, setModalTab] = React.useState('OVERVIEW');
   if (!row) return null;
   const gap = row.gap ?? 0;
   const bias = biasFromGap(gap);
@@ -934,33 +875,6 @@ function PairCardModal({ row, trend, cotBias, onClose }) {
           <button onClick={onClose} style={{background:'transparent',border:'1px solid var(--border)',borderRadius:6,color:'var(--text-muted)',fontFamily:mono,fontSize:11,padding:'5px 12px',cursor:'pointer'}}>✕ ESC</button>
         </div>
 
-        {/* Modal Tab Switcher */}
-        <div style={{display:'flex',gap:6,borderBottom:'1px solid var(--border)',paddingBottom:10}}>
-          {['OVERVIEW','CHART'].map(tab => (
-            <button key={tab} onClick={()=>setModalTab(tab)} style={{
-              fontFamily:mono, fontSize:10, letterSpacing:2, padding:'5px 16px',
-              borderRadius:6, border:`1px solid ${modalTab===tab ? bias.border : 'var(--border)'}`,
-              background: modalTab===tab ? bias.bg : 'transparent',
-              color: modalTab===tab ? bias.color : 'var(--text-muted)',
-              cursor:'pointer', fontWeight: modalTab===tab ? 700 : 400,
-            }}>{tab}</button>
-          ))}
-        </div>
-
-        {/* CHART TAB */}
-        {modalTab === 'CHART' && (
-          <div style={{display:'flex',flexDirection:'column',gap:10}}>
-            <div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2}}>TRADINGVIEW · {row.symbol} · H1</div>
-            <TradingViewChart symbol={row.symbol} bias={bias}/>
-            <div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:1,textAlign:'center',opacity:0.5}}>
-              Powered by TradingView · Click chart to interact
-            </div>
-          </div>
-        )}
-
-        {/* OVERVIEW TAB */}
-        {modalTab === 'OVERVIEW' && (<>
-
         {/* GAP + Sparkline */}
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 16px',background:'rgba(0,0,0,0.2)',borderRadius:10,border:`1px solid ${bias.border}`}}>
           <div>
@@ -1006,10 +920,10 @@ function PairCardModal({ row, trend, cotBias, onClose }) {
           </div>
         )}
 
-        {/* FL-ST Zone — CONTINUATIONday validity */}
+        {/* TBG Zone — G1 Intraday validity */}
         {(()=>{ const tbg = tbgZoneBadge(row.tbg_zone, row.bias); if (!tbg) return null; return (
           <div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',background:'rgba(0,0,0,0.15)',borderRadius:8}}>
-            <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2}}>FL-ST LINES</span>
+            <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2}}>TBG LINES</span>
             <span style={{fontFamily:mono,fontSize:10,color:tbg.color,background:tbg.bg,border:`1px solid ${tbg.border}`,borderRadius:4,padding:'2px 10px',fontWeight:700}}>{tbg.label}</span>
             {tbg.valid && <span style={{fontFamily:mono,fontSize:9,color:'#00ff9f',letterSpacing:1}}>✅ VALID</span>}
             {!tbg.valid && <span style={{fontFamily:mono,fontSize:9,color:'#ff7744',letterSpacing:1}}>⛔ NOT VALID</span>}
@@ -1063,7 +977,6 @@ function PairCardModal({ row, trend, cotBias, onClose }) {
           ) : <span/>}
           <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>Updated: {formatDt(row.updated_at)}</span>
         </div>
-        </>)}
 
       </div>
     </div>
@@ -1138,7 +1051,7 @@ function ValidSetupsTab({ data, trends, cotMap }) {
               <div style={{fontFamily:mono,fontSize:9,color:t.momentumColor||'var(--text-muted)',background:(t.momentumColor||'var(--text-muted)')+'18',border:`1px solid ${(t.momentumColor||'var(--text-muted)')}30`,borderRadius:4,padding:'2px 8px',display:'inline-block',marginBottom:4}}>{t.momentum||'NEUTRAL'}</div>
               {g && <div style={{fontFamily:mono,fontSize:10,color:g.color,fontWeight:700}}>👉 {g.action}</div>}{(()=>{const mu=getMatchup(row);if(!mu)return null;return(<div style={{fontFamily:mono,fontSize:9,color:mu.color,background:mu.color+'12',border:`1px solid ${mu.color}28`,borderRadius:4,padding:'2px 7px',display:'inline-block',marginTop:3,whiteSpace:'nowrap'}}>{mu.label}{mu.note&&<span style={{marginLeft:5,opacity:0.7,fontSize:8}}>{mu.note}</span>}</div>);})()}
               {(()=>{const bh4=boxTrend(row.box_h4_trend),bh1=boxTrend(row.box_h1_trend);if(!bh4&&!bh1)return null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>BOX</span>{bh4&&<span style={{fontFamily:mono,fontSize:8,color:bh4.color,background:bh4.bg,border:`1px solid ${bh4.border}`,borderRadius:3,padding:'1px 6px'}}>H4 {bh4.label}</span>}{bh1&&<span style={{fontFamily:mono,fontSize:8,color:bh1.color,background:bh1.bg,border:`1px solid ${bh1.border}`,borderRadius:3,padding:'1px 6px'}}>H1 {bh1.label}</span>}</div>);})()}
-              {(()=>{ const tbg=tbgZoneBadge(row.tbg_zone,row.bias); if(!tbg)return null; return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>FL-ST</span><span style={{fontFamily:mono,fontSize:9,color:tbg.color,background:tbg.bg,border:`1px solid ${tbg.border}`,borderRadius:4,padding:'1px 8px',fontWeight:700}}>{tbg.label}</span>{tbg.valid&&<span style={{fontFamily:mono,fontSize:8,color:'#00ff9f',fontWeight:700}}>G1 ✅</span>}{!tbg.valid&&<span style={{fontFamily:mono,fontSize:8,color:'#ff7744'}}>G1 ⛔</span>}</div>);})()}
+              {(()=>{ const tbg=tbgZoneBadge(row.tbg_zone,row.bias); if(!tbg)return null; return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>TBG</span><span style={{fontFamily:mono,fontSize:9,color:tbg.color,background:tbg.bg,border:`1px solid ${tbg.border}`,borderRadius:4,padding:'1px 8px',fontWeight:700}}>{tbg.label}</span>{tbg.valid&&<span style={{fontFamily:mono,fontSize:8,color:'#00ff9f',fontWeight:700}}>G1 ✅</span>}{!tbg.valid&&<span style={{fontFamily:mono,fontSize:8,color:'#ff7744'}}>G1 ⛔</span>}</div>);})()}
               {(()=>{
                 const bc=boxConfirm(row.bias,row.box_h4_trend,row.box_h1_trend);
                 const af=atrFill(row.atr);
@@ -1250,10 +1163,10 @@ function ValidPairsTab({ data, trends, cotMap }) {
                 })()}
                 {(()=>{ const tbg=tbgZoneBadge(row.tbg_zone,row.bias); if(!tbg)return null; return(
                   <div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}>
-                    <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>FL-ST</span>
+                    <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>TBG</span>
                     <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:tbg.color,background:tbg.bg,border:`1px solid ${tbg.border}`,borderRadius:4,padding:'1px 8px',fontWeight:700}}>{tbg.label}</span>
-                    {tbg.valid&&<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:'#00ff9f',letterSpacing:1,fontWeight:700}}>CONTINUATION ✅</span>}
-                    {!tbg.valid&&<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:'#ff7744',letterSpacing:1}}>CONTINUATION ⛔</span>}
+                    {tbg.valid&&<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:'#00ff9f',letterSpacing:1,fontWeight:700}}>G1 INTRA ✅</span>}
+                    {!tbg.valid&&<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:'#ff7744',letterSpacing:1}}>G1 INTRA ⛔</span>}
                   </div>
                 );})()}
               </div>
@@ -1489,19 +1402,20 @@ function SpikeLogTab() {
 const TABS = ['PANELS','SIGNALS','TABLE','GAP CHART','CALENDAR','CALCULATOR','COT REPORT','SETUPS','VALID PAIRS','SPIKE LOG'];
 // Maps each tab to the feature_access key that controls it
 const TAB_FEATURE = {
-  'PANELS':      'panels',
+  'PANELS':      'dashboard',
   'SIGNALS':     'signals',
-  'TABLE':       'table',
-  'GAP CHART':   'gap_chart',
+  'TABLE':       'dashboard',
+  'GAP CHART':   'dashboard',
   'CALENDAR':    'calendar',
   'CALCULATOR':  'calculator',
   'COT REPORT':  'cot',
-  'SETUPS':      'setups',
-  'VALID PAIRS': 'valid_pairs',
-  'SPIKE LOG':   'spike_log',
+  'SETUPS':      'dashboard',
+  'VALID PAIRS': 'dashboard',
+  'SPIKE LOG':   'dashboard',
+  'LIVE':        'dashboard',
   'ENGINE':      'engine',
 };
-const FILTERS = ['VALID','ALL','BUY','SELL','STRONG','⚠️ CLOSE'];
+const FILTERS = ['ALL','BUY','SELL','STRONG','⚠️ CLOSE'];
 const SORTS   = [
   {label:'SYMBOL A-Z',value:'symbol_asc'},
   {label:'STRENGTH ↓',value:'strength_desc'},
@@ -1509,115 +1423,6 @@ const SORTS   = [
   {label:'MOMENTUM',value:'momentum'},
   {label:'1H CHANGE',value:'delta1h'},
 ];
-
-
-// ===== SIGNAL FLASHCARD COMPONENT =====
-function SignalFlashcard({ data, trends }) {
-  const mono = "'Share Tech Mono',monospace";
-  const orb  = "'Orbitron',sans-serif";
-  const allSigs = (data||[]).filter(r=>r.bias==='BUY'||r.bias==='SELL').sort((a,b)=>Math.abs(b.gap||0)-Math.abs(a.gap||0));
-  const [cardIdx, setCardIdx] = useState(0);
-  const [flipping, setFlipping] = useState(false);
-  const [paused, setPaused] = useState(false);
-  const timerRef = useRef(null);
-
-  function goTo(idx) {
-    if (flipping || allSigs.length === 0) return;
-    setFlipping(true);
-    setTimeout(() => { setCardIdx((idx + allSigs.length) % allSigs.length); setFlipping(false); }, 240);
-  }
-  function next() { goTo(cardIdx + 1); }
-  function prev() { goTo(cardIdx - 1); }
-
-  useEffect(() => {
-    if (paused || allSigs.length === 0) return;
-    timerRef.current = setInterval(next, 3500);
-    return () => clearInterval(timerRef.current);
-  }, [cardIdx, paused, allSigs.length]);
-
-  if (allSigs.length === 0) return (
-    <div style={{textAlign:'center',padding:40,fontFamily:mono,fontSize:11,letterSpacing:3,color:'var(--text-muted)'}}>NO ACTIVE SIGNALS</div>
-  );
-
-  const row = allSigs[cardIdx];
-  const isBuy = row.bias === 'BUY';
-  const bc = isBuy ? '#00ff9f' : '#ff4d6d';
-  const bgc = isBuy ? 'rgba(0,255,159,0.08)' : 'rgba(255,77,109,0.08)';
-  const t = trends[row.symbol] || {};
-  const momColor = t.momentum==='STRONG'?'#00ff9f':t.momentum==='BUILDING'?'#66ffcc':t.momentum==='SPARK'?'#ffd166':'#ffd166';
-
-  return (
-    <div style={{display:'flex',flexDirection:'column',gap:10}}>
-      {/* Header row */}
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-        <span style={{fontFamily:orb,fontSize:10,color:'#00b4ff',letterSpacing:4,fontWeight:700}}>{'⚡ SIGNAL FLASHCARD'}</span>
-        <div style={{display:'flex',alignItems:'center',gap:8}}>
-          <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>{cardIdx+1} / {allSigs.length}</span>
-          <button onClick={()=>setPaused(p=>!p)} style={{background:paused?'rgba(255,209,102,0.12)':'rgba(0,180,255,0.08)',border:`1px solid ${paused?'#ffd166':'rgba(0,180,255,0.4)'}`,borderRadius:4,color:paused?'#ffd166':'#00b4ff',fontFamily:mono,fontSize:8,padding:'3px 10px',cursor:'pointer',letterSpacing:1}}>
-            {paused ? '▶ PLAY' : '⏸ PAUSE'}
-          </button>
-        </div>
-      </div>
-
-      {/* Main card */}
-      <div style={{position:'relative',height:200,cursor:'pointer'}} onClick={next}>
-        <div style={{
-          position:'absolute',inset:0,
-          background:bgc,
-          border:`2px solid ${bc}77`,
-          borderRadius:18,
-          padding:'28px 36px',
-          display:'flex',flexDirection:'column',justifyContent:'space-between',
-          overflow:'hidden',
-          opacity:flipping?0:1,
-          transform:flipping?'scale(0.96) translateY(4px)':'scale(1) translateY(0)',
-          transition:'opacity 0.22s ease, transform 0.22s ease',
-          boxShadow:`0 0 40px ${bc}18, inset 0 0 60px ${bc}05`,
-        }}>
-          {/* Decorative big bg text */}
-          <div style={{position:'absolute',bottom:-8,right:12,fontFamily:orb,fontSize:80,fontWeight:900,color:bc+'07',pointerEvents:'none',lineHeight:1,userSelect:'none'}}>{row.bias}</div>
-          {/* Top section */}
-          <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between'}}>
-            <div style={{display:'flex',flexDirection:'column',gap:6}}>
-              <span style={{fontFamily:orb,fontSize:38,fontWeight:900,letterSpacing:4,color:'var(--text-primary)',lineHeight:1}}>{row.symbol}</span>
-
-            </div>
-            <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:8}}>
-              <span style={{fontFamily:mono,fontSize:16,fontWeight:700,color:bc,background:bc+'18',border:`1px solid ${bc}55`,borderRadius:8,padding:'6px 20px',letterSpacing:3}}>{row.bias}</span>
-              {t.momentum && <span style={{fontFamily:mono,fontSize:11,color:momColor,background:momColor+'12',border:`1px solid ${momColor}30`,borderRadius:5,padding:'3px 10px'}}>{t.momentum}</span>}
-            </div>
-          </div>
-          {/* Pulse bar */}
-          <div style={{height:3,borderRadius:2,background:`linear-gradient(90deg,transparent,${bc},transparent)`,opacity:0.55,animation:'pulse 2s ease-in-out infinite'}}/>
-        </div>
-      </div>
-
-      {/* Prev / dots / next */}
-      <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10}}>
-        <button onClick={(e)=>{e.stopPropagation();prev();}} style={{background:'transparent',border:'1px solid var(--border)',borderRadius:'50%',width:28,height:28,color:'var(--text-muted)',fontFamily:mono,fontSize:16,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1}}>‹</button>
-        <div style={{display:'flex',gap:5,flexWrap:'wrap',justifyContent:'center',maxWidth:420}}>
-          {allSigs.map((_,i) => (
-            <div key={i} onClick={()=>goTo(i)} style={{width:i===cardIdx?20:6,height:6,borderRadius:3,background:i===cardIdx?bc:'var(--border)',cursor:'pointer',transition:'all 0.3s',flexShrink:0}}/>
-          ))}
-        </div>
-        <button onClick={(e)=>{e.stopPropagation();next();}} style={{background:'transparent',border:'1px solid var(--border)',borderRadius:'50%',width:28,height:28,color:'var(--text-muted)',fontFamily:mono,fontSize:16,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1}}>›</button>
-      </div>
-
-      {/* Mini ticker strip */}
-      <div style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:4,scrollbarWidth:'thin'}}>
-        {allSigs.map((r,i) => {
-          const b = r.bias==='BUY'; const c = b?'#00ff9f':'#ff4d6d';
-          return (
-            <div key={r.symbol} onClick={()=>goTo(i)} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:2,padding:'5px 10px',borderRadius:6,background:i===cardIdx?(b?'rgba(0,255,159,0.12)':'rgba(255,77,109,0.12)'):'transparent',border:`1px solid ${i===cardIdx?c:'var(--border)'}`,cursor:'pointer',flexShrink:0,transition:'all 0.2s',minWidth:58}}>
-              <span style={{fontFamily:orb,fontSize:10,fontWeight:700,color:i===cardIdx?'var(--text-primary)':'var(--text-muted)',letterSpacing:1}}>{r.symbol}</span>
-              <span style={{fontFamily:mono,fontSize:8,color:c,fontWeight:700}}>{r.bias}</span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
 export default function Dashboard() {
   const [data,       setData]       = useState([]);
@@ -1714,18 +1519,18 @@ export default function Dashboard() {
   function toggleSpikeBanner() { setPrefs(p=>({...p,spike_banner_visible:!p?.spike_banner_visible})); }
 
   const validPairs=data.filter(r=>isValid(r.gap??0));
-  let displayed=(filter==='ALL')?[...data].sort((a,b)=>(a.symbol||'').localeCompare(b.symbol||'')):[...validPairs].sort((a,b)=>(a.symbol||'').localeCompare(b.symbol||''));
+  let displayed=filter==='ALL'?[...data]:[...validPairs];
   if(search) displayed=displayed.filter(r=>r.symbol?.toLowerCase().includes(search.toLowerCase()));
   if(filter==='BUY') displayed=displayed.filter(r=>(r.gap??0)>=5);
   if(filter==='SELL') displayed=displayed.filter(r=>(r.gap??0)<=-5);
   if(filter==='STRONG') displayed=displayed.filter(r=>r.signal==='STRONG'||r.strength>=2);
   if(filter==='⚠️ CLOSE') displayed=displayed.filter(r=>trends[r.symbol]?.closeAlert);
 
-  if(sort==='symbol_asc'||filter==='VALID'||filter==='ALL') displayed.sort((a,b)=>(a.symbol||'').localeCompare(b.symbol||''));
-  else if(sort==='strength_desc') displayed.sort((a,b)=>(b.strength||0)-(a.strength||0));
-  else if(sort==='gap_desc') displayed.sort((a,b)=>Math.abs(b.gap||0)-Math.abs(a.gap||0));
-  else if(sort==='delta1h') displayed.sort((a,b)=>(trends[b.symbol]?.delta1h||0)-(trends[a.symbol]?.delta1h||0));
-  else if(sort==='momentum'){const ord={BUILDING:0,SPARK:0,STRONG:0,EMERGING:1,STABLE:2,NEUTRAL:3,CONSOLIDATING:3,COOLING:4,FADING:5,REVERSING:6};displayed.sort((a,b)=>(ord[trends[a.symbol]?.momentum]??3)-(ord[trends[b.symbol]?.momentum]??3));}
+  if(sort==='symbol_asc') displayed.sort((a,b)=>(a.symbol||'').localeCompare(b.symbol||''));
+  if(sort==='strength_desc') displayed.sort((a,b)=>(b.strength||0)-(a.strength||0));
+  if(sort==='gap_desc') displayed.sort((a,b)=>Math.abs(b.gap||0)-Math.abs(a.gap||0));
+  if(sort==='delta1h') displayed.sort((a,b)=>(trends[b.symbol]?.delta1h||0)-(trends[a.symbol]?.delta1h||0));
+  if(sort==='momentum'){const ord={BUILDING:0,SPARK:0,STRONG:0,EMERGING:1,STABLE:2,NEUTRAL:3,CONSOLIDATING:3,COOLING:4,FADING:5,REVERSING:6};displayed.sort((a,b)=>(ord[trends[a.symbol]?.momentum]??3)-(ord[trends[b.symbol]?.momentum]??3));}
 
   const buyCount=validPairs.filter(r=>(r.gap??0)>=5).length;
   const sellCount=validPairs.filter(r=>(r.gap??0)<=-5).length;
@@ -1817,10 +1622,10 @@ export default function Dashboard() {
         </div>
 
         {/* SPIKE BANNER */}
-        {(isAdmin||(user?.feature_access||[]).includes('spike_banner'))&&<SpikeBanner spikes={spikes} prefs={prefs} onToggle={toggleSpikeBanner}/>}
+        <SpikeBanner spikes={spikes} prefs={prefs} onToggle={toggleSpikeBanner}/>
 
         {/* HEATMAP — always visible on panels/table */}
-        {['PANELS','TABLE'].includes(tab) && (isAdmin||(user?.feature_access||[]).includes('heatmap')) && (
+        {['PANELS','TABLE'].includes(tab) && (
           <MomentumHeatmap data={data} visible={prefs?.heatmap_visible!==false} onToggle={toggleHeatmap}/>
         )}
 
@@ -1828,7 +1633,7 @@ export default function Dashboard() {
         <div style={{display:'flex',alignItems:'center',gap:7,padding:'0 20px 10px',flexWrap:'wrap',zIndex:1}}>
           <div style={{display:'flex',background:'var(--bg-secondary)',border:'1px solid var(--border)',borderRadius:7,overflow:'hidden'}}>
             {TABS.filter(t=>{ const feat=TAB_FEATURE[t]; if(!feat) return true; if(isAdmin) return true; const fa=user?.feature_access||[]; return fa.includes(feat)||fa.includes('dashboard');}).map((t,i,arr)=><button key={t} onClick={()=>setTab(t)} style={{background:tab===t?'rgba(0,180,255,0.15)':'transparent',border:'none',borderRight:i<TABS.length-1?'1px solid var(--border)':'none',color:tab===t?'#00b4ff':'rgba(180,205,240,0.80)',fontFamily:mono,fontSize:9,letterSpacing:2,padding:'7px 12px',cursor:'pointer',whiteSpace:'nowrap'}}>{t}</button>)}
-            {isAdmin&&<><button onClick={()=>setTab('ENGINE')} style={{background:tab==='ENGINE'?'rgba(255,209,102,0.15)':'transparent',border:'none',borderLeft:'1px solid var(--border)',color:tab==='ENGINE'?'#ffd166':'rgba(180,205,240,0.80)',fontFamily:mono,fontSize:9,letterSpacing:2,padding:'7px 12px',cursor:'pointer'}}>🏥 ENGINE</button></>}
+            {isAdmin&&<><button onClick={()=>setTab('OPEN TRADES')} style={{background:tab==='OPEN TRADES'?'rgba(255,77,109,0.15)':'transparent',border:'none',borderLeft:'1px solid var(--border)',color:tab==='OPEN TRADES'?'#ff4d6d':'rgba(180,205,240,0.80)',fontFamily:mono,fontSize:9,letterSpacing:2,padding:'7px 12px',cursor:'pointer',whiteSpace:'nowrap'}}>🔴 LIVE</button><button onClick={()=>setTab('ENGINE')} style={{background:tab==='ENGINE'?'rgba(255,209,102,0.15)':'transparent',border:'none',borderLeft:'1px solid var(--border)',color:tab==='ENGINE'?'#ffd166':'rgba(180,205,240,0.80)',fontFamily:mono,fontSize:9,letterSpacing:2,padding:'7px 12px',cursor:'pointer'}}>🏥 ENGINE</button></>}
           </div>
           {['PANELS','TABLE'].includes(tab)&&(
             <>
@@ -1853,114 +1658,46 @@ export default function Dashboard() {
           ):tab==='PANELS'?(
             displayed.length===0
               ?<div style={{textAlign:'center',padding:60,fontFamily:mono,fontSize:11,letterSpacing:3,color:'var(--text-muted)'}}>NO PAIRS MATCH</div>
-              :<><div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2,marginBottom:10}}>{filter==='ALL'?`${displayed.length} ALL PAIRS · ${buyCount} BUY · ${sellCount} SELL`:filter==='VALID'?`${displayed.length} VALID PAIRS · ${buyCount} BUY · ${sellCount} SELL`:`${displayed.length} PAIRS`}</div>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',gap:10,alignItems:'stretch'}}>
-                {displayed.map(row=><div key={row.symbol} onClick={()=>setSelectedPair(row)} style={{cursor:'pointer',height:'100%',display:'flex',flexDirection:'column'}}><PairCard row={row} trend={trends[row.symbol]} cotBias={getPairCotBias(row.symbol)}/></div>)}
+              :<><div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2,marginBottom:10}}>{filter==='ALL'?`${displayed.length} PAIRS · ${buyCount} BUY · ${sellCount} SELL`:`${displayed.length} PAIRS`}</div>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(195px,1fr))',gap:10}}>
+                {displayed.map(row=><div key={row.symbol} onClick={()=>setSelectedPair(row)} style={{cursor:'pointer'}}><PairCard row={row} trend={trends[row.symbol]} cotBias={getPairCotBias(row.symbol)}/></div>)}
               </div></>
           ):tab==='SETUPS'?(<ValidSetupsTab data={data} trends={trends} cotMap={cotMap}/>
 ):tab==='VALID PAIRS'?(<ValidPairsTab data={data} trends={trends} cotMap={cotMap}/>
 ):tab==='SPIKE LOG'?(<SpikeLogTab/>
 ):tab==='SIGNALS'?(
-<div style={{display:'flex',flexDirection:'column',gap:24}}>
-
-  {/* FLASHCARD */}
-  <SignalFlashcard data={data} trends={trends}/>
-
-  {/* LIVE BANNER + MARKET SESSION */}
-  <div style={{display:'flex',flexDirection:'column',gap:8}}>
-    <div style={{display:'flex',alignItems:'center',gap:12,padding:'10px 18px',background:'rgba(0,255,159,0.07)',border:'1px solid rgba(0,255,159,0.35)',borderRadius:10}}>
-      <div style={{width:8,height:8,borderRadius:'50%',background:'#00ff9f',boxShadow:'0 0 10px #00ff9f',animation:'blink 1s infinite',flexShrink:0}}/>
-      <span style={{fontFamily:mono,fontSize:12,color:'#00ff9f',letterSpacing:2,fontWeight:700}}>{'🟢 LIVE | Auto Signals Active | Updates in Real-Time'}</span>
+<div>
+  <div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2,marginBottom:16}}>
+    {data.filter(r=>r.bias==='BUY'||r.bias==='SELL').length} ACTIVE SIGNALS
+    {' · '}{data.filter(r=>r.bias==='BUY').length} BUY
+    {' · '}{data.filter(r=>r.bias==='SELL').length} SELL
+  </div>
+  {data.filter(r=>r.bias==='BUY'||r.bias==='SELL').length===0
+    ?<div style={{textAlign:'center',padding:60,fontFamily:mono,fontSize:11,letterSpacing:3,color:'var(--text-muted)'}}>NO ACTIVE SIGNALS</div>
+    :<div style={{display:'flex',flexWrap:'wrap',gap:10}}>
+      {data.filter(r=>r.bias==='BUY'||r.bias==='SELL').sort((a,b)=>Math.abs(b.gap)-Math.abs(a.gap)).map(row=>{
+        const isBuy=row.bias==='BUY';
+        return(
+          <div key={row.symbol} style={{
+            display:'flex',alignItems:'center',gap:10,
+            padding:'12px 18px',borderRadius:8,
+            background:isBuy?'rgba(0,255,159,0.07)':'rgba(255,77,109,0.07)',
+            border:`1px solid ${isBuy?'rgba(0,255,159,0.25)':'rgba(255,77,109,0.25)'}`,
+            minWidth:160,
+          }}>
+            <span style={{fontFamily:orb,fontSize:14,fontWeight:700,color:'#e8eaf0',letterSpacing:2}}>{row.symbol}</span>
+            <span style={{
+              fontFamily:mono,fontSize:11,fontWeight:700,letterSpacing:2,
+              color:isBuy?'#00ff9f':'#ff4d6d',
+              background:isBuy?'rgba(0,255,159,0.12)':'rgba(255,77,109,0.12)',
+              border:`1px solid ${isBuy?'#00ff9f44':'#ff4d6d44'}`,
+              borderRadius:4,padding:'2px 8px',
+            }}>{row.bias}</span>
+          </div>
+        );
+      })}
     </div>
-    {(()=>{
-      const now=new Date();
-      const utcH=now.getUTCHours(),utcM=now.getUTCMinutes();
-      const utcTotal=utcH*60+utcM;
-      const sessions=[
-        {name:'SYDNEY',   flag:'AU', color:'#00b4ff', open:21*60, close:6*60},
-        {name:'TOKYO',    flag:'JP', color:'#ffd166', open:23*60, close:8*60},
-        {name:'LONDON',   flag:'GB', color:'#cc77ff', open:7*60,  close:16*60},
-        {name:'NEW YORK', flag:'US', color:'#00ff9f', open:12*60, close:21*60},
-      ];
-      const isOpen=(s)=>{if(s.open>s.close) return utcTotal>=s.open||utcTotal<s.close; return utcTotal>=s.open&&utcTotal<s.close;};
-      const active=sessions.filter(isOpen);
-      return(
-        <div style={{display:'flex',alignItems:'center',gap:10,padding:'12px 18px',background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:10,flexWrap:'wrap'}}>
-          <span style={{fontFamily:mono,fontSize:10,color:'var(--text-muted)',letterSpacing:2,marginRight:6,flexShrink:0}}>SESSION:</span>
-          {sessions.map(s=>{const on=isOpen(s);return(
-            <div key={s.name} style={{display:'flex',alignItems:'center',gap:6,padding:'7px 16px',borderRadius:7,background:on?s.color+'18':'rgba(255,255,255,0.02)',border:`1px solid ${on?s.color:'rgba(255,255,255,0.07)'}`,transition:'all 0.3s'}}>
-              <div style={{width:8,height:8,borderRadius:'50%',background:on?s.color:'rgba(255,255,255,0.15)',boxShadow:on?`0 0 8px ${s.color}`:'none',flexShrink:0,transition:'all 0.3s'}}/>
-              <span style={{fontFamily:mono,fontSize:11,fontWeight:on?700:400,color:on?s.color:'rgba(255,255,255,0.3)',letterSpacing:1,whiteSpace:'nowrap'}}>{s.name}</span>
-            </div>
-          );})}
-          {active.length===0&&<span style={{fontFamily:mono,fontSize:11,color:'#ff4d6d',fontWeight:700,padding:'7px 14px',background:'rgba(255,77,109,0.08)',border:'1px solid rgba(255,77,109,0.3)',borderRadius:7}}>CLOSED</span>}
-          {active.length>1&&<span style={{fontFamily:mono,fontSize:11,color:'#ffd166',fontWeight:700,padding:'7px 14px',background:'rgba(255,209,102,0.08)',border:'1px solid rgba(255,209,102,0.3)',borderRadius:7}}>OVERLAP</span>}
-        </div>
-      );
-    })()}
-  </div>
-
-  {/* TOP 3 */}
-  {(()=>{
-    const top3=data.filter(r=>(r.bias==='BUY'||r.bias==='SELL')&&Math.abs(r.gap||0)>=8).sort((a,b)=>Math.abs(b.gap)-Math.abs(a.gap)).slice(0,3);
-    if(top3.length===0) return null;
-    const medals=['\uD83E\uDD47 #1','\uD83E\uDD48 #2','\uD83E\uDD49 #3'];
-    return(
-      <div>
-        <div style={{fontFamily:orb,fontSize:11,color:'#ffd166',letterSpacing:4,marginBottom:12,fontWeight:700}}>{'🏆 TOP SIGNALS — STRONGEST'}</div>
-        <div style={{display:'flex',gap:14,flexWrap:'wrap'}}>
-          {top3.map((row,i)=>{
-            const isBuy=row.bias==='BUY';const bc=isBuy?'#00ff9f':'#ff4d6d';
-            const t3=trends[row.symbol]||{};
-            const mc=t3.momentum==='STRONG'?'#00ff9f':t3.momentum==='BUILDING'?'#66ffcc':'#ffd166';
-            return(
-              <div key={row.symbol} style={{display:'flex',flexDirection:'column',gap:10,padding:'22px 28px',borderRadius:14,background:isBuy?'rgba(0,255,159,0.08)':'rgba(255,77,109,0.08)',border:`2px solid ${bc}66`,minWidth:200,flex:1,maxWidth:300,position:'relative',overflow:'hidden'}}>
-                <div style={{position:'absolute',top:0,left:0,right:0,height:3,background:`linear-gradient(90deg,transparent,${bc},transparent)`}}/>
-                <div style={{position:'absolute',bottom:-14,right:6,fontFamily:orb,fontSize:56,fontWeight:900,color:bc+'07',pointerEvents:'none'}}>{row.bias}</div>
-                <div style={{fontFamily:mono,fontSize:10,color:'#ffd166',fontWeight:700}}>{medals[i]}</div>
-                <div style={{fontFamily:orb,fontSize:26,fontWeight:900,letterSpacing:3,color:'var(--text-primary)'}}>{row.symbol}</div>
-                <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-                  <span style={{fontFamily:mono,fontSize:13,fontWeight:700,color:bc,background:bc+'18',border:`1px solid ${bc}55`,borderRadius:6,padding:'4px 12px',letterSpacing:2}}>{row.bias}</span>
-                  {t3.momentum&&<span style={{fontFamily:mono,fontSize:10,color:mc,background:mc+'12',border:`1px solid ${mc}25`,borderRadius:5,padding:'3px 8px'}}>{t3.momentum}</span>}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  })()}
-
-  {/* ALL SIGNALS GRID */}
-  <div>
-    <div style={{fontFamily:orb,fontSize:11,color:'var(--text-secondary)',letterSpacing:3,marginBottom:12}}>
-      ALL SIGNALS  <span style={{color:'#00ff9f'}}>{data.filter(r=>r.bias==='BUY').length} BUY</span><span style={{color:'var(--text-muted)'}}> / </span><span style={{color:'#ff4d6d'}}>{data.filter(r=>r.bias==='SELL').length} SELL</span>
-    </div>
-    {data.filter(r=>r.bias==='BUY'||r.bias==='SELL').length===0
-      ?<div style={{textAlign:'center',padding:40,fontFamily:mono,fontSize:11,letterSpacing:3,color:'var(--text-muted)'}}>NO ACTIVE SIGNALS</div>
-      :<div style={{display:'flex',flexWrap:'wrap',gap:12}}>
-        {data.filter(r=>r.bias==='BUY'||r.bias==='SELL').sort((a,b)=>Math.abs(b.gap)-Math.abs(a.gap)).map(row=>{
-          const isBuy=row.bias==='BUY';const bc=isBuy?'#00ff9f':'#ff4d6d';
-          const t4=trends[row.symbol]||{};
-          return(
-            <div key={row.symbol} style={{display:'flex',flexDirection:'column',gap:8,padding:'18px 22px',borderRadius:12,background:isBuy?'rgba(0,255,159,0.07)':'rgba(255,77,109,0.07)',border:`1px solid ${isBuy?'rgba(0,255,159,0.3)':'rgba(255,77,109,0.3)'}`,minWidth:175,position:'relative',overflow:'hidden'}}>
-              <div style={{position:'absolute',top:0,left:0,right:0,height:2,background:`linear-gradient(90deg,transparent,${bc}88,transparent)`}}/>
-              <span style={{fontFamily:orb,fontSize:20,fontWeight:900,letterSpacing:2,color:'var(--text-primary)'}}>{row.symbol}</span>
-              <span style={{fontFamily:mono,fontSize:13,fontWeight:700,color:bc,background:bc+'15',border:`1px solid ${bc}44`,borderRadius:5,padding:'4px 12px',letterSpacing:2,alignSelf:'flex-start'}}>{row.bias}</span>
-              {t4.momentum&&<span style={{fontFamily:mono,fontSize:10,color:'var(--text-muted)'}}>{t4.momentum}</span>}
-            </div>
-          );
-        })}
-      </div>
-    }
-  </div>
-
-  {/* DISCLAIMER */}
-  <div style={{padding:'14px 20px',background:'rgba(255,209,102,0.08)',border:'1px solid rgba(255,209,102,0.35)',borderRadius:10,display:'flex',alignItems:'center',gap:12}}>
-    <span style={{fontSize:20,flexShrink:0}}>{'⚠️'}</span>
-    <span style={{fontFamily:raj,fontSize:16,color:'rgba(255,209,102,0.9)',letterSpacing:1,fontWeight:600}}>For educational purposes only — not financial advice.  Watch. Analyze. Decide.</span>
-  </div>
-
+  }
 </div>
 ):tab==='TABLE'?(
 
@@ -1975,7 +1712,7 @@ export default function Dashboard() {
                     const gapTrend=(row.delta_short??0)>0.5?'STRONGER':(row.delta_short??0)<-0.5?'WEAKER':'STABLE';
                     const cotB=getPairCotBias(row.symbol);
                     return(
-                      <tr key={row.symbol} style={{borderBottom:'1px solid var(--border)'}}>
+                      <tr key={row.symbol} style={{borderBottom:'1px solid var(--border)',opacity:valid?1:0.4}}>
                         <td style={{...tdc,fontFamily:mono,fontSize:9,color:'var(--text-muted)',textAlign:'center'}}>{idx+1}</td>
                         <td style={{...tdc,fontFamily:orb,fontSize:11,fontWeight:700,color:valid?'var(--text-primary)':'var(--text-muted)'}}>{row.symbol}</td>
                         <td style={{...tdc,fontFamily:mono,fontSize:12,color:bias.color,fontWeight:700}}>{gap>0?'+':''}{Number(gap).toFixed(1)}</td>
@@ -1999,7 +1736,7 @@ export default function Dashboard() {
            :tab==='CALENDAR'?<EconomicCalendar pairs={validPairs}/>
            :tab==='CALCULATOR'?<PositionCalculator/>
            :tab==='ENGINE'?<EngineHealth/>
-           :tab==='OPEN TRADES'?null
+           :tab==='OPEN TRADES'?<OpenTradesPanel/>
            :tab==='COT REPORT'?(
             <div style={{maxWidth:860,margin:'0 auto'}}>
               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
@@ -2021,8 +1758,6 @@ export default function Dashboard() {
         @keyframes spin{to{transform:rotate(360deg);}}
         @keyframes blink{0%,100%{opacity:1;}50%{opacity:0.3;}}
         @keyframes dotpulse{0%,100%{transform:scale(1);opacity:1;}50%{transform:scale(1.5);opacity:0.5;}}
-        @keyframes pulse{0%,100%{opacity:0.5;}50%{opacity:1;}}
-        @keyframes slideUp{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
         @keyframes slideIn{from{transform:translateX(100px);opacity:0;}to{transform:translateX(0);opacity:1;}}
         button:hover{opacity:0.8;}
         select option{background:var(--bg-secondary);}
