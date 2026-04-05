@@ -1435,8 +1435,8 @@ function ChartTab({ data }) {
   const mono = "'Share Tech Mono',monospace";
   const validPairs = (data||[]).filter(r => Math.abs(r.gap??0) >= 5).sort((a,b)=>Math.abs(b.gap??0)-Math.abs(a.gap??0));
   const displayPairs = validPairs.length > 0 ? validPairs.map(r=>r.symbol) : ALL_PAIRS;
-  const [selected, setSelected] = React.useState('EURUSD');
-  const [tf, setTf] = React.useState('60');
+  const [selected, setSelected] = useState('EURUSD');
+  const [tf, setTf] = useState('60');
   const TFS = [{label:'M15',v:'15'},{label:'H1',v:'60'},{label:'H4',v:'240'},{label:'D1',v:'D'}];
   const rowData = validPairs.find(r=>r.symbol===selected);
   const bias = rowData ? biasFromGap(rowData.gap??0) : {color:'#00b4ff',border:'rgba(0,180,255,0.4)',bg:'rgba(0,180,255,0.1)',label:'—'};
@@ -1480,7 +1480,7 @@ function ChartTab({ data }) {
         <iframe
           key={selected+tf}
           srcDoc={srcdoc}
-          sandbox="allow-scripts allow-same-origin"
+          sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
           style={{width:'100%',height:'100%',border:'none'}}
         />
       </div>
