@@ -634,7 +634,7 @@ function GapChart() {
 function EconomicCalendar({ pairs }) {
   const [events,setEvents]=useState([]);
   const [loading,setLoading]=useState(false);
-  const [filter,setFilter]=useState('ALL');
+  const [filter,setFilter]=useState('VALID');
   const activeCurrencies=new Set();
   (pairs||[]).forEach(p=>{if(p.symbol?.length>=6){activeCurrencies.add(p.symbol.slice(0,3));activeCurrencies.add(p.symbol.slice(3,6));}});
   async function load(){setLoading(true);try{const res=await fetch('/api/calendar');setEvents(await res.json());}catch{}setLoading(false);}
@@ -1431,7 +1431,7 @@ const TAB_FEATURE = {
   'SPIKE LOG':   'spike_log',
   'ENGINE':      'engine',
 };
-const FILTERS = ['ALL','BUY','SELL','STRONG','⚠️ CLOSE'];
+const FILTERS = ['VALID','ALL','BUY','SELL','STRONG','⚠️ CLOSE'];
 const SORTS   = [
   {label:'SYMBOL A-Z',value:'symbol_asc'},
   {label:'STRENGTH ↓',value:'strength_desc'},
@@ -1644,7 +1644,7 @@ export default function Dashboard() {
   function toggleSpikeBanner() { setPrefs(p=>({...p,spike_banner_visible:!p?.spike_banner_visible})); }
 
   const validPairs=data.filter(r=>isValid(r.gap??0));
-  let displayed=filter==='ALL'?[...data]:[...validPairs];
+  let displayed=(filter==='ALL')?[...data]:(filter==='VALID')?[...validPairs]:[...validPairs];
   if(search) displayed=displayed.filter(r=>r.symbol?.toLowerCase().includes(search.toLowerCase()));
   if(filter==='BUY') displayed=displayed.filter(r=>(r.gap??0)>=5);
   if(filter==='SELL') displayed=displayed.filter(r=>(r.gap??0)<=-5);
@@ -1783,7 +1783,7 @@ export default function Dashboard() {
           ):tab==='PANELS'?(
             displayed.length===0
               ?<div style={{textAlign:'center',padding:60,fontFamily:mono,fontSize:11,letterSpacing:3,color:'var(--text-muted)'}}>NO PAIRS MATCH</div>
-              :<><div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2,marginBottom:10}}>{filter==='ALL'?`${displayed.length} PAIRS · ${buyCount} BUY · ${sellCount} SELL`:`${displayed.length} PAIRS`}</div>
+              :<><div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2,marginBottom:10}}>{filter==='ALL'?`${displayed.length} ALL PAIRS · ${buyCount} BUY · ${sellCount} SELL`:filter==='VALID'?`${displayed.length} VALID PAIRS · ${buyCount} BUY · ${sellCount} SELL`:`${displayed.length} PAIRS`}</div>
               <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(195px,1fr))',gap:10}}>
                 {displayed.map(row=><div key={row.symbol} onClick={()=>setSelectedPair(row)} style={{cursor:'pointer'}}><PairCard row={row} trend={trends[row.symbol]} cotBias={getPairCotBias(row.symbol)}/></div>)}
               </div></>
