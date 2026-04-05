@@ -887,9 +887,10 @@ function TradingViewChart({ symbol, bias }) {
 // ===== PAIR CARD MODAL =====
 function PairCardModal({ row, trend, cotBias, onClose }) {
   const [modalTab, setModalTab] = React.useState('OVERVIEW');
-  if (!row) return null;
-  const gap = row.gap ?? 0;
+  // ALL hooks must be called before any conditional return
+  const gap = row ? (row.gap ?? 0) : 0;
   const bias = biasFromGap(gap);
+  if (!row) return null;
   const t = trend || {};
   const mu = getMatchup(row);
   const bc = boxConfirm(row.bias, row.box_h4_trend, row.box_h1_trend);
