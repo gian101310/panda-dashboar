@@ -1511,9 +1511,7 @@ function SignalFlashcard({ data, trends }) {
           <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between'}}>
             <div style={{display:'flex',flexDirection:'column',gap:6}}>
               <span style={{fontFamily:orb,fontSize:38,fontWeight:900,letterSpacing:4,color:'var(--text-primary)',lineHeight:1}}>{row.symbol}</span>
-              <span style={{fontFamily:mono,fontSize:10,color:'var(--text-muted)',letterSpacing:2}}>
-                {isBuy ? 'BASE STRONG / QUOTE WEAK' : 'BASE WEAK / QUOTE STRONG'}
-              </span>
+
             </div>
             <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:8}}>
               <span style={{fontFamily:mono,fontSize:16,fontWeight:700,color:bc,background:bc+'18',border:`1px solid ${bc}55`,borderRadius:8,padding:'6px 20px',letterSpacing:3}}>{row.bias}</span>
