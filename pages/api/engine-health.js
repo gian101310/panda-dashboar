@@ -19,7 +19,7 @@ export default async function handler(req, res) {
     // Check freshness
     const now = new Date();
     const lastRunDate = lastRun ? new Date(lastRun) : null;
-    const minutesAgo = lastRunDate ? Math.floor((now - lastRunDate) / 60000) : 999;
+    const minutesAgo = lastRunDate ? Math.max(0, Math.floor((now - lastRunDate) / 60000)) : 999;
     const isAlive = minutesAgo <= 20;
 
     // Get dashboard stats
@@ -31,7 +31,7 @@ export default async function handler(req, res) {
     const valid   = (dashboard || []).filter(r => Math.abs(r.gap || 0) >= 5).length;
     const stale   = (dashboard || []).filter(r => {
       if (!r.updated_at) return true;
-      const age = (now - new Date(r.updated_at)) / 60000;
+      const age = Math.max(0, (now - new Date(r.updated_at)) / 60000);
       return age > 20;
     }).length;
 
