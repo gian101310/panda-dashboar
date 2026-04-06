@@ -1529,7 +1529,7 @@ function ChartTab({ data }) {
   );
 }
 
-const TABS = ['PANELS','SIGNALS','TABLE','GAP CHART','CALENDAR','CALCULATOR','COT REPORT','SETUPS','VALID PAIRS','SPIKE LOG','CHART'];
+const TABS = ['PANELS','SIGNALS','TABLE','GAP CHART','CALENDAR','CALCULATOR','COT REPORT','SETUPS','VALID PAIRS','SPIKE LOG','CHART','ANALYTICS'];
 // Maps each tab to the feature_access key that controls it
 const TAB_FEATURE = {
   'PANELS':      'panels',
@@ -1544,6 +1544,7 @@ const TAB_FEATURE = {
   'SPIKE LOG':   'spike_log',
   'ENGINE':      'engine',
   'CHART':       'panels',
+  'ANALYTICS':   'analytics',
 };
 const FILTERS = ['VALID','ALL','BUY','SELL','STRONG','⚠️ CLOSE'];
 const SORTS   = [
@@ -2102,9 +2103,6 @@ export default function Dashboard() {
     }
   </div>
 
-  {/* SIGNAL PERFORMANCE ANALYTICS */}
-  <SignalAnalytics/>
-
   {/* DISCLAIMER */}
   <div style={{padding:'14px 20px',background:'rgba(255,209,102,0.08)',border:'1px solid rgba(255,209,102,0.35)',borderRadius:10,display:'flex',alignItems:'center',gap:12}}>
     <span style={{fontSize:20,flexShrink:0}}>{'⚠️'}</span>
@@ -2112,6 +2110,8 @@ export default function Dashboard() {
   </div>
 
 </div>
+):tab==='ANALYTICS'?(
+<SignalAnalytics/>
 ):tab==='TABLE'?(
 
             <div style={{overflowX:'auto'}}>
