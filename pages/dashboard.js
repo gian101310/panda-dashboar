@@ -1567,9 +1567,10 @@ function SignalAnalytics() {
   useEffect(() => { load(); }, [load]);
   if (loading) return <div style={{textAlign:'center',padding:40,fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:'var(--text-muted)'}}>LOADING ANALYTICS...</div>;
   if (!stats || !stats.summary) return <div style={{textAlign:'center',padding:40,fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:'var(--text-muted)'}}>NO SIGNAL DATA YET — signals will appear once the engine logs new BUY/SELL entries</div>;
-  const s = stats.summary;
+  const s = stats.summary || {};
   const mono = "'Share Tech Mono',monospace", orb = "'Orbitron',sans-serif";
-  const wrColor = s.winRate >= 65 ? '#00ff9f' : s.winRate >= 50 ? '#ffd166' : '#ff4d6d';
+  const wr = Number(s.winRate) || 0;
+  const wrColor = wr >= 65 ? '#00ff9f' : wr >= 50 ? '#ffd166' : s.total > 0 ? '#ff4d6d' : 'var(--text-muted)';
   return (
     <div style={{display:'flex',flexDirection:'column',gap:14}}>
       <div style={{display:'flex',alignItems:'center',gap:12}}>
@@ -1579,7 +1580,7 @@ function SignalAnalytics() {
 
       {/* SUMMARY CARDS */}
       <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
-        {[['TOTAL',s.total,'#00b4ff'],['WIN RATE',s.winRate+'%',wrColor],['WINS',s.wins,'#00ff9f'],['LOSSES',s.losses,'#ff4d6d'],['FLAT',s.flats||0,'#ffd166'],['4H PIPS',s.avgPips4h>0?'+'+s.avgPips4h:s.avgPips4h,'#00b4ff'],['8H PIPS',s.avgPips8h>0?'+'+s.avgPips8h:s.avgPips8h,'#00b4ff'],['24H PIPS',s.avgPips24h>0?'+'+s.avgPips24h:s.avgPips24h,'#00b4ff']].map(([l,v,c])=>(
+        {[['TOTAL',s.total||0,'#00b4ff'],['WIN RATE',wr+'%',wrColor],['WINS',s.wins||0,'#00ff9f'],['LOSSES',s.losses||0,'#ff4d6d'],['FLAT',s.flats||0,'#ffd166'],['4H PIPS',(s.avgPips4h||0)>0?'+'+s.avgPips4h:s.avgPips4h||0,'#00b4ff'],['8H PIPS',(s.avgPips8h||0)>0?'+'+s.avgPips8h:s.avgPips8h||0,'#00b4ff'],['12H PIPS',(s.avgPips12h||0)>0?'+'+s.avgPips12h:s.avgPips12h||0,'#00b4ff'],['24H PIPS',(s.avgPips24h||0)>0?'+'+s.avgPips24h:s.avgPips24h||0,'#00b4ff']].map(([l,v,c])=>(
           <div key={l} style={{background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:8,padding:'10px 16px',minWidth:80,textAlign:'center'}}>
             <div style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:2,marginBottom:4}}>{l}</div>
             <div style={{fontFamily:orb,fontSize:18,fontWeight:900,color:c}}>{v}</div>
@@ -1641,7 +1642,7 @@ function SignalAnalytics() {
                 <span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)'}}>{sig.momentum||''}</span>
                 {sig.entry_price&&<span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)'}}>@{sig.entry_price}</span>}
                 <div style={{display:'flex',gap:4}}>
-                  {[['4h',sig.pips_4h,sig.result_4h],['8h',sig.pips_8h,sig.result_8h],['24h',sig.pips_24h,sig.result_24h]].map(([tf,p,r])=>{
+                  {[['4h',sig.pips_4h,sig.result_4h],['8h',sig.pips_8h,sig.result_8h],['12h',sig.pips_12h,sig.result_12h],['24h',sig.pips_24h,sig.result_24h]].map(([tf,p,r])=>{
                     if(p==null)return <span key={tf} style={{fontFamily:mono,fontSize:7,color:'var(--text-muted)',opacity:0.4}}>{tf}:—</span>;
                     const pc=r==='WIN'?'#00ff9f':r==='LOSS'?'#ff4d6d':'#ffaa44';
                     return <span key={tf} style={{fontFamily:mono,fontSize:7,color:pc,fontWeight:700}}>{tf}:{fmt(p)}p</span>;
@@ -1866,7 +1867,6 @@ export default function Dashboard() {
   if(filter==='SELL') displayed=displayed.filter(r=>(r.gap??0)<=-5);
   if(filter==='STRONG') displayed=displayed.filter(r=>r.signal==='STRONG'||r.strength>=2);
   if(filter==='⚠️ CLOSE') displayed=displayed.filter(r=>trends[r.symbol]?.closeAlert);
-  displayed=displayed.filter(r=>{const mu=getMatchup(r);return !mu||mu.label!=='NEUTRAL / NEUTRAL';});
 
   if(sort==='symbol_asc'||filter==='VALID'||filter==='ALL') displayed.sort((a,b)=>(a.symbol||'').localeCompare(b.symbol||''));
   else if(sort==='strength_desc') displayed.sort((a,b)=>(b.strength||0)-(a.strength||0));

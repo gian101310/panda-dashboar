@@ -5,12 +5,12 @@ const mono = "'Share Tech Mono', monospace";
 // ── TAB ACCESS ──
 const ALL_FEATURES = [
   'panels','table','setups','valid_pairs','spike_log',
-  'signals','gap_chart',
+  'signals','gap_chart','analytics',
   'cot','calendar','calculator','journal','engine',
   'heatmap','spike_banner',
 ];
 const FEATURE_GROUPS = {
-  'TABS': ['panels','table','setups','valid_pairs','spike_log','signals','gap_chart','cot','calendar','calculator','journal','engine'],
+  'TABS': ['panels','table','setups','valid_pairs','spike_log','signals','gap_chart','analytics','cot','calendar','calculator','journal','engine'],
   'WIDGETS': ['heatmap','spike_banner'],
 };
 const FEATURE_LABELS = {
@@ -26,13 +26,14 @@ const FEATURE_LABELS = {
   calculator:   '🧮 CALCULATOR tab',
   journal:      '📓 JOURNAL page',
   engine:       '🏥 ENGINE tab',
+  analytics:    '📊 ANALYTICS tab',
   heatmap:      '🗺️ Heatmap widget',
   spike_banner: '🔔 Spike Banner widget',
 };
 const ROLE_DEFAULTS = {
   user:  ['panels','gap_chart','cot','calendar','calculator','heatmap','spike_banner'],
-  vip:   ['panels','table','setups','valid_pairs','spike_log','signals','gap_chart','cot','calendar','calculator','heatmap','spike_banner'],
-  admin: ['panels','table','setups','valid_pairs','spike_log','signals','gap_chart','cot','calendar','calculator','journal','engine','heatmap','spike_banner'],
+  vip:   ['panels','table','setups','valid_pairs','spike_log','signals','gap_chart','analytics','cot','calendar','calculator','heatmap','spike_banner'],
+  admin: ['panels','table','setups','valid_pairs','spike_log','signals','gap_chart','analytics','cot','calendar','calculator','journal','engine','heatmap','spike_banner'],
 };
 const orb = "'Orbitron', sans-serif";
 const raj = "'Rajdhani', sans-serif";

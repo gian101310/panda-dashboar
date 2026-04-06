@@ -13,7 +13,7 @@ export default async function handler(req, res) {
 
     if (error) return res.status(500).json({ error: error.message });
     if (!signals || signals.length === 0)
-      return res.status(200).json({ signals: [], summary: {}, pairStats: {}, momentumStats: {} });
+      return res.status(200).json({ signals: [], pending: 0, summary: { total:0, winRate:0, wins:0, losses:0, flats:0, avgPips4h:0, avgPips8h:0, avgPips24h:0 }, pairStats: {}, momentumStats: {} });
 
     // Only count completed signals for stats
     const done = signals.filter(s => s.status === 'DONE');
@@ -33,6 +33,9 @@ export default async function handler(req, res) {
       : 0;
     const avgPips24h = total > 0
       ? Math.round(done.reduce((a, s) => a + (s.pips_24h || 0), 0) / total * 10) / 10
+      : 0;
+    const avgPips12h = total > 0
+      ? Math.round(done.reduce((a, s) => a + (s.pips_12h || 0), 0) / total * 10) / 10
       : 0;
 
     // Per-pair breakdown
@@ -66,7 +69,7 @@ export default async function handler(req, res) {
       summary: {
         total, winRate: winRate8h,
         wins: wins8h, losses: losses8h, flats: flats8h,
-        avgPips4h, avgPips8h, avgPips24h
+        avgPips4h, avgPips8h, avgPips12h, avgPips24h
       },
       pairStats,
       momentumStats
