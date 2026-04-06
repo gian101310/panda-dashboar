@@ -91,29 +91,57 @@ function atrFill(atrPoints, currentPrice, entryPrice) {
 
 // ===== ADVANCE SCORE WARNING =====
 // ADV scores project: H1=tomorrow, H4=next week, D1=next month
-// If ADV gap < 5 → trend may be weakening → warn trader
+// ===== ADV TIMEFRAME HOLD/EXIT LOGIC =====
+// H1 ADV → next-day bias (always evaluated)
+// H4 ADV → next-week bias (critical on Thu/Fri — hold over weekend?)
+// D1 ADV → next-month bias (critical last 3 days of month — hold into new month?)
+// Returns: { label, color, bg, border, detail, level, verdicts:{h1,h4,d1}, holdExit }
 function advScore(row) {
   if (!row) return null;
   const bD1 = row.adv_base_d1 ?? 0, bH4 = row.adv_base_h4 ?? 0, bH1 = row.adv_base_h1 ?? 0;
   const qD1 = row.adv_quote_d1 ?? 0, qH4 = row.adv_quote_h4 ?? 0, qH1 = row.adv_quote_h1 ?? 0;
-  // Pick strongest per currency (same as main scoring — largest abs)
-  const baseAdv  = [bD1, bH4, bH1].reduce((a,b) => Math.abs(b) > Math.abs(a) ? b : a, 0);
-  const quoteAdv = [qD1, qH4, qH1].reduce((a,b) => Math.abs(b) > Math.abs(a) ? b : a, 0);
-  const advGap   = baseAdv - quoteAdv;
-  // H1 ADV = most recent shift (tomorrow)
-  const h1BaseAdv  = bH1, h1QuoteAdv = qH1;
-  const advGapH1   = h1BaseAdv - h1QuoteAdv;
-  // H4 ADV = weekly shift
-  const h4BaseAdv  = bH4, h4QuoteAdv = qH4;
-  const advGapH4   = h4BaseAdv - h4QuoteAdv;
+  const advH1 = bH1 - qH1;
+  const advH4 = bH4 - qH4;
+  const advD1 = bD1 - qD1;
   const isBuy = (row.gap ?? 0) > 0;
-  const ok1 = isBuy ? advGapH1 >= 5 : advGapH1 <= -5;
-  const ok4 = isBuy ? advGapH4 >= 5 : advGapH4 <= -5;
-  const okD = isBuy ? advGap   >= 5 : advGap   <= -5;
-  if (ok1 && ok4) return { label:'🟢 ADV OK', color:'#00ff9f', bg:'rgba(0,255,159,0.08)', border:'rgba(0,255,159,0.25)', detail:`H1:${advGapH1>0?'+':''}${advGapH1} H4:${advGapH4>0?'+':''}${advGapH4}`, level:'OK' };
-  if (!ok4)       return { label:'🔴 ADV H4 WEAK', color:'#ff4d6d', bg:'rgba(255,77,109,0.10)', border:'rgba(255,77,109,0.35)', detail:`Next week gap may flip. H4:${advGapH4>0?'+':''}${advGapH4}`, level:'BAD' };
-  if (!ok1)       return { label:'🟡 ADV H1 WEAK', color:'#ffd166', bg:'rgba(255,209,102,0.10)', border:'rgba(255,209,102,0.35)', detail:`Tomorrow gap uncertain. H1:${advGapH1>0?'+':''}${advGapH1}`, level:'WARN' };
-  return null;
+  const okH1 = isBuy ? advH1 >= 5 : advH1 <= -5;
+  const okH4 = isBuy ? advH4 >= 5 : advH4 <= -5;
+  const okD1 = isBuy ? advD1 >= 5 : advD1 <= -5;
+  // Time context
+  const now = new Date();
+  const dow = now.getUTCDay(); // 0=Sun..5=Fri
+  const dom = now.getUTCDate();
+  const lastDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth()+1, 0)).getUTCDate();
+  const isFriWindow = dow >= 4 || dow === 0; // Thu-Sun: weekend decision window
+  const isMonthEnd  = (lastDay - dom) <= 2;  // Last 3 days of month
+  // Per-TF verdicts
+  const h1v = okH1 ? {tag:'HOLD',note:'Next-day bias aligned',c:'#00ff9f'} : {tag:'EXIT',note:'Tomorrow gap may flip',c:'#ff4d6d'};
+  const h4v = okH4 ? {tag:'HOLD',note:isFriWindow?'Safe to hold over weekend':'Weekly bias aligned',c:'#00ff9f'} : {tag:'EXIT',note:isFriWindow?'Exit before weekend — H4 weak':'Next-week gap weakening',c:'#ff4d6d'};
+  const d1v = okD1 ? {tag:'HOLD',note:isMonthEnd?'Safe to hold into new month':'Monthly bias aligned',c:'#00ff9f'} : {tag:'EXIT',note:isMonthEnd?'Exit before month end — D1 weak':'Next-month bias fading',c:'#ff4d6d'};
+  // Combined hold/exit
+  const exits = [!okH1, !okH4, !okD1].filter(Boolean).length;
+  let holdExit, label, color, bg, border, level;
+  if (exits === 0) {
+    holdExit = 'HOLD'; label = '🟢 HOLD'; color = '#00ff9f';
+    bg = 'rgba(0,255,159,0.08)'; border = 'rgba(0,255,159,0.25)'; level = 'OK';
+  } else if (exits === 1 && okH4) {
+    holdExit = 'HOLD'; label = '🟡 HOLD — H1 WEAK'; color = '#ffd166';
+    bg = 'rgba(255,209,102,0.10)'; border = 'rgba(255,209,102,0.35)'; level = 'WARN';
+  } else if (exits >= 2 || !okH4) {
+    holdExit = 'EXIT'; label = '🔴 EXIT'; color = '#ff4d6d';
+    bg = 'rgba(255,77,109,0.10)'; border = 'rgba(255,77,109,0.35)'; level = 'BAD';
+  } else {
+    holdExit = 'HOLD'; label = '🟡 HOLD — CAUTION'; color = '#ffd166';
+    bg = 'rgba(255,209,102,0.10)'; border = 'rgba(255,209,102,0.35)'; level = 'WARN';
+  }
+  const fmt = v => (v>0?'+':'')+v;
+  const detail = `H1:${fmt(advH1)} H4:${fmt(advH4)} D1:${fmt(advD1)}`;
+  // Contextual urgency flags
+  const urgent = [];
+  if (isFriWindow && !okH4) urgent.push('⚠️ WEEKEND');
+  if (isMonthEnd  && !okD1) urgent.push('⚠️ MONTH-END');
+  return { label, color, bg, border, detail, level, holdExit, urgent,
+    verdicts: { h1:h1v, h4:h4v, d1:d1v }, gaps: { h1:advH1, h4:advH4, d1:advD1 } };
 }
 
 // ===== CURRENCY STRENGTH MATCHUP LABEL (v2) =====
@@ -822,7 +850,15 @@ function PairCard({ row, trend, cotBias }) {
     {af&&<span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:0.5}}>ATR {af.atrPips}p · {af.pipsPerHour}p/hr</span>}
   </div>);
 })()}
-{(()=>{const adv=advScore(row);if(!adv||adv.level==='OK')return null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:adv.color,background:adv.bg,border:`1px solid ${adv.border}`,borderRadius:4,padding:'1px 7px',fontWeight:700}}>{adv.label}</span><span style={{fontFamily:mono,fontSize:7,color:'var(--text-muted)'}}>{adv.detail}</span></div>);})()}{cotBias&&<div style={{display:'flex',alignItems:'center',gap:4}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>COT</span><span style={{fontFamily:mono,fontSize:9,color:cotBias.bias==='BULLISH'?'#00ff9f':'#ff4d6d',background:cotBias.bias==='BULLISH'?'rgba(0,255,159,0.08)':'rgba(255,77,109,0.08)',border:`1px solid ${cotBias.bias==='BULLISH'?'#00ff9f33':'#ff4d6d33'}`,borderRadius:3,padding:'1px 5px'}}>{cotBias.bias==='BULLISH'?'▲':'▼'} {cotBias.bias}</span></div>}
+{(()=>{const adv=advScore(row);if(!adv)return null;return(<div style={{display:'flex',flexDirection:'column',gap:3,marginTop:2}}>
+<div style={{display:'flex',alignItems:'center',gap:5}}>
+<span style={{fontFamily:mono,fontSize:8,color:adv.color,background:adv.bg,border:`1px solid ${adv.border}`,borderRadius:4,padding:'1px 7px',fontWeight:700}}>{adv.label}</span>
+{adv.urgent&&adv.urgent.map((u,i)=><span key={i} style={{fontFamily:mono,fontSize:7,color:'#ff4d6d',fontWeight:700,letterSpacing:0.5}}>{u}</span>)}
+</div>
+<div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+{[['H1',adv.verdicts.h1,adv.gaps.h1],['H4',adv.verdicts.h4,adv.gaps.h4],['D1',adv.verdicts.d1,adv.gaps.d1]].map(([tf,v,g])=><span key={tf} style={{fontFamily:mono,fontSize:7,color:v.c,background:v.c+'12',border:`1px solid ${v.c}28`,borderRadius:3,padding:'1px 5px',whiteSpace:'nowrap'}}>{tf} {v.tag} {g>0?'+':''}{g}</span>)}
+</div>
+</div>);})()}{cotBias&&<div style={{display:'flex',alignItems:'center',gap:4}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>COT</span><span style={{fontFamily:mono,fontSize:9,color:cotBias.bias==='BULLISH'?'#00ff9f':'#ff4d6d',background:cotBias.bias==='BULLISH'?'rgba(0,255,159,0.08)':'rgba(255,77,109,0.08)',border:`1px solid ${cotBias.bias==='BULLISH'?'#00ff9f33':'#ff4d6d33'}`,borderRadius:3,padding:'1px 5px'}}>{cotBias.bias==='BULLISH'?'▲':'▼'} {cotBias.bias}</span></div>}
       <div style={{display:'flex',flexDirection:'column',gap:3}}>
         <div style={{display:'flex',alignItems:'center',gap:6}}>
           <span style={{fontFamily:mono,fontSize:10,color:t.momentumColor||'var(--text-muted)',background:(t.momentumColor||'var(--text-muted)')+'18',border:`1px solid ${(t.momentumColor||'var(--text-muted)')}30`,borderRadius:4,padding:'2px 8px',letterSpacing:1}}>{momIcons[t.momentum]||'▬'} {t.momentum||'NEUTRAL'}</span>
@@ -922,7 +958,7 @@ function PairCardModal({ row, trend, cotBias, onClose }) {
             <div style={{display:'flex',flexDirection:'column',gap:2}}>
               <span style={{fontFamily:mono,fontSize:10,color:adv.color}}>{adv.detail}</span>
               <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>
-                {adv.level==='OK'?'Advance scoring intact — hold or enter':adv.level==='BAD'?'⚠️ Cancel pending or tighten SL — next week gap may flip':'⚠️ Tomorrow uncertain — consider reducing risk'}
+                {adv.holdExit==='HOLD'?'Advance scoring aligned — hold position':adv.holdExit==='EXIT'?'⚠️ Consider exit — advance gap weakening':'⚠️ Caution — partial misalignment'}
               </span>
             </div>
           </div>
@@ -1078,7 +1114,7 @@ function ValidSetupsTab({ data, trends, cotMap }) {
                   {af&&<span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:0.5}}>ATR {af.atrPips}p · {af.pipsPerHour}p/hr</span>}
                 </div>);
               })()}
-              {(()=>{const adv=advScore(row);if(!adv||adv.level==='OK')return null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}><span style={{fontFamily:mono,fontSize:9,color:adv.color,background:adv.bg,border:`1px solid ${adv.border}`,borderRadius:4,padding:'2px 8px',fontWeight:700}}>{adv.label}</span><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)'}}>{adv.detail}</span></div>);})()}
+              {(()=>{const adv=advScore(row);if(!adv)return null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}><span style={{fontFamily:mono,fontSize:9,color:adv.color,background:adv.bg,border:`1px solid ${adv.border}`,borderRadius:4,padding:'2px 8px',fontWeight:700}}>{adv.label}</span><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)'}}>{adv.detail}</span></div>);})()}
             </div>
 
             {/* STRENGTH */}
@@ -1115,7 +1151,9 @@ function ValidSetupsTab({ data, trends, cotMap }) {
 function ValidPairsTab({ data, trends, cotMap }) {
   const valid = data.filter(r => {
     const gap = r.gap ?? 0;
-    if (Math.abs(gap) < 5) return false;
+    if (Math.abs(gap) < 7) return false;
+    const mu = getMatchup(r);
+    if (mu && mu.label === 'NEUTRAL / NEUTRAL') return false;
     const t = trends[r.symbol] || {};
     const mom = t.momentum;
     if (!['STRONG','BUILDING','SPARK'].includes(mom)) return false;
@@ -1131,7 +1169,7 @@ function ValidPairsTab({ data, trends, cotMap }) {
     <div style={{textAlign:'center',padding:80,display:'flex',flexDirection:'column',gap:12,alignItems:'center'}}>
       <div style={{fontFamily:"'Orbitron',sans-serif",fontSize:14,color:'var(--text-muted)',letterSpacing:3}}>NO VALID PAIRS RIGHT NOW</div>
       <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:'var(--text-muted)',lineHeight:1.8}}>
-        Waiting for: gap &gt;= 5 + momentum BUILDING/STRONG + 1H &amp; 4H aligned
+        Waiting for: gap &gt;= 7 + momentum BUILDING/STRONG + 1H &amp; 4H aligned + no NEUTRAL vs NEUTRAL
       </div>
     </div>
   );
@@ -1201,7 +1239,7 @@ function ValidPairsTab({ data, trends, cotMap }) {
                 <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:'var(--text-secondary)'}}>{af.pipsPerHour}p</div>
               </div>
             );})()}
-            {(()=>{const adv=advScore(row);if(!adv||adv.level==='OK')return null;return(
+            {(()=>{const adv=advScore(row);if(!adv)return null;return(
               <div style={{minWidth:90,textAlign:'center'}}>
                 <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:'var(--text-muted)',letterSpacing:2,marginBottom:2}}>ADV</div>
                 <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:adv.color,background:adv.bg,border:`1px solid ${adv.border}`,borderRadius:4,padding:'2px 6px',fontWeight:700}}>{adv.label}</div>
@@ -1517,7 +1555,76 @@ const SORTS   = [
 ];
 
 
-// ===== SIGNAL FLASHCARD COMPONENT =====
+// ===== SIGNAL PERFORMANCE ANALYTICS =====
+function SignalAnalytics() {
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const load = useCallback(async () => {
+    try { const r = await fetch('/api/signal-analytics'); if (r.ok) setStats(await r.json()); } catch {}
+    setLoading(false);
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  if (loading) return <div style={{textAlign:'center',padding:40,fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:'var(--text-muted)'}}>LOADING ANALYTICS...</div>;
+  if (!stats || !stats.summary) return <div style={{textAlign:'center',padding:40,fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:'var(--text-muted)'}}>NO SIGNAL DATA</div>;
+  const s = stats.summary;
+  const mono = "'Share Tech Mono',monospace", orb = "'Orbitron',sans-serif";
+  const wrColor = s.winRate >= 65 ? '#00ff9f' : s.winRate >= 50 ? '#ffd166' : '#ff4d6d';
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:14}}>
+      <div style={{fontFamily:orb,fontSize:11,color:'#00b4ff',letterSpacing:4,fontWeight:700}}>📊 SIGNAL PERFORMANCE — 7 DAY</div>
+
+      {/* SUMMARY CARDS */}
+      <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+        {[['TOTAL',s.total,'#00b4ff'],['WIN RATE',s.winRate+'%',wrColor],['WINS',s.wins,'#00ff9f'],['LOSSES',s.losses,'#ff4d6d'],['HOLDS',s.holds,'#ffd166'],['AVG GAIN',s.avgPeakGain>0?'+'+s.avgPeakGain:s.avgPeakGain,'#00b4ff']].map(([l,v,c])=>(
+          <div key={l} style={{background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:8,padding:'10px 16px',minWidth:80,textAlign:'center'}}>
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:2,marginBottom:4}}>{l}</div>
+            <div style={{fontFamily:orb,fontSize:18,fontWeight:900,color:c}}>{v}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* PER-PAIR WIN RATE */}
+      {stats.pairStats && Object.keys(stats.pairStats).length > 0 && (
+        <div style={{display:'flex',flexDirection:'column',gap:6}}>
+          <div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2}}>PER-PAIR BREAKDOWN</div>
+          <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+            {Object.entries(stats.pairStats).sort((a,b)=>{const wr=(x)=>x.total>0?x.wins/x.total:0;return wr(b[1])-wr(a[1]);}).map(([sym,p])=>{
+              const wr=p.total>0?Math.round(p.wins/p.total*100):0;
+              const c=wr>=65?'#00ff9f':wr>=50?'#ffd166':'#ff4d6d';
+              return(<div key={sym} style={{background:'var(--bg-card)',border:`1px solid ${c}28`,borderRadius:6,padding:'6px 10px',minWidth:90,display:'flex',flexDirection:'column',alignItems:'center',gap:2}}>
+                <span style={{fontFamily:orb,fontSize:10,fontWeight:700,color:'var(--text-primary)',letterSpacing:1}}>{sym}</span>
+                <span style={{fontFamily:orb,fontSize:14,fontWeight:900,color:c}}>{wr}%</span>
+                <span style={{fontFamily:mono,fontSize:7,color:'var(--text-muted)'}}>{p.wins}W {p.losses}L {p.holds}H</span>
+              </div>);
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* RECENT SIGNALS */}
+      {stats.signals && stats.signals.length > 0 && (
+        <div style={{display:'flex',flexDirection:'column',gap:6}}>
+          <div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2}}>RECENT SIGNALS</div>
+          <div style={{display:'flex',flexDirection:'column',gap:4,maxHeight:300,overflowY:'auto'}}>
+            {stats.signals.slice(0,20).map((sig,i)=>{
+              const oc=sig.outcome==='WIN'?'#00ff9f':sig.outcome==='LOSS'?'#ff4d6d':'#ffd166';
+              const dc=sig.direction==='BUY'?'#00ff9f':'#ff4d6d';
+              return(<div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'6px 12px',background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:6}}>
+                <span style={{fontFamily:orb,fontSize:10,fontWeight:700,color:'var(--text-primary)',minWidth:70,letterSpacing:1}}>{sig.symbol}</span>
+                <span style={{fontFamily:mono,fontSize:9,color:dc,background:dc+'15',border:`1px solid ${dc}33`,borderRadius:3,padding:'1px 6px',minWidth:32,textAlign:'center'}}>{sig.direction}</span>
+                <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',minWidth:50}}>Gap {sig.gap>0?'+':''}{sig.gap}</span>
+                <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',minWidth:55}}>Peak {sig.peakGap>0?'+':''}{sig.peakGap}</span>
+                <span style={{fontFamily:mono,fontSize:9,color:oc,fontWeight:700,background:oc+'15',border:`1px solid ${oc}33`,borderRadius:3,padding:'1px 8px',minWidth:36,textAlign:'center'}}>{sig.outcome}</span>
+                <span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',marginLeft:'auto'}}>{sig.timestamp?new Date(sig.timestamp).toLocaleDateString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):''}</span>
+              </div>);
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SignalFlashcard({ data, trends }) {
   const mono = "'Share Tech Mono',monospace";
   const orb  = "'Orbitron',sans-serif";
@@ -1726,6 +1833,7 @@ export default function Dashboard() {
   if(filter==='SELL') displayed=displayed.filter(r=>(r.gap??0)<=-5);
   if(filter==='STRONG') displayed=displayed.filter(r=>r.signal==='STRONG'||r.strength>=2);
   if(filter==='⚠️ CLOSE') displayed=displayed.filter(r=>trends[r.symbol]?.closeAlert);
+  displayed=displayed.filter(r=>{const mu=getMatchup(r);return !mu||mu.label!=='NEUTRAL / NEUTRAL';});
 
   if(sort==='symbol_asc'||filter==='VALID'||filter==='ALL') displayed.sort((a,b)=>(a.symbol||'').localeCompare(b.symbol||''));
   else if(sort==='strength_desc') displayed.sort((a,b)=>(b.strength||0)-(a.strength||0));
@@ -1962,6 +2070,9 @@ export default function Dashboard() {
     }
   </div>
 
+  {/* SIGNAL PERFORMANCE ANALYTICS */}
+  <SignalAnalytics/>
+
   {/* DISCLAIMER */}
   <div style={{padding:'14px 20px',background:'rgba(255,209,102,0.08)',border:'1px solid rgba(255,209,102,0.35)',borderRadius:10,display:'flex',alignItems:'center',gap:12}}>
     <span style={{fontSize:20,flexShrink:0}}>{'⚠️'}</span>
@@ -1973,7 +2084,7 @@ export default function Dashboard() {
 
             <div style={{overflowX:'auto'}}>
               <table style={{width:'100%',borderCollapse:'collapse',background:'var(--bg-secondary)',border:'1px solid var(--border)',borderRadius:10,overflow:'hidden'}}>
-                <thead><tr style={{background:'var(--bg-hover)'}}>{['#','SYMBOL','GAP','▲▼','BIAS','MOMENTUM','MATCHUP','1H','4H','8H','CHART','STATE','STR','SIG','COT','⚠️'].map(h=><th key={h} style={hdr}>{h}</th>)}</tr></thead>
+                <thead><tr style={{background:'var(--bg-hover)'}}>{['#','SYMBOL','GAP','▲▼','BIAS','MOMENTUM','MATCHUP','1H','4H','8H','CHART','STATE','STR','SIG','COT','FL-ST','⚠️'].map(h=><th key={h} style={hdr}>{h}</th>)}</tr></thead>
                 <tbody>
                   {displayed.length===0?<tr><td colSpan={15} style={{textAlign:'center',padding:40,fontFamily:mono,fontSize:10,color:'var(--text-muted)'}}>NO DATA</td></tr>
                   :displayed.map((row,idx)=>{
@@ -1995,6 +2106,7 @@ export default function Dashboard() {
                         <td style={tdc}><div style={{display:'flex',alignItems:'center',gap:5}}><div style={{flex:1,height:4,background:'var(--border)',borderRadius:2,overflow:'hidden',minWidth:40}}><div style={{width:`${Math.min(100,(Math.abs(sv)/30)*100)}%`,height:'100%',background:strColor(sv),borderRadius:2}}/></div><span style={{fontFamily:orb,fontSize:10,color:strColor(sv),fontWeight:700,minWidth:28}}>{Number(sv).toFixed(1)}</span></div></td>
                         <td style={tdc}>{(()=>{const s=signalLabel(row.signal,sv);return<span style={{fontFamily:mono,fontSize:9,color:s.color}}>{s.icon}</span>;})()}</td>
                         <td style={tdc}>{cotB?<span style={{fontFamily:mono,fontSize:9,color:cotB.bias==='BULLISH'?'#00ff9f':'#ff4d6d'}}>{cotB.bias==='BULLISH'?'▲':'▼'}</span>:<span style={{color:'var(--text-muted)'}}>—</span>}</td>
+                        <td style={tdc}>{(()=>{const tbg=tbgZoneBadge(row.tbg_zone,row.bias);if(!tbg)return <span style={{color:'var(--text-muted)'}}>—</span>;return <span style={{fontFamily:mono,fontSize:9,color:tbg.color,background:tbg.bg,border:`1px solid ${tbg.border}`,borderRadius:3,padding:'1px 6px',whiteSpace:'nowrap'}}>{tbg.valid?'✅':'⛔'} {tbg.label}</span>;})()}</td>
                         <td style={tdc}>{t.closeAlert?<span style={{fontFamily:mono,fontSize:9,color:'#ff4d6d'}}>⚠️</span>:<span style={{color:'var(--text-muted)'}}>—</span>}</td>
                       </tr>
                     );
