@@ -2,77 +2,87 @@ import { supabase } from '../../lib/supabase';
 
 export default async function handler(req, res) {
   try {
-    // Fetch all signal results (last 30 days)
     const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
     const { data: signals, error } = await supabase
       .from('signal_results')
       .select('*')
-      .gte('signal_time', since)
-      .order('signal_time', { ascending: false })
+      .gte('created_at', since)
+      .order('created_at', { ascending: false })
       .limit(500);
 
     if (error) return res.status(500).json({ error: error.message });
     if (!signals || signals.length === 0)
-      return res.status(200).json({ signals: [], pending: 0, summary: { total:0, winRate:0, wins:0, losses:0, flats:0, avgPips4h:0, avgPips8h:0, avgPips24h:0 }, pairStats: {}, momentumStats: {} });
+      return res.status(200).json({
+        signals: [], pending: 0,
+        summary: { total:0, winRate:0, wins:0, losses:0, flat:0, avgPips:0, avgDuration:0, avgPeakGap:0 },
+        byStrategy: {}, byPair: {}, byExitReason: {}
+      });
 
-    // Only count completed signals for stats
     const done = signals.filter(s => s.status === 'DONE');
     const pending = signals.filter(s => s.status === 'PENDING');
+    const wins = done.filter(s => s.outcome === 'WIN');
+    const losses = done.filter(s => s.outcome === 'LOSS');
 
-    // Summary stats (use 8h as primary metric)
-    const total = done.length;
-    const wins8h = done.filter(s => s.result_8h === 'WIN').length;
-    const losses8h = done.filter(s => s.result_8h === 'LOSS').length;
-    const flats8h = done.filter(s => s.result_8h === 'FLAT').length;
-    const winRate8h = total > 0 ? Math.round((wins8h / total) * 100) : 0;
-    const avgPips8h = total > 0
-      ? Math.round(done.reduce((a, s) => a + (s.pips_8h || 0), 0) / total * 10) / 10
-      : 0;
-    const avgPips4h = total > 0
-      ? Math.round(done.reduce((a, s) => a + (s.pips_4h || 0), 0) / total * 10) / 10
-      : 0;
-    const avgPips24h = total > 0
-      ? Math.round(done.reduce((a, s) => a + (s.pips_24h || 0), 0) / total * 10) / 10
-      : 0;
-    const avgPips12h = total > 0
-      ? Math.round(done.reduce((a, s) => a + (s.pips_12h || 0), 0) / total * 10) / 10
-      : 0;
+    const avgPips = done.length > 0 ? Math.round(done.reduce((a,s) => a + (s.pips||0), 0) / done.length * 10) / 10 : 0;
+    const avgDuration = done.length > 0 ? Math.round(done.reduce((a,s) => a + (s.duration_min||0), 0) / done.length) : 0;
+    const avgPeakGap = done.length > 0 ? Math.round(done.reduce((a,s) => a + (s.peak_gap||0), 0) / done.length * 10) / 10 : 0;
+
+    // Per-strategy breakdown
+    const byStrategy = {};
+    for (const s of done) {
+      const st = s.strategy || 'BB';
+      if (!byStrategy[st]) byStrategy[st] = { wins:0, losses:0, flat:0, total:0, totalPips:0, avgDuration:0, durSum:0 };
+      const b = byStrategy[st];
+      b.total++;
+      b.totalPips += s.pips || 0;
+      b.durSum += s.duration_min || 0;
+      if (s.outcome === 'WIN') b.wins++;
+      else if (s.outcome === 'LOSS') b.losses++;
+      else b.flat++;
+    }
+    Object.values(byStrategy).forEach(b => { b.avgDuration = b.total > 0 ? Math.round(b.durSum / b.total) : 0; });
 
     // Per-pair breakdown
-    const pairStats = {};
+    const byPair = {};
     for (const s of done) {
-      if (!pairStats[s.symbol]) pairStats[s.symbol] = { wins: 0, losses: 0, flats: 0, total: 0, totalPips: 0 };
-      const ps = pairStats[s.symbol];
-      ps.total++;
-      ps.totalPips += s.pips_8h || 0;
-      if (s.result_8h === 'WIN') ps.wins++;
-      else if (s.result_8h === 'LOSS') ps.losses++;
-      else ps.flats++;
+      if (!byPair[s.symbol]) byPair[s.symbol] = { wins:0, losses:0, flat:0, total:0, totalPips:0 };
+      const p = byPair[s.symbol];
+      p.total++; p.totalPips += s.pips || 0;
+      if (s.outcome === 'WIN') p.wins++;
+      else if (s.outcome === 'LOSS') p.losses++;
+      else p.flat++;
     }
 
-    // Per-momentum breakdown
-    const momentumStats = {};
+    // By exit reason
+    const byExitReason = {};
     for (const s of done) {
-      const m = s.momentum || 'UNKNOWN';
-      if (!momentumStats[m]) momentumStats[m] = { wins: 0, losses: 0, flats: 0, total: 0, totalPips: 0 };
-      const ms = momentumStats[m];
-      ms.total++;
-      ms.totalPips += s.pips_8h || 0;
-      if (s.result_8h === 'WIN') ms.wins++;
-      else if (s.result_8h === 'LOSS') ms.losses++;
-      else ms.flats++;
+      const r = s.exit_reason || 'UNKNOWN';
+      if (!byExitReason[r]) byExitReason[r] = { count:0, wins:0, totalPips:0 };
+      const e = byExitReason[r];
+      e.count++; e.totalPips += s.pips || 0;
+      if (s.outcome === 'WIN') e.wins++;
     }
+
+    // Format signals for display
+    const formatted = signals.map(s => ({
+      symbol: s.symbol, direction: s.direction, strategy: s.strategy,
+      entryGap: s.entry_gap, peakGap: s.peak_gap, exitGap: s.exit_gap,
+      entryPrice: s.entry_price, exitPrice: s.exit_price, pips: s.pips,
+      exitReason: s.exit_reason, outcome: s.outcome, status: s.status,
+      durationMin: s.duration_min, bias: s.bias, tbgZone: s.tbg_zone,
+      baseScore: s.base_score, quoteScore: s.quote_score,
+      snapshotCount: (s.snapshots || []).length,
+      timestamp: s.created_at, closedAt: s.closed_at
+    }));
 
     return res.status(200).json({
-      signals: signals.slice(0, 50),
-      pending: pending.length,
       summary: {
-        total, winRate: winRate8h,
-        wins: wins8h, losses: losses8h, flats: flats8h,
-        avgPips4h, avgPips8h, avgPips12h, avgPips24h
+        total: done.length, pending: pending.length,
+        wins: wins.length, losses: losses.length, flat: done.length - wins.length - losses.length,
+        winRate: done.length > 0 ? Math.round(wins.length / done.length * 100) : 0,
+        avgPips, avgDuration, avgPeakGap
       },
-      pairStats,
-      momentumStats
+      signals: formatted, byStrategy, byPair, byExitReason
     });
   } catch (err) {
     return res.status(500).json({ error: err.message });

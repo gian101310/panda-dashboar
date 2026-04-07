@@ -1556,31 +1556,40 @@ const SORTS   = [
 ];
 
 
-// ===== SIGNAL PERFORMANCE ANALYTICS =====
+// ===== SIGNAL PERFORMANCE ANALYTICS V2 =====
 function SignalAnalytics() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [stratFilter, setStratFilter] = useState('ALL');
   const load = useCallback(async () => {
     try { const r = await fetch('/api/signal-analytics'); if (r.ok) setStats(await r.json()); } catch {}
     setLoading(false);
   }, []);
   useEffect(() => { load(); }, [load]);
   if (loading) return <div style={{textAlign:'center',padding:40,fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:'var(--text-muted)'}}>LOADING ANALYTICS...</div>;
-  if (!stats || !stats.summary) return <div style={{textAlign:'center',padding:40,fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:'var(--text-muted)'}}>NO SIGNAL DATA YET — signals will appear once the engine logs new BUY/SELL entries</div>;
+  if (!stats || !stats.summary) return <div style={{textAlign:'center',padding:40,fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:'var(--text-muted)'}}>NO SIGNAL DATA YET</div>;
   const s = stats.summary || {};
   const mono = "'Share Tech Mono',monospace", orb = "'Orbitron',sans-serif";
   const wr = Number(s.winRate) || 0;
   const wrColor = wr >= 65 ? '#00ff9f' : wr >= 50 ? '#ffd166' : s.total > 0 ? '#ff4d6d' : 'var(--text-muted)';
+  const filteredSignals = (stats.signals||[]).filter(sig => stratFilter === 'ALL' || sig.strategy === stratFilter);
   return (
     <div style={{display:'flex',flexDirection:'column',gap:14}}>
-      <div style={{display:'flex',alignItems:'center',gap:12}}>
+      <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
         <span style={{fontFamily:orb,fontSize:11,color:'#00b4ff',letterSpacing:4,fontWeight:700}}>📊 SIGNAL PERFORMANCE — 30 DAY</span>
-        {stats.pending>0&&<span style={{fontFamily:mono,fontSize:9,color:'#ffd166',background:'rgba(255,209,102,0.1)',border:'1px solid rgba(255,209,102,0.3)',borderRadius:4,padding:'2px 8px'}}>{stats.pending} PENDING</span>}
+        {s.pending>0&&<span style={{fontFamily:mono,fontSize:9,color:'#ffd166',background:'rgba(255,209,102,0.1)',border:'1px solid rgba(255,209,102,0.3)',borderRadius:4,padding:'2px 8px'}}>{s.pending} PENDING</span>}
+      </div>
+
+      {/* STRATEGY FILTER */}
+      <div style={{display:'flex',gap:6}}>
+        {['ALL','BB','INTRA'].map(st=>(
+          <button key={st} onClick={()=>setStratFilter(st)} style={{fontFamily:mono,fontSize:9,padding:'4px 12px',borderRadius:4,border:`1px solid ${stratFilter===st?'#00b4ff':'var(--border)'}`,background:stratFilter===st?'rgba(0,180,255,0.15)':'var(--bg-card)',color:stratFilter===st?'#00b4ff':'var(--text-muted)',cursor:'pointer',letterSpacing:2}}>{st}</button>
+        ))}
       </div>
 
       {/* SUMMARY CARDS */}
       <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
-        {[['TOTAL',s.total||0,'#00b4ff'],['WIN RATE',wr+'%',wrColor],['WINS',s.wins||0,'#00ff9f'],['LOSSES',s.losses||0,'#ff4d6d'],['FLAT',s.flats||0,'#ffd166'],['4H PIPS',(s.avgPips4h||0)>0?'+'+s.avgPips4h:s.avgPips4h||0,'#00b4ff'],['8H PIPS',(s.avgPips8h||0)>0?'+'+s.avgPips8h:s.avgPips8h||0,'#00b4ff'],['12H PIPS',(s.avgPips12h||0)>0?'+'+s.avgPips12h:s.avgPips12h||0,'#00b4ff'],['24H PIPS',(s.avgPips24h||0)>0?'+'+s.avgPips24h:s.avgPips24h||0,'#00b4ff']].map(([l,v,c])=>(
+        {[['TOTAL',s.total||0,'#00b4ff'],['WIN RATE',wr+'%',wrColor],['WINS',s.wins||0,'#00ff9f'],['LOSSES',s.losses||0,'#ff4d6d'],['FLAT',s.flat||0,'#ffd166'],['AVG PIPS',(s.avgPips||0)>0?'+'+s.avgPips:s.avgPips||0,'#00b4ff'],['AVG HOLD',Math.round(s.avgDuration||0)+'m','#00b4ff'],['AVG PEAK',(s.avgPeakGap||0).toFixed(1),'#ffaa44']].map(([l,v,c])=>(
           <div key={l} style={{background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:8,padding:'10px 16px',minWidth:80,textAlign:'center'}}>
             <div style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:2,marginBottom:4}}>{l}</div>
             <div style={{fontFamily:orb,fontSize:18,fontWeight:900,color:c}}>{v}</div>
@@ -1588,12 +1597,32 @@ function SignalAnalytics() {
         ))}
       </div>
 
+      {/* STRATEGY BREAKDOWN */}
+      {stats.byStrategy && Object.keys(stats.byStrategy).length > 0 && (
+        <div style={{display:'flex',flexDirection:'column',gap:6}}>
+          <div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2}}>BY STRATEGY</div>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+            {Object.entries(stats.byStrategy).map(([st,d])=>{
+              const w=d.total>0?Math.round(d.wins/d.total*100):0;
+              const c=w>=65?'#00ff9f':w>=50?'#ffd166':d.total>0?'#ff4d6d':'var(--text-muted)';
+              const avgP=d.total>0?Math.round(d.totalPips/d.total*10)/10:0;
+              return(<div key={st} style={{background:'var(--bg-card)',border:`1px solid ${c}28`,borderRadius:8,padding:'10px 14px',minWidth:140}}>
+                <div style={{fontFamily:orb,fontSize:11,fontWeight:700,color:'#00b4ff',letterSpacing:2,marginBottom:6}}>{st}</div>
+                <div style={{fontFamily:orb,fontSize:20,fontWeight:900,color:c}}>{w}%</div>
+                <div style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',marginTop:4}}>{d.wins}W {d.losses}L {d.flat}F · {d.total} sig</div>
+                <div style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)'}}>avg {avgP>0?'+':''}{ avgP}p · {d.avgDuration}m hold</div>
+              </div>);
+            })}
+          </div>
+        </div>
+      )}
+
       {/* PER-PAIR WIN RATE */}
-      {stats.pairStats && Object.keys(stats.pairStats).length > 0 && (
+      {stats.byPair && Object.keys(stats.byPair).length > 0 && (
         <div style={{display:'flex',flexDirection:'column',gap:6}}>
           <div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2}}>PER-PAIR BREAKDOWN</div>
           <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-            {Object.entries(stats.pairStats).sort((a,b)=>{const wr=(x)=>x.total>0?x.wins/x.total:0;return wr(b[1])-wr(a[1]);}).map(([sym,p])=>{
+            {Object.entries(stats.byPair).sort((a,b)=>{const wr=(x)=>x.total>0?x.wins/x.total:0;return wr(b[1])-wr(a[1]);}).map(([sym,p])=>{
               const wr=p.total>0?Math.round(p.wins/p.total*100):0;
               const c=wr>=65?'#00ff9f':wr>=50?'#ffd166':'#ff4d6d';
               return(<div key={sym} style={{background:'var(--bg-card)',border:`1px solid ${c}28`,borderRadius:6,padding:'6px 10px',minWidth:90,display:'flex',flexDirection:'column',alignItems:'center',gap:2}}>
@@ -1606,18 +1635,19 @@ function SignalAnalytics() {
         </div>
       )}
 
-      {/* MOMENTUM BREAKDOWN */}
-      {stats.momentumStats && Object.keys(stats.momentumStats).length > 0 && (
+      {/* EXIT REASON BREAKDOWN */}
+      {stats.byExitReason && Object.keys(stats.byExitReason).length > 0 && (
         <div style={{display:'flex',flexDirection:'column',gap:6}}>
-          <div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2}}>BY MOMENTUM STATE</div>
+          <div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2}}>BY EXIT REASON</div>
           <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-            {Object.entries(stats.momentumStats).sort((a,b)=>{const wr=(x)=>x.total>0?x.wins/x.total:0;return wr(b[1])-wr(a[1]);}).map(([mom,p])=>{
-              const wr=p.total>0?Math.round(p.wins/p.total*100):0;
-              const c=wr>=65?'#00ff9f':wr>=50?'#ffd166':'#ff4d6d';
-              return(<div key={mom} style={{background:'var(--bg-card)',border:`1px solid ${c}28`,borderRadius:6,padding:'6px 10px',minWidth:100,display:'flex',flexDirection:'column',alignItems:'center',gap:2}}>
-                <span style={{fontFamily:mono,fontSize:9,fontWeight:700,color:'var(--text-primary)',letterSpacing:1}}>{mom}</span>
-                <span style={{fontFamily:orb,fontSize:14,fontWeight:900,color:c}}>{wr}%</span>
-                <span style={{fontFamily:mono,fontSize:7,color:'var(--text-muted)'}}>{p.wins}W {p.losses}L · {p.total} sig</span>
+            {Object.entries(stats.byExitReason).map(([reason,d])=>{
+              const w=d.count>0?Math.round(d.wins/d.count*100):0;
+              const c=w>=65?'#00ff9f':w>=50?'#ffd166':d.count>0?'#ff4d6d':'var(--text-muted)';
+              const avgP=d.count>0?Math.round(d.totalPips/d.count*10)/10:0;
+              return(<div key={reason} style={{background:'var(--bg-card)',border:`1px solid ${c}28`,borderRadius:6,padding:'6px 10px',minWidth:120,display:'flex',flexDirection:'column',alignItems:'center',gap:2}}>
+                <span style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'var(--text-primary)',letterSpacing:1}}>{reason}</span>
+                <span style={{fontFamily:orb,fontSize:14,fontWeight:900,color:c}}>{w}%</span>
+                <span style={{fontFamily:mono,fontSize:7,color:'var(--text-muted)'}}>{d.count} exits · avg {avgP>0?'+':''}{avgP}p</span>
               </div>);
             })}
           </div>
@@ -1625,31 +1655,28 @@ function SignalAnalytics() {
       )}
 
       {/* RECENT SIGNALS */}
-      {stats.signals && stats.signals.length > 0 && (
+      {filteredSignals.length > 0 && (
         <div style={{display:'flex',flexDirection:'column',gap:6}}>
           <div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2}}>RECENT SIGNALS</div>
-          <div style={{display:'flex',flexDirection:'column',gap:4,maxHeight:300,overflowY:'auto'}}>
-            {stats.signals.slice(0,20).map((sig,i)=>{
+          <div style={{display:'flex',flexDirection:'column',gap:4,maxHeight:350,overflowY:'auto'}}>
+            {filteredSignals.slice(0,30).map((sig,i)=>{
               const dc=sig.direction==='BUY'?'#00ff9f':'#ff4d6d';
               const isPending=sig.status==='PENDING';
-              const r8=sig.result_8h;
-              const oc=isPending?'#ffd166':r8==='WIN'?'#00ff9f':r8==='LOSS'?'#ff4d6d':'#ffaa44';
+              const oc=isPending?'#ffd166':sig.outcome==='WIN'?'#00ff9f':sig.outcome==='LOSS'?'#ff4d6d':'#ffaa44';
               const fmt=v=>v!=null?(v>0?'+':'')+v:'—';
+              const stC=sig.strategy==='INTRA'?'#00b4ff':'#ffaa44';
               return(<div key={i} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 12px',background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:6,flexWrap:'wrap'}}>
+                <span style={{fontFamily:mono,fontSize:7,color:stC,background:stC+'15',border:`1px solid ${stC}33`,borderRadius:3,padding:'1px 4px'}}>{sig.strategy||'BB'}</span>
                 <span style={{fontFamily:orb,fontSize:10,fontWeight:700,color:'var(--text-primary)',minWidth:65,letterSpacing:1}}>{sig.symbol}</span>
                 <span style={{fontFamily:mono,fontSize:9,color:dc,background:dc+'15',border:`1px solid ${dc}33`,borderRadius:3,padding:'1px 6px',minWidth:30,textAlign:'center'}}>{sig.direction}</span>
-                <span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)'}}>gap {fmt(sig.gap)}</span>
-                <span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)'}}>{sig.momentum||''}</span>
-                {sig.entry_price&&<span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)'}}>@{sig.entry_price}</span>}
-                <div style={{display:'flex',gap:4}}>
-                  {[['4h',sig.pips_4h,sig.result_4h],['8h',sig.pips_8h,sig.result_8h],['12h',sig.pips_12h,sig.result_12h],['24h',sig.pips_24h,sig.result_24h]].map(([tf,p,r])=>{
-                    if(p==null)return <span key={tf} style={{fontFamily:mono,fontSize:7,color:'var(--text-muted)',opacity:0.4}}>{tf}:—</span>;
-                    const pc=r==='WIN'?'#00ff9f':r==='LOSS'?'#ff4d6d':'#ffaa44';
-                    return <span key={tf} style={{fontFamily:mono,fontSize:7,color:pc,fontWeight:700}}>{tf}:{fmt(p)}p</span>;
-                  })}
-                </div>
-                <span style={{fontFamily:mono,fontSize:8,color:oc,fontWeight:700,background:oc+'15',border:`1px solid ${oc}33`,borderRadius:3,padding:'1px 6px',marginLeft:'auto'}}>{isPending?'⏳ PENDING':r8||'—'}</span>
-                <span style={{fontFamily:mono,fontSize:7,color:'var(--text-muted)'}}>{sig.signal_time?new Date(sig.signal_time).toLocaleDateString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):''}</span>
+                <span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)'}}>gap {fmt(sig.entryGap)}</span>
+                <span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)'}}>peak {fmt(sig.peakGap)}</span>
+                {sig.entryPrice&&<span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)'}}>@{sig.entryPrice}</span>}
+                {sig.pips!=null&&sig.status==='DONE'&&<span style={{fontFamily:mono,fontSize:8,color:sig.pips>0?'#00ff9f':'#ff4d6d',fontWeight:700}}>{fmt(sig.pips)}p</span>}
+                {sig.durationMin&&<span style={{fontFamily:mono,fontSize:7,color:'var(--text-muted)'}}>{Math.round(sig.durationMin)}m</span>}
+                {sig.exitReason&&<span style={{fontFamily:mono,fontSize:7,color:'var(--text-muted)'}}>{sig.exitReason}</span>}
+                <span style={{fontFamily:mono,fontSize:8,color:oc,fontWeight:700,background:oc+'15',border:`1px solid ${oc}33`,borderRadius:3,padding:'1px 6px',marginLeft:'auto'}}>{isPending?'⏳ PENDING':sig.outcome||'—'}</span>
+                <span style={{fontFamily:mono,fontSize:7,color:'var(--text-muted)'}}>{sig.timestamp?new Date(sig.timestamp).toLocaleDateString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):''}</span>
               </div>);
             })}
           </div>
