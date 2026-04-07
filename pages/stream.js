@@ -74,25 +74,33 @@ export default function StreamPage(){
     return()=>clearInterval(i);
   },[]);
 
-  const top=pairs.filter(p=>p.strong);
+  const top=pairs.filter(p=>p.strong).slice(0,6);
   const hero=pairs[heroIdx]||null;
+  const isBuy=hero&&hero.bias==='BUY';
+  const neonG='#00ffae';
+  const neonR='#ff4d6d';
+  const heroColor=isBuy?neonG:neonR;
 
   return(
     <>
     <Head>
       <title>FOREX ENGINE — Live Signals</title>
-      <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet"/>
+      <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet"/>
     </Head>
     <div style={S.root}>
 
-      {/* watermark */}
-      <div style={S.watermark}>FOREX ENGINE</div>
+      {/* ── radial glow behind hero ── */}
+      <div style={{...S.heroGlow,background:hero
+        ?`radial-gradient(ellipse 600px 400px at 50% 46%,${isBuy?'rgba(0,255,174,.07)':'rgba(255,77,109,.07)'},transparent 70%)`
+        :'radial-gradient(ellipse 500px 350px at 50% 46%,rgba(0,180,255,.04),transparent 70%)'}}/>
+
+      {/* ── subtle grid texture ── */}
+      <div style={S.gridTexture}/>
 
       {/* ─── TOP BAR ─── */}
       <div style={S.topBar}>
         <div style={S.liveWrap}>
-          <span style={S.liveDot}/>
-          <span style={S.liveText}>LIVE</span>
+          <span style={S.liveDot}/><span style={S.liveText}>LIVE</span>
         </div>
         <div style={S.sessionWrap}>
           {SESSIONS.map(s=>{
@@ -103,17 +111,23 @@ export default function StreamPage(){
         </div>
       </div>
 
-      {/* ─── HERO ─── */}
+      {/* ─── HERO (center of gravity) ─── */}
       <div style={S.heroSection}>
         {hero?(
-          <div key={heroIdx} style={{...S.heroCard,opacity:fade?1:0,transform:fade?'scale(1)':'scale(0.92)',
-            boxShadow:hero.bias==='BUY'?'0 0 80px rgba(0,255,159,.25), 0 0 160px rgba(0,255,159,.08)':'0 0 80px rgba(255,77,109,.25), 0 0 160px rgba(255,77,109,.08)'}}>
+          <div key={heroIdx} style={{...S.heroCard,
+            opacity:fade?1:0,transform:fade?'scale(1)':'scale(0.94)',
+            borderColor:isBuy?'rgba(0,255,174,.15)':'rgba(255,77,109,.15)',
+            boxShadow:`0 0 120px ${isBuy?'rgba(0,255,174,.12)':'rgba(255,77,109,.12)'}, inset 0 0 80px ${isBuy?'rgba(0,255,174,.03)':'rgba(255,77,109,.03)'}`}}>
             <div style={S.heroPair}>{hero.pair}</div>
-            <div style={{...S.heroBias,color:hero.bias==='BUY'?'#00ff9f':'#ff4d6d',
-              textShadow:hero.bias==='BUY'?'0 0 40px rgba(0,255,159,.6)':'0 0 40px rgba(255,77,109,.6)'}}>{hero.bias}</div>
+            <div style={{...S.heroBias,color:heroColor,
+              textShadow:`0 0 60px ${heroColor}88, 0 0 120px ${heroColor}33`}}>
+              {hero.bias}
+            </div>
+            <div style={{...S.heroUnderline,background:heroColor,boxShadow:`0 0 20px ${heroColor}66`}}/>
           </div>
         ):(
           <div style={S.emptyHero}>
+            <div style={S.scanPulse}/>
             <div style={S.scanTitle}>SCANNING MARKETS…</div>
             <div style={S.scanSub}>WAITING FOR HIGH-PROBABILITY SETUPS</div>
             <div style={S.ctaInline}>Join VIP — Get alerts instantly</div>
@@ -121,53 +135,41 @@ export default function StreamPage(){
         )}
       </div>
 
-      {/* ─── TOP SIGNALS ─── */}
+      {/* ─── TOP SIGNALS ROW ─── */}
       {top.length>0&&(
-        <div style={S.section}>
-          <div style={S.sectionTitle}>TOP SIGNALS — HIGH PROBABILITY</div>
-          <div style={S.topGrid}>
-            {top.map((p,i)=>(
-              <div key={p.pair} style={{...S.topCard,animationDelay:`${i*.12}s`,
-                borderColor:p.bias==='BUY'?'rgba(0,255,159,.35)':'rgba(255,77,109,.35)',
-                boxShadow:p.bias==='BUY'?'0 0 30px rgba(0,255,159,.12)':'0 0 30px rgba(255,77,109,.12)'}}>
-                <div style={S.topPair}>{p.pair}</div>
-                <div style={{...S.topBias,color:p.bias==='BUY'?'#00ff9f':'#ff4d6d'}}>{p.bias}</div>
-              </div>
-            ))}
+        <div style={S.topSection}>
+          <div style={S.topLabel}>HIGH PROBABILITY</div>
+          <div style={S.topRow}>
+            {top.map((p,i)=>{
+              const c=p.bias==='BUY'?neonG:neonR;
+              return(
+                <div key={p.pair} style={{...S.topCard,animationDelay:`${i*.1}s`,
+                  borderColor:c+'33',
+                  boxShadow:`0 0 24px ${c}11, inset 0 0 20px ${c}06`}}>
+                  <div style={S.topPair}>{p.pair}</div>
+                  <div style={{...S.topBias,color:c}}>{p.bias}</div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
 
-      {/* ─── ALL SIGNALS GRID ─── */}
-      {pairs.length>0&&(
-        <div style={S.section}>
-          <div style={S.sectionTitle}>ALL VALID SIGNALS</div>
-          <div style={S.allGrid}>
-            {pairs.map((p,i)=>(
-              <div key={p.pair} style={{...S.gridCard,animationDelay:`${i*.07}s`,
-                borderColor:p.bias==='BUY'?'rgba(0,255,159,.2)':'rgba(255,77,109,.2)'}}>
-                <div style={S.gridPair}>{p.pair}</div>
-                <div style={{...S.gridBias,color:p.bias==='BUY'?'#00ff9f':'#ff4d6d'}}>{p.bias}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ─── BOTTOM BAR ─── */}
-      <div style={S.bottomBar}>
-        <span style={S.disclaimer}>Educational purposes only — not financial advice</span>
-        <span style={S.ctaBottom}>Join VIP — Link in Description</span>
+      {/* ─── FOOTER ─── */}
+      <div style={S.footer}>
+        <span style={S.footerMain}>LIVE FOREX SIGNALS • 24/7</span>
+        <span style={S.footerDisclaim}>Educational purposes only — not financial advice</span>
       </div>
 
     </div>
 
     <style jsx global>{`
       *{margin:0;padding:0;box-sizing:border-box}
-      html,body{background:#0a0c10;overflow-x:hidden}
-      @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
-      @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-      @keyframes softGlow{0%,100%{filter:brightness(1)}50%{filter:brightness(1.12)}}
+      html,body{background:#060810;overflow:hidden}
+      @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+      @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+      @keyframes glowPulse{0%,100%{opacity:.7}50%{opacity:1}}
+      @keyframes scanPing{0%{transform:scale(.8);opacity:.6}50%{transform:scale(1.1);opacity:.15}100%{transform:scale(.8);opacity:.6}}
     `}</style>
     </>
   );
@@ -177,68 +179,88 @@ export default function StreamPage(){
 const S={
   root:{
     width:'1920px',height:'1080px',position:'relative',overflow:'hidden',
-    background:'linear-gradient(160deg,#0a0c10 0%,#0f1218 40%,#111520 100%)',
-    display:'flex',flexDirection:'column',padding:'32px 64px',
+    background:'linear-gradient(170deg,#060810 0%,#0a0e18 35%,#0c1020 60%,#080c16 100%)',
+    display:'flex',flexDirection:'column',padding:'40px 80px',
   },
-  watermark:{
-    position:'absolute',bottom:'80px',right:'64px',
-    fontFamily:"'Orbitron',sans-serif",fontSize:'14px',fontWeight:700,letterSpacing:'6px',
-    color:'rgba(255,255,255,.04)',userSelect:'none',pointerEvents:'none',
+  heroGlow:{
+    position:'absolute',inset:0,pointerEvents:'none',zIndex:0,
   },
+  gridTexture:{
+    position:'absolute',inset:0,pointerEvents:'none',zIndex:0,opacity:.03,
+    backgroundImage:'linear-gradient(rgba(255,255,255,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.08) 1px,transparent 1px)',
+    backgroundSize:'80px 80px',
+  },
+
+  /* top bar */
   topBar:{
     display:'flex',justifyContent:'space-between',alignItems:'center',
-    height:'40px',marginBottom:'24px',flexShrink:0,
+    height:'36px',marginBottom:'0',flexShrink:0,position:'relative',zIndex:1,
   },
-  liveWrap:{display:'flex',alignItems:'center',gap:'10px'},
+  liveWrap:{display:'flex',alignItems:'center',gap:'12px'},
   liveDot:{
-    width:'10px',height:'10px',borderRadius:'50%',background:'#ff4d6d',
-    animation:'pulse 1.4s ease-in-out infinite',
+    width:'9px',height:'9px',borderRadius:'50%',background:'#ff4d6d',
+    boxShadow:'0 0 12px rgba(255,77,109,.6)',
+    animation:'pulse 1.6s ease-in-out infinite',
   },
-  liveText:{fontFamily:"'Orbitron',sans-serif",fontSize:'16px',fontWeight:700,color:'#ff4d6d',letterSpacing:'4px'},
-  sessionWrap:{display:'flex',alignItems:'center',gap:'12px'},
-  sessionTag:{fontFamily:"'Share Tech Mono',monospace",fontSize:'13px',padding:'4px 12px',borderRadius:'4px',letterSpacing:'1px'},
-  sessionActive:{background:'rgba(0,180,255,.15)',color:'#00b4ff',border:'1px solid rgba(0,180,255,.3)'},
-  sessionDim:{background:'rgba(255,255,255,.03)',color:'rgba(255,255,255,.2)',border:'1px solid rgba(255,255,255,.06)'},
-  clock:{fontFamily:"'Share Tech Mono',monospace",fontSize:'14px',color:'rgba(255,255,255,.4)',marginLeft:'8px'},
+  liveText:{fontFamily:orb,fontSize:'14px',fontWeight:700,color:'#ff4d6d',letterSpacing:'5px',
+    textShadow:'0 0 20px rgba(255,77,109,.4)'},
+  sessionWrap:{display:'flex',alignItems:'center',gap:'14px'},
+  sessionTag:{fontFamily:mono,fontSize:'12px',padding:'5px 14px',borderRadius:'6px',letterSpacing:'1.5px',
+    transition:'all .3s ease'},
+  sessionActive:{background:'rgba(0,180,255,.1)',color:'#00b4ff',border:'1px solid rgba(0,180,255,.25)',
+    boxShadow:'0 0 16px rgba(0,180,255,.08)'},
+  sessionDim:{background:'transparent',color:'rgba(255,255,255,.15)',border:'1px solid rgba(255,255,255,.06)'},
+  clock:{fontFamily:mono,fontSize:'13px',color:'rgba(255,255,255,.3)',marginLeft:'10px',letterSpacing:'2px'},
+
+  /* hero — dominant center */
   heroSection:{
-    flex:'0 0 auto',display:'flex',justifyContent:'center',alignItems:'center',
-    minHeight:'320px',marginBottom:'28px',
+    flex:1,display:'flex',justifyContent:'center',alignItems:'center',
+    position:'relative',zIndex:1,
   },
   heroCard:{
-    textAlign:'center',padding:'48px 80px',borderRadius:'20px',
-    background:'rgba(255,255,255,.02)',backdropFilter:'blur(4px)',
-    border:'1px solid rgba(255,255,255,.06)',
-    transition:'opacity .4s ease, transform .4s ease',
+    textAlign:'center',padding:'52px 100px 44px',borderRadius:'28px',
+    background:'linear-gradient(160deg,rgba(255,255,255,.025),rgba(255,255,255,.008))',
+    backdropFilter:'blur(8px)',
+    border:'1px solid',
+    transition:'opacity .45s ease, transform .45s ease',
+    animation:'glowPulse 4s ease-in-out infinite',
+    position:'relative',
   },
-  heroPair:{fontFamily:"'Orbitron',sans-serif",fontSize:'72px',fontWeight:900,color:'#fff',letterSpacing:'6px',lineHeight:1.1},
-  heroBias:{fontFamily:"'Orbitron',sans-serif",fontSize:'56px',fontWeight:700,letterSpacing:'10px',marginTop:'8px'},
-  emptyHero:{textAlign:'center'},
-  scanTitle:{fontFamily:"'Orbitron',sans-serif",fontSize:'28px',fontWeight:700,color:'rgba(255,255,255,.35)',letterSpacing:'6px'},
-  scanSub:{fontFamily:"'Rajdhani',sans-serif",fontSize:'18px',color:'rgba(255,255,255,.18)',marginTop:'12px',letterSpacing:'2px'},
-  ctaInline:{fontFamily:"'Rajdhani',sans-serif",fontSize:'16px',color:'#00b4ff',marginTop:'24px',letterSpacing:'1px',opacity:.6},
-  section:{marginBottom:'24px',flexShrink:0},
-  sectionTitle:{fontFamily:"'Orbitron',sans-serif",fontSize:'14px',fontWeight:700,color:'rgba(255,255,255,.3)',letterSpacing:'5px',marginBottom:'14px'},
-  topGrid:{display:'flex',gap:'16px',flexWrap:'wrap'},
+  heroPair:{fontFamily:orb,fontSize:'120px',fontWeight:900,color:'#fff',letterSpacing:'10px',lineHeight:1},
+  heroBias:{fontFamily:orb,fontSize:'72px',fontWeight:700,letterSpacing:'14px',marginTop:'4px'},
+  heroUnderline:{width:'120px',height:'3px',borderRadius:'2px',margin:'16px auto 0',opacity:.6},
+
+  /* empty state */
+  emptyHero:{textAlign:'center',position:'relative'},
+  scanPulse:{
+    position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-50%)',
+    width:'200px',height:'200px',borderRadius:'50%',
+    border:'1px solid rgba(0,180,255,.1)',
+    animation:'scanPing 3s ease-in-out infinite',pointerEvents:'none',
+  },
+  scanTitle:{fontFamily:orb,fontSize:'32px',fontWeight:700,color:'rgba(255,255,255,.25)',letterSpacing:'8px'},
+  scanSub:{fontFamily:raj,fontSize:'18px',color:'rgba(255,255,255,.12)',marginTop:'14px',letterSpacing:'3px'},
+  ctaInline:{fontFamily:raj,fontSize:'16px',color:'#00b4ff',marginTop:'32px',letterSpacing:'2px',opacity:.4},
+
+  /* top signals row */
+  topSection:{flexShrink:0,position:'relative',zIndex:1,paddingBottom:'8px'},
+  topLabel:{fontFamily:orb,fontSize:'11px',fontWeight:500,color:'rgba(255,255,255,.18)',
+    letterSpacing:'6px',textAlign:'center',marginBottom:'16px'},
+  topRow:{display:'flex',justifyContent:'center',gap:'20px',flexWrap:'nowrap'},
   topCard:{
-    padding:'20px 32px',borderRadius:'12px',textAlign:'center',
-    background:'rgba(255,255,255,.03)',border:'1px solid',
-    animation:'fadeUp .5s ease both, softGlow 3s ease-in-out infinite',
-    minWidth:'180px',
-  },
-  topPair:{fontFamily:"'Orbitron',sans-serif",fontSize:'22px',fontWeight:700,color:'#fff',letterSpacing:'3px'},
-  topBias:{fontFamily:"'Orbitron',sans-serif",fontSize:'20px',fontWeight:700,letterSpacing:'4px',marginTop:'4px'},
-  allGrid:{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:'12px'},
-  gridCard:{
-    padding:'14px 20px',borderRadius:'10px',textAlign:'center',
+    padding:'18px 36px',borderRadius:'14px',textAlign:'center',
     background:'rgba(255,255,255,.02)',border:'1px solid',
-    animation:'fadeUp .4s ease both',
+    animation:'fadeUp .5s ease both',
+    minWidth:'160px',
   },
-  gridPair:{fontFamily:"'Share Tech Mono',monospace",fontSize:'17px',fontWeight:400,color:'rgba(255,255,255,.85)',letterSpacing:'2px'},
-  gridBias:{fontFamily:"'Orbitron',sans-serif",fontSize:'16px',fontWeight:700,letterSpacing:'3px',marginTop:'2px'},
-  bottomBar:{
-    marginTop:'auto',display:'flex',justifyContent:'space-between',alignItems:'center',
-    paddingTop:'16px',borderTop:'1px solid rgba(255,255,255,.05)',flexShrink:0,
+  topPair:{fontFamily:orb,fontSize:'20px',fontWeight:700,color:'rgba(255,255,255,.9)',letterSpacing:'3px'},
+  topBias:{fontFamily:orb,fontSize:'17px',fontWeight:700,letterSpacing:'5px',marginTop:'4px'},
+
+  /* footer */
+  footer:{
+    flexShrink:0,display:'flex',flexDirection:'column',alignItems:'center',
+    gap:'6px',paddingTop:'12px',position:'relative',zIndex:1,
   },
-  disclaimer:{fontFamily:"'Rajdhani',sans-serif",fontSize:'13px',color:'rgba(255,255,255,.15)',letterSpacing:'1px'},
-  ctaBottom:{fontFamily:"'Orbitron',sans-serif",fontSize:'13px',color:'#00b4ff',letterSpacing:'3px',opacity:.5},
+  footerMain:{fontFamily:orb,fontSize:'11px',fontWeight:500,color:'rgba(255,255,255,.12)',letterSpacing:'6px'},
+  footerDisclaim:{fontFamily:raj,fontSize:'12px',color:'rgba(255,255,255,.08)',letterSpacing:'1px'},
 };
