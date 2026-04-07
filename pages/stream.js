@@ -40,13 +40,13 @@ export default function StreamPage(){
     try{
       const r=await fetch('/api/data');
       const json=await r.json();
-      const rows=(json.data||json||[]);
+      const rows=Array.isArray(json)?json:(json.data||[]);
       const valid=rows.filter(p=>{
-        const g=parseFloat(p.gap_score)||0;
+        const g=parseFloat(p.gap)||0;
         return g>=5||g<=-5;
       }).map(p=>{
-        const g=parseFloat(p.gap_score)||0;
-        return {pair:p.pair, bias:g>=5?'BUY':'SELL', strong:Math.abs(g)>=8, gap:g};
+        const g=parseFloat(p.gap)||0;
+        return {pair:p.symbol, bias:g>=5?'BUY':'SELL', strong:Math.abs(g)>=8, gap:g};
       }).sort((a,b)=>Math.abs(b.gap)-Math.abs(a.gap));
       setPairs(valid);
     }catch(e){console.error(e)}
