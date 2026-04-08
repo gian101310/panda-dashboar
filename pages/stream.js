@@ -38,6 +38,10 @@ export default function StreamPage(){
   const heroRef=useRef(0);
   const prevPairsRef=useRef('');
   const sweepKey=useRef(0);
+  const startTime=useRef(Date.now());
+  const [uptime,setUptime]=useState('00:00:00');
+  const [lastRefresh,setLastRefresh]=useState('--:--:--');
+  const [signalCount,setSignalCount]=useState(0);
 
   /* fetch /api/data every 30s */
   const fetchData=useCallback(async()=>{
@@ -61,6 +65,8 @@ export default function StreamPage(){
       }
       prevPairsRef.current=sig;
       setPairs(valid);
+      setSignalCount(valid.length);
+      setLastRefresh(new Date().toISOString().slice(11,19));
     }catch(e){console.error(e)}
   },[]);
 
@@ -82,7 +88,13 @@ export default function StreamPage(){
 
   /* clock */
   useEffect(()=>{
-    const i=setInterval(()=>{setClock(utcTime());setSessions(activeSessions())},1000);
+    const i=setInterval(()=>{setClock(utcTime());setSessions(activeSessions());
+      const diff=Math.floor((Date.now()-startTime.current)/1000);
+      const hh=String(Math.floor(diff/3600)).padStart(2,'0');
+      const mm=String(Math.floor((diff%3600)/60)).padStart(2,'0');
+      const ss=String(diff%60).padStart(2,'0');
+      setUptime(hh+':'+mm+':'+ss);
+    },1000);
     return()=>clearInterval(i);
   },[]);
 
@@ -126,6 +138,40 @@ export default function StreamPage(){
           })}
           <span style={S.clock}>{clock}</span>
         </div>
+      </div>
+
+      {/* ─── LIVE TICKER BAR ─── */}
+      <div style={S.tickerBar}>
+        <div style={S.tickerInner}>
+          <span style={S.tickerDot}/>
+          <span style={S.tickerLabel}>LIVE</span>
+          <span style={S.tickerSep}>│</span>
+          <span style={S.tickerText}>Auto Signals Active</span>
+          <span style={S.tickerSep}>│</span>
+          <span style={S.tickerText}>Updates in Real-Time</span>
+          <span style={S.tickerSep}>│</span>
+          <span style={S.tickerText}>{signalCount} Active Signal{signalCount!==1?'s':''}</span>
+          <span style={S.tickerSep}>│</span>
+          <span style={S.tickerText}>Last Refresh: {lastRefresh}</span>
+        </div>
+      </div>
+
+      {/* ─── CORNER OVERLAYS ─── */}
+      {/* top-left: uptime */}
+      <div style={S.overlayTL}>
+        <span style={S.overlayIcon}>▶</span>
+        <span style={S.overlayVal}>{uptime}</span>
+        <span style={S.overlayDim}>STREAM UPTIME</span>
+      </div>
+      {/* top-right: signal count */}
+      <div style={S.overlayTR}>
+        <span style={S.overlayDim}>ACTIVE SIGNALS</span>
+        <span style={{...S.overlayVal,color:signalCount>0?'#00ffae':'rgba(255,255,255,.3)'}}>{signalCount}</span>
+      </div>
+      {/* bottom-left: branding */}
+      <div style={S.overlayBL}>
+        <span style={S.brandMark}>FOREX ENGINE</span>
+        <span style={S.brandSub}>Powered by Panda Engine</span>
       </div>
 
       {/* ─── HERO ─── */}
@@ -208,6 +254,8 @@ export default function StreamPage(){
       @keyframes badgeFade{0%{opacity:0;transform:translateY(6px)}15%{opacity:1;transform:translateY(0)}85%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-4px)}}
       @keyframes bgDrift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
       @keyframes sweepLight{0%{transform:translateX(-100%);opacity:0}10%{opacity:.04}50%{opacity:.02}100%{transform:translateX(200%);opacity:0}}
+      @keyframes tickerGlow{0%,100%{box-shadow:0 0 20px rgba(0,255,174,.08),inset 0 0 20px rgba(0,255,174,.03)}50%{box-shadow:0 0 30px rgba(0,255,174,.14),inset 0 0 30px rgba(0,255,174,.05)}}
+      @keyframes dotBlink{0%,100%{opacity:1;box-shadow:0 0 8px #00ffae}50%{opacity:.4;box-shadow:0 0 4px #00ffae}}
     `}</style>
     </>
   );
@@ -331,6 +379,41 @@ const S={
   },
   topPair:{fontFamily:orb,fontSize:'20px',fontWeight:700,color:'rgba(255,255,255,.88)',letterSpacing:'3px'},
   topBias:{fontFamily:orb,fontSize:'17px',fontWeight:700,letterSpacing:'5px',marginTop:'4px'},
+
+  /* live ticker bar */
+  tickerBar:{
+    position:'relative',zIndex:2,marginTop:'10px',marginBottom:'0',flexShrink:0,
+  },
+  tickerInner:{
+    display:'flex',alignItems:'center',justifyContent:'center',gap:'16px',
+    padding:'10px 32px',borderRadius:'10px',
+    background:'linear-gradient(90deg,rgba(0,255,174,.04),rgba(0,255,174,.08),rgba(0,255,174,.04))',
+    border:'1px solid rgba(0,255,174,.18)',
+    animation:'tickerGlow 4s ease-in-out infinite',
+  },
+  tickerDot:{
+    width:'8px',height:'8px',borderRadius:'50%',background:'#00ffae',flexShrink:0,
+    animation:'dotBlink 1.8s ease-in-out infinite',
+  },
+  tickerLabel:{fontFamily:orb,fontSize:'13px',fontWeight:700,color:'#00ffae',letterSpacing:'4px'},
+  tickerSep:{fontFamily:mono,fontSize:'14px',color:'rgba(0,255,174,.25)',userSelect:'none'},
+  tickerText:{fontFamily:mono,fontSize:'13px',color:'rgba(0,255,174,.7)',letterSpacing:'1px'},
+
+  /* corner overlays */
+  overlayTL:{
+    position:'absolute',top:'88px',left:'80px',zIndex:2,display:'flex',alignItems:'center',gap:'8px',
+  },
+  overlayIcon:{fontFamily:mono,fontSize:'10px',color:'#00ffae',opacity:.6},
+  overlayVal:{fontFamily:mono,fontSize:'14px',color:'rgba(255,255,255,.5)',letterSpacing:'2px'},
+  overlayDim:{fontFamily:raj,fontSize:'11px',color:'rgba(255,255,255,.2)',letterSpacing:'2px',textTransform:'uppercase'},
+  overlayTR:{
+    position:'absolute',top:'88px',right:'80px',zIndex:2,display:'flex',alignItems:'center',gap:'8px',
+  },
+  overlayBL:{
+    position:'absolute',bottom:'56px',left:'80px',zIndex:2,display:'flex',flexDirection:'column',gap:'2px',
+  },
+  brandMark:{fontFamily:orb,fontSize:'13px',fontWeight:700,color:'rgba(255,255,255,.06)',letterSpacing:'6px'},
+  brandSub:{fontFamily:raj,fontSize:'11px',color:'rgba(255,255,255,.04)',letterSpacing:'2px'},
 
   /* footer */
   footer:{
