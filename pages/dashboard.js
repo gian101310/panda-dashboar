@@ -1529,7 +1529,108 @@ function ChartTab({ data }) {
   );
 }
 
-const TABS = ['PANELS','SIGNALS','TABLE','GAP CHART','CALENDAR','CALCULATOR','COT REPORT','SETUPS','VALID PAIRS','SPIKE LOG','CHART','ANALYTICS'];
+// ===== SIGNAL LOG TAB =====
+function SignalLogTab() {
+  const mono = "'Share Tech Mono',monospace";
+  const orb = "'Orbitron',sans-serif";
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [filterSym, setFilterSym] = useState('');
+  const [filterBias, setFilterBias] = useState('ALL');
+  const [filterValid, setFilterValid] = useState('ALL');
+  const [filterFrom, setFilterFrom] = useState('');
+  const [filterTo, setFilterTo] = useState('');
+  const ALL_SYMS = ['AUDJPY','AUDCAD','AUDNZD','AUDUSD','CADJPY','EURAUD','EURCAD','EURGBP','EURJPY','EURNZD','EURUSD','GBPAUD','GBPCAD','GBPJPY','GBPNZD','GBPUSD','NZDCAD','NZDJPY','NZDUSD','USDCAD','USDJPY'];
+
+  const fetchLogs = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (filterSym) params.set('symbol', filterSym);
+      if (filterBias !== 'ALL') params.set('bias', filterBias);
+      if (filterValid === 'VALID') params.set('valid', 'true');
+      if (filterValid === 'INVALID') params.set('valid', 'false');
+      if (filterFrom) params.set('from', new Date(filterFrom).toISOString());
+      if (filterTo) params.set('to', new Date(filterTo).toISOString());
+      params.set('limit', '500');
+      const res = await fetch(`/api/signal-log?${params}`);
+      const d = await res.json();
+      setLogs(Array.isArray(d) ? d : []);
+    } catch (e) { console.error(e); }
+    setLoading(false);
+  }, [filterSym, filterBias, filterValid, filterFrom, filterTo]);
+
+  useEffect(() => { fetchLogs(); }, [fetchLogs]);
+
+  const biasColor = (b) => b === 'BUY' ? '#00ff9f' : b === 'SELL' ? '#ff4d6d' : 'var(--text-muted)';
+  const fmtTime = (ts) => { try { const d = new Date(ts); return d.toLocaleString('en-GB', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit', hour12:false }); } catch { return '—'; } };
+
+  const sel = { fontFamily:mono, fontSize:10, padding:'5px 8px', borderRadius:5, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text-primary)', cursor:'pointer' };
+  const inp = { ...sel, minWidth:120 };
+
+  return (
+    <div style={{maxWidth:1100,margin:'0 auto'}}>
+      <div style={{fontFamily:orb,fontSize:15,fontWeight:700,color:'#00b4ff',letterSpacing:3,marginBottom:6}}>SIGNAL LOG</div>
+      <div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2,marginBottom:14}}>ALL PAIRS · EVERY CYCLE · VALID + INVALID</div>
+
+      {/* Filters */}
+      <div style={{display:'flex',flexWrap:'wrap',gap:8,alignItems:'center',marginBottom:14}}>
+        <select value={filterSym} onChange={e=>setFilterSym(e.target.value)} style={sel}>
+          <option value="">ALL PAIRS</option>
+          {ALL_SYMS.map(s=><option key={s} value={s}>{s}</option>)}
+        </select>
+        <select value={filterBias} onChange={e=>setFilterBias(e.target.value)} style={sel}>
+          {['ALL','BUY','SELL','WAIT','HARD_INVALID'].map(b=><option key={b} value={b}>{b}</option>)}
+        </select>
+        <select value={filterValid} onChange={e=>setFilterValid(e.target.value)} style={sel}>
+          {['ALL','VALID','INVALID'].map(v=><option key={v} value={v}>{v}</option>)}
+        </select>
+        <input type="date" value={filterFrom} onChange={e=>setFilterFrom(e.target.value)} style={inp} title="From date"/>
+        <input type="date" value={filterTo} onChange={e=>setFilterTo(e.target.value)} style={inp} title="To date"/>
+        <button onClick={fetchLogs} style={{...sel,color:'#00b4ff',border:'1px solid rgba(0,180,255,0.4)',fontWeight:700}}>{loading ? '↻ LOADING' : '⟳ REFRESH'}</button>
+        <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',marginLeft:6}}>{logs.length} rows</span>
+      </div>
+
+      {/* Table */}
+      <div style={{overflowX:'auto',borderRadius:10,border:'1px solid var(--border)'}}>
+        <table style={{width:'100%',borderCollapse:'collapse',fontFamily:mono,fontSize:10}}>
+          <thead>
+            <tr style={{background:'var(--bg-secondary)'}}>
+              {['TIME','PAIR','GAP','BIAS','CONF','EXEC','MOMENTUM','STATE','STR','TBG','VALID'].map(h=>(
+                <th key={h} style={{padding:'8px 6px',color:'var(--text-muted)',fontWeight:600,fontSize:9,letterSpacing:1,textAlign:'left',borderBottom:'1px solid var(--border)',whiteSpace:'nowrap'}}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {logs.map((r,i) => {
+              const gap = Number(r.gap||0);
+              const bc = biasColor(r.bias);
+              const valid = r.is_valid;
+              return (
+                <tr key={r.id||i} style={{borderBottom:'1px solid var(--border)',opacity:valid?1:0.5,background:valid?'rgba(0,180,255,0.03)':'transparent'}}>
+                  <td style={{padding:'6px',whiteSpace:'nowrap',color:'var(--text-muted)'}}>{fmtTime(r.timestamp)}</td>
+                  <td style={{padding:'6px',fontFamily:orb,fontSize:11,fontWeight:700,color:valid?'var(--text-primary)':'var(--text-muted)'}}>{r.symbol}</td>
+                  <td style={{padding:'6px',color:bc,fontWeight:700}}>{gap>0?'+':''}{gap.toFixed(1)}</td>
+                  <td style={{padding:'6px'}}><span style={{color:bc,border:`1px solid ${bc}33`,borderRadius:3,padding:'1px 5px',fontSize:9}}>{r.bias||'—'}</span></td>
+                  <td style={{padding:'6px',color:r.confidence==='HIGH'?'#00ff9f':r.confidence==='MEDIUM'?'#ffd166':'var(--text-muted)'}}>{r.confidence||'—'}</td>
+                  <td style={{padding:'6px',color:r.execution==='MARKET'?'#00ff9f':r.execution==='PULLBACK'?'#ffd166':'var(--text-muted)'}}>{r.execution||'—'}</td>
+                  <td style={{padding:'6px',color:r.momentum==='STRONG'?'#00ff9f':r.momentum==='BUILDING'?'#00b4ff':'var(--text-muted)'}}>{r.momentum||'—'}</td>
+                  <td style={{padding:'6px',color:'var(--text-muted)'}}>{r.state||'—'}</td>
+                  <td style={{padding:'6px',fontWeight:700,color:r.strength>=2?'#00ff9f':r.strength>=1?'#ffd166':'var(--text-muted)'}}>{Number(r.strength||0).toFixed(1)}</td>
+                  <td style={{padding:'6px'}}>{r.tbg_zone?<span style={{fontSize:9,color:r.tbg_zone==='ABOVE'?'#00ff9f':r.tbg_zone==='BELOW'?'#ff4d6d':'#ffd166'}}>{r.tbg_zone}</span>:'—'}</td>
+                  <td style={{padding:'6px',textAlign:'center'}}>{valid?<span style={{color:'#00ff9f'}}>✅</span>:<span style={{color:'var(--text-muted)'}}>⛔</span>}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {logs.length===0 && !loading && <div style={{textAlign:'center',padding:40,fontFamily:mono,fontSize:11,color:'var(--text-muted)'}}>No snapshots yet — data logs every engine cycle</div>}
+    </div>
+  );
+}
+
+const TABS = ['PANELS','SIGNALS','TABLE','GAP CHART','CALENDAR','CALCULATOR','COT REPORT','SETUPS','VALID PAIRS','SPIKE LOG','CHART','ANALYTICS','SIGNAL LOG'];
 // Maps each tab to the feature_access key that controls it
 const TAB_FEATURE = {
   'PANELS':      'panels',
@@ -1545,6 +1646,7 @@ const TAB_FEATURE = {
   'ENGINE':      'engine',
   'CHART':       'panels',
   'ANALYTICS':   'analytics',
+  'SIGNAL LOG':  'signal_log',
 };
 const FILTERS = ['VALID','ALL','BUY','SELL','STRONG','⚠️ CLOSE'];
 const SORTS   = [
@@ -2139,6 +2241,8 @@ export default function Dashboard() {
 </div>
 ):tab==='ANALYTICS'?(
 <SignalAnalytics/>
+):tab==='SIGNAL LOG'?(
+<SignalLogTab/>
 ):tab==='TABLE'?(
 
             <div style={{overflowX:'auto'}}>
