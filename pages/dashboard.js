@@ -880,7 +880,7 @@ function PairCard({ row, trend, cotBias }) {
 
 
 // ===== PAIR CARD MODAL =====
-function PairCardModal({ row, trend, cotBias, onClose }) {
+function PairCardModal({ row, trend, cotBias, onClose, isMobile }) {
   if (!row) return null;
   const gap = row.gap ?? 0;
   const bias = biasFromGap(gap);
@@ -913,8 +913,8 @@ function PairCardModal({ row, trend, cotBias, onClose }) {
   );
 
   return (
-    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',zIndex:3000,display:'flex',alignItems:'center',justifyContent:'center',padding:20,backdropFilter:'blur(4px)'}}>
-      <div onClick={e=>e.stopPropagation()} style={{background:'var(--bg-card)',border:`2px solid ${bias.border}`,borderRadius:16,padding:28,width:'100%',maxWidth:560,maxHeight:'90vh',overflowY:'auto',display:'flex',flexDirection:'column',gap:14,boxShadow:`0 0 40px ${bias.color}33`,position:'relative'}}>
+    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',zIndex:3000,display:'flex',alignItems:'center',justifyContent:'center',padding:isMobile?8:20,backdropFilter:'blur(4px)'}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:'var(--bg-card)',border:`2px solid ${bias.border}`,borderRadius:isMobile?12:16,padding:isMobile?16:28,width:'100%',maxWidth:isMobile?'100%':560,maxHeight:'95vh',overflowY:'auto',display:'flex',flexDirection:'column',gap:isMobile?10:14,boxShadow:`0 0 40px ${bias.color}33`,position:'relative'}}>
 
         {/* Header */}
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
@@ -1915,6 +1915,15 @@ export default function Dashboard() {
   const [showAlertSettings, setShowAlertSettings] = useState(false);
   const [popup,      setPopup]      = useState(null);
 
+  // Mobile detection
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
   const prevSpikesRef = useRef([]);
   const cotMap = {};
   cotData.forEach(c=>{ cotMap[c.currency]=c; });
@@ -2029,7 +2038,7 @@ export default function Dashboard() {
       <Head>
         <title>PANDA ENGINE — LIVE</title>
         <meta name="viewport" content="width=device-width,initial-scale=1"/>
-        <style>{`@media print{body{visibility:hidden!important;}} *{-webkit-touch-callout:none;}`}</style>
+        <style>{`@media print{body{visibility:hidden!important;}} *{-webkit-touch-callout:none;} @media(max-width:767px){*::-webkit-scrollbar{height:3px!important;width:3px!important;} button{min-height:32px;} select,input[type=date]{min-height:32px;} table{font-size:9px!important;}}`}</style>
       </Head>
 
       {/* ALERT SETTINGS MODAL */}
@@ -2050,19 +2059,19 @@ export default function Dashboard() {
         <div style={{position:'fixed',inset:0,backgroundImage:'linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,rgba(0,180,255,0.025) 1px,transparent 1px)',backgroundSize:'40px 40px',pointerEvents:'none',zIndex:0}}/>
 
         {/* HEADER */}
-        <header style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 20px',background:'var(--bg-secondary)',borderBottom:'1px solid var(--border)',position:'sticky',top:0,zIndex:100}}>
+        <header style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:isMobile?'8px 12px':'10px 20px',background:'var(--bg-secondary)',borderBottom:'1px solid var(--border)',position:'sticky',top:0,zIndex:100,flexWrap:isMobile?'wrap':'nowrap',gap:isMobile?8:0}}>
           <div style={{display:'flex',alignItems:'center',gap:10}}>
-            <span style={{fontSize:22}}>🐼</span>
-            <div><div style={{fontFamily:orb,fontWeight:900,fontSize:13,letterSpacing:4,color:'#00ff9f'}}>PANDA ENGINE</div><div style={{fontFamily:mono,fontSize:8,letterSpacing:3,color:'var(--text-muted)'}}>FOREX INTELLIGENCE · LIVE</div></div>
+            <span style={{fontSize:isMobile?18:22}}>🐼</span>
+            <div><div style={{fontFamily:orb,fontWeight:900,fontSize:isMobile?11:13,letterSpacing:isMobile?2:4,color:'#00ff9f'}}>PANDA ENGINE</div>{!isMobile&&<div style={{fontFamily:mono,fontSize:8,letterSpacing:3,color:'var(--text-muted)'}}>FOREX INTELLIGENCE · LIVE</div>}</div>
           </div>
-          <div style={{display:'flex',alignItems:'center',gap:8,flex:1,justifyContent:'center'}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,flex:isMobile?'none':1,justifyContent:'center',order:isMobile?3:0,width:isMobile?'100%':'auto'}}>
             <div style={{width:6,height:6,borderRadius:'50%',background:'#00ff9f',boxShadow:'0 0 8px #00ff9f',animation:'blink 2s infinite'}}/>
             <span style={{fontFamily:mono,fontSize:10,letterSpacing:2,color:'#00ff9f'}}>LIVE</span>
             <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>{lastUpdate?formatTime(lastUpdate):'...'}</span>
             {refreshing&&<span style={{color:'#00b4ff',animation:'spin 1s linear infinite',display:'inline-block',fontSize:14}}>↻</span>}
             {spikes.length>0&&<div style={{display:'flex',alignItems:'center',gap:4,background:'rgba(255,209,102,0.1)',border:'1px solid rgba(255,209,102,0.3)',borderRadius:4,padding:'2px 8px'}}><span style={{width:6,height:6,borderRadius:'50%',background:'#ffd166',animation:'blink 1s infinite',display:'inline-block'}}/><span style={{fontFamily:mono,fontSize:8,color:'#ffd166',letterSpacing:1}}>{spikes.length} SPIKE{spikes.length>1?'S':''}</span></div>}
           </div>
-          <div style={{display:'flex',gap:7}}>
+          <div style={{display:'flex',gap:isMobile?5:7,flexWrap:'wrap'}}>
             {/* Alert settings button */}
             <button onClick={()=>setShowAlertSettings(true)} style={{background:'rgba(255,209,102,0.06)',border:'1px solid #ffd16633',borderRadius:5,color:'#ffd166',fontFamily:mono,fontSize:9,padding:'5px 10px',cursor:'pointer'}}>🔔 ALERTS</button>
             <button onClick={()=>fetchData(true)} style={{background:'transparent',border:'1px solid #1e3060',borderRadius:5,color:'#00b4ff',fontFamily:mono,fontSize:9,padding:'5px 10px',cursor:'pointer'}}>⟳</button>
@@ -2082,7 +2091,7 @@ export default function Dashboard() {
         )}
 
         {/* STATS */}
-        <div style={{display:'flex',gap:7,padding:'10px 20px',overflowX:'auto',zIndex:1}}>
+        <div style={{display:'flex',gap:isMobile?5:7,padding:isMobile?'8px 12px':'10px 20px',overflowX:'auto',zIndex:1}}>
           <StatCard label="PAIRS"       value={data.length}     color="#00b4ff"/>
           <StatCard label="📈 BUY"      value={buyCount}        color="#00ff9f"/>
           <StatCard label="📉 SELL"     value={sellCount}       color="#ff4d6d"/>
@@ -2101,8 +2110,8 @@ export default function Dashboard() {
         )}
 
         {/* TABS */}
-        <div style={{display:'flex',alignItems:'center',gap:7,padding:'0 20px 10px',flexWrap:'wrap',zIndex:1}}>
-          <div style={{display:'flex',background:'var(--bg-secondary)',border:'1px solid var(--border)',borderRadius:7,overflow:'hidden'}}>
+        <div style={{display:'flex',alignItems:'center',gap:7,padding:isMobile?'0 12px 10px':'0 20px 10px',flexWrap:isMobile?'nowrap':'wrap',overflowX:isMobile?'auto':'visible',zIndex:1}}>
+          <div style={{display:'flex',background:'var(--bg-secondary)',border:'1px solid var(--border)',borderRadius:7,overflow:isMobile?'visible':'hidden',flexShrink:0}}>
             {TABS.filter(t=>{ const feat=TAB_FEATURE[t]; if(!feat) return true; if(isAdmin) return true; const fa=user?.feature_access||[]; return fa.includes(feat)||fa.includes('dashboard');}).map((t,i,arr)=><button key={t} onClick={()=>setTab(t)} style={{background:tab===t?'rgba(0,180,255,0.15)':'transparent',border:'none',borderRight:i<TABS.length-1?'1px solid var(--border)':'none',color:tab===t?'#00b4ff':'rgba(180,205,240,0.80)',fontFamily:mono,fontSize:9,letterSpacing:2,padding:'7px 12px',cursor:'pointer',whiteSpace:'nowrap'}}>{t}</button>)}
             {isAdmin&&<><button onClick={()=>setTab('ENGINE')} style={{background:tab==='ENGINE'?'rgba(255,209,102,0.15)':'transparent',border:'none',borderLeft:'1px solid var(--border)',color:tab==='ENGINE'?'#ffd166':'rgba(180,205,240,0.80)',fontFamily:mono,fontSize:9,letterSpacing:2,padding:'7px 12px',cursor:'pointer'}}>🏥 ENGINE</button></>}
           </div>
@@ -2120,7 +2129,7 @@ export default function Dashboard() {
         </div>
 
         {/* CONTENT */}
-        <div style={{flex:1,padding:'0 20px 20px',zIndex:1}}>
+        <div style={{flex:1,padding:isMobile?'0 10px 16px':'0 20px 20px',zIndex:1}}>
           {loading?(
             <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:12,padding:80}}>
               <div style={{width:10,height:10,borderRadius:'50%',background:'#00ff9f',animation:'dotpulse 1s ease-in-out infinite'}}/>
@@ -2130,7 +2139,7 @@ export default function Dashboard() {
             displayed.length===0
               ?<div style={{textAlign:'center',padding:60,fontFamily:mono,fontSize:11,letterSpacing:3,color:'var(--text-muted)'}}>NO PAIRS MATCH</div>
               :<><div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2,marginBottom:10}}>{filter==='ALL'?`${displayed.length} ALL PAIRS · ${buyCount} BUY · ${sellCount} SELL`:filter==='VALID'?`${displayed.length} VALID PAIRS · ${buyCount} BUY · ${sellCount} SELL`:`${displayed.length} PAIRS`}</div>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',gap:10,alignItems:'stretch'}}>
+              <div style={{display:'grid',gridTemplateColumns:isMobile?'repeat(auto-fit,minmax(160px,1fr))':'repeat(auto-fit,minmax(190px,1fr))',gap:isMobile?8:10,alignItems:'stretch'}}>
                 {displayed.map(row=><div key={row.symbol} onClick={()=>setSelectedPair(row)} style={{cursor:'pointer',height:'100%',display:'flex',flexDirection:'column'}}><PairCard row={row} trend={trends[row.symbol]} cotBias={getPairCotBias(row.symbol)}/></div>)}
               </div></>
           ):tab==='SETUPS'?(<ValidSetupsTab data={data} trends={trends} cotMap={cotMap}/>
@@ -2320,6 +2329,7 @@ export default function Dashboard() {
         trend={trends[selectedPair.symbol]}
         cotBias={getPairCotBias(selectedPair.symbol)}
         onClose={()=>setSelectedPair(null)}
+        isMobile={isMobile}
       />
     )}
     </>
