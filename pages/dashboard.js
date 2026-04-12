@@ -183,6 +183,58 @@ function getMatchup(row) {
   if (bl === 'WEAK'   && ql === 'WEAK')   return { label: 'WEAK vs WEAK',   color: '#ffaa44', note: 'AVOID' };
   return { label: `${bl} / ${ql}`, color: 'var(--text-muted)', note: '' };
 }
+// ===== CONFIDENCE SCORING =====
+function computeConfidence(row, trend, cotBias) {
+  if (!row) return null;
+  const gap = Math.abs(row.gap ?? 0);
+  const biasLabel = row.bias || biasFromGap(row.gap ?? 0).label;
+  if (biasLabel === 'WAIT' && gap < 5) return null;
+  const isBuy = (row.gap ?? 0) > 0;
+  const baseVals = [row.base_d1, row.base_h4, row.base_h1].filter(v => v != null);
+  const quoteVals = [row.quote_d1, row.quote_h4, row.quote_h1].filter(v => v != null);
+  const bsRaw = baseVals.length ? (isBuy ? Math.max(...baseVals.filter(v => v > 0), 0) : Math.min(...baseVals.filter(v => v < 0), 0)) : 0;
+  const qsRaw = quoteVals.length ? (isBuy ? Math.min(...quoteVals.filter(v => v < 0), 0) : Math.max(...quoteVals.filter(v => v > 0), 0)) : 0;
+  const bl = scoreLabel(bsRaw);
+  const ql = scoreLabel(qsRaw);
+  if (bl === 'NEUTRAL' && ql === 'NEUTRAL') return null;
+  let score = 0;
+  const reasons = [];
+  if (gap >= 8) { score += 25; reasons.push('GAP≥8 +25'); }
+  else if (gap >= 5) { score += 15; reasons.push('GAP≥5 +15'); }
+  const diff = Math.abs(bsRaw - qsRaw);
+  if (diff >= 8) { score += 20; reasons.push('MU≥8 +20'); }
+  else if (diff >= 5) { score += 10; reasons.push('MU≥5 +10'); }
+  const tbg = tbgZoneBadge(row.tbg_zone, biasLabel);
+  const flStValid = tbg?.valid === true;
+  if (flStValid) { score += 15; reasons.push('FL-ST✅ +15'); }
+  const goodTrend = isBuy ? 'UPTREND' : 'DOWNTREND';
+  const h1Ok = row.box_h1_trend === goodTrend;
+  const h4Ok = row.box_h4_trend === goodTrend;
+  if (h1Ok && h4Ok) { score += 10; reasons.push('H1+H4 +10'); }
+  else if (h1Ok) { score += 5; reasons.push('H1 +5'); }
+  if (cotBias) {
+    const cb = typeof cotBias === 'string' ? cotBias : cotBias.bias;
+    if ((biasLabel === 'BUY' && cb === 'BULLISH') || (biasLabel === 'SELL' && cb === 'BEARISH')) { score += 10; reasons.push('COT +10'); }
+  }
+  const mom = trend?.momentum || row.momentum || '';
+  if (mom === 'STRONG') { score += 10; reasons.push('MOM+10'); }
+  else if (mom === 'BUILDING') { score += 5; reasons.push('MOM+5'); }
+  const str = Math.abs(row.strength ?? 0);
+  if (str >= 3) { score += 10; reasons.push('STR≥3 +10'); }
+  else if (str >= 1) { score += 5; reasons.push('STR≥1 +5'); }
+  if (row.box_h4_trend && row.box_h4_trend !== 'UNKNOWN' && !h4Ok) { score -= 10; reasons.push('H4✗ -10'); }
+  if (!flStValid) { score -= 15; reasons.push('FL-ST✗ -15'); }
+  if (['FADING','REVERSING','COOLING','NEUTRAL'].includes(mom)) { score -= 10; reasons.push('MOMWK -10'); }
+  score = Math.max(0, Math.min(100, score));
+  if (score < 60) return null;
+  return { confidence: score, reasons };
+}
+function confStyle(c) {
+  if (!c) return null;
+  if (c >= 90) return { label:'ELITE', color:'#00ff9f', bg:'rgba(0,255,159,0.10)', border:'rgba(0,255,159,0.35)' };
+  if (c >= 75) return { label:'HIGH', color:'#00b4ff', bg:'rgba(0,180,255,0.10)', border:'rgba(0,180,255,0.35)' };
+  return { label:'MOD', color:'#ffd166', bg:'rgba(255,209,102,0.10)', border:'rgba(255,209,102,0.35)' };
+}
 function signalLabel(signal, strength) {
   if (signal==='STRONG'||strength>=2) return { icon:'🔥', text:'STRONG', color:'#ffd166' };
   if (signal==='MODERATE'||strength>=1) return { icon:'⚡', text:'MOD',  color:'#00b4ff' };
@@ -816,7 +868,7 @@ function StatCard({ label, value, color, sub }) {
 }
 
 // ===== PAIR CARD =====
-function PairCard({ row, trend, cotBias }) {
+function PairCard({ row, trend, cotBias, confidence }) {
   const gap=row.gap??0,valid=isValid(gap),bias=biasFromGap(gap),sig=signalLabel(row.signal,row.strength),strVal=row.strength??0,sc=stateColor(row.state),t=trend||{};
   const sparkColor=t.trend1h==='STRONGER'?'#00ff9f':t.trend1h==='WEAKER'?'#ff4d6d':'var(--text-muted)';
   const momIcons={BUILDING:'🚀',EMERGING:'📈',FADING:'📉',COOLING:'🌡️',REVERSAL:'⚠️',NEUTRAL:'▬',SPARK:'⚡',STRONG:'🔥',STABLE:'▬',CONSOLIDATING:'🔵',REVERSING:'⚠️'};
@@ -859,6 +911,7 @@ function PairCard({ row, trend, cotBias }) {
 {[['H1',adv.verdicts.h1,adv.gaps.h1],['H4',adv.verdicts.h4,adv.gaps.h4],['D1',adv.verdicts.d1,adv.gaps.d1]].map(([tf,v,g])=><span key={tf} style={{fontFamily:mono,fontSize:7,color:v.c,background:v.c+'12',border:`1px solid ${v.c}28`,borderRadius:3,padding:'1px 5px',whiteSpace:'nowrap'}}>{tf} {v.tag} {g>0?'+':''}{g}</span>)}
 </div>
 </div>);})()}{cotBias&&<div style={{display:'flex',alignItems:'center',gap:4}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>COT</span><span style={{fontFamily:mono,fontSize:9,color:cotBias.bias==='BULLISH'?'#00ff9f':'#ff4d6d',background:cotBias.bias==='BULLISH'?'rgba(0,255,159,0.08)':'rgba(255,77,109,0.08)',border:`1px solid ${cotBias.bias==='BULLISH'?'#00ff9f33':'#ff4d6d33'}`,borderRadius:3,padding:'1px 5px'}}>{cotBias.bias==='BULLISH'?'▲':'▼'} {cotBias.bias}</span></div>}
+      {(()=>{if(!confidence)return null;const cs=confStyle(confidence.confidence);if(!cs)return null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>CONF</span><span style={{fontFamily:mono,fontSize:9,color:cs.color,background:cs.bg,border:`1px solid ${cs.border}`,borderRadius:4,padding:'1px 7px',fontWeight:700}}>{confidence.confidence} {cs.label}</span></div>);})()}
       <div style={{display:'flex',flexDirection:'column',gap:3}}>
         <div style={{display:'flex',alignItems:'center',gap:6}}>
           <span style={{fontFamily:mono,fontSize:10,color:t.momentumColor||'var(--text-muted)',background:(t.momentumColor||'var(--text-muted)')+'18',border:`1px solid ${(t.momentumColor||'var(--text-muted)')}30`,borderRadius:4,padding:'2px 8px',letterSpacing:1}}>{momIcons[t.momentum]||'▬'} {t.momentum||'NEUTRAL'}</span>
@@ -880,7 +933,7 @@ function PairCard({ row, trend, cotBias }) {
 
 
 // ===== PAIR CARD MODAL =====
-function PairCardModal({ row, trend, cotBias, onClose, isMobile }) {
+function PairCardModal({ row, trend, cotBias, onClose, isMobile, confidence }) {
   if (!row) return null;
   const gap = row.gap ?? 0;
   const bias = biasFromGap(gap);
@@ -924,6 +977,7 @@ function PairCardModal({ row, trend, cotBias, onClose, isMobile }) {
             {row.execution && row.execution !== 'NONE' && (
               <span style={{fontFamily:mono,fontSize:10,color:'#ffd166',background:'rgba(255,209,102,0.1)',border:'1px solid rgba(255,209,102,0.3)',borderRadius:5,padding:'3px 10px'}}>{row.execution}</span>
             )}
+            {(()=>{if(!confidence)return null;const cs=confStyle(confidence.confidence);if(!cs)return null;return <span style={{fontFamily:mono,fontSize:10,color:cs.color,background:cs.bg,border:`1px solid ${cs.border}`,borderRadius:5,padding:'3px 10px',fontWeight:700}}>{confidence.confidence} {cs.label}</span>;})()}
           </div>
           <button onClick={onClose} style={{background:'transparent',border:'1px solid var(--border)',borderRadius:6,color:'var(--text-muted)',fontFamily:mono,fontSize:11,padding:'5px 12px',cursor:'pointer'}}>✕ ESC</button>
         </div>
@@ -1038,7 +1092,7 @@ function PairCardModal({ row, trend, cotBias, onClose, isMobile }) {
 
 
 // ===== VALID SETUPS TAB =====
-function ValidSetupsTab({ data, trends, cotMap }) {
+function ValidSetupsTab({ data, trends, cotMap, confidenceMap }) {
   const MOMENTUM_GUIDE = {
     STRONG:        { action:'RIDE IT',         color:'#ffd166' },
     BUILDING:      { action:'ENTER NOW',       color:'#00ff9f' },
@@ -1115,6 +1169,7 @@ function ValidSetupsTab({ data, trends, cotMap }) {
                 </div>);
               })()}
               {(()=>{const adv=advScore(row);if(!adv)return null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}><span style={{fontFamily:mono,fontSize:9,color:adv.color,background:adv.bg,border:`1px solid ${adv.border}`,borderRadius:4,padding:'2px 8px',fontWeight:700}}>{adv.label}</span><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)'}}>{adv.detail}</span></div>);})()}
+              {(()=>{const cf=confidenceMap&&confidenceMap[row.symbol];if(!cf)return null;const cs=confStyle(cf.confidence);if(!cs)return null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>CONF</span><span style={{fontFamily:mono,fontSize:9,color:cs.color,background:cs.bg,border:`1px solid ${cs.border}`,borderRadius:4,padding:'2px 8px',fontWeight:700}}>{cf.confidence} {cs.label}</span></div>);})()}
             </div>
 
             {/* STRENGTH */}
@@ -1148,7 +1203,7 @@ function ValidSetupsTab({ data, trends, cotMap }) {
   );
 }
 // ===== VALID PAIRS TAB — auto-filtered tradable pairs =====
-function ValidPairsTab({ data, trends, cotMap }) {
+function ValidPairsTab({ data, trends, cotMap, confidenceMap }) {
   const valid = data.filter(r => {
     const gap = r.gap ?? 0;
     if (Math.abs(gap) < 7) return false;
@@ -1249,6 +1304,12 @@ function ValidPairsTab({ data, trends, cotMap }) {
               <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:'var(--text-muted)',letterSpacing:2,marginBottom:2}}>COT</div>
               <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:cotBias==='BULLISH'?'#00ff9f':'#ff4d6d',fontWeight:700}}>{cotBias==='BULLISH'?'▲':'▼'} {cotBias}</div>
             </div>}
+            {(()=>{const cf=confidenceMap&&confidenceMap[row.symbol];if(!cf)return null;const cs=confStyle(cf.confidence);if(!cs)return null;return(
+              <div style={{minWidth:60,textAlign:'center'}}>
+                <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:'var(--text-muted)',letterSpacing:2,marginBottom:2}}>CONF</div>
+                <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:cs.color,background:cs.bg,border:`1px solid ${cs.border}`,borderRadius:4,padding:'2px 6px',fontWeight:700}}>{cf.confidence} {cs.label}</div>
+              </div>
+            );})()}
           </div>
         );
       })}
@@ -1434,11 +1495,12 @@ function SpikeLogTab() {
             const momColors = {STRONG:'#00ff9f',BUILDING:'#66ffcc',SPARK:'#ffd166',CONSOLIDATING:'#00b4ff',COOLING:'#ffaa44',FADING:'#ff7744',REVERSING:'#ff4d6d'};
             const mc = momColors[s.momentum] || '#ffd166';
             return (
-              <div key={s.id||i} style={{display:'grid',gridTemplateColumns:'90px 55px 55px 100px 80px 140px 1fr 80px',alignItems:'center',gap:10,padding:'9px 12px',background:i%2===0?'var(--bg-card)':'transparent',border:'1px solid var(--border)',borderLeft:`3px solid ${color}`,borderRadius:6}}>
+              <div key={s.id||i} style={{display:'grid',gridTemplateColumns:'90px 55px 55px 100px 80px 50px 140px 1fr 80px',alignItems:'center',gap:10,padding:'9px 12px',background:i%2===0?'var(--bg-card)':'transparent',border:'1px solid var(--border)',borderLeft:`3px solid ${color}`,borderRadius:6}}>
                 <span style={{fontFamily:"'Orbitron',sans-serif",fontSize:11,fontWeight:700,color:'var(--text-primary)'}}>{s.symbol}</span>
                 <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:color,fontWeight:700,background:color+'15',borderRadius:3,padding:'1px 6px',textAlign:'center'}}>{s.bias||( (s.gap??0)>0?'BUY':'SELL')}</span>
                 <span style={{fontFamily:"'Orbitron',sans-serif",fontSize:12,fontWeight:700,color,textAlign:'center'}}>{(s.gap??0)>0?'+':''}{s.gap}</span>
                 <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:mc}}>{s.momentum}</span><span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:(()=>{if(!s.base_score&&!s.quote_score)return'var(--text-muted)';const abs=(v)=>Math.abs(v||0);const bl=abs(s.base_score)>=4?'STRONG':abs(s.base_score)>=1?'WEAK':'NEUTRAL';const ql=abs(s.quote_score)>=4?'STRONG':abs(s.quote_score)>=1?'WEAK':'NEUTRAL';return bl==='STRONG'&&ql==='WEAK'?'#00ff9f':bl==='WEAK'&&ql==='STRONG'?'#ff4d6d':'var(--text-muted)';})()}}>{(()=>{if(!s.base_score&&!s.quote_score)return'—';const abs=(v)=>Math.abs(v||0);const bl=abs(s.base_score)>=4?'STR':abs(s.base_score)>=1?'WK':'N';const ql=abs(s.quote_score)>=4?'STR':abs(s.quote_score)>=1?'WK':'N';return bl+' vs '+ql;})()}</span>
+                {(()=>{const cf=computeConfidence(s,null,null);if(!cf)return <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:'var(--text-muted)',textAlign:'center'}}>—</span>;const cs=confStyle(cf.confidence);return <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:cs.color,fontWeight:700,textAlign:'center'}}>{cf.confidence}</span>;})()}
                 <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:'var(--text-muted)',textAlign:'center'}}>{Number(s.strength??0).toFixed(2)}</span>
                 <div style={{display:'flex',gap:8}}>
                   {[['1H',s.delta_short],['4H',s.delta_mid]].map(([l,v])=>{const val=parseFloat(v??0);const c=Math.abs(val)<0.1?'var(--text-muted)':val>0?'#00ff9f':'#ff4d6d';return(<span key={l} style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:c}}>{l}:{val>0?'+':''}{val?.toFixed(1)}</span>);})}
@@ -1596,7 +1658,7 @@ function SignalLogTab() {
         <table style={{width:'100%',borderCollapse:'collapse',fontFamily:mono,fontSize:10}}>
           <thead>
             <tr style={{background:'var(--bg-secondary)'}}>
-              {['TIME','PAIR','GAP','BIAS','CONF','EXEC','MOMENTUM','STATE','STR','TBG','VALID'].map(h=>(
+              {['TIME','PAIR','GAP','BIAS','CONF','EXEC','SCORE','MOMENTUM','STATE','STR','TBG','VALID'].map(h=>(
                 <th key={h} style={{padding:'8px 6px',color:'var(--text-muted)',fontWeight:600,fontSize:9,letterSpacing:1,textAlign:'left',borderBottom:'1px solid var(--border)',whiteSpace:'nowrap'}}>{h}</th>
               ))}
             </tr>
@@ -1614,6 +1676,7 @@ function SignalLogTab() {
                   <td style={{padding:'6px'}}><span style={{color:bc,border:`1px solid ${bc}33`,borderRadius:3,padding:'1px 5px',fontSize:9}}>{r.bias||'—'}</span></td>
                   <td style={{padding:'6px',color:r.confidence==='HIGH'?'#00ff9f':r.confidence==='MEDIUM'?'#ffd166':'var(--text-muted)'}}>{r.confidence||'—'}</td>
                   <td style={{padding:'6px',color:r.execution==='MARKET'?'#00ff9f':r.execution==='PULLBACK'?'#ffd166':'var(--text-muted)'}}>{r.execution||'—'}</td>
+                  <td style={{padding:'6px'}}>{(()=>{const cf=computeConfidence(r,null,null);if(!cf)return <span style={{color:'var(--text-muted)'}}>—</span>;const cs=confStyle(cf.confidence);return <span style={{fontSize:9,color:cs.color,fontWeight:700}}>{cf.confidence}</span>;})()}</td>
                   <td style={{padding:'6px',color:r.momentum==='STRONG'?'#00ff9f':r.momentum==='BUILDING'?'#00b4ff':'var(--text-muted)'}}>{r.momentum||'—'}</td>
                   <td style={{padding:'6px',color:'var(--text-muted)'}}>{r.state||'—'}</td>
                   <td style={{padding:'6px',fontWeight:700,color:r.strength>=2?'#00ff9f':r.strength>=1?'#ffd166':'var(--text-muted)'}}>{Number(r.strength||0).toFixed(1)}</td>
@@ -2033,6 +2096,13 @@ export default function Dashboard() {
     return null;
   }
 
+  // Confidence scoring — computed once, used everywhere
+  const confidenceMap = {};
+  data.forEach(row => {
+    const conf = computeConfidence(row, trends[row.symbol], getPairCotBias(row.symbol));
+    if (conf) confidenceMap[row.symbol] = conf;
+  });
+
   return (
     <>
       <Head>
@@ -2140,10 +2210,10 @@ export default function Dashboard() {
               ?<div style={{textAlign:'center',padding:60,fontFamily:mono,fontSize:11,letterSpacing:3,color:'var(--text-muted)'}}>NO PAIRS MATCH</div>
               :<><div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2,marginBottom:10}}>{filter==='ALL'?`${displayed.length} ALL PAIRS · ${buyCount} BUY · ${sellCount} SELL`:filter==='VALID'?`${displayed.length} VALID PAIRS · ${buyCount} BUY · ${sellCount} SELL`:`${displayed.length} PAIRS`}</div>
               <div style={{display:'grid',gridTemplateColumns:isMobile?'repeat(auto-fit,minmax(160px,1fr))':'repeat(auto-fit,minmax(190px,1fr))',gap:isMobile?8:10,alignItems:'stretch'}}>
-                {displayed.map(row=><div key={row.symbol} onClick={()=>setSelectedPair(row)} style={{cursor:'pointer',height:'100%',display:'flex',flexDirection:'column'}}><PairCard row={row} trend={trends[row.symbol]} cotBias={getPairCotBias(row.symbol)}/></div>)}
+                {displayed.map(row=><div key={row.symbol} onClick={()=>setSelectedPair(row)} style={{cursor:'pointer',height:'100%',display:'flex',flexDirection:'column'}}><PairCard row={row} trend={trends[row.symbol]} cotBias={getPairCotBias(row.symbol)} confidence={confidenceMap[row.symbol]}/></div>)}
               </div></>
-          ):tab==='SETUPS'?(<ValidSetupsTab data={data} trends={trends} cotMap={cotMap}/>
-):tab==='VALID PAIRS'?(<ValidPairsTab data={data} trends={trends} cotMap={cotMap}/>
+          ):tab==='SETUPS'?(<ValidSetupsTab data={data} trends={trends} cotMap={cotMap} confidenceMap={confidenceMap}/>
+):tab==='VALID PAIRS'?(<ValidPairsTab data={data} trends={trends} cotMap={cotMap} confidenceMap={confidenceMap}/>
 ):tab==='SPIKE LOG'?(<SpikeLogTab/>
 ):tab==='CHART'?(<ChartTab data={data}/>
 ):tab==='SIGNALS'?(
@@ -2208,6 +2278,7 @@ export default function Dashboard() {
                 <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
                   <span style={{fontFamily:mono,fontSize:13,fontWeight:700,color:bc,background:bc+'18',border:`1px solid ${bc}55`,borderRadius:6,padding:'4px 12px',letterSpacing:2}}>{row.bias}</span>
                   {t3.momentum&&<span style={{fontFamily:mono,fontSize:10,color:mc,background:mc+'12',border:`1px solid ${mc}25`,borderRadius:5,padding:'3px 8px'}}>{t3.momentum}</span>}
+                  {(()=>{const cf=confidenceMap[row.symbol];if(!cf)return null;const cs=confStyle(cf.confidence);return <span style={{fontFamily:mono,fontSize:10,color:cs.color,background:cs.bg,border:`1px solid ${cs.border}`,borderRadius:5,padding:'3px 8px',fontWeight:700}}>{cf.confidence} {cs.label}</span>;})()}
                 </div>
               </div>
             );
@@ -2234,6 +2305,7 @@ export default function Dashboard() {
               <span style={{fontFamily:orb,fontSize:20,fontWeight:900,letterSpacing:2,color:'var(--text-primary)'}}>{row.symbol}</span>
               <span style={{fontFamily:mono,fontSize:13,fontWeight:700,color:bc,background:bc+'15',border:`1px solid ${bc}44`,borderRadius:5,padding:'4px 12px',letterSpacing:2,alignSelf:'flex-start'}}>{row.bias}</span>
               {t4.momentum&&<span style={{fontFamily:mono,fontSize:10,color:'var(--text-muted)'}}>{t4.momentum}</span>}
+              {(()=>{const cf=confidenceMap[row.symbol];if(!cf)return null;const cs=confStyle(cf.confidence);return <span style={{fontFamily:mono,fontSize:9,color:cs.color,background:cs.bg,border:`1px solid ${cs.border}`,borderRadius:4,padding:'2px 8px',fontWeight:700,alignSelf:'flex-start'}}>{cf.confidence} {cs.label}</span>;})()}
             </div>
           );
         })}
@@ -2256,7 +2328,7 @@ export default function Dashboard() {
 
             <div style={{overflowX:'auto'}}>
               <table style={{width:'100%',borderCollapse:'collapse',background:'var(--bg-secondary)',border:'1px solid var(--border)',borderRadius:10,overflow:'hidden'}}>
-                <thead><tr style={{background:'var(--bg-hover)'}}>{['#','SYMBOL','GAP','▲▼','BIAS','MOMENTUM','MATCHUP','1H','4H','8H','CHART','STATE','STR','SIG','COT','FL-ST','⚠️'].map(h=><th key={h} style={hdr}>{h}</th>)}</tr></thead>
+                <thead><tr style={{background:'var(--bg-hover)'}}>{['#','SYMBOL','GAP','▲▼','BIAS','CONF','MOMENTUM','MATCHUP','1H','4H','8H','CHART','STATE','STR','SIG','COT','FL-ST','⚠️'].map(h=><th key={h} style={hdr}>{h}</th>)}</tr></thead>
                 <tbody>
                   {displayed.length===0?<tr><td colSpan={15} style={{textAlign:'center',padding:40,fontFamily:mono,fontSize:10,color:'var(--text-muted)'}}>NO DATA</td></tr>
                   :displayed.map((row,idx)=>{
@@ -2271,6 +2343,7 @@ export default function Dashboard() {
                         <td style={{...tdc,fontFamily:mono,fontSize:12,color:bias.color,fontWeight:700}}>{gap>0?'+':''}{Number(gap).toFixed(1)}</td>
                         <td style={tdc}><TrendArrow trend={gapTrend} size={14}/></td>
                         <td style={tdc}><span style={{border:`1px solid ${bias.border}`,borderRadius:3,padding:'1px 6px',fontFamily:mono,fontSize:9,color:bias.color,background:bias.bg}}>{bias.label}</span></td>
+                        <td style={tdc}>{(()=>{const cf=confidenceMap[row.symbol];if(!cf)return <span style={{color:'var(--text-muted)'}}>—</span>;const cs=confStyle(cf.confidence);return <span style={{fontFamily:mono,fontSize:9,color:cs.color,background:cs.bg,border:`1px solid ${cs.border}`,borderRadius:3,padding:'1px 6px',whiteSpace:'nowrap'}}>{cf.confidence}</span>;})()}</td>
                         <td style={{...tdc,fontFamily:mono,fontSize:9,color:t.momentumColor||'var(--text-muted)'}}>{t.momentum||'—'}</td><td style={{...tdc}}>{(()=>{const mu=getMatchup(row);if(!mu)return <span style={{color:'var(--text-muted)'}}>—</span>;return <span style={{fontFamily:mono,fontSize:9,color:mu.color,background:mu.color+'12',border:`1px solid ${mu.color}28`,borderRadius:4,padding:'1px 6px',whiteSpace:'nowrap'}}>{mu.label}</span>;})()}</td>
                         {['delta1h','delta4h','delta8h'].map(k=><td key={k} style={{...tdc,fontFamily:mono,fontSize:10,color:(t[k]||0)>0?'#00ff9f':(t[k]||0)<0?'#ff4d6d':'var(--text-muted)'}}>{t[k]!==undefined?(t[k]>0?'+':'')+t[k]:'—'}</td>)}
                         <td style={tdc}><Sparkline data={t.history||[]} color={sc2} w={55} h={18}/></td>
@@ -2330,6 +2403,7 @@ export default function Dashboard() {
         cotBias={getPairCotBias(selectedPair.symbol)}
         onClose={()=>setSelectedPair(null)}
         isMobile={isMobile}
+        confidence={confidenceMap[selectedPair.symbol]}
       />
     )}
     </>
