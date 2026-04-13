@@ -1,5 +1,5 @@
 @echo off
 cd /d C:\Users\Admin\panda-dashboard
 git add -A
-git commit -m "feat: add confidence scoring with global propagation (60-100 scale, ELITE/HIGH/MOD tiers)"
+git commit -m "fix: remove confidence threshold - always show score for all pairs (5 tiers: ELITE/HIGH/MOD/LOW/WEAK)"
 git push origin main

@@ -188,7 +188,6 @@ function computeConfidence(row, trend, cotBias) {
   if (!row) return null;
   const gap = Math.abs(row.gap ?? 0);
   const biasLabel = row.bias || biasFromGap(row.gap ?? 0).label;
-  if (biasLabel === 'WAIT' && gap < 5) return null;
   const isBuy = (row.gap ?? 0) > 0;
   const baseVals = [row.base_d1, row.base_h4, row.base_h1].filter(v => v != null);
   const quoteVals = [row.quote_d1, row.quote_h4, row.quote_h1].filter(v => v != null);
@@ -196,7 +195,6 @@ function computeConfidence(row, trend, cotBias) {
   const qsRaw = quoteVals.length ? (isBuy ? Math.min(...quoteVals.filter(v => v < 0), 0) : Math.max(...quoteVals.filter(v => v > 0), 0)) : 0;
   const bl = scoreLabel(bsRaw);
   const ql = scoreLabel(qsRaw);
-  if (bl === 'NEUTRAL' && ql === 'NEUTRAL') return null;
   let score = 0;
   const reasons = [];
   if (gap >= 8) { score += 25; reasons.push('GAP≥8 +25'); }
@@ -226,14 +224,15 @@ function computeConfidence(row, trend, cotBias) {
   if (!flStValid) { score -= 15; reasons.push('FL-ST✗ -15'); }
   if (['FADING','REVERSING','COOLING','NEUTRAL'].includes(mom)) { score -= 10; reasons.push('MOMWK -10'); }
   score = Math.max(0, Math.min(100, score));
-  if (score < 60) return null;
   return { confidence: score, reasons };
 }
 function confStyle(c) {
-  if (!c) return null;
+  if (c == null) return null;
   if (c >= 90) return { label:'ELITE', color:'#00ff9f', bg:'rgba(0,255,159,0.10)', border:'rgba(0,255,159,0.35)' };
   if (c >= 75) return { label:'HIGH', color:'#00b4ff', bg:'rgba(0,180,255,0.10)', border:'rgba(0,180,255,0.35)' };
-  return { label:'MOD', color:'#ffd166', bg:'rgba(255,209,102,0.10)', border:'rgba(255,209,102,0.35)' };
+  if (c >= 60) return { label:'MOD', color:'#ffd166', bg:'rgba(255,209,102,0.10)', border:'rgba(255,209,102,0.35)' };
+  if (c >= 40) return { label:'LOW', color:'#ffaa44', bg:'rgba(255,170,68,0.10)', border:'rgba(255,170,68,0.35)' };
+  return { label:'WEAK', color:'var(--text-muted)', bg:'rgba(40,50,80,0.15)', border:'rgba(40,50,80,0.35)' };
 }
 function signalLabel(signal, strength) {
   if (signal==='STRONG'||strength>=2) return { icon:'🔥', text:'STRONG', color:'#ffd166' };
