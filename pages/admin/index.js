@@ -384,6 +384,7 @@ export default function AdminPanel() {
             <span style={{ fontFamily: mono, fontSize: 9, color: '#2a3550' }}>👤 {adminUser?.username}</span>
             <button onClick={() => window.location.href = '/dashboard'} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(0,255,159,0.08)', border: '1px solid #00ff9f44', borderRadius: 6, color: '#00ff9f', fontFamily: mono, fontSize: 9, letterSpacing: 2, padding: '6px 14px', cursor: 'pointer' }}>📊 DASHBOARD</button>
             <button style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(255,209,102,0.15)', border: '1px solid #ffd166', borderRadius: 6, color: '#ffd166', fontFamily: mono, fontSize: 9, letterSpacing: 2, padding: '6px 14px', cursor: 'default' }}>🛡️ ADMIN</button>
+            <button onClick={() => window.location.href = '/admin/pf-approvals'} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(0,180,255,0.10)', border: '1px solid #00b4ff44', borderRadius: 6, color: '#00b4ff', fontFamily: mono, fontSize: 9, letterSpacing: 2, padding: '6px 14px', cursor: 'pointer' }}>✅ APPROVALS</button>
             <button onClick={async () => { await fetch('/api/logout', { method: 'POST' }); window.location.href = '/login'; }} style={{ background: 'transparent', border: '1px solid #2a1525', borderRadius: 6, color: '#ff4d6d', fontFamily: mono, fontSize: 9, padding: '6px 12px', cursor: 'pointer' }}>LOGOUT</button>
           </div>
         </header>
