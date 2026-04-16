@@ -32,6 +32,15 @@ export default function LandingPage() {
 
   useEffect(() => { setVisible(true); }, []);
   useEffect(() => {
+    // pf-root-routing: auto-redirect authenticated users
+    fetch('/api/pf-me').then(r => r.json()).then(d => {
+      if (d && d.username) {
+        if (d.pf_approved === false) router.replace('/pending');
+        else router.replace(d.role === 'admin' ? '/admin' : '/dashboard');
+      }
+    }).catch(() => {});
+  }, []);
+  useEffect(() => {
     const h = () => setScrollY(window.scrollY);
     window.addEventListener('scroll', h, { passive: true });
     return () => window.removeEventListener('scroll', h);
@@ -61,7 +70,7 @@ export default function LandingPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <button onClick={() => router.push('/pricing')} style={{ background: 'none', border: 'none', color: '#8899aa', fontFamily: mono, fontSize: 11, letterSpacing: 2, cursor: 'pointer', padding: '8px 14px', transition: 'color 0.2s' }} className="nav-link">PRICING</button>
             <button onClick={() => router.push('/login')} style={{ background: 'none', border: '1px solid #1a2540', borderRadius: 6, color: '#8899aa', fontFamily: mono, fontSize: 11, letterSpacing: 2, cursor: 'pointer', padding: '8px 18px', transition: 'all 0.2s' }} className="nav-link">LOG IN</button>
-            <button onClick={() => router.push('/pricing')} style={{ background: '#00ff9f', border: 'none', borderRadius: 6, color: '#050810', fontFamily: orb, fontSize: 10, fontWeight: 700, letterSpacing: 2, cursor: 'pointer', padding: '9px 20px', transition: 'all 0.2s' }} className="cta-btn">GET ACCESS</button>
+            <button onClick={() => router.push('/funnel')} style={{ background: '#00ff9f', border: 'none', borderRadius: 6, color: '#050810', fontFamily: orb, fontSize: 10, fontWeight: 700, letterSpacing: 2, cursor: 'pointer', padding: '9px 20px', transition: 'all 0.2s' }} className="cta-btn">GET ACCESS</button>
           </div>
         </nav>
         {/* HERO */}
@@ -80,7 +89,7 @@ export default function LandingPage() {
               21 currency pairs. Scored every 5 minutes. Advanced modified currency scoring, live signal generation, momentum tracking, and automated bias detection — all in one engine.
             </p>
             <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
-              <button onClick={() => router.push('/pricing')} style={{ background: '#00ff9f', border: 'none', borderRadius: 8, color: '#050810', fontFamily: orb, fontSize: 13, fontWeight: 700, letterSpacing: 2, padding: '15px 36px', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 0 30px rgba(0,255,159,0.25)' }} className="cta-btn">START NOW →</button>
+              <button onClick={() => router.push('/funnel')} style={{ background: '#00ff9f', border: 'none', borderRadius: 8, color: '#050810', fontFamily: orb, fontSize: 13, fontWeight: 700, letterSpacing: 2, padding: '15px 36px', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 0 30px rgba(0,255,159,0.25)' }} className="cta-btn">START NOW →</button>
               <button onClick={() => { document.getElementById('features').scrollIntoView({ behavior: 'smooth' }); }} style={{ background: 'transparent', border: '1px solid #1a2540', borderRadius: 8, color: '#8899aa', fontFamily: mono, fontSize: 12, letterSpacing: 2, padding: '15px 30px', cursor: 'pointer', transition: 'all 0.2s' }} className="nav-link">LEARN MORE</button>
             </div>
           </div>
@@ -138,7 +147,7 @@ export default function LandingPage() {
             STOP GUESSING.<br /><span style={{ color: '#00ff9f' }}>START SEEING.</span>
           </h2>
           <p style={{ fontFamily: raj, fontSize: 17, color: '#6b7d8e', maxWidth: 440, margin: '0 auto 32px', lineHeight: 1.6 }}>Join traders who use data-driven intelligence instead of gut feeling.</p>
-          <button onClick={() => router.push('/pricing')} style={{ background: '#00ff9f', border: 'none', borderRadius: 8, color: '#050810', fontFamily: orb, fontSize: 14, fontWeight: 700, letterSpacing: 2, padding: '16px 44px', cursor: 'pointer', boxShadow: '0 0 40px rgba(0,255,159,0.3)', transition: 'all 0.2s' }} className="cta-btn">GET ACCESS →</button>
+          <button onClick={() => router.push('/funnel')} style={{ background: '#00ff9f', border: 'none', borderRadius: 8, color: '#050810', fontFamily: orb, fontSize: 14, fontWeight: 700, letterSpacing: 2, padding: '16px 44px', cursor: 'pointer', boxShadow: '0 0 40px rgba(0,255,159,0.3)', transition: 'all 0.2s' }} className="cta-btn">GET ACCESS →</button>
         </section>
         {/* FOOTER */}
         <footer style={{ position: 'relative', zIndex: 1, borderTop: '1px solid #1a2540', padding: '40px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, maxWidth: 1000, margin: '0 auto' }}>

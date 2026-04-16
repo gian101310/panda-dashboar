@@ -28,8 +28,36 @@ export default function PricingPage() {
   const [visible, setVisible] = useState(false);
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [pfSignupOpen, setPfSignupOpen] = useState(false);
+  const [pfSignupTier, setPfSignupTier] = useState('starter');
+  const [pfSignupEmail, setPfSignupEmail] = useState('');
+  const [pfSignupUsername, setPfSignupUsername] = useState('');
+  const [pfSignupBusy, setPfSignupBusy] = useState(false);
+  const [pfSignupOk, setPfSignupOk] = useState(false);
+  const [pfSignupErr, setPfSignupErr] = useState('');
 
   useEffect(() => { setVisible(true); }, []);
+
+  const pfOpenSignup = (tier) => {
+    setPfSignupTier(tier); setPfSignupEmail(''); setPfSignupUsername('');
+    setPfSignupOk(false); setPfSignupErr(''); setPfSignupOpen(true);
+  };
+  const pfSubmitSignup = async () => {
+    if (!pfSignupEmail.includes('@')) { setPfSignupErr('Valid email required'); return; }
+    setPfSignupBusy(true); setPfSignupErr('');
+    try {
+      const r = await fetch('/api/pf-signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: pfSignupEmail, username: pfSignupUsername, tier: pfSignupTier })
+      });
+      const j = await r.json();
+      if (r.ok) setPfSignupOk(true); else setPfSignupErr(j.error || 'Request failed');
+    } catch { setPfSignupErr('Network error'); }
+    setPfSignupBusy(false);
+  };
+  const pfCloseSignup = () => setPfSignupOpen(false);
+  const pfOpenTelegram = () => window.open('https://t.me/panda_engine_alerts_bot', '_blank');
 
   return (
     <>
@@ -84,10 +112,30 @@ export default function PricingPage() {
                       </div>
                     ))}
                   </div>
-                  <button onClick={() => router.push(t.href)} style={{ width: '100%', background: isPro ? '#00ff9f' : 'transparent', border: `1px solid ${t.color}`, borderRadius: 8, color: isPro ? '#050810' : t.color, fontFamily: orb, fontSize: 11, fontWeight: 700, letterSpacing: 2, padding: '14px', cursor: 'pointer', transition: 'all 0.2s' }} className={isPro ? 'cta-btn' : 'tier-btn'}>{t.cta}</button>
+                  <button onClick={() => pfOpenSignup(t.name.toLowerCase())} style={{ width: '100%', background: isPro ? '#00ff9f' : 'transparent', border: `1px solid ${t.color}`, borderRadius: 8, color: isPro ? '#050810' : t.color, fontFamily: orb, fontSize: 11, fontWeight: 700, letterSpacing: 2, padding: '14px', cursor: 'pointer', transition: 'all 0.2s' }} className={isPro ? 'cta-btn' : 'tier-btn'}>{t.cta}</button>
                 </div>
               );
             })}
+          </div>
+        </section>
+
+        {/* pf-reviews */}
+        <section style={{ position: 'relative', zIndex: 1, padding: '40px 24px 20px', maxWidth: 900, margin: '0 auto' }}>
+          <div style={{ textAlign: 'center', marginBottom: 32 }}>
+            <div style={{ fontFamily: mono, fontSize: 10, letterSpacing: 5, color: '#ffd166', marginBottom: 10 }}>REAL TRADERS</div>
+            <h3 style={{ fontFamily: orb, fontSize: 22, fontWeight: 700, margin: 0 }}>WHY THEY STAYED</h3>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 16 }} className="pf-review-grid">
+            {[
+              { text: 'I became more consistent using the signals.', who: 'PRO USER' },
+              { text: 'Pro plan paid for itself in the first week.', who: 'SWING TRADER' },
+              { text: 'Everything in one place with Elite — no more tab hopping.', who: 'ELITE USER' }
+            ].map((r, i) => (
+              <div key={i} style={{ background: '#0a0e1a', border: '1px solid #1a2540', borderRadius: 10, padding: '22px 20px' }}>
+                <p style={{ fontFamily: raj, fontSize: 14, color: '#8899aa', lineHeight: 1.6, marginBottom: 12, fontStyle: 'italic' }}>"{r.text}"</p>
+                <div style={{ fontFamily: mono, fontSize: 9, letterSpacing: 3, color: '#00b4ff' }}>— {r.who}</div>
+              </div>
+            ))}
           </div>
         </section>
         {/* EARLY ACCESS CTA */}
@@ -110,6 +158,44 @@ export default function PricingPage() {
         <footer style={{ position: 'relative', zIndex: 1, borderTop: '1px solid #1a2540', padding: '36px 24px', textAlign: 'center' }}>
           <div style={{ fontFamily: mono, fontSize: 9, letterSpacing: 2, color: '#1a2540' }}>© {new Date().getFullYear()} PANDA ENGINE · ALL RIGHTS RESERVED</div>
         </footer>
+
+        {/* pf-signup-modal */}
+        {pfSignupOpen && (
+          <div onClick={pfCloseSignup} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+            <div onClick={e => e.stopPropagation()} style={{ background: 'linear-gradient(135deg,#0a0e1a,#0e1525)', border: '1px solid #1a2540', borderRadius: 14, padding: '32px 28px', maxWidth: 420, width: '100%', position: 'relative' }}>
+              <button onClick={pfCloseSignup} style={{ position: 'absolute', top: 14, right: 14, background: 'none', border: 'none', color: '#445566', fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>×</button>
+              {pfSignupOk ? (
+                <div style={{ textAlign: 'center', padding: '12px 0' }}>
+                  <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
+                  <div style={{ fontFamily: mono, fontSize: 10, letterSpacing: 4, color: '#00ff9f', marginBottom: 10 }}>REQUEST RECEIVED</div>
+                  <h3 style={{ fontFamily: orb, fontSize: 20, fontWeight: 900, margin: '0 0 12px' }}>PENDING APPROVAL</h3>
+                  <p style={{ fontFamily: raj, fontSize: 14, color: '#8899aa', lineHeight: 1.6, marginBottom: 20 }}>
+                    Your <span style={{ color: '#00ff9f', fontFamily: mono }}>{pfSignupTier.toUpperCase()}</span> request is in the queue. Admin has been notified. Contact Telegram with your username to speed things up.
+                  </p>
+                  <button onClick={pfOpenTelegram} style={{ width: '100%', background: '#00b4ff', border: 'none', borderRadius: 8, color: '#050810', fontFamily: orb, fontSize: 11, fontWeight: 700, letterSpacing: 2, padding: '12px', cursor: 'pointer', marginBottom: 10 }}>📨 CONTACT TELEGRAM</button>
+                  <button onClick={pfCloseSignup} style={{ width: '100%', background: 'transparent', border: '1px solid #1a2540', borderRadius: 8, color: '#445566', fontFamily: mono, fontSize: 10, letterSpacing: 2, padding: '10px', cursor: 'pointer' }}>CLOSE</button>
+                </div>
+              ) : (
+                <>
+                  <div style={{ fontFamily: mono, fontSize: 10, letterSpacing: 4, color: '#00b4ff', marginBottom: 8 }}>SIGN UP · {pfSignupTier.toUpperCase()} TIER</div>
+                  <h3 style={{ fontFamily: orb, fontSize: 22, fontWeight: 900, margin: '0 0 8px' }}>REQUEST ACCESS</h3>
+                  <p style={{ fontFamily: raj, fontSize: 13, color: '#6b7d8e', marginBottom: 22, lineHeight: 1.5 }}>
+                    Access is manually approved to maintain system quality. Submit your details and admin will activate your account.
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 18 }}>
+                    <input value={pfSignupEmail} onChange={e => setPfSignupEmail(e.target.value)} placeholder="your@email.com" type="email" style={{ background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '12px 14px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, outline: 'none' }} />
+                    <input value={pfSignupUsername} onChange={e => setPfSignupUsername(e.target.value)} placeholder="preferred username (optional)" style={{ background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '12px 14px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, outline: 'none' }} />
+                  </div>
+                  {pfSignupErr && <div style={{ fontFamily: mono, fontSize: 11, color: '#ff4d6d', marginBottom: 12 }}>⚠ {pfSignupErr}</div>}
+                  <button onClick={pfSubmitSignup} disabled={pfSignupBusy} style={{ width: '100%', background: '#00ff9f', border: 'none', borderRadius: 8, color: '#050810', fontFamily: orb, fontSize: 12, fontWeight: 700, letterSpacing: 2, padding: '14px', cursor: 'pointer', opacity: pfSignupBusy ? 0.6 : 1, marginBottom: 10 }}>{pfSignupBusy ? 'SUBMITTING...' : 'REQUEST ACCESS →'}</button>
+                  <div style={{ fontFamily: mono, fontSize: 9, letterSpacing: 2, color: '#445566', textAlign: 'center' }}>
+                    ALREADY APPROVED? <span onClick={() => router.push('/login')} style={{ color: '#00b4ff', cursor: 'pointer' }}>LOG IN</span>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       <style>{`

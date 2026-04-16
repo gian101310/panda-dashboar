@@ -26,8 +26,25 @@ export default function LoginPage() {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ username: username })
             }).catch(() => {});
+            // pf-security: log event + device/IP detection (non-blocking)
+            fetch('/api/pf-log-event', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ event_type: 'LOGIN_SUCCESS', username, role: d.role, status: 'OK' })
+            }).catch(() => {});
+            // pf-approval gate
+            try {
+              const me = await fetch('/api/pf-me').then(r => r.json());
+              if (me && me.pf_approved === false) { window.location.href = '/pending'; return; }
+            } catch {}
             window.location.href = d.role === 'admin' ? '/admin' : '/dashboard';
       } else {
+        // pf-security: log failed attempt (non-blocking)
+        fetch('/api/pf-log-event', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ event_type: 'LOGIN_FAILED', username, status: 'FAIL', detail: d.error || 'login_failed' })
+        }).catch(() => {});
         setError(d.error || 'Login failed');
       }
     } catch { setError('Network error. Please try again.'); }
@@ -99,6 +116,11 @@ export default function LoginPage() {
               {loading ? 'AUTHENTICATING...' : 'ACCESS SYSTEM →'}
             </button>
           </form>
+
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', fontFamily: "'Share Tech Mono',monospace", fontSize: 10, letterSpacing: 2, color: '#445566' }}>
+            NEW USER?
+            <a href="/pricing" style={{ color: '#00b4ff', textDecoration: 'none', borderBottom: '1px solid #00b4ff33', paddingBottom: 1 }}>SIGN UP →</a>
+          </div>
 
           <div style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: 9, letterSpacing: 2, color: '#1a2540' }}>
             PANDA ENGINE v2.0 · INVITE ONLY
