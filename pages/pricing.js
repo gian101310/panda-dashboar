@@ -9,17 +9,17 @@ const raj = "'Rajdhani',sans-serif";
 const TIERS = [
   {
     name: 'FREE', price: '0', period: '', color: '#445566', tag: null,
-    features: ['Live signal tab', 'Position calculator', 'Economic calendar', 'COT report'],
+    features: ['Live signals tab', 'Position calculator', 'Economic calendar', 'COT report access'],
     cta: 'START FREE', href: '/login',
   },
   {
     name: 'PRO', price: '29', period: '/mo', color: '#00ff9f', tag: 'MOST POPULAR',
-    features: ['Everything in Free', 'Signal tab (real-time)', 'Full data table', 'Gap score chart', 'Valid setups tab', 'Spike detection widgets', 'Momentum heatmap'],
+    features: ['Live signals (real-time)', 'Full data table', 'Gap score chart', 'Economic calendar', 'Position calculator', 'COT report', 'Valid setups tab', 'Spike detection widgets'],
     cta: 'GO PRO →', href: '/login',
   },
   {
     name: 'ELITE', price: '79', period: '/mo', color: '#00b4ff', tag: 'FULL ACCESS',
-    features: ['Everything in Pro', 'Live panels view', 'Spike log history', 'TradingView chart tab', 'Private trading journal', 'Telegram spike alerts', 'Currency strength charts', 'Engine health monitor', 'Early access to new features'],
+    features: ['Live panels view', 'Live signals (real-time)', 'Full data table', 'Gap score chart', 'Economic calendar', 'Position calculator', 'COT report', 'Valid setups tab', 'Spike detection widgets', 'Spike log history', 'Telegram alerts', 'Private trading journal', 'TradingView chart tab'],
     cta: 'GO ELITE →', href: '/login',
   },
 ];
