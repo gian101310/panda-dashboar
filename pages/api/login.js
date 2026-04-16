@@ -93,7 +93,7 @@ export default async function handler(req, res) {
         '\u{1F4C5} <b>Day:</b> ' + dayName,
         '\u{1F310} <b>IP:</b> ' + ip,
         '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501',
-        '\u{1F310} <a href="https://panda-dashboar.vercel.app/dashboard">Open Dashboard</a>'
+        '\u{1F310} <a href="https://pandaengine.app/dashboard">Open Dashboard</a>'
       ].join('\n');
       await fetch('https://api.telegram.org/bot8605294552:AAG2o7bF30qkZx0Zv_FgmwA0RgS7g56OH7Y/sendMessage', {
         method: 'POST',
