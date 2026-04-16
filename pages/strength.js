@@ -33,7 +33,7 @@ export default function StrengthPage() {
     fetch('/api/me').then(r => r.json()).then(d => {
       setUser(d);
       if (d.role === 'admin') setIsAdmin(true);
-    }).catch(() => { window.location.href = '/'; });
+    }).catch(() => { window.location.href = '/login'; });
   }, []);
 
   // Load data
@@ -41,7 +41,7 @@ export default function StrengthPage() {
     setLoading(true);
     try {
       const r = await fetch('/api/currency-strength?periods=' + period);
-      if (r.status === 401) { window.location.href = '/'; return; }
+      if (r.status === 401) { window.location.href = '/login'; return; }
       setData(await r.json());
     } catch(e) {}
     setLoading(false);

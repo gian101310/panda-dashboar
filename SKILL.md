@@ -35,6 +35,8 @@ description: >
 | File | Path | Lines | Purpose |
 |------|------|-------|---------|
 | **dashboard.js** | `C:\Users\Admin\panda-dashboard\pages\dashboard.js` | 2337 | Main dashboard — all tabs, components, rendering (mobile responsive) |
+| **landing.js** | `C:\Users\Admin\panda-dashboard\pages\landing.js` | 171 | Landing page (hero, features, social proof, CTA) |
+| **pricing.js** | `C:\Users\Admin\panda-dashboard\pages\pricing.js` | 130 | Pricing funnel page (Free/Pro/Elite tiers, waitlist) |
 | **strength.js** | `C:\Users\Admin\panda-dashboard\pages\strength.js` | — | Currency strength chart (canvas) |
 | **journal.js** | `C:\Users\Admin\panda-dashboard\pages\journal.js` | — | Trade journal page |
 | **admin/index.js** | `C:\Users\Admin\panda-dashboard\pages\admin\index.js` | — | Admin panel (users, features, logs) |

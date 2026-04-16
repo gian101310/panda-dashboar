@@ -1999,7 +1999,7 @@ export default function Dashboard() {
     if(!silent) setLoading(true); else setRefreshing(true);
     try {
       const [dr,tr] = await Promise.all([fetch('/api/data'), fetch('/api/strength-history')]);
-      if(dr.status===401){window.location.href='/';return;}
+      if(dr.status===401){window.location.href='/login';return;}
       const [d,t] = await Promise.all([dr.json(),tr.json()]);
       setData(Array.isArray(d)?d:[]);
       setTrends(t&&typeof t==='object'?t:{});
@@ -2055,7 +2055,7 @@ export default function Dashboard() {
   useEffect(()=>{fetchCot();},[fetchCot]);
   useEffect(()=>{fetch('/api/me').then(r=>r.json()).then(d=>{setUser(d);if(d.role==='admin') setIsAdmin(true);}).catch(()=>{});},[]);
 
-  async function handleLogout(){await fetch('/api/logout',{method:'POST'});window.location.href='/';}
+  async function handleLogout(){await fetch('/api/logout',{method:'POST'});window.location.href='/login';}
 
   function toggleHeatmap() { setPrefs(p=>({...p,heatmap_visible:!p?.heatmap_visible})); }
   function toggleSpikeBanner() { setPrefs(p=>({...p,spike_banner_visible:!p?.spike_banner_visible})); }

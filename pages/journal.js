@@ -298,7 +298,7 @@ export default function JournalPage() {
       if (filterDir) url += `&direction=${filterDir}`;
       if (filterStatus) url += `&status=${filterStatus}`;
       const res = await fetch(url);
-      if (res.status === 401) { window.location.href='/'; return; }
+      if (res.status === 401) { window.location.href='/login'; return; }
       if (res.status === 403) { window.location.href='/dashboard'; return; }
       setTrades(await res.json());
     } catch {}
@@ -313,7 +313,7 @@ export default function JournalPage() {
     fetch('/api/me').then(r=>r.json()).then(d => {
       setUser(d); if (d.role === 'admin') setIsAdmin(true);
       if (!d.feature_access?.includes('journal') && d.role !== 'admin' && d.role !== 'vip') window.location.href = '/dashboard';
-    }).catch(() => { window.location.href = '/'; });
+    }).catch(() => { window.location.href = '/login'; });
     loadTrades(); loadStrategies();
   }, [loadTrades, loadStrategies]);
 

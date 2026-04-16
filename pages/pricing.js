@@ -9,18 +9,18 @@ const raj = "'Rajdhani',sans-serif";
 const TIERS = [
   {
     name: 'FREE', price: '0', period: '', color: '#445566', tag: null,
-    features: ['Live pair scoring (5-min delay)', 'Panels + Valid Pairs tabs', 'Basic gap chart', 'Community access'],
-    cta: 'START FREE', href: '/',
+    features: ['Live signal tab', 'Position calculator', 'Economic calendar', 'COT report'],
+    cta: 'START FREE', href: '/login',
   },
   {
     name: 'PRO', price: '29', period: '/mo', color: '#00ff9f', tag: 'MOST POPULAR',
-    features: ['Real-time scoring (no delay)', 'All 14 dashboard tabs', 'Signal log + analytics', 'Momentum heatmap', 'Spike alerts (Telegram)', 'Private trade journal', 'Priority support'],
-    cta: 'GO PRO →', href: '/',
+    features: ['Everything in Free', 'Signal tab (real-time)', 'Full data table', 'Gap score chart', 'Valid setups tab', 'Spike detection widgets', 'Momentum heatmap'],
+    cta: 'GO PRO →', href: '/login',
   },
   {
     name: 'ELITE', price: '79', period: '/mo', color: '#00b4ff', tag: 'FULL ACCESS',
-    features: ['Everything in Pro', 'Engine health + admin tools', 'COT report integration', 'Open trades panel', 'Currency strength charts', 'Early access to new features', 'Direct line to dev team'],
-    cta: 'GO ELITE →', href: '/',
+    features: ['Everything in Pro', 'Live panels view', 'Spike log history', 'TradingView chart tab', 'Private trading journal', 'Telegram spike alerts', 'Currency strength charts', 'Engine health monitor', 'Early access to new features'],
+    cta: 'GO ELITE →', href: '/login',
   },
 ];
 export default function PricingPage() {
@@ -44,13 +44,13 @@ export default function PricingPage() {
 
         {/* NAV */}
         <nav style={{ position: 'relative', zIndex: 10, padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #1a2540' }}>
-          <div onClick={() => router.push('/landing')} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+          <div onClick={() => router.push('/')} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
             <span style={{ fontSize: 28 }}>🐼</span>
             <span style={{ fontFamily: orb, fontSize: 14, fontWeight: 900, letterSpacing: 4, color: '#00ff9f' }}>PANDA ENGINE</span>
           </div>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <button onClick={() => router.push('/landing')} style={{ background: 'none', border: 'none', color: '#8899aa', fontFamily: mono, fontSize: 11, letterSpacing: 2, cursor: 'pointer', padding: '8px 14px' }} className="nav-link">HOME</button>
-            <button onClick={() => router.push('/')} style={{ background: 'none', border: '1px solid #1a2540', borderRadius: 6, color: '#8899aa', fontFamily: mono, fontSize: 11, letterSpacing: 2, cursor: 'pointer', padding: '8px 18px' }} className="nav-link">LOG IN</button>
+            <button onClick={() => router.push('/')} style={{ background: 'none', border: 'none', color: '#8899aa', fontFamily: mono, fontSize: 11, letterSpacing: 2, cursor: 'pointer', padding: '8px 14px' }} className="nav-link">HOME</button>
+            <button onClick={() => router.push('/login')} style={{ background: 'none', border: '1px solid #1a2540', borderRadius: 6, color: '#8899aa', fontFamily: mono, fontSize: 11, letterSpacing: 2, cursor: 'pointer', padding: '8px 18px' }} className="nav-link">LOG IN</button>
           </div>
         </nav>
         {/* HERO */}

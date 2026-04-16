@@ -303,7 +303,7 @@ export default function AdminPanel() {
 
   const loadUsers = useCallback(async () => {
     const res = await fetch('/api/admin/users');
-    if (res.status === 403) { window.location.href = '/'; return; }
+    if (res.status === 403) { window.location.href = '/login'; return; }
     const d = await res.json();
     setUsers(Array.isArray(d) ? d : []);
   }, []);
@@ -321,9 +321,9 @@ export default function AdminPanel() {
 
   useEffect(() => {
     fetch('/api/me').then(r => r.json()).then(d => {
-      if (!d.username || d.role !== 'admin') { window.location.href = '/'; return; }
+      if (!d.username || d.role !== 'admin') { window.location.href = '/login'; return; }
       setAdminUser(d); setLoading(false); loadUsers();
-    }).catch(() => { window.location.href = '/'; });
+    }).catch(() => { window.location.href = '/login'; });
   }, [loadUsers]);
 
   useEffect(() => {
@@ -384,7 +384,7 @@ export default function AdminPanel() {
             <span style={{ fontFamily: mono, fontSize: 9, color: '#2a3550' }}>👤 {adminUser?.username}</span>
             <button onClick={() => window.location.href = '/dashboard'} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(0,255,159,0.08)', border: '1px solid #00ff9f44', borderRadius: 6, color: '#00ff9f', fontFamily: mono, fontSize: 9, letterSpacing: 2, padding: '6px 14px', cursor: 'pointer' }}>📊 DASHBOARD</button>
             <button style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(255,209,102,0.15)', border: '1px solid #ffd166', borderRadius: 6, color: '#ffd166', fontFamily: mono, fontSize: 9, letterSpacing: 2, padding: '6px 14px', cursor: 'default' }}>🛡️ ADMIN</button>
-            <button onClick={async () => { await fetch('/api/logout', { method: 'POST' }); window.location.href = '/'; }} style={{ background: 'transparent', border: '1px solid #2a1525', borderRadius: 6, color: '#ff4d6d', fontFamily: mono, fontSize: 9, padding: '6px 12px', cursor: 'pointer' }}>LOGOUT</button>
+            <button onClick={async () => { await fetch('/api/logout', { method: 'POST' }); window.location.href = '/login'; }} style={{ background: 'transparent', border: '1px solid #2a1525', borderRadius: 6, color: '#ff4d6d', fontFamily: mono, fontSize: 9, padding: '6px 12px', cursor: 'pointer' }}>LOGOUT</button>
           </div>
         </header>
 
