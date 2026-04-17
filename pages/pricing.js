@@ -169,11 +169,11 @@ export default function PricingPage() {
                 <div style={{ textAlign: 'center', padding: '12px 0' }}>
                   <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
                   <div style={{ fontFamily: mono, fontSize: 10, letterSpacing: 4, color: '#00ff9f', marginBottom: 10 }}>REQUEST RECEIVED</div>
-                  <h3 style={{ fontFamily: orb, fontSize: 20, fontWeight: 900, margin: '0 0 12px' }}>PENDING APPROVAL</h3>
+                  <h3 style={{ fontFamily: orb, fontSize: 20, fontWeight: 900, margin: '0 0 12px' }}>{pfSignupTier === 'starter' ? 'ACCOUNT CREATED' : 'PENDING APPROVAL'}</h3>
                   <p style={{ fontFamily: raj, fontSize: 14, color: '#8899aa', lineHeight: 1.6, marginBottom: 20 }}>
-                    Your <span style={{ color: '#00ff9f', fontFamily: mono }}>{pfSignupTier.toUpperCase()}</span> request is in the queue. Admin has been notified. Contact Telegram with your username to speed things up.
+                    {pfSignupTier === 'starter' ? 'Your STARTER account is ready! Message our Telegram bot below to receive your login credentials instantly.' : 'Your ' + pfSignupTier.toUpperCase() + ' request is in the queue. Admin has been notified. Message our bot to receive your credentials once approved.'}
                   </p>
-                  <button onClick={pfOpenTelegram} style={{ width: '100%', background: '#00b4ff', border: 'none', borderRadius: 8, color: '#050810', fontFamily: orb, fontSize: 11, fontWeight: 700, letterSpacing: 2, padding: '12px', cursor: 'pointer', marginBottom: 10 }}>📨 CONTACT TELEGRAM</button>
+                  <button onClick={pfOpenTelegram} style={{ width: '100%', background: '#00b4ff', border: 'none', borderRadius: 8, color: '#050810', fontFamily: orb, fontSize: 11, fontWeight: 700, letterSpacing: 2, padding: '12px', cursor: 'pointer', marginBottom: 10 }}>📨 GET MY PASSWORD</button>
                   <button onClick={pfCloseSignup} style={{ width: '100%', background: 'transparent', border: '1px solid #1a2540', borderRadius: 8, color: '#445566', fontFamily: mono, fontSize: 10, letterSpacing: 2, padding: '10px', cursor: 'pointer' }}>CLOSE</button>
                 </div>
               ) : (

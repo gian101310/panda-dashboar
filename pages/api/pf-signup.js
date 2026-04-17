@@ -58,22 +58,11 @@ export default async function handler(req, res) {
         is_active: true,
       });
 
+      // Store password for Telegram webhook to deliver when user /starts bot
       if (tgUser) {
-        const { data: tgRow } = await supabase.from('pf_telegram_chats')
-          .select('chat_id').ilike('telegram_username', tgUser).maybeSingle();
-        if (tgRow?.chat_id) {
-          const dm = [
-            '✅ <b>PANDA ENGINE — ACCESS APPROVED</b>',
-            '━━━━━━━━━━━━━━━━━━━━━━',
-            `<b>Username:</b> ${finalUser}`,
-            `<b>Password:</b> ${password}`,
-            `<b>Tier:</b> STARTER`,
-            '━━━━━━━━━━━━━━━━━━━━━━',
-            '🔗 <a href="https://panda-dashboard.vercel.app/login">Login Now</a>',
-            '🐼 Welcome to the system.',
-          ].join('\n');
-          await pfSendTelegram(tgRow.chat_id, dm);
-        }
+        await supabase.from('pf_signup_requests')
+          .update({ pending_password: password, notes: `auto-approved as ${finalUser}` })
+          .eq('telegram_username', tgUser).eq('status', 'AUTO');
       }
       await pfSendTelegram(PF_ADMIN_CHAT, `🐼 <b>NEW STARTER USER</b>\n<b>User:</b> ${finalUser}\n<b>Email:</b> ${email}\n<i>Auto-approved — no action needed.</i>`);
       return res.status(200).json({ ok: true, status: 'APPROVED', auto: true });

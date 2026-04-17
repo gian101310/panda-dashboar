@@ -1,9 +1,6 @@
 @echo off
 cd /d C:\Users\Admin\panda-dashboard
-echo Committing fixed dashboard.js...
-git add -f pages\dashboard.js pages\api\data.js pages\api\spikes.js
-git commit -m "fix build duplicate stateColor spike banner limit 10"
+del push3.bat 2>nul
+git add -A
+git commit -m "fix: correct flow - sign up first then message bot for credentials"
 git push origin main
-echo.
-echo DONE
-pause
