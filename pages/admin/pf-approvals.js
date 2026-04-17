@@ -29,7 +29,7 @@ export default function PfApprovalsPage() {
   const [pfTab, setPfTab] = useState('signups');
   const [pfApproveOpen, setPfApproveOpen] = useState(null);
   const [pfApUser, setPfApUser] = useState('');
-  const [pfApPass, setPfApPass] = useState('');
+
   const [pfApTier, setPfApTier] = useState('starter');
   const [pfApRole, setPfApRole] = useState('user');
   const [pfApBusy, setPfApBusy] = useState(false);
@@ -52,19 +52,18 @@ export default function PfApprovalsPage() {
   const pfOpenApprove = (s) => {
     setPfApproveOpen(s);
     setPfApUser(s.username || (s.email || '').split('@')[0]);
-    setPfApPass('');
     setPfApTier(s.tier || 'starter');
     setPfApRole('user');
     setPfApErr('');
   };
   const pfDoApprove = async () => {
-    if (!pfApUser || pfApPass.length < 6) { setPfApErr('Username + 6+ char password required'); return; }
+    if (!pfApUser) { setPfApErr('Username required'); return; }
     setPfApBusy(true); setPfApErr('');
     try {
       const r = await fetch('/api/admin/pf-approve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'approve_signup', id: pfApproveOpen.id, username: pfApUser, password: pfApPass, tier: pfApTier, role: pfApRole })
+        body: JSON.stringify({ action: 'approve_signup', id: pfApproveOpen.id, username: pfApUser, tier: pfApTier, role: pfApRole })
       });
       const j = await r.json();
       if (r.ok) { setPfApproveOpen(null); pfLoad(); }
@@ -222,9 +221,7 @@ export default function PfApprovalsPage() {
                 <label style={{ fontFamily: mono, fontSize: 9, letterSpacing: 2, color: '#445566' }}>USERNAME
                   <input value={pfApUser} onChange={e => setPfApUser(e.target.value)} style={{ display: 'block', width: '100%', marginTop: 4, background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '10px 12px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
                 </label>
-                <label style={{ fontFamily: mono, fontSize: 9, letterSpacing: 2, color: '#445566' }}>PASSWORD (min 6 chars)
-                  <input type="text" value={pfApPass} onChange={e => setPfApPass(e.target.value)} placeholder="set initial password" style={{ display: 'block', width: '100%', marginTop: 4, background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '10px 12px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
-                </label>
+                <div style={{ fontFamily: mono, fontSize: 9, letterSpacing: 2, color: '#445566', padding: '8px 0' }}>PASSWORD — <span style={{color:'#00ff9f'}}>auto-generated and sent to user via Telegram</span></div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                   <label style={{ fontFamily: mono, fontSize: 9, letterSpacing: 2, color: '#445566' }}>TIER
                     <select value={pfApTier} onChange={e => setPfApTier(e.target.value)} style={{ display: 'block', width: '100%', marginTop: 4, background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '10px 12px', color: '#e8eaf0', fontFamily: mono, fontSize: 12, outline: 'none' }}>

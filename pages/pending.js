@@ -49,12 +49,12 @@ export default function PfPendingPage() {
           <div style={{ background: 'linear-gradient(135deg,#0a0e1a,#0e1525)', border: '1px solid #1a2540', borderRadius: 12, padding: '28px 24px', marginBottom: 20 }}>
             <div style={{ fontFamily: pfMono, fontSize: 10, letterSpacing: 3, color: '#445566', marginBottom: 12 }}>NEXT STEP</div>
             <p style={{ fontFamily: pfRaj, fontSize: 14, color: '#8899aa', lineHeight: 1.6, marginBottom: 20 }}>
-              Contact admin on Telegram to activate your access. Mention your username.
+              If you provided your Telegram username during signup, your credentials will be sent automatically once approved. If not, message @panda_engine_alerts_bot with your username to speed things up.
             </p>
             <button onClick={pfOpenTelegram} style={{ width: '100%', background: '#00b4ff', border: 'none', borderRadius: 8, color: '#050810', fontFamily: pfOrb, fontSize: 12, fontWeight: 700, letterSpacing: 2, padding: '14px', cursor: 'pointer', transition: 'all 0.2s' }}
               onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 0 30px rgba(0,180,255,0.4)'; }}
               onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; }}>
-              📨 CONTACT ON TELEGRAM
+              📨 MESSAGE @panda_engine_alerts_bot
             </button>
           </div>
 
