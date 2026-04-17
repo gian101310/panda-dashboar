@@ -2,13 +2,22 @@ import { supabase } from '../../lib/supabase';
 
 export default async function handler(req, res) {
   try {
-    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-    const { data: signals, error } = await supabase
+    const { symbol, from, to } = req.query;
+    let query = supabase
       .from('signal_results')
       .select('*')
-      .gte('created_at', since)
-      .order('created_at', { ascending: false })
-      .limit(500);
+      .order('created_at', { ascending: false });
+
+    if (symbol && symbol !== 'ALL') query = query.eq('symbol', symbol);
+    if (from) query = query.gte('created_at', new Date(from).toISOString());
+    if (to) {
+      const toEnd = new Date(to);
+      toEnd.setHours(23,59,59,999);
+      query = query.lte('created_at', toEnd.toISOString());
+    }
+    query = query.limit(2000);
+
+    const { data: signals, error } = await query;
 
     if (error) return res.status(500).json({ error: error.message });
     if (!signals || signals.length === 0)

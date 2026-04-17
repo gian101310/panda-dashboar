@@ -1784,10 +1784,22 @@ function SignalAnalytics() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [stratFilter, setStratFilter] = useState('ALL');
+  const [pairFilter, setPairFilter] = useState('ALL');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const load = useCallback(async () => {
-    try { const r = await fetch('/api/signal-analytics'); if (r.ok) setStats(await r.json()); } catch {}
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (pairFilter !== 'ALL') params.set('symbol', pairFilter);
+      if (dateFrom) params.set('from', dateFrom);
+      if (dateTo) params.set('to', dateTo);
+      const qs = params.toString();
+      const r = await fetch('/api/signal-analytics' + (qs ? '?' + qs : ''));
+      if (r.ok) setStats(await r.json());
+    } catch {}
     setLoading(false);
-  }, []);
+  }, [pairFilter, dateFrom, dateTo]);
   useEffect(() => { load(); }, [load]);
   if (loading) return <div style={{textAlign:'center',padding:40,fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:'var(--text-muted)'}}>LOADING ANALYTICS...</div>;
   if (!stats || !stats.summary) return <div style={{textAlign:'center',padding:40,fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:'var(--text-muted)'}}>NO SIGNAL DATA YET</div>;
@@ -1799,15 +1811,22 @@ function SignalAnalytics() {
   return (
     <div style={{display:'flex',flexDirection:'column',gap:14}}>
       <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
-        <span style={{fontFamily:orb,fontSize:11,color:'#00b4ff',letterSpacing:4,fontWeight:700}}>📊 SIGNAL PERFORMANCE — 30 DAY</span>
+        <span style={{fontFamily:orb,fontSize:11,color:'#00b4ff',letterSpacing:4,fontWeight:700}}>📊 SIGNAL PERFORMANCE</span>
         {s.pending>0&&<span style={{fontFamily:mono,fontSize:9,color:'#ffd166',background:'rgba(255,209,102,0.1)',border:'1px solid rgba(255,209,102,0.3)',borderRadius:4,padding:'2px 8px'}}>{s.pending} PENDING</span>}
       </div>
 
       {/* STRATEGY FILTER */}
-      <div style={{display:'flex',gap:6}}>
+      <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
         {['ALL','BB','INTRA'].map(st=>(
           <button key={st} onClick={()=>setStratFilter(st)} style={{fontFamily:mono,fontSize:9,padding:'4px 12px',borderRadius:4,border:`1px solid ${stratFilter===st?'#00b4ff':'var(--border)'}`,background:stratFilter===st?'rgba(0,180,255,0.15)':'var(--bg-card)',color:stratFilter===st?'#00b4ff':'var(--text-muted)',cursor:'pointer',letterSpacing:2}}>{st}</button>
         ))}
+        <select value={pairFilter} onChange={e=>setPairFilter(e.target.value)} style={{fontFamily:mono,fontSize:9,padding:'4px 8px',borderRadius:4,border:'1px solid var(--border)',background:'var(--bg-card)',color:'var(--text-primary)',cursor:'pointer',letterSpacing:1}}>
+          <option value="ALL">ALL PAIRS</option>
+          {ALL_PAIRS.map(p=><option key={p} value={p}>{p}</option>)}
+        </select>
+        <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)} style={{fontFamily:mono,fontSize:9,padding:'4px 8px',borderRadius:4,border:'1px solid var(--border)',background:'var(--bg-card)',color:'var(--text-primary)'}} placeholder="From"/>
+        <input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)} style={{fontFamily:mono,fontSize:9,padding:'4px 8px',borderRadius:4,border:'1px solid var(--border)',background:'var(--bg-card)',color:'var(--text-primary)'}} placeholder="To"/>
+        {(pairFilter!=='ALL'||dateFrom||dateTo)&&<button onClick={()=>{setPairFilter('ALL');setDateFrom('');setDateTo('');}} style={{fontFamily:mono,fontSize:8,padding:'4px 8px',borderRadius:4,border:'1px solid #ff4d6d33',background:'rgba(255,77,109,0.1)',color:'#ff4d6d',cursor:'pointer',letterSpacing:1}}>✕ CLEAR</button>}
       </div>
 
       {/* SUMMARY CARDS */}
