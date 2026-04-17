@@ -35,13 +35,13 @@ export default function PricingPage() {
   const [pfSignupBusy, setPfSignupBusy] = useState(false);
   const [pfSignupOk, setPfSignupOk] = useState(false);
   const [pfSignupErr, setPfSignupErr] = useState('');
-  const [pfSignupTelegram, setPfSignupTelegram] = useState('');
+  const [pfSignupToken, setPfSignupToken] = useState('');
 
   useEffect(() => { setVisible(true); }, []);
 
   const pfOpenSignup = (tier) => {
-    setPfSignupTier(tier); setPfSignupEmail(''); setPfSignupUsername(''); setPfSignupTelegram('');
-    setPfSignupOk(false); setPfSignupErr(''); setPfSignupOpen(true);
+    setPfSignupTier(tier); setPfSignupEmail(''); setPfSignupUsername('');
+    setPfSignupOk(false); setPfSignupErr(''); setPfSignupToken(''); setPfSignupOpen(true);
   };
   const pfSubmitSignup = async () => {
     if (!pfSignupEmail.includes('@')) { setPfSignupErr('Valid email required'); return; }
@@ -50,10 +50,10 @@ export default function PricingPage() {
       const r = await fetch('/api/pf-signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: pfSignupEmail, username: pfSignupUsername, tier: pfSignupTier, telegram_username: pfSignupTelegram })
+        body: JSON.stringify({ email: pfSignupEmail, username: pfSignupUsername, tier: pfSignupTier })
       });
       const j = await r.json();
-      if (r.ok) setPfSignupOk(true); else setPfSignupErr(j.error || 'Request failed');
+      if (r.ok) { setPfSignupOk(true); setPfSignupToken(j.token || ''); } else setPfSignupErr(j.error || 'Request failed');
     } catch { setPfSignupErr('Network error'); }
     setPfSignupBusy(false);
   };
@@ -173,7 +173,7 @@ export default function PricingPage() {
                   <p style={{ fontFamily: raj, fontSize: 14, color: '#8899aa', lineHeight: 1.6, marginBottom: 20 }}>
                     {pfSignupTier === 'starter' ? 'Your STARTER account is ready! Message our Telegram bot below to receive your login credentials instantly.' : 'Your ' + pfSignupTier.toUpperCase() + ' request is in the queue. Admin has been notified. Message our bot to receive your credentials once approved.'}
                   </p>
-                  <button onClick={pfOpenTelegram} style={{ width: '100%', background: '#00b4ff', border: 'none', borderRadius: 8, color: '#050810', fontFamily: orb, fontSize: 11, fontWeight: 700, letterSpacing: 2, padding: '12px', cursor: 'pointer', marginBottom: 10 }}>📨 GET MY PASSWORD</button>
+                  <button onClick={() => window.open('https://t.me/panda_engine_alerts_bot?start=' + pfSignupToken, '_blank')} style={{ width: '100%', background: '#00b4ff', border: 'none', borderRadius: 8, color: '#050810', fontFamily: orb, fontSize: 11, fontWeight: 700, letterSpacing: 2, padding: '12px', cursor: 'pointer', marginBottom: 10 }}>📨 GET MY PASSWORD</button>
                   <button onClick={pfCloseSignup} style={{ width: '100%', background: 'transparent', border: '1px solid #1a2540', borderRadius: 8, color: '#445566', fontFamily: mono, fontSize: 10, letterSpacing: 2, padding: '10px', cursor: 'pointer' }}>CLOSE</button>
                 </div>
               ) : (
@@ -186,8 +186,7 @@ export default function PricingPage() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 18 }}>
                     <input value={pfSignupEmail} onChange={e => setPfSignupEmail(e.target.value)} placeholder="your@email.com" type="email" style={{ background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '12px 14px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, outline: 'none' }} />
                     <input value={pfSignupUsername} onChange={e => setPfSignupUsername(e.target.value)} placeholder="preferred username (optional)" style={{ background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '12px 14px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, outline: 'none' }} />
-                    <div style={{ fontFamily: mono, fontSize: 9, letterSpacing: 2, color: '#445566', marginTop: 4 }}>TELEGRAM — <span style={{color:'#00b4ff'}}>message @panda_engine_alerts_bot first to receive credentials instantly</span></div>
-                    <input value={pfSignupTelegram} onChange={e => setPfSignupTelegram(e.target.value)} placeholder="@your_telegram (optional)" style={{ background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '12px 14px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, outline: 'none' }} />
+
                   </div>
                   {pfSignupErr && <div style={{ fontFamily: mono, fontSize: 11, color: '#ff4d6d', marginBottom: 12 }}>⚠ {pfSignupErr}</div>}
                   <button onClick={pfSubmitSignup} disabled={pfSignupBusy} style={{ width: '100%', background: '#00ff9f', border: 'none', borderRadius: 8, color: '#050810', fontFamily: orb, fontSize: 12, fontWeight: 700, letterSpacing: 2, padding: '14px', cursor: 'pointer', opacity: pfSignupBusy ? 0.6 : 1, marginBottom: 10 }}>{pfSignupBusy ? 'SUBMITTING...' : 'REQUEST ACCESS →'}</button>

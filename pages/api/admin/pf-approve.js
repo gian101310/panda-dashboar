@@ -84,20 +84,33 @@ export default async function handler(req, res) {
       });
       if (insErr) return res.status(500).json({ error: insErr.message });
 
-      await supabase.from('pf_signup_requests').update({ status: 'APPROVED', notes: `approved as ${username}` }).eq('id', id);
+      // Store password for deep link retrieval
+      await supabase.from('pf_signup_requests').update({
+        status: 'APPROVED',
+        notes: `approved as ${username}`,
+        pending_password: password,
+      }).eq('id', id);
 
-      // DM user their credentials
-      const dm = [
-        '✅ <b>PANDA ENGINE — ACCESS APPROVED</b>',
-        '━━━━━━━━━━━━━━━━━━━━━━',
-        `<b>Username:</b> ${username.trim()}`,
-        `<b>Password:</b> ${password}`,
-        `<b>Tier:</b> ${safeTier.toUpperCase()}`,
-        '━━━━━━━━━━━━━━━━━━━━━━',
-        '🔗 <a href="https://panda-dashboard.vercel.app/login">Login Now</a>',
-        '🐼 Welcome to the system.',
-      ].join('\n');
-      await pfSendUserDM(req_row.telegram_username, dm);
+      // Try to DM if user already clicked deep link (chat_id saved)
+      if (req_row.token) {
+        // Check if user has a stored chat_id from webhook
+        const { data: tgChat } = await supabase.from('pf_telegram_chats')
+          .select('chat_id').eq('telegram_username', 'token_' + req_row.token).maybeSingle();
+        if (tgChat?.chat_id) {
+          const dm = [
+            '✅ <b>PANDA ENGINE — ACCESS APPROVED</b>',
+            '━━━━━━━━━━━━━━━━━━━━━━',
+            `<b>Username:</b> ${username.trim()}`,
+            `<b>Password:</b> ${password}`,
+            `<b>Tier:</b> ${safeTier.toUpperCase()}`,
+            '━━━━━━━━━━━━━━━━━━━━━━',
+            '🔗 <a href="https://panda-dashboard.vercel.app/login">Login Now</a>',
+            '🐼 Welcome to the system.',
+          ].join('\n');
+          await pfSendTelegram(tgChat.chat_id, dm);
+          await supabase.from('pf_signup_requests').update({ pending_password: null }).eq('id', id);
+        }
+      }
 
       // Notify admin
       await pfSendTelegram('5379148910', `🐼 <b>USER APPROVED</b>\n<b>User:</b> ${username}\n<b>Tier:</b> ${safeTier.toUpperCase()}\n<b>Email:</b> ${req_row.email}`);

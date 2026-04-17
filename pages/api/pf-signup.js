@@ -1,5 +1,6 @@
 import { supabase } from '../../lib/supabase';
 import { hashPassword } from '../../lib/auth';
+import crypto from 'crypto';
 
 const PF_BOT_TOKEN  = '8605294552:AAG2o7bF30qkZx0Zv_FgmwA0RgS7g56OH7Y';
 const PF_ADMIN_CHAT = '5379148910';
@@ -10,6 +11,9 @@ function pfGetIp(req) {
 }
 function pfGenPassword() {
   return 'Panda#' + Math.floor(1000 + Math.random() * 9000);
+}
+function pfGenToken() {
+  return crypto.randomBytes(16).toString('hex');
 }
 async function pfSendTelegram(chatId, text) {
   try {
@@ -22,33 +26,30 @@ async function pfSendTelegram(chatId, text) {
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
-  const { email, username, tier, telegram_username } = req.body || {};
-  if (!email || !email.includes('@')) return res.status(400).json({ error: 'valid email required' });
+  const { email, username, tier } = req.body || {};
+  if (!email || !email.includes('@')) return res.status(400).json({ error: 'Valid email required' });
 
   const ip = pfGetIp(req);
   const safeTier = ['starter','pro','elite'].includes(tier) ? tier : 'starter';
-  const tgUser = (telegram_username || '').replace('@','').trim().toLowerCase();
+  const safeUser = (username || '').trim();
+
+  // Username required
+  if (!safeUser) return res.status(400).json({ error: 'Username is required' });
+
+  // Check duplicate username
+  const { data: exists } = await supabase.from('panda_users')
+    .select('id').eq('username', safeUser).maybeSingle();
+  if (exists) return res.status(409).json({ error: 'Username already taken. Please choose another.' });
+
+  const token = pfGenToken();
 
   try {
-    await supabase.from('pf_signup_requests').insert({
-      email: email.trim().toLowerCase(),
-      username: (username || '').trim() || null,
-      tier: safeTier,
-      telegram_username: tgUser || null,
-      ip,
-      status: safeTier === 'starter' ? 'AUTO' : 'PENDING',
-    });
-
     // ── STARTER: auto-approve ──
     if (safeTier === 'starter') {
-      const safeUser = ((username || '').trim() || email.split('@')[0]).slice(0,30);
       const password = pfGenPassword();
 
-      const { data: exists } = await supabase.from('panda_users').select('id').eq('username', safeUser).maybeSingle();
-      const finalUser = exists ? safeUser + '_' + Math.floor(100 + Math.random() * 900) : safeUser;
-
       await supabase.from('panda_users').insert({
-        username: finalUser,
+        username: safeUser,
         password_hash: hashPassword(password),
         role: 'user',
         pf_approved: true,
@@ -58,32 +59,46 @@ export default async function handler(req, res) {
         is_active: true,
       });
 
-      // Store password for Telegram webhook to deliver when user /starts bot
-      if (tgUser) {
-        await supabase.from('pf_signup_requests')
-          .update({ pending_password: password, notes: `auto-approved as ${finalUser}` })
-          .eq('telegram_username', tgUser).eq('status', 'AUTO');
-      }
-      await pfSendTelegram(PF_ADMIN_CHAT, `🐼 <b>NEW STARTER USER</b>\n<b>User:</b> ${finalUser}\n<b>Email:</b> ${email}\n<i>Auto-approved — no action needed.</i>`);
-      return res.status(200).json({ ok: true, status: 'APPROVED', auto: true });
+      await supabase.from('pf_signup_requests').insert({
+        email: email.trim().toLowerCase(),
+        username: safeUser,
+        tier: 'starter',
+        token,
+        pending_password: password,
+        ip,
+        status: 'AUTO',
+      });
+
+      await pfSendTelegram(PF_ADMIN_CHAT,
+        `🐼 <b>NEW STARTER USER</b>\n<b>User:</b> ${safeUser}\n<b>Email:</b> ${email}\n<i>Auto-approved — no action needed.</i>`
+      );
+      return res.status(200).json({ ok: true, status: 'APPROVED', auto: true, token });
     }
 
     // ── PRO / ELITE: manual approval ──
-    const msg = [
+    await supabase.from('pf_signup_requests').insert({
+      email: email.trim().toLowerCase(),
+      username: safeUser,
+      tier: safeTier,
+      token,
+      ip,
+      status: 'PENDING',
+    });
+
+    await pfSendTelegram(PF_ADMIN_CHAT, [
       '🐼 <b>PANDA ENGINE — SIGNUP REQUEST</b>',
       '━━━━━━━━━━━━━━━━━━━━━━',
       `<b>Email:</b> ${email}`,
-      `<b>Username:</b> ${username || '—'}`,
+      `<b>Username:</b> ${safeUser}`,
       `<b>Tier:</b> ${safeTier.toUpperCase()}`,
       `<b>IP:</b> ${ip}`,
       '━━━━━━━━━━━━━━━━━━━━━━',
       '✅ Action: approve in admin panel'
-    ].join('\n');
-    await pfSendTelegram(PF_ADMIN_CHAT, msg);
-    return res.status(200).json({ ok: true, status: 'PENDING' });
+    ].join('\n'));
+    return res.status(200).json({ ok: true, status: 'PENDING', token });
 
   } catch (err) {
     console.error('pf_signup_err', err);
-    return res.status(500).json({ error: 'signup failed' });
+    return res.status(500).json({ error: 'Signup failed' });
   }
 }
