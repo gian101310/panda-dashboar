@@ -34,9 +34,7 @@ description: >
 
 | File | Path | Lines | Purpose |
 |------|------|-------|---------|
-| **dashboard.js** | `C:\Users\Admin\panda-dashboard\pages\dashboard.js` | 2337 | Main dashboard — all tabs, components, rendering (mobile responsive) |
-| **landing.js** | `C:\Users\Admin\panda-dashboard\pages\landing.js` | 171 | Landing page (hero, features, social proof, CTA) |
-| **pricing.js** | `C:\Users\Admin\panda-dashboard\pages\pricing.js` | 130 | Pricing funnel page (Free/Pro/Elite tiers, waitlist) |
+| **dashboard.js** | `C:\Users\Admin\panda-dashboard\pages\dashboard.js` | 2459 | Main dashboard — all tabs, components, rendering (mobile responsive) |
 | **strength.js** | `C:\Users\Admin\panda-dashboard\pages\strength.js` | — | Currency strength chart (canvas) |
 | **journal.js** | `C:\Users\Admin\panda-dashboard\pages\journal.js` | — | Trade journal page |
 | **admin/index.js** | `C:\Users\Admin\panda-dashboard\pages\admin\index.js` | — | Admin panel (users, features, logs) |
@@ -65,47 +63,49 @@ description: >
 | 25–41 | `stateColor`, `biasFromGap`, `isValid` | Core utility functions |
 | 45–54 | `boxTrend` | Box trend detection (UP/DOWN/RANGING) |
 | 56–65 | `boxConfirm` | Box confirmation + ATR fill helpers |
-| 70–81 | `tbgZoneBadge` | FL-ST zone badge (ABOVE/BELOW/BETWEEN) |
+| 66–81 | `tbgZoneBadge` | FL-ST zone badge (ABOVE/BELOW/BETWEEN) |
 | 82–91 | `atrFill` | ATR fill percentage helper |
-| 99–118 | `advScore` | Advance score warning logic |
-| 149–157 | `scoreLabel`, `getMatchup` | Currency strength matchup labels |
-| 186–208 | `signalLabel`, `strColor`, `formatTime`, `formatDt`, `timeAgo` | Display helpers |
-| 226–249 | `playBeep` | Sound alert (Web Audio API) |
-| 252–278 | `TrendArrow`, `Sparkline`, `DeltaChip` | Small visual components |
-| 280–324 | `SpikeBanner` | Spike alert banner |
-| 326–436 | `MomentumHeatmap` | Full momentum heatmap grid |
-| 438–561 | `AlertSettingsModal` | Per-user alert settings |
-| 563–660 | `GapChart` | Gap history chart (canvas) |
-| 662–712 | `EconomicCalendar` | Calendar tab with pair filtering |
-| 714–766 | `PositionCalculator` | Lot size / risk calculator |
-| 768–792 | `EngineHealth` | Engine status (admin only) |
-| 794–817 | `CotRow`, `StatCard` | COT row + stat card atoms |
-| 819–881 | `PairCard` | Main pair card (panels view) |
-| 883–1039 | `PairCardModal` | Click-to-expand modal (accepts `isMobile` prop) |
-| 1041–1149 | `ValidSetupsTab` | Filtered setups with box confirmation |
-| 1151–1258 | `ValidPairsTab` | Auto-filtered tradable pairs |
-| 1260–1398 | `OpenTradesPanel` | Open trades (admin only) |
-| 1400–1456 | `SpikeLogTab` | Spike log with time-in-minutes |
-| 1458–1531 | `buildTVDoc`, `ChartTab` | TradingView chart tab (srcdoc iframe) |
-| 1533–1631 | `SignalLogTab` | **NEW** Signal snapshot log with filters (date/pair/bias/valid) |
-| 1633 | `TABS` | Tab name array (13 tabs) |
-| 1635–1650 | `TAB_FEATURE` | Tab → feature_access key mapping |
-| 1651–1660 | `FILTERS`, `SORTS` | Filter buttons and sort options |
-| 1662–1789 | `SignalAnalytics` | Signal performance analytics V2 |
-| 1791–1896 | `SignalFlashcard` | Signal flashcard component |
-| 1898–2337 | `export default function Dashboard()` | **Main component** — state, fetch, tabs, render |
+| 92–146 | `advScore` | Advance score warning logic |
+| 147–185 | `scoreLabel`, `getMatchup` | Currency strength matchup labels |
+| 186–275 | `computeConfidence` | Confidence scoring system (ELITE/HIGH/MOD) |
+| 237–259 | `signalLabel`, `strColor`, `formatTime`, `formatDt`, `timeAgo` | Display helpers |
+| 276–301 | `playBeep` | Sound alert (Web Audio API) |
+| 302–329 | `TrendArrow`, `Sparkline`, `DeltaChip` | Small visual components |
+| 330–375 | `SpikeBanner` | Spike alert banner |
+| 376–487 | `MomentumHeatmap` | Full momentum heatmap grid |
+| 488–612 | `AlertSettingsModal` | Per-user alert settings |
+| 613–711 | `GapChart` | Gap history chart (canvas) |
+| 712–763 | `EconomicCalendar` | Calendar with pair filtering (used inside ResearchTab) |
+| 764–817 | `PositionCalculator` | Lot size / risk calculator |
+| 818–843 | `EngineHealth` | Engine status (admin only) |
+| 844–868 | `CotRow`, `StatCard` | COT row + stat card atoms |
+| 869–933 | `PairCard` | Main pair card (panels view) |
+| 934–1092 | `PairCardModal` | Click-to-expand modal (accepts `isMobile` prop) |
+| 1093–1203 | `ValidSetupsTab` | Filtered setups with box confirmation |
+| 1204–1355 | `ValidPairsTab` | Auto-filtered tradable pairs |
+| 1356–1495 | `OpenTradesPanel` | Open trades (admin only) |
+| 1496–1553 | `SpikeLogTab` | Spike log with time-in-minutes |
+| 1554–1629 | `buildTVDoc`, `ChartTab` | TradingView chart tab (srcdoc iframe) |
+| 1630–1731 | `SignalLogTab` | Signal snapshot log with filters (date/pair/bias/valid) |
+| 1732–1753 | `ResearchTab` | **NEW** Combined Calendar + COT tab with subtab toggle |
+| 1754 | `TABS` | Tab name array (12 tabs) |
+| 1755–1770 | `TAB_FEATURE` | Tab → feature_access key mapping |
+| 1771–1780 | `FILTERS`, `SORTS` | Filter buttons and sort options |
+| 1782–1911 | `SignalAnalytics` | Signal performance analytics V2 |
+| 1912–2018 | `SignalFlashcard` | Signal flashcard component |
+| 2019–2459 | `export default function Dashboard()` | **Main component** — state, fetch, tabs, render |
 
-### Main Dashboard State (line ~1898)
+### Main Dashboard State (line ~2019)
 Key state variables: `data`, `trends`, `cotMap`, `tab`, `filter`, `sort`, `search`,
 `isAdmin`, `user`, `selectedPair`, `popup`, `lastUpdate`, **`isMobile`** (responsive hook).
 
-### Tab Rendering (line ~2130–2300)
+### Tab Rendering (line ~2240–2430)
 Ternary chain: `tab==='PANELS'` → `tab==='SETUPS'` → `tab==='VALID PAIRS'` →
 `tab==='SPIKE LOG'` → `tab==='CHART'` → `tab==='SIGNALS'` → `tab==='ANALYTICS'` →
-`tab==='SIGNAL LOG'` → `tab==='TABLE'` → `tab==='GAP CHART'` → `tab==='CALENDAR'` →
-`tab==='CALCULATOR'` → `tab==='ENGINE'` → `tab==='COT REPORT'`
+`tab==='SIGNAL LOG'` → `tab==='TABLE'` → `tab==='GAP CHART'` → `tab==='RESEARCH'` →
+`tab==='CALCULATOR'` → `tab==='ENGINE'`
 
-### Mobile Responsive (line ~1918)
+### Mobile Responsive (line ~2040)
 `isMobile` state + `useEffect` resize listener (breakpoint: 768px).
 Applied to: header wrap, tab scroll, content padding, grid columns, modal fullscreen.
 PairCardModal receives `isMobile` as prop.
@@ -126,7 +126,7 @@ PairCardModal receives `isMobile` as prop.
 | 438–452 | `get_gap_history` | Fetches gap_history from Supabase |
 | 454–495 | `classify_momentum`, `should_close_alert`, `classify_structural_state` | Momentum engine |
 | 497–755 | `run_gap_once` | **Main engine loop** — parse → score → momentum → Supabase upsert |
-| 968–995 | **Signal snapshots insert** | **NEW** Logs all 21 pairs to `signal_snapshots` after dashboard upsert |
+| 968–995 | **Signal snapshots insert** | Logs all 21 pairs to `signal_snapshots` after dashboard upsert |
 | 757–809 | `generate_snapshot` | Renders PNG snapshot with PIL |
 | 811–866 | `send_snapshot` | Posts snapshot to Telegram |
 | 880–909 | `send_spike_alert` | Spike detection + Telegram alert |
@@ -142,7 +142,7 @@ PairCardModal receives `isMobile` as prop.
 |-------|---------|---------|
 | `dashboard` | app.py, API `/data` | Live pair data (upserted every 5 min) |
 | `gap_history` | app.py, API `/gap-chart` | Historical gap scores per pair |
-| `signal_snapshots` | app.py, API `/signal-log` | **NEW** All 21 pairs logged every cycle (valid+invalid) |
+| `signal_snapshots` | app.py, API `/signal-log` | All 21 pairs logged every cycle (valid+invalid) |
 | `signal_results` | app.py, API `/signal-analytics` | V2 strategy performance (BB + INTRA) |
 | `strength_log` | app.py, API `/strength-history` | Currency strength time series |
 | `spike_events` | app.py, API `/spikes` | Spike alerts with timestamps |
@@ -178,7 +178,7 @@ Indexes: `timestamp DESC`, `(symbol, timestamp DESC)`, `(is_valid, timestamp DES
 |-------|------|--------|---------|
 | `/api/data` | `data.js` | GET | Fetch all dashboard rows |
 | `/api/gap-chart` | `gap-chart.js` | GET | Gap history for chart |
-| `/api/signal-log` | `signal-log.js` | GET | **NEW** Signal snapshots (filters: symbol, bias, valid, from, to, limit) |
+| `/api/signal-log` | `signal-log.js` | GET | Signal snapshots (filters: symbol, bias, valid, from, to, limit) |
 | `/api/signal-analytics` | `signal-analytics.js` | GET | Signal performance stats |
 | `/api/strength-history` | `strength-history.js` | GET | Currency strength series |
 | `/api/heatmap` | `heatmap.js` | GET | Momentum heatmap data |
@@ -268,7 +268,7 @@ EURUSD, GBPAUD, GBPCAD, GBPJPY, GBPNZD, GBPUSD, NZDCAD, NZDJPY, NZDUSD, USDCAD, 
 
 ### PLAYBOOK A: Fix a Bug
 1. Read this skill → identify file + line range from Component Index
-2. `read_file` with exact `offset` and `length` (never read full 2337 lines)
+2. `read_file` with exact `offset` and `length` (never read full 2459 lines)
 3. `edit_block` with `old_string` / `new_string`
 4. Run `py -3.11 check_dupes.py` from `C:\Users\Admin\panda-dashboard`
 5. Run `npx next build` to verify
@@ -276,10 +276,10 @@ EURUSD, GBPAUD, GBPCAD, GBPJPY, GBPNZD, GBPUSD, NZDCAD, NZDJPY, NZDUSD, USDCAD, 
 7. Verify Vercel deployment
 
 ### PLAYBOOK B: Add a New Dashboard Tab
-1. Define component function BEFORE line 1633 (`const TABS`)
-2. Add tab name to `TABS` array (line 1633)
-3. Add feature key to `TAB_FEATURE` map (line 1635)
-4. Add ternary render case in tab chain (around line 2130–2300)
+1. Define component function BEFORE line 1754 (`const TABS`)
+2. Add tab name to `TABS` array (line 1754)
+3. Add feature key to `TAB_FEATURE` map (line 1755)
+4. Add ternary render case in tab chain (around line 2240–2430)
 5. Run check_dupes → build → bat push
 
 ### PLAYBOOK C: Add a New API Route
@@ -348,3 +348,7 @@ Never use `React.useState` — React is NOT imported as namespace.
 **G1 Trading System Colors**: Red=Strong Sell, Green=Strong Buy, Yellow=Anticipation, White=No Trade
 **TBG Zones**: ABOVE both lines=BUY valid, BELOW both=SELL valid, BETWEEN=always invalid
 **Signal validity**: `!hard_invalid && bias in (BUY,SELL) && |gap|>=5 && TBG confirms`
+
+**Tab structure** (12 tabs):
+PANELS, SIGNALS, TABLE, GAP CHART, RESEARCH (Calendar|COT subtabs), CALCULATOR,
+SETUPS, VALID PAIRS, SPIKE LOG, CHART, ANALYTICS, SIGNAL LOG
