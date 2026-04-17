@@ -1729,16 +1729,38 @@ function SignalLogTab() {
   );
 }
 
-const TABS = ['PANELS','SIGNALS','TABLE','GAP CHART','CALENDAR','CALCULATOR','COT REPORT','SETUPS','VALID PAIRS','SPIKE LOG','CHART','ANALYTICS','SIGNAL LOG'];
+// ===== RESEARCH TAB (CALENDAR + COT) =====
+function ResearchTab({ pairs, cotData, cotLoading, fetchCot }) {
+  const [sub,setSub]=useState('CALENDAR');
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:12}}>
+      <div style={{display:'flex',gap:6}}>
+        {['CALENDAR','COT'].map(s=><button key={s} onClick={()=>setSub(s)} style={{background:sub===s?'rgba(0,180,255,0.12)':'transparent',border:`1px solid ${sub===s?'#00b4ff':'var(--border)'}`,borderRadius:5,color:sub===s?'#00b4ff':'var(--text-muted)',fontFamily:mono,fontSize:10,letterSpacing:2,padding:'6px 16px',cursor:'pointer',fontWeight:sub===s?700:400}}>{s}</button>)}
+      </div>
+      {sub==='CALENDAR'?<EconomicCalendar pairs={pairs}/>:(
+        <div style={{maxWidth:860,margin:'0 auto'}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
+            <div><div style={{fontFamily:orb,fontSize:15,fontWeight:700,color:'#00b4ff',letterSpacing:3}}>COT REPORT</div><div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2,marginTop:3}}>CFTC · NON-COMMERCIAL · WEEKLY</div></div>
+            <button onClick={fetchCot} style={{background:'transparent',border:'1px solid #1e3060',borderRadius:5,color:'#00b4ff',fontFamily:mono,fontSize:9,padding:'5px 12px',cursor:'pointer'}}>{cotLoading?'↻ LOADING':'⟳ REFRESH'}</button>
+          </div>
+          {cotLoading?<div style={{textAlign:'center',padding:60,fontFamily:mono,fontSize:11,color:'var(--text-muted)'}}>FETCHING COT DATA...</div>
+           :cotData.length===0?<div style={{textAlign:'center',padding:60,fontFamily:mono,fontSize:10,color:'var(--text-muted)'}}>NO DATA — Click REFRESH</div>
+           :<div style={{display:'flex',flexDirection:'column',gap:8}}>{[...cotData].sort((a,b)=>b.netPos-a.netPos).map(cot=><CotRow key={cot.currency} cot={cot}/>)}</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const TABS = ['PANELS','SIGNALS','TABLE','GAP CHART','RESEARCH','CALCULATOR','SETUPS','VALID PAIRS','SPIKE LOG','CHART','ANALYTICS','SIGNAL LOG'];
 // Maps each tab to the feature_access key that controls it
 const TAB_FEATURE = {
   'PANELS':      'panels',
   'SIGNALS':     'signals',
   'TABLE':       'table',
   'GAP CHART':   'gap_chart',
-  'CALENDAR':    'calendar',
+  'RESEARCH':    'calendar',
   'CALCULATOR':  'calculator',
-  'COT REPORT':  'cot',
   'SETUPS':      'setups',
   'VALID PAIRS': 'valid_pairs',
   'SPIKE LOG':   'spike_log',
@@ -2088,7 +2110,7 @@ export default function Dashboard() {
   useEffect(()=>{fetchData();},[fetchData]);
   useEffect(()=>{const t=setInterval(()=>fetchData(true),15000);return()=>clearInterval(t);},[fetchData]);
   useEffect(()=>{const t=setInterval(fetchSpikes,15000);fetchSpikes();return()=>clearInterval(t);},[fetchSpikes]);
-  useEffect(()=>{if(tab==='COT REPORT'&&cotData.length===0) fetchCot();},[tab,cotData.length,fetchCot]);
+  useEffect(()=>{if(tab==='RESEARCH'&&cotData.length===0) fetchCot();},[tab,cotData.length,fetchCot]);
   useEffect(()=>{fetchCot();},[fetchCot]);
   useEffect(()=>{fetch('/api/me').then(r=>r.json()).then(d=>{setUser(d);if(d.role==='admin') setIsAdmin(true);}).catch(()=>{});},[]);
 
@@ -2396,21 +2418,11 @@ export default function Dashboard() {
               </table>
             </div>
           ):tab==='GAP CHART'?<GapChart/>
-           :tab==='CALENDAR'?<EconomicCalendar pairs={validPairs}/>
+           :tab==='RESEARCH'?<ResearchTab pairs={validPairs} cotData={cotData} cotLoading={cotLoading} fetchCot={fetchCot}/>
            :tab==='CALCULATOR'?<PositionCalculator/>
            :tab==='ENGINE'?<EngineHealth/>
            :tab==='OPEN TRADES'?null
-           :tab==='COT REPORT'?(
-            <div style={{maxWidth:860,margin:'0 auto'}}>
-              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
-                <div><div style={{fontFamily:orb,fontSize:15,fontWeight:700,color:'#00b4ff',letterSpacing:3}}>COT REPORT</div><div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2,marginTop:3}}>CFTC · NON-COMMERCIAL · WEEKLY</div></div>
-                <button onClick={fetchCot} style={{background:'transparent',border:'1px solid #1e3060',borderRadius:5,color:'#00b4ff',fontFamily:mono,fontSize:9,padding:'5px 12px',cursor:'pointer'}}>{cotLoading?'↻ LOADING':'⟳ REFRESH'}</button>
-              </div>
-              {cotLoading?<div style={{textAlign:'center',padding:60,fontFamily:mono,fontSize:11,color:'var(--text-muted)'}}>FETCHING COT DATA...</div>
-               :cotData.length===0?<div style={{textAlign:'center',padding:60,fontFamily:mono,fontSize:10,color:'var(--text-muted)'}}>NO DATA — Click REFRESH</div>
-               :<div style={{display:'flex',flexDirection:'column',gap:8}}>{[...cotData].sort((a,b)=>b.netPos-a.netPos).map(cot=><CotRow key={cot.currency} cot={cot}/>)}</div>}
-            </div>
-          ):null}
+          :null}
         </div>
 
         <div style={{fontFamily:mono,fontSize:9,letterSpacing:2,color:'var(--text-muted)',textAlign:'center',padding:'8px 20px',borderTop:'1px solid var(--border)',zIndex:1}}>
