@@ -5,6 +5,15 @@
 
 ---
 
+## Apr 18, 2026 — Analytics Tab: All-Time Data + Filters
+- Removed hardcoded 30-day window from `signal-analytics.js` — now fetches all-time by default
+- Added pair filter dropdown (ALL_PAIRS) to SignalAnalytics component
+- Added date range filters (from/to) with clear button
+- Raised API limit from 500 to 2000 rows
+- API accepts `symbol`, `from`, `to` query params
+- Files changed: `pages/api/signal-analytics.js`, `pages/dashboard.js`
+- Commit: `fff930f`
+
 ## Apr 18, 2026 — Merge Calendar + COT into Research Tab
 - Merged CALENDAR and COT REPORT tabs into single RESEARCH tab with subtab toggle (Calendar | COT)
 - Created `ResearchTab` component with inline subtab state
