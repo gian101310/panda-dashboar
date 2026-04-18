@@ -5,6 +5,31 @@
 
 ---
 
+## Apr 18, 2026 — Phase 3 Complete (Signal Agent v1)
+
+**New file: `pages/api/signal-agent.js` (246 lines)**
+- POST triggers full analysis → writes findings to `ai_memory`
+- GET returns all signal agent memories
+- Idempotent: clears previous agent memories before re-writing
+
+**6 analysis functions (core validation sequence from BUILD_PLAN):**
+1. `analyzeByStrategy` — overall BB and INTRA win rates
+2. `analyzeGapLevels` — win rate at each gap level (5,6,7,8,9,10+) per strategy
+3. `analyzeTBGConfirmation` — TBG confirmed vs unconfirmed edge per strategy
+4. `analyzeGapPlusTBG` — combined gap + TBG confluence validation
+5. `analyzePairs` — per-pair performance (sample ≥ 20 only)
+6. `analyzeFlatRate` — FLAT % as signal quality indicator per gap level
+
+**Both win rates computed per BUILD_PLAN:**
+- `win_rate_resolved`: WIN / (WIN + LOSS) — excludes FLAT
+- `win_rate_total`: WIN / (WIN + LOSS + FLAT) — includes FLAT
+- Both stored in metadata for every memory
+
+**Sample size enforcement:** MIN_SAMPLE = 20 (memories with fewer signals are skipped)
+**Commit:** ba876ba
+
+---
+
 ## Apr 18, 2026 — Phase 2 Complete (AI Memory Layer)
 
 **ai_memory Supabase table created:**
@@ -118,9 +143,9 @@
 ---
 
 ## PENDING / NEXT UP
-- Phase 3: Signal Agent v1 (gap range + TBG zone analysis → writes to ai_memory)
 - Phase 4: Journal Agent (manual_trades 439 trades → writes to ai_memory)
 - Phase 5: Master Agent reads ai_memory as context for OpenAI calls
+- Phase 6: Pattern Agent (cross-reference Signal Agent + Journal Agent findings)
 - VPS migration (Hyonix HS-2, $12/mo — decision made, not yet purchased)
 - Landing/funnel pages (Free/Pro/Elite tiers)
 - PWA publishing
