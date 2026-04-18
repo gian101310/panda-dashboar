@@ -5,6 +5,19 @@
 
 ---
 
+## Apr 18, 2026 — Panda AI Tab + Analytics Filters
+- **NEW: Panda AI tab** — AI-powered market analysis chatbot
+  - Three modes: Analyze Market (rank pairs), Review Trades (journal vs signals), Free Chat
+  - Guardrails: never reveals scoring logic, thresholds, or system internals
+  - Uses GPT-4o-mini via OpenAI API (key via Vercel env var `OPENAI_API_KEY`)
+  - Feeds all 21 pairs' live data as context for every request
+  - Review mode cross-references `signal_results` + `trade_journal` (30-day window)
+  - Chat history maintained in-session (last 6 messages as context)
+- **NEW files**: `lib/openai.js`, `pages/api/ai-chat.js`
+- **Analytics tab**: removed 30-day limit, added pair + date filters, raised limit to 2000
+- Files changed: `dashboard.js`, `signal-analytics.js`, `lib/openai.js`, `pages/api/ai-chat.js`
+- Commit: `dee3ae6`
+
 ## Apr 18, 2026 — Analytics Tab: All-Time Data + Filters
 - Removed hardcoded 30-day window from `signal-analytics.js` — now fetches all-time by default
 - Added pair filter dropdown (ALL_PAIRS) to SignalAnalytics component
