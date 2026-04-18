@@ -1752,7 +1752,78 @@ function ResearchTab({ pairs, cotData, cotLoading, fetchCot }) {
   );
 }
 
-const TABS = ['PANELS','SIGNALS','TABLE','GAP CHART','RESEARCH','CALCULATOR','SETUPS','VALID PAIRS','SPIKE LOG','CHART','ANALYTICS','SIGNAL LOG'];
+// ===== PANDA AI CHAT =====
+function PandaAIChat() {
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [activeMode, setActiveMode] = useState(null);
+  const chatEndRef = useRef(null);
+  const mono = "'Share Tech Mono',monospace", orb = "'Orbitron',sans-serif";
+
+  const scrollToBottom = useCallback(() => {
+    if (chatEndRef.current) chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+  }, []);
+  useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
+
+  const sendRequest = useCallback(async (mode, userMessage) => {
+    if (loading) return;
+    setLoading(true);
+    setActiveMode(mode);
+    const displayMsg = mode === 'chat' ? userMessage : mode === 'insights' ? '📊 Analyze market — rank best setups' : '📋 Review my trade performance';
+    setMessages(prev => [...prev, { role: 'user', content: displayMsg }]);
+    try {
+      const body = { mode };
+      if (mode === 'chat') { body.message = userMessage; body.history = messages.slice(-6); }
+      const r = await fetch('/api/ai-chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const data = await r.json();
+      if (r.ok && data.reply) setMessages(prev => [...prev, { role: 'assistant', content: data.reply }]);
+      else setMessages(prev => [...prev, { role: 'assistant', content: '⚠️ ' + (data.error || 'Failed to get response.') }]);
+    } catch { setMessages(prev => [...prev, { role: 'assistant', content: '⚠️ Connection error. Try again.' }]); }
+    setLoading(false);
+    setActiveMode(null);
+  }, [loading, messages]);
+
+  const handleSend = useCallback(() => { if (!input.trim()) return; const msg = input.trim(); setInput(''); sendRequest('chat', msg); }, [input, sendRequest]);
+  const handleKeyDown = useCallback((e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }, [handleSend]);
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:12,height:'100%'}}>
+      <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+        <span style={{fontFamily:orb,fontSize:11,color:'#00b4ff',letterSpacing:4,fontWeight:700}}>🐼 PANDA AI</span>
+        <button onClick={()=>sendRequest('insights')} disabled={loading} style={{fontFamily:mono,fontSize:9,padding:'5px 14px',borderRadius:4,border:'1px solid #00ff9f44',background:activeMode==='insights'?'rgba(0,255,159,0.15)':'var(--bg-card)',color:'#00ff9f',cursor:loading?'not-allowed':'pointer',letterSpacing:2}}>📊 ANALYZE MARKET</button>
+        <button onClick={()=>sendRequest('review')} disabled={loading} style={{fontFamily:mono,fontSize:9,padding:'5px 14px',borderRadius:4,border:'1px solid #ffd16644',background:activeMode==='review'?'rgba(255,209,102,0.15)':'var(--bg-card)',color:'#ffd166',cursor:loading?'not-allowed':'pointer',letterSpacing:2}}>📋 REVIEW TRADES</button>
+        {messages.length>0&&<button onClick={()=>setMessages([])} style={{fontFamily:mono,fontSize:8,padding:'4px 8px',borderRadius:4,border:'1px solid #ff4d6d33',background:'rgba(255,77,109,0.1)',color:'#ff4d6d',cursor:'pointer',letterSpacing:1}}>✕ CLEAR</button>}
+      </div>
+
+      <div style={{flex:1,minHeight:300,maxHeight:500,overflowY:'auto',display:'flex',flexDirection:'column',gap:8,padding:8,background:'var(--bg-secondary)',borderRadius:8,border:'1px solid var(--border)'}}>
+        {messages.length===0&&!loading&&(
+          <div style={{textAlign:'center',padding:40,color:'var(--text-muted)',fontFamily:mono,fontSize:10}}>
+            Click ANALYZE MARKET for AI insights, REVIEW TRADES to analyze performance, or ask a question below.
+          </div>
+        )}
+        {messages.map((m,i)=>(
+          <div key={i} style={{alignSelf:m.role==='user'?'flex-end':'flex-start',maxWidth:'85%',padding:'8px 12px',borderRadius:8,background:m.role==='user'?'rgba(0,180,255,0.12)':'var(--bg-card)',border:`1px solid ${m.role==='user'?'#00b4ff33':'var(--border)'}`,fontFamily:mono,fontSize:10,color:'var(--text-primary)',lineHeight:1.6,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>
+            {m.content}
+          </div>
+        ))}
+        {loading&&(
+          <div style={{alignSelf:'flex-start',padding:'8px 12px',borderRadius:8,background:'var(--bg-card)',border:'1px solid var(--border)',fontFamily:mono,fontSize:10,color:'#00b4ff'}}>
+            🐼 Analyzing{activeMode==='insights'?' market data':activeMode==='review'?' trade history':''}...
+          </div>
+        )}
+        <div ref={chatEndRef}/>
+      </div>
+
+      <div style={{display:'flex',gap:8}}>
+        <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={handleKeyDown} placeholder="Ask Panda AI about any pair or setup..." disabled={loading} style={{flex:1,fontFamily:mono,fontSize:10,padding:'8px 12px',borderRadius:6,border:'1px solid var(--border)',background:'var(--bg-card)',color:'var(--text-primary)',outline:'none'}}/>
+        <button onClick={handleSend} disabled={loading||!input.trim()} style={{fontFamily:mono,fontSize:9,padding:'8px 16px',borderRadius:6,border:'1px solid #00b4ff44',background:input.trim()?'rgba(0,180,255,0.15)':'var(--bg-card)',color:input.trim()?'#00b4ff':'var(--text-muted)',cursor:input.trim()&&!loading?'pointer':'not-allowed',letterSpacing:2}}>SEND</button>
+      </div>
+    </div>
+  );
+}
+
+const TABS = ['PANELS','SIGNALS','TABLE','GAP CHART','RESEARCH','CALCULATOR','SETUPS','VALID PAIRS','SPIKE LOG','CHART','ANALYTICS','SIGNAL LOG','PANDA AI'];
 // Maps each tab to the feature_access key that controls it
 const TAB_FEATURE = {
   'PANELS':      'panels',
@@ -1768,6 +1839,7 @@ const TAB_FEATURE = {
   'CHART':       'panels',
   'ANALYTICS':   'analytics',
   'SIGNAL LOG':  'signal_log',
+  'PANDA AI':    'panda_ai',
 };
 const FILTERS = ['VALID','ALL','BUY','SELL','STRONG','⚠️ CLOSE'];
 const SORTS   = [
@@ -2401,6 +2473,8 @@ export default function Dashboard() {
 <SignalAnalytics/>
 ):tab==='SIGNAL LOG'?(
 <SignalLogTab/>
+):tab==='PANDA AI'?(
+<PandaAIChat/>
 ):tab==='TABLE'?(
 
             <div style={{overflowX:'auto'}}>

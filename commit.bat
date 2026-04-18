@@ -1,5 +1,5 @@
 @echo off
 cd /d C:\Users\Admin\panda-dashboard
 git add -A
-git commit -m "Analytics: remove 30-day limit, add pair + date filters, raise limit to 2000"
-git push origin main
+git commit --amend -m "Add Panda AI tab: chatbot + market insights + trade review with guardrails"
+git push origin main --force
