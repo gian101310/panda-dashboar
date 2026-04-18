@@ -208,14 +208,10 @@ export default async function handler(req, res) {
         .delete()
         .in('factor', ['strategy_overall', 'gap_level', 'tbg_confirmation', 'gap_plus_tbg', 'pair_performance', 'flat_rate_by_gap']);
 
-      // 4. Write all new memories
-      let written = 0;
-      const errors = [];
-      for (const mem of allMemories) {
-        const { error: writeErr } = await supabase.from('ai_memory').insert(mem);
-        if (writeErr) errors.push({ factor: mem.metadata?.description, error: writeErr.message });
-        else written++;
-      }
+      // 4. Batch insert all memories in one call
+      const { data: inserted, error: writeErr } = await supabase.from('ai_memory').insert(allMemories).select('id');
+      const written = writeErr ? 0 : (inserted || []).length;
+      const errors = writeErr ? [{ error: writeErr.message }] : [];
 
       // 5. Build summary
       const summary = {
@@ -223,7 +219,7 @@ export default async function handler(req, res) {
         bb_count: rows.filter(r => r.strategy === 'BB').length,
         intra_count: rows.filter(r => r.strategy === 'INTRA').length,
         memories_written: written,
-        memories_skipped_low_sample: allMemories.length === written ? 0 : 'check errors',
+        memories_attempted: allMemories.length,
         errors: errors.length > 0 ? errors : undefined,
         analysis_types: [
           'strategy_overall — BB and INTRA overall win rates',
