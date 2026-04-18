@@ -136,7 +136,7 @@ PairCardModal receives `isMobile` as prop.
 
 ---
 
-## 4. SUPABASE TABLES (15 tables)
+## 4. SUPABASE TABLES (16 tables)
 
 | Table | Used By | Purpose |
 |-------|---------|---------|
@@ -156,6 +156,7 @@ PairCardModal receives `isMobile` as prop.
 | `user_strategies` | API `/strategies` | Custom strategy labels |
 | `user_alert_prefs` | API `/alert-prefs` | Per-user alert preferences |
 | `telegram_subscriptions` | API `/notify-telegram` | Telegram notification opt-ins |
+| `ai_memory` | API `/ai-memory` | AI agent findings: patterns, edges, behaviors (strict JSON, sample_size ≥ 20) |
 
 ### signal_snapshots columns
 `id` (uuid PK), `timestamp` (timestamptz), `symbol`, `gap`, `bias`, `confidence`, `execution`,
@@ -164,6 +165,14 @@ PairCardModal receives `isMobile` as prop.
 `atr`, `atr_reference`, `spread`, `box_h1_trend`, `box_h4_trend`,
 `tbg_zone`, `tbg_bias`, `tbg_g1_valid`, `is_valid`, `base_currency`, `quote_currency`
 Indexes: `timestamp DESC`, `(symbol, timestamp DESC)`, `(is_valid, timestamp DESC)`
+
+### ai_memory columns
+`id` (uuid PK), `type` (text, CHECK enum), `factor` (text), `pair` (text nullable),
+`strategy` (text nullable), `win_rate` (numeric), `sample_size` (integer),
+`metadata` (jsonb), `computed_at` (timestamptz)
+Type enum: signal_pattern, behavior, edge_analysis, market_theme, confluence_validation
+Indexes: `type`, `pair` (partial), `strategy` (partial), `computed_at DESC`
+Rules: sample_size < 20 rejected by API, metadata must be JSON object (no free text)
 
 ### Roles & Access
 - **Admin** > **VIP** > **User** (stored in `panda_users.role`)
@@ -200,6 +209,7 @@ Indexes: `timestamp DESC`, `(symbol, timestamp DESC)`, `(is_valid, timestamp DES
 | `/api/admin/users` | `admin/users.js` | GET/POST | User CRUD |
 | `/api/admin/logs` | `admin/logs.js` | GET | Access logs |
 | `/api/admin/sessions` | `admin/sessions.js` | GET | Active sessions |
+| `/api/ai-memory` | `ai-memory.js` | GET/POST/DELETE | AI agent memory CRUD (sample_size ≥ 20 enforced) |
 
 ---
 

@@ -5,6 +5,26 @@
 
 ---
 
+## Apr 18, 2026 — Phase 2 Complete (AI Memory Layer)
+
+**ai_memory Supabase table created:**
+- 9 columns: id, type, factor, pair, strategy, win_rate, sample_size, metadata, computed_at
+- CHECK constraint on `type` — 5 valid enum values (signal_pattern, behavior, edge_analysis, market_theme, confluence_validation)
+- 4 indexes: type, pair (partial), strategy (partial), computed_at DESC
+- RLS enabled: service_role full access, authenticated read-only
+
+**API route: `pages/api/ai-memory.js`**
+- GET with filters: type, pair, strategy, limit (max 500)
+- POST with validation: sample_size >= 20 enforced, metadata must be JSON object (no free text)
+- DELETE by id for maintenance
+- Uses shared Supabase client from `../../lib/supabase`
+
+**Files changed:** pages/api/ai-memory.js (new, 71 lines)
+**Supabase migration:** create_ai_memory_table
+**Commit:** 4370860
+
+---
+
 ## Apr 18, 2026 — Phase 1 Complete (Foundation Fixes)
 
 **1A: ai-chat.js journal fix**
@@ -98,8 +118,9 @@
 ---
 
 ## PENDING / NEXT UP
+- Phase 3: Signal Agent v1 (gap range + TBG zone analysis → writes to ai_memory)
+- Phase 4: Journal Agent (manual_trades 439 trades → writes to ai_memory)
+- Phase 5: Master Agent reads ai_memory as context for OpenAI calls
 - VPS migration (Hyonix HS-2, $12/mo — decision made, not yet purchased)
-- Signal tab YouTube redesign (Bloomberg-style, motion, live indicators)
 - Landing/funnel pages (Free/Pro/Elite tiers)
-- Mobile layout optimization
 - PWA publishing
