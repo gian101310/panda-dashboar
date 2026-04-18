@@ -59,7 +59,7 @@ async function fetchReviewContext() {
   const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   const [signals, journal] = await Promise.all([
     supabase.from('signal_results').select('*').gte('created_at', since).order('created_at', { ascending: false }).limit(100),
-    supabase.from('trade_journal').select('*').gte('open_time', since).order('open_time', { ascending: false }).limit(50)
+    supabase.from('manual_trades').select('*').gte('entry_time', since).order('entry_time', { ascending: false }).limit(50)
   ]);
   let ctx = '';
   if (signals.data && signals.data.length > 0) {
@@ -67,8 +67,8 @@ async function fetchReviewContext() {
     ctx += signals.data.map(s => `${s.symbol} ${s.strategy} ${s.direction} gap:${s.entry_gap} peak:${s.peak_gap} pips:${s.pips||'pending'} outcome:${s.outcome||'PENDING'} exit:${s.exit_reason||'-'} dur:${s.duration_min||'-'}m ${s.created_at}`).join('\n');
   }
   if (journal.data && journal.data.length > 0) {
-    ctx += '\n\nTRADE JOURNAL (last 30 days):\n';
-    ctx += journal.data.map(t => `${t.symbol} ${t.direction} entry:${t.entry_price} exit:${t.close_price||'open'} pips:${t.net_pips||'-'} ${t.open_time}`).join('\n');
+    ctx += '\n\nTRADE HISTORY (last 30 days):\n';
+    ctx += journal.data.map(t => `${t.symbol} ${t.direction} strategy:${t.strategy_name||'-'} entry:${t.entry_price} exit:${t.exit_price||'open'} pips:${t.profit_loss_pips||'-'} ${t.entry_time}`).join('\n');
   }
   return ctx || 'No trade history available for review.';
 }

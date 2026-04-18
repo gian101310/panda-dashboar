@@ -1,5 +1,5 @@
 @echo off
 cd /d C:\Users\Admin\panda-dashboard
-git add -A
-git commit --amend -m "Add Panda AI tab: chatbot + market insights + trade review with guardrails"
-git push origin main --force
+git add CHANGELOG.md
+git commit -m "Update CHANGELOG for Panda AI tab"
+git push origin main
