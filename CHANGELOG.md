@@ -5,6 +5,37 @@
 
 ---
 
+## Apr 18, 2026 — Phase 1 Complete (Foundation Fixes)
+
+**1A: ai-chat.js journal fix**
+- Changed `trade_journal` → `manual_trades` with correct columns (`entry_time`, `exit_price`, `profit_loss_pips`, `strategy_name`)
+- Review Trades button now pulls real 439 trades
+
+**1B: Confidence + Momentum pipeline**
+- Added `confidence` numeric column to `signal_results` (Supabase migration)
+- Backfilled 326 existing records with gap-based approximation
+- Added `compute_signal_confidence()` in app.py — server-side multi-factor score (gap 0-30 + TBG 0-20 + box 0-20 + momentum 0-10)
+- `log_signal()` now writes both `momentum` and `confidence` at signal entry
+- Threaded momentum + parsed data through `check_bb_entry` → `check_intra_entry` → `log_signal`
+
+**1C: BB + INTRA strategy logic**
+- BB entry: verified correct — no TBG required, concurrent check already in place via `has_pending_signal`
+- INTRA entry window: expanded from 3AM UAE ±30min to 2AM–4AM UAE (22:00–23:59 UTC)
+- INTRA gap threshold: 8 → 9
+- INTRA exit: 6-hour from entry → 10AM UAE hard close (06:00 UTC)
+
+**1D: cTrader API test endpoint**
+- Added `/test-ctrader` route — tests token refresh, measures REST API latency
+- Returns: status, token_valid, refresh_latency_ms
+- Note: spot price capture needs protobuf WebSocket (Phase 7)
+
+**Files changed:** pages/api/ai-chat.js, app.py (9 edits)
+**Supabase migration:** add_confidence_to_signal_results
+**Commits:** d941160 (dashboard), app.py changes need uvicorn restart
+**app.py now:** ~1640 lines (was 1527)
+
+---
+
 ## Apr 18, 2026 — Panda AI Tab + Analytics Filters
 - **NEW: Panda AI tab** — AI-powered market analysis chatbot
   - Three modes: Analyze Market (rank pairs), Review Trades (journal vs signals), Free Chat
