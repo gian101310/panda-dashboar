@@ -50,6 +50,15 @@ function isNeutralMatchup(row) {
   const qs = isBuy ? Math.min(...qv.filter(v => v < 0), 0) : Math.max(...qv.filter(v => v > 0), 0);
   return scoreLabel(bs) === 'NEUTRAL' && scoreLabel(qs) === 'NEUTRAL';
 }
+function isMarketOpen() {
+  const now = new Date();
+  const day = now.getUTCDay();   // 0=Sun, 6=Sat
+  const h = now.getUTCHours();
+  if (day === 6) return false;           // All Saturday
+  if (day === 0 && h < 22) return false; // Sunday before 22:00 UTC
+  if (day === 5 && h >= 22) return false; // Friday after 22:00 UTC
+  return true;
+}
 
 // ===== BOX TREND DETECTION =====
 function boxTrend(trend) {
@@ -2367,7 +2376,7 @@ export default function Dashboard() {
   return (
     <>
       <Head>
-        <title>PANDA ENGINE — LIVE</title>
+        <title>PANDA ENGINE — {isMarketOpen()?'LIVE':'CLOSED'}</title>
         <meta name="viewport" content="width=device-width,initial-scale=1"/>
         <style>{`@media print{body{visibility:hidden!important;}} *{-webkit-touch-callout:none;} @media(max-width:767px){*::-webkit-scrollbar{height:3px!important;width:3px!important;} button{min-height:32px;} select,input[type=date]{min-height:32px;} table{font-size:9px!important;}}`}</style>
       </Head>
@@ -2393,11 +2402,11 @@ export default function Dashboard() {
         <header style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:isMobile?'8px 12px':'10px 20px',background:'var(--bg-secondary)',borderBottom:'1px solid var(--border)',position:'sticky',top:0,zIndex:100,flexWrap:isMobile?'wrap':'nowrap',gap:isMobile?8:0}}>
           <div style={{display:'flex',alignItems:'center',gap:10}}>
             <span style={{fontSize:isMobile?18:22}}>🐼</span>
-            <div><div style={{fontFamily:orb,fontWeight:900,fontSize:isMobile?11:13,letterSpacing:isMobile?2:4,color:'#00ff9f'}}>PANDA ENGINE</div>{!isMobile&&<div style={{fontFamily:mono,fontSize:8,letterSpacing:3,color:'var(--text-muted)'}}>FOREX INTELLIGENCE · LIVE</div>}</div>
+            <div><div style={{fontFamily:orb,fontWeight:900,fontSize:isMobile?11:13,letterSpacing:isMobile?2:4,color:'#00ff9f'}}>PANDA ENGINE</div>{!isMobile&&<div style={{fontFamily:mono,fontSize:8,letterSpacing:3,color:'var(--text-muted)'}}>FOREX INTELLIGENCE · {isMarketOpen()?'LIVE':'MARKET CLOSED'}</div>}</div>
           </div>
           <div style={{display:'flex',alignItems:'center',gap:8,flex:isMobile?'none':1,justifyContent:'center',order:isMobile?3:0,width:isMobile?'100%':'auto'}}>
-            <div style={{width:6,height:6,borderRadius:'50%',background:'#00ff9f',boxShadow:'0 0 8px #00ff9f',animation:'blink 2s infinite'}}/>
-            <span style={{fontFamily:mono,fontSize:10,letterSpacing:2,color:'#00ff9f'}}>LIVE</span>
+            <div style={{width:6,height:6,borderRadius:'50%',background:isMarketOpen()?'#00ff9f':'#ff4d6d',boxShadow:`0 0 8px ${isMarketOpen()?'#00ff9f':'#ff4d6d'}`,animation:'blink 2s infinite'}}/>
+            <span style={{fontFamily:mono,fontSize:10,letterSpacing:2,color:isMarketOpen()?'#00ff9f':'#ff4d6d'}}>{isMarketOpen()?'LIVE':'CLOSED'}</span>
             <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>{lastUpdate?formatTime(lastUpdate):'...'}</span>
             {refreshing&&<span style={{color:'#00b4ff',animation:'spin 1s linear infinite',display:'inline-block',fontSize:14}}>↻</span>}
             {spikes.length>0&&<div style={{display:'flex',alignItems:'center',gap:4,background:'rgba(255,209,102,0.1)',border:'1px solid rgba(255,209,102,0.3)',borderRadius:4,padding:'2px 8px'}}><span style={{width:6,height:6,borderRadius:'50%',background:'#ffd166',animation:'blink 1s infinite',display:'inline-block'}}/><span style={{fontFamily:mono,fontSize:8,color:'#ffd166',letterSpacing:1}}>{spikes.length} SPIKE{spikes.length>1?'S':''}</span></div>}
