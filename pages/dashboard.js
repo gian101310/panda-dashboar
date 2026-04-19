@@ -40,6 +40,16 @@ function biasFromGap(gap) {
   return         { label:'WAIT', color:'var(--text-muted)', bg:'rgba(40,50,80,0.3)', border:'rgba(40,50,80,0.5)' };
 }
 function isValid(gap) { return gap >= 5 || gap <= -5; }
+function isNeutralMatchup(row) {
+  if (!row) return false;
+  const isBuy = (row.gap ?? 0) > 0;
+  const bv = [row.base_d1, row.base_h4, row.base_h1].filter(v => v != null);
+  const qv = [row.quote_d1, row.quote_h4, row.quote_h1].filter(v => v != null);
+  if (!bv.length || !qv.length) return false;
+  const bs = isBuy ? Math.max(...bv.filter(v => v > 0), 0) : Math.min(...bv.filter(v => v < 0), 0);
+  const qs = isBuy ? Math.min(...qv.filter(v => v < 0), 0) : Math.max(...qv.filter(v => v > 0), 0);
+  return scoreLabel(bs) === 'NEUTRAL' && scoreLabel(qs) === 'NEUTRAL';
+}
 
 // ===== BOX TREND DETECTION =====
 function boxTrend(trend) {
@@ -457,7 +467,7 @@ function MomentumHeatmap({ data, heatmapData, visible, onToggle }) {
                 const row = data.find(r=>r.symbol===symbol);
                 const hRow = hData[symbol] || {};
                 const gap = row?.gap ?? 0;
-                const valid = isValid(gap);
+                const valid = isValid(gap) && !row?.hard_invalid && !isNeutralMatchup(row);
                 const bias = biasFromGap(gap);
                 const momentum = row?.momentum || '—';
                 const momColor = momentum==='STRONG'?'#00ff9f':momentum==='BUILDING'?'#66ffcc':momentum==='SPARK'?'#ffd166':momentum==='CONSOLIDATING'?'#00b4ff':momentum==='COOLING'?'#ffaa44':momentum==='FADING'?'#ff7744':momentum==='REVERSING'?'#ff4d6d':'var(--text-muted)';
@@ -869,7 +879,7 @@ function StatCard({ label, value, color, sub }) {
 
 // ===== PAIR CARD =====
 function PairCard({ row, trend, cotBias, confidence }) {
-  const gap=row.gap??0,valid=isValid(gap),bias=biasFromGap(gap),sig=signalLabel(row.signal,row.strength),strVal=row.strength??0,sc=stateColor(row.state),t=trend||{};
+  const gap=row.gap??0,valid=isValid(gap)&&!row.hard_invalid&&!isNeutralMatchup(row),bias=biasFromGap(gap),sig=signalLabel(row.signal,row.strength),strVal=row.strength??0,sc=stateColor(row.state),t=trend||{};
   const sparkColor=t.trend1h==='STRONGER'?'#00ff9f':t.trend1h==='WEAKER'?'#ff4d6d':'var(--text-muted)';
   const momIcons={BUILDING:'🚀',EMERGING:'📈',FADING:'📉',COOLING:'🌡️',REVERSAL:'⚠️',NEUTRAL:'▬',SPARK:'⚡',STRONG:'🔥',STABLE:'▬',CONSOLIDATING:'🔵',REVERSING:'⚠️'};
   const gapTrend=(row.delta_short??0)>0.5?'STRONGER':(row.delta_short??0)<-0.5?'WEAKER':'STABLE';
@@ -1106,7 +1116,7 @@ function ValidSetupsTab({ data, trends, cotMap, confidenceMap }) {
   const orb  = "'Orbitron',sans-serif";
 
   const valid = data
-    .filter(r => Math.abs(r.gap ?? 0) >= 5)
+    .filter(r => Math.abs(r.gap ?? 0) >= 5 && !r.hard_invalid && !isNeutralMatchup(r))
     .sort((a,b) => a.symbol.localeCompare(b.symbol));
 
   if (valid.length === 0) return (
@@ -1214,6 +1224,7 @@ function ValidPairsTab({ data, trends, cotMap, confidenceMap }) {
     const conf = cf ? cf.confidence : 0;
     const biasDir = gap > 0 ? 'BUY' : gap < 0 ? 'SELL' : 'WAIT';
     if (biasDir === 'WAIT') return;
+    if (r.hard_invalid || isNeutralMatchup(r)) return;
     const zone = (r.tbg_zone || '').toUpperCase();
     const tbgValid = (biasDir === 'BUY' && zone === 'ABOVE') || (biasDir === 'SELL' && zone === 'BELOW');
     if (absGap >= 9 && tbgValid && conf >= 60) {
@@ -2311,7 +2322,7 @@ export default function Dashboard() {
   function toggleHeatmap() { setPrefs(p=>({...p,heatmap_visible:!p?.heatmap_visible})); }
   function toggleSpikeBanner() { setPrefs(p=>({...p,spike_banner_visible:!p?.spike_banner_visible})); }
 
-  const validPairs=data.filter(r=>isValid(r.gap??0));
+  const validPairs=data.filter(r=>isValid(r.gap??0)&&!r.hard_invalid&&!isNeutralMatchup(r));
   let displayed=(filter==='ALL')?[...data].sort((a,b)=>(a.symbol||'').localeCompare(b.symbol||'')):[...validPairs].sort((a,b)=>(a.symbol||'').localeCompare(b.symbol||''));
   if(search) displayed=displayed.filter(r=>r.symbol?.toLowerCase().includes(search.toLowerCase()));
   if(filter==='BUY') displayed=displayed.filter(r=>(r.gap??0)>=5);
@@ -2587,7 +2598,7 @@ export default function Dashboard() {
                 <tbody>
                   {displayed.length===0?<tr><td colSpan={15} style={{textAlign:'center',padding:40,fontFamily:mono,fontSize:10,color:'var(--text-muted)'}}>NO DATA</td></tr>
                   :displayed.map((row,idx)=>{
-                    const gap=row.gap??0,valid=isValid(gap),bias=biasFromGap(gap),t=trends[row.symbol]||{},sv=row.strength??0;
+                    const gap=row.gap??0,valid=isValid(gap)&&!row.hard_invalid&&!isNeutralMatchup(row),bias=biasFromGap(gap),t=trends[row.symbol]||{},sv=row.strength??0;
                     const sc2=t.trend1h==='STRONGER'?'#00ff9f':t.trend1h==='WEAKER'?'#ff4d6d':'var(--text-muted)';
                     const gapTrend=(row.delta_short??0)>0.5?'STRONGER':(row.delta_short??0)<-0.5?'WEAKER':'STABLE';
                     const cotB=getPairCotBias(row.symbol);
