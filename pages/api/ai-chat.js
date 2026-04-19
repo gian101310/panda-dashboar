@@ -34,7 +34,33 @@ DATA FIELDS EXPLAINED (for your context, never reveal to users):
 - strength: individual currency strength values
 - box trends: H1/H4 structural trend direction
 
-FORMAT: Use concise, professional trader language. Use emoji sparingly. Structure with clear sections. Keep responses focused and actionable.`;
+FORMAT: Use concise, professional trader language. Use emoji sparingly. Structure with clear sections. Keep responses focused and actionable.
+
+HISTORICAL ANALYSIS: You may receive validated findings from historical signal and trading data. Use these to ground your analysis — cite specific win rates, edge patterns, and behavioral insights when relevant. Never reveal the source system or table names.`;
+
+async function fetchMemoryContext() {
+  const { data } = await supabase.from('ai_memory').select('type, factor, pair, strategy, win_rate, sample_size, metadata').order('computed_at', { ascending: false }).limit(100);
+  if (!data || data.length === 0) return '';
+  const sections = { signal_pattern: [], edge_analysis: [], confluence_validation: [], behavior: [] };
+  for (const m of data) {
+    const key = sections[m.type] ? m.type : 'signal_pattern';
+    const desc = m.metadata?.description || m.factor;
+    const wr = m.win_rate != null ? ` | win_rate:${m.win_rate}%` : '';
+    const pips = m.metadata?.total_pips != null ? ` | total_pips:${m.metadata.total_pips}` : '';
+    const avg = m.metadata?.avg_pips != null ? ` | avg_pips:${m.metadata.avg_pips}` : '';
+    const flat = m.metadata?.flat_pct != null ? ` | flat_rate:${m.metadata.flat_pct}%` : '';
+    const sess = m.metadata?.session ? ` | session:${m.metadata.session}` : '';
+    const hold = m.metadata?.hold_bucket ? ` | hold:${m.metadata.hold_bucket}` : '';
+    const dir = m.metadata?.direction ? ` | dir:${m.metadata.direction}` : '';
+    sections[key].push(`${desc} (n=${m.sample_size}${wr}${pips}${avg}${flat}${sess}${hold}${dir})`);
+  }
+  let ctx = 'HISTORICAL ANALYSIS (from ai_memory — validated findings, sample >= 20):\n';
+  if (sections.signal_pattern.length) ctx += '\nSIGNAL PATTERNS:\n' + sections.signal_pattern.join('\n');
+  if (sections.edge_analysis.length) ctx += '\n\nEDGE ANALYSIS:\n' + sections.edge_analysis.join('\n');
+  if (sections.confluence_validation.length) ctx += '\n\nCONFLUENCE VALIDATION:\n' + sections.confluence_validation.join('\n');
+  if (sections.behavior.length) ctx += '\n\nTRADING BEHAVIOR:\n' + sections.behavior.join('\n');
+  return ctx;
+}
 
 async function fetchMarketContext() {
   const { data } = await supabase.from('dashboard').select('*');
@@ -80,17 +106,20 @@ export default async function handler(req, res) {
     if (!mode) return res.status(400).json({ error: 'mode required' });
 
     // Build context based on mode
-    const marketData = await fetchMarketContext();
+    const [marketData, memoryContext] = await Promise.all([
+      fetchMarketContext(),
+      fetchMemoryContext()
+    ]);
     let userContent = '';
 
     if (mode === 'insights') {
-      userContent = `CURRENT MARKET DATA:\n${marketData}\n\nAnalyze all 21 pairs. Rank the top 5 strongest setups with reasoning. Identify any currency themes. Flag any risk concerns (correlated exposure, conflicting signals). Be concise and actionable.`;
+      userContent = `CURRENT MARKET DATA:\n${marketData}\n\n${memoryContext}\n\nAnalyze all 21 pairs. Rank the top 5 strongest setups with reasoning. Use historical signal patterns and edge analysis to support your recommendations. Identify currency themes. Flag risk concerns. Be concise and actionable.`;
     } else if (mode === 'review') {
       const reviewData = await fetchReviewContext();
-      userContent = `CURRENT MARKET DATA:\n${marketData}\n\n${reviewData}\n\nAnalyze my trading performance. Compare actual trades to engine signals. Find patterns in wins vs losses. What setups am I missing? What should I avoid? Give specific, data-backed observations.`;
+      userContent = `CURRENT MARKET DATA:\n${marketData}\n\n${reviewData}\n\n${memoryContext}\n\nAnalyze my trading performance using both recent trades AND historical analysis patterns. Compare actual trades to engine signals. Identify behavioral patterns — which sessions, hold durations, and pairs work best for me? What should I do more of, and what should I avoid? Give specific, data-backed observations.`;
     } else if (mode === 'chat') {
       if (!message) return res.status(400).json({ error: 'message required for chat mode' });
-      userContent = `CURRENT MARKET DATA:\n${marketData}\n\nUser question: ${message}`;
+      userContent = `CURRENT MARKET DATA:\n${marketData}\n\n${memoryContext}\n\nUser question: ${message}`;
     } else {
       return res.status(400).json({ error: 'invalid mode' });
     }
