@@ -5,6 +5,27 @@
 
 ---
 
+## Apr 19, 2026 — Phase 6 Complete (Pattern Agent)
+
+**New file: `pages/api/pattern-agent.js` (270 lines)**
+- Cross-references Signal Agent findings vs Journal Agent findings
+- Reads all existing `ai_memory` + raw `signal_results` + `manual_trades`
+- Writes `market_theme` type memories to `ai_memory`
+- Idempotent: clears previous pattern memories before re-writing
+
+**7 pattern detection factors:**
+1. `alpha_pair` — pairs where user profits AND signals confirm edge
+2. `leak_pair` — user loses money despite signals showing good win rate
+3. `overtraded_weak` — high trade count on weak signal pairs
+4. `session_edge` — best vs worst trading session with pip totals
+5. `hold_duration_edge` — optimal vs worst hold duration bucket
+6. `edge_gap` — BB signal win rate vs actual trading win rate gap
+7. `tbg_discipline` — TBG confirmed vs unconfirmed edge difference
+
+**Commit:** b9813df
+
+---
+
 ## Apr 19, 2026 — Phase 5 Complete (Master Agent Reads Memory)
 
 **Modified: `pages/api/ai-chat.js` (134 → 163 lines)**
@@ -180,9 +201,8 @@
 ---
 
 ## PENDING / NEXT UP
-- Phase 6: Pattern Agent (cross-reference Signal Agent + Journal Agent findings)
-- Phase 7: signal_tracker + price capture
-- Phase 8: Signal Agent v2 on tracker data
+- Phase 7: signal_tracker table + price capture routes
+- Phase 8: Signal Agent v2 on tracker data (needs 30+ days)
 - VPS migration (Hyonix HS-2, $12/mo — decision made, not yet purchased)
 - Landing/funnel pages (Free/Pro/Elite tiers)
 - PWA publishing
