@@ -5,6 +5,27 @@
 
 ---
 
+## Apr 19, 2026 — Phase 4 Complete (Journal Agent)
+
+**New file: `pages/api/journal-agent.js` (222 lines)**
+- POST analyzes all 439 closed trades from `manual_trades` → writes to `ai_memory`
+- GET returns all `behavior` type memories
+- Idempotent: clears previous journal agent memories before re-writing
+- Batch insert (single Supabase call)
+
+**6 analysis functions:**
+1. `analyzeOverall` — overall win rate, avg pips, avg hold duration
+2. `analyzeByPair` — per-pair win rate + total pips (sample ≥ 20 only)
+3. `analyzeByMonth` — monthly P&L with best/worst month identification
+4. `analyzeBySession` — ASIAN/LONDON/OVERLAP/NY session performance
+5. `analyzeByHoldDuration` — under_1h / 1-4h / 4-12h / 12-24h / 1-3d / 3d+
+6. `analyzeByDirection` — BUY vs SELL performance
+
+**Note:** `strategy_name` is empty string on all 439 trades — strategy analysis skipped
+**Commit:** 975304c
+
+---
+
 ## Apr 18, 2026 — Phase 3 Complete (Signal Agent v1)
 
 **New file: `pages/api/signal-agent.js` (246 lines)**
