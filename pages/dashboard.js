@@ -1823,6 +1823,106 @@ function PandaAIChat() {
   );
 }
 
+// ===== SIGNAL TRACKER PANEL =====
+function TrackerPanel() {
+  const [trackers, setTrackers] = useState([]);
+  const [closed, setClosed] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showClosed, setShowClosed] = useState(false);
+  const mono = "'Share Tech Mono',monospace", orb = "'Orbitron',sans-serif";
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const [openR, closedR] = await Promise.all([
+          fetch('/api/signal-tracker?status=OPEN').then(r => r.json()),
+          fetch('/api/signal-tracker?status=CLOSED&limit=20').then(r => r.json())
+        ]);
+        setTrackers(openR.trackers || []);
+        setClosed(closedR.trackers || []);
+      } catch {}
+      setLoading(false);
+    })();
+  }, []);
+
+  const ageStr = (opened) => {
+    const h = Math.round((Date.now() - new Date(opened).getTime()) / 3600000);
+    return h < 24 ? h + 'h' : Math.round(h / 24) + 'd';
+  };
+  const gapColor = (g) => g >= 9 ? '#00ff9f' : g >= 7 ? '#ffd166' : '#ffaa44';
+
+  if (loading) return <div style={{textAlign:'center',padding:20,fontFamily:mono,fontSize:10,color:'var(--text-muted)'}}>LOADING TRACKERS...</div>;
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:12}}>
+      <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+        <span style={{fontFamily:orb,fontSize:11,color:'#ffaa44',letterSpacing:4,fontWeight:700}}>🔭 SIGNAL TRACKER</span>
+        <span style={{fontFamily:mono,fontSize:9,color:'#00ff9f',background:'rgba(0,255,159,0.1)',border:'1px solid rgba(0,255,159,0.3)',borderRadius:4,padding:'2px 8px'}}>{trackers.length} OPEN</span>
+        <button onClick={()=>setShowClosed(!showClosed)} style={{fontFamily:mono,fontSize:8,padding:'3px 10px',borderRadius:4,border:'1px solid var(--border)',background:showClosed?'rgba(0,180,255,0.12)':'var(--bg-card)',color:showClosed?'#00b4ff':'var(--text-muted)',cursor:'pointer',letterSpacing:1}}>
+          {showClosed ? 'HIDE' : 'SHOW'} CLOSED ({closed.length})
+        </button>
+      </div>
+
+      {trackers.length === 0 && <div style={{fontFamily:mono,fontSize:10,color:'var(--text-muted)',padding:16,textAlign:'center'}}>No signals being tracked right now</div>}
+
+      {trackers.length > 0 && (
+        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+          {trackers.map(t => {
+            const dc = t.direction === 'BUY' ? '#00ff9f' : '#ff4d6d';
+            const gaps = Array.isArray(t.hourly_gaps) ? t.hourly_gaps : [];
+            const lastGap = gaps.length > 0 ? gaps[gaps.length - 1].gap : t.gap_at_open;
+            const gapDelta = lastGap - t.gap_at_open;
+            return (
+              <div key={t.id} style={{background:'var(--bg-card)',border:`1px solid ${dc}28`,borderRadius:8,padding:'10px 14px',minWidth:170,maxWidth:220,display:'flex',flexDirection:'column',gap:4}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                  <span style={{fontFamily:orb,fontSize:12,fontWeight:700,color:'var(--text-primary)',letterSpacing:1}}>{t.symbol}</span>
+                  <span style={{fontFamily:mono,fontSize:8,color:dc,background:dc+'18',border:`1px solid ${dc}33`,borderRadius:3,padding:'1px 5px'}}>{t.direction}</span>
+                </div>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline'}}>
+                  <span style={{fontFamily:orb,fontSize:22,fontWeight:900,color:gapColor(lastGap)}}>{lastGap}</span>
+                  <span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)'}}>open: {t.gap_at_open}</span>
+                </div>
+                <div style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',display:'flex',justifyContent:'space-between'}}>
+                  <span>peak: {t.peak_gap}</span>
+                  <span style={{color:gapDelta > 0 ? '#00ff9f' : gapDelta < 0 ? '#ff4d6d' : 'var(--text-muted)'}}>{gapDelta > 0 ? '+' : ''}{gapDelta}</span>
+                </div>
+                <div style={{fontFamily:mono,fontSize:7,color:'var(--text-muted)',display:'flex',justifyContent:'space-between',marginTop:2}}>
+                  <span>{t.strategy} · {t.momentum_at_open || '—'}</span>
+                  <span>{ageStr(t.opened_at)}</span>
+                </div>
+                {t.h24_snapshot && <div style={{fontFamily:mono,fontSize:7,color:'#00b4ff'}}>24h: gap {t.h24_snapshot.gap}</div>}
+                {t.h48_snapshot && <div style={{fontFamily:mono,fontSize:7,color:'#00b4ff'}}>48h: gap {t.h48_snapshot.gap}</div>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {showClosed && closed.length > 0 && (
+        <div style={{display:'flex',flexDirection:'column',gap:6,marginTop:8}}>
+          <div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2}}>RECENTLY CLOSED</div>
+          <div style={{display:'flex',flexDirection:'column',gap:4,maxHeight:250,overflowY:'auto'}}>
+            {closed.map(t => {
+              const dc = t.direction === 'BUY' ? '#00ff9f' : '#ff4d6d';
+              const dur = t.closed_at ? Math.round((new Date(t.closed_at) - new Date(t.opened_at)) / 3600000) : 0;
+              return (
+                <div key={t.id} style={{display:'flex',alignItems:'center',gap:8,padding:'5px 10px',background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:6,flexWrap:'wrap'}}>
+                  <span style={{fontFamily:orb,fontSize:10,fontWeight:700,color:'var(--text-primary)',minWidth:65}}>{t.symbol}</span>
+                  <span style={{fontFamily:mono,fontSize:7,color:dc,background:dc+'15',borderRadius:3,padding:'1px 4px'}}>{t.direction}</span>
+                  <span style={{fontFamily:mono,fontSize:7,color:'var(--text-muted)'}}>gap:{t.gap_at_open}→peak:{t.peak_gap}</span>
+                  <span style={{fontFamily:mono,fontSize:7,color:'#ffaa44'}}>{t.close_reason}</span>
+                  <span style={{fontFamily:mono,fontSize:7,color:'var(--text-muted)',marginLeft:'auto'}}>{dur}h</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const TABS = ['PANELS','SIGNALS','TABLE','GAP CHART','RESEARCH','CALCULATOR','SETUPS','VALID PAIRS','SPIKE LOG','CHART','ANALYTICS','SIGNAL LOG','PANDA AI'];
 // Maps each tab to the feature_access key that controls it
 const TAB_FEATURE = {
@@ -2470,7 +2570,10 @@ export default function Dashboard() {
 
 </div>
 ):tab==='ANALYTICS'?(
+<div style={{display:'flex',flexDirection:'column',gap:24}}>
+<TrackerPanel/>
 <SignalAnalytics/>
+</div>
 ):tab==='SIGNAL LOG'?(
 <SignalLogTab/>
 ):tab==='PANDA AI'?(
