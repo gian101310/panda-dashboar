@@ -38,8 +38,6 @@
 5. Creates milestone snapshots at 24h, 48h, 72h, and weekly
 
 **app.py integration:** added `requests.post()` call after engine cycle to trigger tracker update
-- Needs uvicorn restart to take effect
-
 **Close reasons:** GAP_BELOW_5, BIAS_FLIPPED, TBG_FLIPPED, MAX_AGE_30D
 **Commit:** 10b3454
 
@@ -241,7 +239,7 @@
 ---
 
 ## PENDING / NEXT UP
-- Phase 8: Signal Agent v2 on tracker data (needs 30+ days of tracker data accumulation)
-- VPS migration (Hyonix HS-2, $12/mo — decision made, not yet purchased)
-- Landing/funnel pages (Free/Pro/Elite tiers)
-- PWA publishing
+- Phase 8: Signal Agent v2 on tracker data (needs 30+ days of data accumulation)
+- Part A: AI refinements (dual win rate, edge flags, maturity filtering — see PENDING_OPTIMIZATIONS_v2.md)
+- Part B: Market on/off toggle
+- Part C: Per-user AI analysis (Pro/Elite feature)

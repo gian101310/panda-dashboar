@@ -181,6 +181,7 @@ function getMatchup(row) {
   if (bl === 'STRONG' && ql === 'NEUTRAL')return { label: `${baseCur} STRONG / ${quoteCur} NEUTRAL`,color: '#66ffcc', note: 'GOOD' };
   if (bl === 'NEUTRAL'&& ql === 'STRONG') return { label: `${baseCur} NEUTRAL / ${quoteCur} STRONG`,color: '#ff7090', note: 'GOOD' };
   if (bl === 'WEAK'   && ql === 'WEAK')   return { label: 'WEAK vs WEAK',   color: '#ffaa44', note: 'AVOID' };
+  if (bl === 'NEUTRAL'&& ql === 'NEUTRAL')return { label: 'NEUTRAL vs NEUTRAL', color: '#ff4d6d', note: 'INVALID' };
   return { label: `${bl} / ${ql}`, color: 'var(--text-muted)', note: '' };
 }
 // ===== CONFIDENCE SCORING =====
