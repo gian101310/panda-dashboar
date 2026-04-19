@@ -5,6 +5,22 @@
 
 ---
 
+## Apr 19, 2026 — Phase 5 Complete (Master Agent Reads Memory)
+
+**Modified: `pages/api/ai-chat.js` (134 → 163 lines)**
+- New `fetchMemoryContext()` function — queries all `ai_memory` findings, formats into 4 sections (SIGNAL PATTERNS, EDGE ANALYSIS, CONFLUENCE VALIDATION, TRADING BEHAVIOR)
+- Injected into ALL 3 modes: insights, review, chat — fetched in parallel with market data
+- System prompt updated: instructs GPT to cite win rates, edge patterns, behavioral insights
+- No existing logic changed — strictly additive
+
+**What Panda AI now knows on every call (43 memories):**
+- Signal Agent findings: BB/INTRA win rates, gap level edges, TBG confirmation impact, per-pair signal stats, FLAT rates
+- Journal Agent findings: overall performance, per-pair trading P&L, monthly trends, session performance, hold duration sweet spots, BUY/SELL direction stats
+
+**Commit:** c2b2aa1
+
+---
+
 ## Apr 19, 2026 — Phase 4 Complete (Journal Agent)
 
 **New file: `pages/api/journal-agent.js` (222 lines)**
@@ -164,9 +180,9 @@
 ---
 
 ## PENDING / NEXT UP
-- Phase 4: Journal Agent (manual_trades 439 trades → writes to ai_memory)
-- Phase 5: Master Agent reads ai_memory as context for OpenAI calls
 - Phase 6: Pattern Agent (cross-reference Signal Agent + Journal Agent findings)
+- Phase 7: signal_tracker + price capture
+- Phase 8: Signal Agent v2 on tracker data
 - VPS migration (Hyonix HS-2, $12/mo — decision made, not yet purchased)
 - Landing/funnel pages (Free/Pro/Elite tiers)
 - PWA publishing
