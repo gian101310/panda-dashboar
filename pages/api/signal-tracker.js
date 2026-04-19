@@ -1,5 +1,32 @@
 import { supabase } from '../../lib/supabase';
 
+const TWELVEDATA_KEY = process.env.TWELVEDATA_API_KEY || '';
+
+// Fetch spot prices from Twelve Data (free tier: 800/day, 8/min)
+async function fetchPrices(symbols) {
+  if (!symbols.length || !TWELVEDATA_KEY) return {};
+  const tdSymbols = symbols.map(s => s.slice(0,3) + '/' + s.slice(3)).join(',');
+  try {
+    const r = await fetch(
+      `https://api.twelvedata.com/price?symbol=${tdSymbols}&apikey=${TWELVEDATA_KEY}`
+    );
+    const data = await r.json();
+    const prices = {};
+    if (symbols.length === 1) {
+      prices[symbols[0]] = parseFloat(data.price) || null;
+    } else {
+      for (const sym of symbols) {
+        const td = sym.slice(0,3) + '/' + sym.slice(3);
+        prices[sym] = parseFloat(data[td]?.price) || null;
+      }
+    }
+    return prices;
+  } catch (e) {
+    console.error('[PRICE FETCH]', e.message);
+    return {};
+  }
+}
+
 // Session from UTC hour
 function sessionFromHour(h) {
   // UTC-based: Tokyo 0-7, London 8-12, Overlap 13-16, NY 17-21
@@ -177,6 +204,56 @@ export default async function handler(req, res) {
       // 4. Update existing trackers + close dead signals
       const { closed, updated } = await updateAndCloseTrackers(dashboardPairs, openTrackers || []);
 
+      // 5. Price capture (every 15 min — free tier safe)
+      let priceUpdates = 0;
+      const min = new Date().getUTCMinutes();
+      const isPriceCycle = min % 15 <= 4;
+
+      if (isPriceCycle && TWELVEDATA_KEY) {
+        const { data: currentOpen } = await supabase
+          .from('signal_tracker').select('id, symbol, direction, entry_price, peak_price, worst_price, hourly_prices')
+          .eq('status', 'OPEN');
+
+        if (currentOpen && currentOpen.length > 0) {
+          const symbols = [...new Set(currentOpen.map(t => t.symbol))];
+          const prices = await fetchPrices(symbols);
+
+          for (const t of currentOpen) {
+            const price = prices[t.symbol];
+            if (!price) continue;
+            const updates = {};
+            const isBuy = t.direction === 'BUY';
+            const pipDiv = t.symbol.includes('JPY') ? 0.01 : 0.0001;
+
+            // Set entry_price on first price capture
+            if (!t.entry_price) updates.entry_price = price;
+            const ep = t.entry_price || price;
+
+            // Track peak/worst
+            const prevPeak = t.peak_price || price;
+            const prevWorst = t.worst_price || price;
+            updates.peak_price = Math.max(prevPeak, price);
+            updates.worst_price = Math.min(prevWorst, price);
+
+            // Append to hourly_prices
+            const hp = Array.isArray(t.hourly_prices) ? [...t.hourly_prices] : [];
+            hp.push({ price, ts: new Date().toISOString() });
+            updates.hourly_prices = hp;
+
+            // Pip calculations
+            const netRaw = isBuy ? (price - ep) / pipDiv : (ep - price) / pipDiv;
+            updates.net_pips = Math.round(netRaw * 10) / 10;
+            const bestPrice = isBuy ? updates.peak_price : updates.worst_price;
+            const worstPrice = isBuy ? updates.worst_price : updates.peak_price;
+            updates.pips_gained = Math.round(Math.max(0, (isBuy ? bestPrice - ep : ep - bestPrice) / pipDiv) * 10) / 10;
+            updates.pips_lost = Math.round(Math.min(0, (isBuy ? worstPrice - ep : ep - worstPrice) / pipDiv) * 10) / 10;
+
+            await supabase.from('signal_tracker').update(updates).eq('id', t.id);
+            priceUpdates++;
+          }
+        }
+      }
+
       return res.status(200).json({
         cycle_at: new Date().toISOString(),
         open_before: (openTrackers || []).length,
@@ -185,7 +262,8 @@ export default async function handler(req, res) {
         closed: closed.length,
         closed_details: closed,
         open_after: (openTrackers || []).length + newlyOpened.length - closed.length,
-        new_trackers: newlyOpened
+        new_trackers: newlyOpened,
+        price_updates: priceUpdates
       });
     } catch (err) {
       return res.status(500).json({ error: err.message });
