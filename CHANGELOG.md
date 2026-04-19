@@ -5,6 +5,19 @@
 
 ---
 
+## Apr 19, 2026 — Phase 7B Complete (Tracker Panel in Analytics)
+
+**New component: `TrackerPanel` in dashboard.js**
+- Shows all OPEN signal trackers as cards: symbol, direction, current gap, peak gap, gap delta, age, momentum, strategy
+- Milestone badges (24h, 48h snapshots shown when available)
+- "SHOW CLOSED" toggle reveals recently closed trackers with close reason and duration
+- Renders at top of ANALYTICS tab, above existing SignalAnalytics
+
+**Commit:** 25345fd
+**dashboard.js:** ~2655 lines (was ~2552)
+
+---
+
 ## Apr 19, 2026 — Phase 7A Complete (Signal Tracker)
 
 **Supabase: `signal_tracker` table created**
@@ -228,8 +241,7 @@
 ---
 
 ## PENDING / NEXT UP
-- Phase 7B: Analytics tab — tracker section in dashboard
-- Phase 8: Signal Agent v2 on tracker data (needs 30+ days of tracker data)
+- Phase 8: Signal Agent v2 on tracker data (needs 30+ days of tracker data accumulation)
 - VPS migration (Hyonix HS-2, $12/mo — decision made, not yet purchased)
 - Landing/funnel pages (Free/Pro/Elite tiers)
 - PWA publishing
