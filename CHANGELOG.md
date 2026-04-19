@@ -5,6 +5,33 @@
 
 ---
 
+## Apr 19, 2026 — Phase 7A Complete (Signal Tracker)
+
+**Supabase: `signal_tracker` table created**
+- 30 columns: full signal lifecycle tracking (gap, price, milestones, close reasons)
+- Indexes: status, symbol+status, opened_at DESC, strategy
+- RLS: service_role full access, authenticated read
+
+**New file: `pages/api/signal-tracker.js` (201 lines)**
+- GET: list trackers (filter by status, symbol)
+- POST: full update cycle — opens new trackers, updates hourly gaps, closes dead signals
+- POST action=watch: toggle extended_watch flag per tracker
+
+**Tracker update cycle (runs every engine cycle via app.py):**
+1. Reads current `dashboard` data (all 21 pairs)
+2. Opens trackers for valid signals not already being tracked
+3. Updates `hourly_gaps` + `peak_gap` for all open trackers
+4. Closes trackers on: gap < 5, bias flip, TBG flip, or 30-day max age
+5. Creates milestone snapshots at 24h, 48h, 72h, and weekly
+
+**app.py integration:** added `requests.post()` call after engine cycle to trigger tracker update
+- Needs uvicorn restart to take effect
+
+**Close reasons:** GAP_BELOW_5, BIAS_FLIPPED, TBG_FLIPPED, MAX_AGE_30D
+**Commit:** 10b3454
+
+---
+
 ## Apr 19, 2026 — Phase 6 Complete (Pattern Agent)
 
 **New file: `pages/api/pattern-agent.js` (270 lines)**
@@ -201,8 +228,8 @@
 ---
 
 ## PENDING / NEXT UP
-- Phase 7: signal_tracker table + price capture routes
-- Phase 8: Signal Agent v2 on tracker data (needs 30+ days)
+- Phase 7B: Analytics tab — tracker section in dashboard
+- Phase 8: Signal Agent v2 on tracker data (needs 30+ days of tracker data)
 - VPS migration (Hyonix HS-2, $12/mo — decision made, not yet purchased)
 - Landing/funnel pages (Free/Pro/Elite tiers)
 - PWA publishing
