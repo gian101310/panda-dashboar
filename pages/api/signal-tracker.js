@@ -46,7 +46,7 @@ async function openNewTrackers(dashboardPairs, openTrackers) {
       direction: pair.bias,
       strategy,
       gap_at_open: Math.abs(pair.gap),
-      confidence_at_open: pair.confidence_score || null,
+      confidence_at_open: null,
       momentum_at_open: pair.momentum || null,
       tbg_zone_at_open: pair.tbg_zone || null,
       session_at_open: sessionFromHour(hour),
@@ -163,7 +163,7 @@ export default async function handler(req, res) {
       // Default action: full update cycle
       // 1. Get current dashboard data
       const { data: dashboardPairs, error: dashErr } = await supabase
-        .from('dashboard').select('symbol, gap, bias, confidence, momentum, tbg_zone, confidence_score');
+        .from('dashboard').select('symbol, gap, bias, confidence, momentum, tbg_zone');
       if (dashErr) return res.status(500).json({ error: dashErr.message });
 
       // 2. Get all open trackers
