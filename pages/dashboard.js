@@ -97,6 +97,20 @@ function getEdgeMemory(row, memoryIndex) {
   return { flag, mem, maturity, winRate: wr, resRate, sample: mem.sample_size };
 }
 
+// ===== PDR BADGE =====
+function PdrBadge({ pdr }) {
+  if (!pdr) return null;
+  const mono = "'Share Tech Mono',monospace";
+  const color = pdr.strong ? '#00ff9f' : '#6b7280';
+  return (
+    <span style={{fontFamily:mono,fontSize:8,padding:'1px 5px',borderRadius:4,
+      background:pdr.strong?'rgba(0,255,159,0.12)':'rgba(107,114,128,0.12)',
+      color,border:`1px solid ${color}40`,marginLeft:4,letterSpacing:1}}>
+      PDR {pdr.strength.toFixed(2)} {pdr.direction==='BULLISH'?'▲':'▼'} {pdr.strong?'STRONG':'WEAK'}
+    </span>
+  );
+}
+
 // ===== BOX TREND DETECTION =====
 function boxTrend(trend) {
   if (!trend || trend === 'UNKNOWN') return null;
@@ -924,7 +938,7 @@ function StatCard({ label, value, color, sub }) {
 }
 
 // ===== PAIR CARD =====
-function PairCard({ row, trend, cotBias, confidence, memoryIndex }) {
+function PairCard({ row, trend, cotBias, confidence, memoryIndex, pdr }) {
   const gap=row.gap??0,valid=isValid(gap)&&!row.hard_invalid&&!isNeutralMatchup(row),bias=biasFromGap(gap),sig=signalLabel(row.signal,row.strength),strVal=row.strength??0,sc=stateColor(row.state),t=trend||{};
   const sparkColor=t.trend1h==='STRONGER'?'#00ff9f':t.trend1h==='WEAKER'?'#ff4d6d':'var(--text-muted)';
   const momIcons={BUILDING:'🚀',EMERGING:'📈',FADING:'📉',COOLING:'🌡️',REVERSAL:'⚠️',NEUTRAL:'▬',SPARK:'⚡',STRONG:'🔥',STABLE:'▬',CONSOLIDATING:'🔵',REVERSING:'⚠️'};
@@ -969,6 +983,7 @@ function PairCard({ row, trend, cotBias, confidence, memoryIndex }) {
 </div>);})()}{cotBias&&<div style={{display:'flex',alignItems:'center',gap:4}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>COT</span><span style={{fontFamily:mono,fontSize:9,color:cotBias.bias==='BULLISH'?'#00ff9f':'#ff4d6d',background:cotBias.bias==='BULLISH'?'rgba(0,255,159,0.08)':'rgba(255,77,109,0.08)',border:`1px solid ${cotBias.bias==='BULLISH'?'#00ff9f33':'#ff4d6d33'}`,borderRadius:3,padding:'1px 5px'}}>{cotBias.bias==='BULLISH'?'▲':'▼'} {cotBias.bias}</span></div>}
       {(()=>{if(!confidence)return null;const cs=confStyle(confidence.confidence);if(!cs)return null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>CONF</span><span style={{fontFamily:mono,fontSize:9,color:cs.color,background:cs.bg,border:`1px solid ${cs.border}`,borderRadius:4,padding:'1px 7px',fontWeight:700}}>{confidence.confidence} {cs.label}</span></div>);})()}
       {(()=>{const em=getEdgeMemory(row,memoryIndex);if(!em)return null;const fc=em.flag==='PROVEN_EDGE'?'#00ff9f':em.flag==='DEAD_ZONE'?'#ff4d6d':'#00b4ff';const icon=em.flag==='PROVEN_EDGE'?'✅':em.flag==='DEAD_ZONE'?'⛔':'📊';const lbl=em.flag?em.flag.replace('_',' '):(em.maturity||'').toUpperCase();const wrPct=Math.round((em.winRate||0)*100);const resPct=em.resRate!=null?Math.round(em.resRate*100):null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2,flexWrap:'wrap'}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>EDGE</span><span style={{fontFamily:mono,fontSize:9,color:fc,background:fc+'12',border:`1px solid ${fc}33`,borderRadius:4,padding:'1px 7px',fontWeight:700}}>{icon} {lbl}</span><span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>Win:{wrPct}%{resPct!=null?` | Res:${resPct}%`:''} (n={em.sample})</span></div>);})()}
+      {pdr&&<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>PDR</span><PdrBadge pdr={pdr}/></div>}
       <div style={{display:'flex',flexDirection:'column',gap:3}}>
         <div style={{display:'flex',alignItems:'center',gap:6}}>
           <span style={{fontFamily:mono,fontSize:10,color:t.momentumColor||'var(--text-muted)',background:(t.momentumColor||'var(--text-muted)')+'18',border:`1px solid ${(t.momentumColor||'var(--text-muted)')}30`,borderRadius:4,padding:'2px 8px',letterSpacing:1}}>{momIcons[t.momentum]||'▬'} {t.momentum||'NEUTRAL'}</span>
@@ -2537,7 +2552,7 @@ export default function Dashboard() {
               ?<div style={{textAlign:'center',padding:60,fontFamily:mono,fontSize:11,letterSpacing:3,color:'var(--text-muted)'}}>NO PAIRS MATCH</div>
               :<><div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2,marginBottom:10}}>{filter==='ALL'?`${displayed.length} ALL PAIRS · ${buyCount} BUY · ${sellCount} SELL`:filter==='VALID'?`${displayed.length} VALID PAIRS · ${buyCount} BUY · ${sellCount} SELL`:`${displayed.length} PAIRS`}</div>
               <div style={{display:'grid',gridTemplateColumns:isMobile?'repeat(auto-fit,minmax(160px,1fr))':'repeat(auto-fit,minmax(190px,1fr))',gap:isMobile?8:10,alignItems:'stretch'}}>
-                {displayed.map(row=><div key={row.symbol} onClick={()=>setSelectedPair(row)} style={{cursor:'pointer',height:'100%',display:'flex',flexDirection:'column'}}><PairCard row={row} trend={trends[row.symbol]} cotBias={getPairCotBias(row.symbol)} confidence={confidenceMap[row.symbol]} memoryIndex={memoryIndex}/></div>)}
+                {displayed.map(row=><div key={row.symbol} onClick={()=>setSelectedPair(row)} style={{cursor:'pointer',height:'100%',display:'flex',flexDirection:'column'}}><PairCard row={row} trend={trends[row.symbol]} cotBias={getPairCotBias(row.symbol)} confidence={confidenceMap[row.symbol]} memoryIndex={memoryIndex} pdr={pdrData[row.symbol]}/></div>)}
               </div></>
           ):tab==='SETUPS'?(<ValidSetupsTab data={data} trends={trends} cotMap={cotMap} confidenceMap={confidenceMap}/>
 ):tab==='VALID PAIRS'?(<ValidPairsTab data={data} trends={trends} cotMap={cotMap} confidenceMap={confidenceMap}/>
@@ -2666,7 +2681,7 @@ export default function Dashboard() {
 
             <div style={{overflowX:'auto'}}>
               <table style={{width:'100%',borderCollapse:'collapse',background:'var(--bg-secondary)',border:'1px solid var(--border)',borderRadius:10,overflow:'hidden'}}>
-                <thead><tr style={{background:'var(--bg-hover)'}}>{['#','SYMBOL','GAP','▲▼','BIAS','CONF','MOMENTUM','MATCHUP','1H','4H','8H','CHART','STATE','STR','SIG','COT','FL-ST','⚠️'].map(h=><th key={h} style={hdr}>{h}</th>)}</tr></thead>
+                <thead><tr style={{background:'var(--bg-hover)'}}>{['#','SYMBOL','GAP','▲▼','BIAS','CONF','MOMENTUM','MATCHUP','PDR','1H','4H','8H','CHART','STATE','STR','SIG','COT','FL-ST','⚠️'].map(h=><th key={h} style={hdr}>{h}</th>)}</tr></thead>
                 <tbody>
                   {displayed.length===0?<tr><td colSpan={15} style={{textAlign:'center',padding:40,fontFamily:mono,fontSize:10,color:'var(--text-muted)'}}>NO DATA</td></tr>
                   :displayed.map((row,idx)=>{
@@ -2682,7 +2697,7 @@ export default function Dashboard() {
                         <td style={tdc}><TrendArrow trend={gapTrend} size={14}/></td>
                         <td style={tdc}><span style={{border:`1px solid ${bias.border}`,borderRadius:3,padding:'1px 6px',fontFamily:mono,fontSize:9,color:bias.color,background:bias.bg}}>{bias.label}</span></td>
                         <td style={tdc}>{(()=>{const cf=confidenceMap[row.symbol];if(!cf)return <span style={{color:'var(--text-muted)'}}>—</span>;const cs=confStyle(cf.confidence);return <span style={{fontFamily:mono,fontSize:9,color:cs.color,background:cs.bg,border:`1px solid ${cs.border}`,borderRadius:3,padding:'1px 6px',whiteSpace:'nowrap'}}>{cf.confidence}</span>;})()}</td>
-                        <td style={{...tdc,fontFamily:mono,fontSize:9,color:t.momentumColor||'var(--text-muted)'}}>{t.momentum||'—'}</td><td style={{...tdc}}>{(()=>{const mu=getMatchup(row);if(!mu)return <span style={{color:'var(--text-muted)'}}>—</span>;return <span style={{fontFamily:mono,fontSize:9,color:mu.color,background:mu.color+'12',border:`1px solid ${mu.color}28`,borderRadius:4,padding:'1px 6px',whiteSpace:'nowrap'}}>{mu.label}</span>;})()}</td>
+                        <td style={{...tdc,fontFamily:mono,fontSize:9,color:t.momentumColor||'var(--text-muted)'}}>{t.momentum||'—'}</td><td style={{...tdc}}>{(()=>{const mu=getMatchup(row);if(!mu)return <span style={{color:'var(--text-muted)'}}>—</span>;return <span style={{fontFamily:mono,fontSize:9,color:mu.color,background:mu.color+'12',border:`1px solid ${mu.color}28`,borderRadius:4,padding:'1px 6px',whiteSpace:'nowrap'}}>{mu.label}</span>;})()}</td><td style={tdc}>{(()=>{const p=pdrData[row.symbol];return p?<PdrBadge pdr={p}/>:<span style={{color:'var(--text-muted)'}}>—</span>;})()}</td>
                         {['delta1h','delta4h','delta8h'].map(k=><td key={k} style={{...tdc,fontFamily:mono,fontSize:10,color:(t[k]||0)>0?'#00ff9f':(t[k]||0)<0?'#ff4d6d':'var(--text-muted)'}}>{t[k]!==undefined?(t[k]>0?'+':'')+t[k]:'—'}</td>)}
                         <td style={tdc}><Sparkline data={t.history||[]} color={sc2} w={55} h={18}/></td>
                         <td style={{...tdc,fontFamily:mono,fontSize:9,color:stateColor(row.state)}}>{row.state||'—'}</td>
