@@ -15,11 +15,12 @@ async function fetchRawCrossData() {
     .select('symbol, direction, outcome, entry_gap, tbg_zone, strategy')
     .not('outcome', 'is', null);
 
-  // Manual trades per pair
+  // Manual trades per pair — query kept identical to journal-agent (known working)
   const { data: trades, error: tradeErr } = await supabase
     .from('manual_trades')
     .select('symbol, direction, profit_loss_pips, duration_minutes, entry_time')
-    .not('exit_time', 'is', null);
+    .not('exit_time', 'is', null)
+    .order('entry_time', { ascending: false });
 
   return {
     signals: signals || [],
@@ -271,6 +272,7 @@ export default async function handler(req, res) {
         patterns_found: written,
         patterns_attempted: allMemories.length,
         pattern_types: allMemories.map(m => `${m.factor}: ${m.metadata?.description}`),
+        fetch_errors: { signals: sigErr, trades: tradeErr },
         ran_at: new Date().toISOString()
       });
     } catch (err) {
