@@ -10,18 +10,23 @@ async function fetchAllMemories() {
 
 async function fetchRawCrossData() {
   // Signal results per pair (including below-20 threshold)
-  const { data: signals } = await supabase
+  const { data: signals, error: sigErr } = await supabase
     .from('signal_results')
     .select('symbol, direction, outcome, entry_gap, tbg_zone, strategy')
     .not('outcome', 'is', null);
 
   // Manual trades per pair
-  const { data: trades } = await supabase
+  const { data: trades, error: tradeErr } = await supabase
     .from('manual_trades')
     .select('symbol, direction, profit_loss_pips, duration_minutes, entry_time')
     .not('exit_time', 'is', null);
 
-  return { signals: signals || [], trades: trades || [] };
+  return {
+    signals: signals || [],
+    trades: trades || [],
+    sigErr: sigErr?.message || null,
+    tradeErr: tradeErr?.message || null
+  };
 }
 
 function buildPairStats(signals, trades) {
@@ -217,10 +222,18 @@ export default async function handler(req, res) {
   if (req.method === 'POST') {
     try {
       // 1. Fetch existing memories + raw cross-reference data
-      const [memories, { signals, trades }] = await Promise.all([
+      const [memories, { signals, trades, sigErr, tradeErr }] = await Promise.all([
         fetchAllMemories(),
         fetchRawCrossData()
       ]);
+
+      // Surface any fetch errors immediately before deleting existing memories
+      if (tradeErr) {
+        return res.status(500).json({ error: 'manual_trades fetch failed', detail: tradeErr });
+      }
+      if (sigErr) {
+        return res.status(500).json({ error: 'signal_results fetch failed', detail: sigErr });
+      }
 
       // 2. Build pair-level cross-reference maps
       const { sigMap, tradeMap } = buildPairStats(signals, trades);
