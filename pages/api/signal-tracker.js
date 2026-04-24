@@ -40,11 +40,8 @@ function sessionFromHour(h) {
 function isValidSignal(pair) {
   const gap = Math.abs(pair.gap || 0);
   const bias = pair.bias;
-  const tbg = pair.tbg_zone;
+  // BB does not require TBG — gap >= 5 and directional bias is the only requirement
   if (gap < 5 || !bias || bias === 'WAIT') return false;
-  // TBG must confirm for validity
-  if (bias === 'BUY' && tbg !== 'ABOVE') return false;
-  if (bias === 'SELL' && tbg !== 'BELOW') return false;
   return true;
 }
 
