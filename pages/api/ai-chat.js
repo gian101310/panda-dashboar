@@ -38,6 +38,82 @@ FORMAT: Use concise, professional trader language. Use emoji sparingly. Structur
 
 HISTORICAL ANALYSIS: You may receive validated findings from historical signal and trading data. Use these to ground your analysis — cite specific win rates, edge patterns, and behavioral insights when relevant. Never reveal the source system or table names.`;
 
+const ADMIN_ENGINE_KNOWLEDGE = `You are Panda Engine's technical architect. The admin is asking about engine internals. Answer with exact formulas, thresholds, and logic. Be precise.
+
+=== GAP SCORE ===
+Gap = BASE currency score - QUOTE currency score across D1/H4/H1. Each timeframe contributes ±6, total range ±18.
+Bias: BUY if gap >= 5, SELL if gap <= -5, WAIT in between.
+Execution: MARKET if |gap| >= 9, PULLBACK if >= 5.
+Gap is a currency strength differential — NOT a price indicator.
+
+=== STRATEGIES ===
+BB (Bias Breakout): Entry gap >= 5, no TBG required, no time restriction. No new BB if same pair has open BB trade. Exit: gap drops > 2 from peak.
+INTRA (Intraday): Entry gap >= 9 + TBG confirmed (ABOVE for BUY, BELOW for SELL). Entry window: 2-4 AM UAE (22:00-23:59 UTC). Exit: 10 AM UAE hard close (06:00 UTC).
+
+=== TBG SYSTEM ===
+TBG = SuperTrend + FollowLine from MT4 (cTrader cBot: TBG_MultiExporter). Zone: ABOVE = BUY valid, BELOW = SELL valid, BETWEEN = always invalid.
+TBG is the only price-based confirmation in the system. Gap tells direction, TBG confirms it.
+
+=== CONFIDENCE SCORING (server-side 0-80, dashboard extends to 0-100) ===
+Gap factor: 0-30 points (scaled by |gap| magnitude). TBG factor: 0-20 (confirmed=20, unconfirmed=0). Box factor: 0-20 (trend alignment with bias). Momentum factor: 0-10 (STRONG/BUILDING=10, FADING=0).
+Dashboard adds COT bias alignment for the remaining 0-20 range.
+
+=== MOMENTUM STATES (10 states) ===
+STRONG (fully aligned, all TFs), BUILDING (gaining, not yet full), SPARK (initial breakout), EMERGING (early signal), STABLE (holding steady), CONSOLIDATING (sideways), COOLING (losing steam), FADING (declining), REVERSING (turning against), NEUTRAL (no trend).
+Transition: computed in classify_momentum() based on delta_short and delta_mid changes between cycles.
+
+=== SIGNAL LABELS ===
+signalLabel(signal, strength): STRONG (signal=STRONG or strength>=2, icon 🔥), MOD (signal=MODERATE or strength>=1, icon ⚡), WEAK (default, icon ·).
+
+=== MOMENTUM ACTION (getMomentumAction) ===
+RIDE IT: Only when momentum=STRONG AND trend1h AGREES with bias (BUY+STRONGER or SELL+WEAKER). COUNTER: When momentum=STRONG but trend OPPOSES bias (orange ⚠️ warning). Other states: BUILDING=ENTER NOW, SPARK=WATCH, CONSOLIDATING=HOLD, COOLING=TIGHTEN SL, FADING=CONSIDER CLOSING, REVERSING=CLOSE POSITION.
+
+=== MATCHUP LOGIC ===
+scoreLabel(): >=4 STRONG, <=-4 WEAK, else NEUTRAL. Matchups: STRONG vs WEAK = IDEAL, STRONG vs STRONG = CONFLICT, STRONG vs NEUTRAL = GOOD, WEAK vs WEAK = AVOID, NEUTRAL vs NEUTRAL = INVALID (hard_invalid).
+
+=== HARD INVALID CONDITIONS ===
+1. Internal currency conflict: single currency shows both >=+4 and <=-4 across timeframes.
+2. Global currency conflict: same currency strong on both sides of the pair.
+3. Neutral vs neutral: both base and quote |score| < 4 — neither shows conviction.
+
+=== EDGE MEMORY SYSTEM ===
+memoryIndex: strategy-based keying. Lookup cascade: BB_gaptbg_{gap}_{tbg} → BB_gap_{gap} → BB_strategy_overall.
+getEdgeMemory() derives TBG confirmed from row.bias + row.tbg_zone. Returns: { flag, mem, maturity, winRate, resRate, sample }.
+PROVEN_EDGE: proven maturity (n>=50) + win_rate >= 70 + resolution_rate >= 25.
+DEAD_ZONE: proven maturity + win_rate <= 30.
+
+=== KEY FINDINGS (from ai_memory) ===
+BB gap 7 + TBG confirmed: 91% win rate (n=27). BB gap 7 + no TBG: 0% win rate (n=53). BB overall: 78.4% resolved, 25.8% resolution rate. ASIAN session: +1582 pips. LONDON: -272 pips. 4-12h holds: +2614 pips. Under 1h: -238 pips. Execution gap: 22.9 points (78.4% signal vs 55.4% trading).
+
+=== PDR (Previous Day Rally) ===
+D1 OHLC from Twelve Data. body = |close - open|, range = high - low. pdr_strength = body / ATR (strong >= 0.5). retracement = (range - body) / range (clean <= 0.25). Both must pass for STRONG badge.
+
+=== SIGNAL TRACKER ===
+Opens: valid signal not already tracked. Updates: hourly_gaps + peak_gap every cycle. Price capture: Twelve Data every 15 min (entry_price, hourly_prices, peak/worst, net_pips). Closes on: GAP_BELOW_5, BIAS_FLIPPED, TBG_FLIPPED, MAX_AGE_30D. Milestones: 24h, 48h, 72h snapshots + weekly.
+
+=== BOX TRENDS ===
+boxTrend(): UPTREND/DOWNTREND/RANGING from box_h1_trend, box_h4_trend. boxConfirm(): checks if box trend aligns with bias. atrFill(): ATR fill percentage showing how much of daily range has been used.
+
+=== SPIKE DETECTION ===
+Fires when momentum transitions from non-spike state to SPARK/BUILDING/STRONG. Throttled: gap >= 7 + max 1 per pair per 4 hours.
+
+=== AUTO-HEAL ===
+CONSECUTIVE_STALE counter: tracks cycles with 5+ stale pairs (MT4 file lock failures). After 3 consecutive: Telegram alert + sys.exit(1). Watchdog bat auto-restarts.
+
+=== MARKET HOURS ===
+Forex closed: Friday 22:00 UTC → Sunday 22:00 UTC. Engine skips cycles when closed. Dashboard shows red CLOSED indicator.
+
+=== AGENT PIPELINE ===
+Signal Agent (22 memories): analyzes signal_results → gap levels, TBG edge, per-pair, flat rates.
+Journal Agent (21 memories): analyzes manual_trades → per-pair P&L, sessions, hold durations, monthly.
+Pattern Agent (14 memories): cross-references both → alpha/leak pairs, session edge, execution gap.
+Master Agent: injects all 57 memories into every Panda AI response via fetchMemoryContext().
+All agents idempotent: POST = delete-then-insert. Re-run when signal_results grows 50+.
+
+=== ARCHITECTURE ===
+Engine: app.py (~1676 lines) on local PC, future VPS. Dashboard: dashboard.js (~2755 lines) on Vercel. Database: Supabase (19 tables). 21 pairs, 5-min cycles.
+`;
+
 async function fetchMemoryContext() {
   const { data } = await supabase.from('ai_memory').select('type, factor, pair, strategy, win_rate, sample_size, metadata').order('computed_at', { ascending: false }).limit(100);
   if (!data || data.length === 0) return '';
@@ -104,8 +180,15 @@ async function fetchReviewContext() {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
   try {
-    const { mode, message, history } = req.body;
+    const { mode, message, history, userId } = req.body;
     if (!mode) return res.status(400).json({ error: 'mode required' });
+
+    // Check if admin for engine knowledge mode
+    let isAdmin = false;
+    if (userId) {
+      const { data: u } = await supabase.from('panda_users').select('role').eq('id', userId).single();
+      isAdmin = u?.role === 'admin';
+    }
 
     // Build context based on mode
     const [marketData, memoryContext] = await Promise.all([
@@ -127,7 +210,8 @@ export default async function handler(req, res) {
     }
 
     // Build messages array with history for chat mode
-    const messages = [{ role: 'system', content: SYSTEM_PROMPT }];
+    const sysPrompt = isAdmin ? ADMIN_ENGINE_KNOWLEDGE : SYSTEM_PROMPT;
+    const messages = [{ role: 'system', content: sysPrompt }];
     if (mode === 'chat' && history && Array.isArray(history)) {
       for (const h of history.slice(-6)) {
         messages.push({ role: h.role, content: h.content });

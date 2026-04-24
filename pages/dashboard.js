@@ -1819,7 +1819,7 @@ function ResearchTab({ pairs, cotData, cotLoading, fetchCot }) {
 }
 
 // ===== PANDA AI CHAT =====
-function PandaAIChat() {
+function PandaAIChat({ userId }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -1839,7 +1839,7 @@ function PandaAIChat() {
     const displayMsg = mode === 'chat' ? userMessage : mode === 'insights' ? '📊 Analyze market — rank best setups' : '📋 Review my trade performance';
     setMessages(prev => [...prev, { role: 'user', content: displayMsg }]);
     try {
-      const body = { mode };
+      const body = { mode, userId };
       if (mode === 'chat') { body.message = userMessage; body.history = messages.slice(-6); }
       const r = await fetch('/api/ai-chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const data = await r.json();
@@ -2676,7 +2676,7 @@ export default function Dashboard() {
 <SignalAnalytics/>
 </div>
 ):tab==='PANDA AI'?(
-<PandaAIChat/>
+<PandaAIChat userId={user?.id}/>
 ):tab==='TABLE'?(
 
             <div style={{overflowX:'auto'}}>
