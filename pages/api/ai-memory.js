@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase';
+import { validateSession } from '../../lib/auth';
 
 const VALID_TYPES = ['signal_pattern', 'behavior', 'edge_analysis', 'market_theme', 'confluence_validation'];
 const MIN_SAMPLE_SIZE = 20;
@@ -25,6 +26,9 @@ export default async function handler(req, res) {
 
   // POST — write a new memory (agent use only)
   if (req.method === 'POST') {
+    const token = req.cookies?.panda_session;
+    const session = await validateSession(token);
+    if (!session) return res.status(401).json({ error: 'Unauthorized' });
     const { type, factor, pair, strategy, win_rate, sample_size, metadata } = req.body;
 
     // Validate required fields
@@ -59,6 +63,9 @@ export default async function handler(req, res) {
 
   // DELETE — remove a memory by id (maintenance)
   if (req.method === 'DELETE') {
+    const token = req.cookies?.panda_session;
+    const session = await validateSession(token);
+    if (!session) return res.status(401).json({ error: 'Unauthorized' });
     const { id } = req.query;
     if (!id) return res.status(400).json({ error: 'id is required' });
 

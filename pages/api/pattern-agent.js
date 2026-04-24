@@ -61,7 +61,7 @@ function findAlphaAndLeakPairs(sigMap, tradeMap) {
     // Alpha pair: user profitable AND signals strong
     if (trade.pips > 50 && sigWR !== null && sigWR >= 70) {
       memories.push({
-        type: 'market_theme', factor: 'alpha_pair', pair,
+        type: 'market_theme', factor: 'alpha_pair', pair, strategy: 'BB',
         win_rate: tradeWR, sample_size: trade.n,
         metadata: { trade_pips: Math.round(trade.pips * 100) / 100,
           trade_wins: trade.wins, trade_losses: trade.losses,
@@ -73,7 +73,7 @@ function findAlphaAndLeakPairs(sigMap, tradeMap) {
     // Leak pair: user loses money despite decent signal edge
     if (trade.pips < -50 && sigWR !== null && sigWR >= 60) {
       memories.push({
-        type: 'market_theme', factor: 'leak_pair', pair,
+        type: 'market_theme', factor: 'leak_pair', pair, strategy: 'BB',
         win_rate: tradeWR, sample_size: trade.n,
         metadata: { trade_pips: Math.round(trade.pips * 100) / 100,
           trade_wins: trade.wins, trade_losses: trade.losses,
@@ -85,7 +85,7 @@ function findAlphaAndLeakPairs(sigMap, tradeMap) {
     // Overtraded weak pair: user trades a lot but signals are weak
     if (trade.n >= 15 && trade.pips < 0 && sigWR !== null && sigWR < 55) {
       memories.push({
-        type: 'market_theme', factor: 'overtraded_weak', pair,
+        type: 'market_theme', factor: 'overtraded_weak', pair, strategy: 'BB',
         win_rate: tradeWR, sample_size: trade.n,
         metadata: { trade_pips: Math.round(trade.pips * 100) / 100,
           signal_win_rate: sigWR, signal_count: sigTotal,

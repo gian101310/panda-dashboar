@@ -4,6 +4,9 @@ import crypto from 'crypto';
 const PF_BOT_TOKEN = '8605294552:AAG2o7bF30qkZx0Zv_FgmwA0RgS7g56OH7Y';
 const ADMIN_CHAT_ID = '5379148910';
 const FREE_TABS = ['signals','gap_chart','calendar','calculator'];
+// Set TG_WEBHOOK_SECRET in Vercel env vars, then re-register webhook with:
+// https://api.telegram.org/bot<TOKEN>/setWebhook?url=<URL>&secret_token=<SECRET>
+const TG_WEBHOOK_SECRET = process.env.TG_WEBHOOK_SECRET || '';
 
 function hashPassword(password) {
   return crypto.createHash('sha256').update(password + 'panda_salt_2026').digest('hex');
@@ -23,6 +26,12 @@ async function pfBotSend(chatId, text) {
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(200).json({ ok: true });
+
+  // Validate Telegram webhook secret — blocks non-Telegram POST requests
+  if (TG_WEBHOOK_SECRET) {
+    const incoming = req.headers['x-telegram-bot-api-secret-token'] || '';
+    if (incoming !== TG_WEBHOOK_SECRET) return res.status(403).json({ ok: false });
+  }
 
   try {
     const message = req.body?.message;

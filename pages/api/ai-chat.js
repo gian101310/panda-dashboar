@@ -1,5 +1,6 @@
 import { supabase } from '../../lib/supabase';
 import OPENAI_API_KEY from '../../lib/openai';
+import { validateSession } from '../../lib/auth';
 
 const SYSTEM_PROMPT = `You are Panda AI — a forex market analyst assistant for the Panda Engine dashboard.
 
@@ -180,15 +181,16 @@ async function fetchReviewContext() {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
   try {
-    const { mode, message, history, userId } = req.body;
+    // Auth gate — session cookie required
+    const token = req.cookies?.panda_session;
+    const session = await validateSession(token);
+    if (!session) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { mode, message, history } = req.body;
     if (!mode) return res.status(400).json({ error: 'mode required' });
 
-    // Check if admin for engine knowledge mode
-    let isAdmin = false;
-    if (userId) {
-      const { data: u } = await supabase.from('panda_users').select('role').eq('id', userId).single();
-      isAdmin = u?.role === 'admin';
-    }
+    // Derive admin status from the validated session — never from client-supplied body
+    const isAdmin = session.panda_users?.role === 'admin';
 
     // Build context based on mode
     const [marketData, memoryContext] = await Promise.all([
