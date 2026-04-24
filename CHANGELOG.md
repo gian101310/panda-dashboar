@@ -1,5 +1,5 @@
 > # PANDA ENGINE — CHANGELOG
-
+>
 > Claude updates this at the end of every session. Most recent entries first. Keep only last 15 sessions.
 
 ---
