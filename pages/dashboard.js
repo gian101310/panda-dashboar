@@ -924,7 +924,7 @@ function StatCard({ label, value, color, sub }) {
 }
 
 // ===== PAIR CARD =====
-function PairCard({ row, trend, cotBias, confidence }) {
+function PairCard({ row, trend, cotBias, confidence, memoryIndex }) {
   const gap=row.gap??0,valid=isValid(gap)&&!row.hard_invalid&&!isNeutralMatchup(row),bias=biasFromGap(gap),sig=signalLabel(row.signal,row.strength),strVal=row.strength??0,sc=stateColor(row.state),t=trend||{};
   const sparkColor=t.trend1h==='STRONGER'?'#00ff9f':t.trend1h==='WEAKER'?'#ff4d6d':'var(--text-muted)';
   const momIcons={BUILDING:'🚀',EMERGING:'📈',FADING:'📉',COOLING:'🌡️',REVERSAL:'⚠️',NEUTRAL:'▬',SPARK:'⚡',STRONG:'🔥',STABLE:'▬',CONSOLIDATING:'🔵',REVERSING:'⚠️'};
@@ -968,6 +968,7 @@ function PairCard({ row, trend, cotBias, confidence }) {
 </div>
 </div>);})()}{cotBias&&<div style={{display:'flex',alignItems:'center',gap:4}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>COT</span><span style={{fontFamily:mono,fontSize:9,color:cotBias.bias==='BULLISH'?'#00ff9f':'#ff4d6d',background:cotBias.bias==='BULLISH'?'rgba(0,255,159,0.08)':'rgba(255,77,109,0.08)',border:`1px solid ${cotBias.bias==='BULLISH'?'#00ff9f33':'#ff4d6d33'}`,borderRadius:3,padding:'1px 5px'}}>{cotBias.bias==='BULLISH'?'▲':'▼'} {cotBias.bias}</span></div>}
       {(()=>{if(!confidence)return null;const cs=confStyle(confidence.confidence);if(!cs)return null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>CONF</span><span style={{fontFamily:mono,fontSize:9,color:cs.color,background:cs.bg,border:`1px solid ${cs.border}`,borderRadius:4,padding:'1px 7px',fontWeight:700}}>{confidence.confidence} {cs.label}</span></div>);})()}
+      {(()=>{const em=getEdgeMemory(row,memoryIndex);if(!em)return null;const fc=em.flag==='PROVEN_EDGE'?'#00ff9f':em.flag==='DEAD_ZONE'?'#ff4d6d':'#00b4ff';const icon=em.flag==='PROVEN_EDGE'?'✅':em.flag==='DEAD_ZONE'?'⛔':'📊';const lbl=em.flag?em.flag.replace('_',' '):(em.maturity||'').toUpperCase();const wrPct=Math.round((em.winRate||0)*100);const resPct=em.resRate!=null?Math.round(em.resRate*100):null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2,flexWrap:'wrap'}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>EDGE</span><span style={{fontFamily:mono,fontSize:9,color:fc,background:fc+'12',border:`1px solid ${fc}33`,borderRadius:4,padding:'1px 7px',fontWeight:700}}>{icon} {lbl}</span><span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>Win:{wrPct}%{resPct!=null?` | Res:${resPct}%`:''} (n={em.sample})</span></div>);})()}
       <div style={{display:'flex',flexDirection:'column',gap:3}}>
         <div style={{display:'flex',alignItems:'center',gap:6}}>
           <span style={{fontFamily:mono,fontSize:10,color:t.momentumColor||'var(--text-muted)',background:(t.momentumColor||'var(--text-muted)')+'18',border:`1px solid ${(t.momentumColor||'var(--text-muted)')}30`,borderRadius:4,padding:'2px 8px',letterSpacing:1}}>{momIcons[t.momentum]||'▬'} {t.momentum||'NEUTRAL'}</span>
@@ -981,6 +982,7 @@ function PairCard({ row, trend, cotBias, confidence }) {
       </div>
       <div style={{display:'flex',background:'var(--bg-card)',borderRadius:6,padding:'6px 8px'}}><DeltaChip label="1H" delta={t.delta1h}/><div style={{width:1,background:'var(--border)',margin:'0 4px'}}/><DeltaChip label="4H" delta={t.delta4h}/><div style={{width:1,background:'var(--border)',margin:'0 4px'}}/><DeltaChip label="8H" delta={t.delta8h}/></div>
       <div style={{display:'flex',alignItems:'center',gap:5}}><div style={{width:5,height:5,borderRadius:'50%',background:sc,flexShrink:0}}/><span style={{fontFamily:mono,fontSize:9,color:sc}}>{row.state||'NEUTRAL'}</span></div>
+      {(()=>{const em=getEdgeMemory(row,memoryIndex);if(!em)return null;const fc=em.flag==='PROVEN_EDGE'?'#00ff9f':em.flag==='DEAD_ZONE'?'#ff4d6d':'#00b4ff';const icon=em.flag==='PROVEN_EDGE'?'✅':em.flag==='DEAD_ZONE'?'⛔':'📊';const lbl=em.flag?em.flag.replace('_',' '):(em.maturity||'').toUpperCase();const wrPct=Math.round((em.winRate||0)*100);const resPct=em.resRate!=null?Math.round(em.resRate*100):null;return(<div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>EDGE</span><span style={{fontFamily:mono,fontSize:9,color:fc,background:fc+'12',border:`1px solid ${fc}33`,borderRadius:4,padding:'1px 7px',fontWeight:700}}>{icon} {lbl}</span><span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>Win:{wrPct}%{resPct!=null?` | Res:${resPct}%`:''} (n={em.sample})</span></div>);})()}
       <div style={{background:'var(--bg-card)',borderRadius:6,padding:'7px 10px',display:'flex',flexDirection:'column',gap:5}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}><span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2}}>STRENGTH</span><span style={{fontFamily:orb,fontSize:15,fontWeight:700,color:strColor(strVal),textShadow:`0 0 8px ${strColor(strVal)}66`}}>{Number(strVal).toFixed(2)}</span></div><div style={{height:4,background:'var(--border)',borderRadius:2,overflow:'hidden'}}><div style={{width:`${Math.min(100,(Math.abs(strVal)/30)*100)}%`,height:'100%',background:strColor(strVal),borderRadius:2}}/></div></div>
       <div style={{display:'flex',justifyContent:'space-between',borderTop:'1px solid var(--border)',paddingTop:5}}><span style={{fontFamily:mono,fontSize:9,color:sig.color}}>{sig.icon} {sig.text}</span><span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>{formatTime(row.updated_at)}</span></div>
     </div>
@@ -989,7 +991,7 @@ function PairCard({ row, trend, cotBias, confidence }) {
 
 
 // ===== PAIR CARD MODAL =====
-function PairCardModal({ row, trend, cotBias, onClose, isMobile, confidence }) {
+function PairCardModal({ row, trend, cotBias, onClose, isMobile, confidence, memoryIndex }) {
   if (!row) return null;
   const gap = row.gap ?? 0;
   const bias = biasFromGap(gap);
@@ -2544,7 +2546,7 @@ export default function Dashboard() {
               ?<div style={{textAlign:'center',padding:60,fontFamily:mono,fontSize:11,letterSpacing:3,color:'var(--text-muted)'}}>NO PAIRS MATCH</div>
               :<><div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2,marginBottom:10}}>{filter==='ALL'?`${displayed.length} ALL PAIRS · ${buyCount} BUY · ${sellCount} SELL`:filter==='VALID'?`${displayed.length} VALID PAIRS · ${buyCount} BUY · ${sellCount} SELL`:`${displayed.length} PAIRS`}</div>
               <div style={{display:'grid',gridTemplateColumns:isMobile?'repeat(auto-fit,minmax(160px,1fr))':'repeat(auto-fit,minmax(190px,1fr))',gap:isMobile?8:10,alignItems:'stretch'}}>
-                {displayed.map(row=><div key={row.symbol} onClick={()=>setSelectedPair(row)} style={{cursor:'pointer',height:'100%',display:'flex',flexDirection:'column'}}><PairCard row={row} trend={trends[row.symbol]} cotBias={getPairCotBias(row.symbol)} confidence={confidenceMap[row.symbol]}/></div>)}
+                {displayed.map(row=><div key={row.symbol} onClick={()=>setSelectedPair(row)} style={{cursor:'pointer',height:'100%',display:'flex',flexDirection:'column'}}><PairCard row={row} trend={trends[row.symbol]} cotBias={getPairCotBias(row.symbol)} confidence={confidenceMap[row.symbol]} memoryIndex={memoryIndex}/></div>)}
               </div></>
           ):tab==='SETUPS'?(<ValidSetupsTab data={data} trends={trends} cotMap={cotMap} confidenceMap={confidenceMap}/>
 ):tab==='VALID PAIRS'?(<ValidPairsTab data={data} trends={trends} cotMap={cotMap} confidenceMap={confidenceMap}/>
@@ -2739,6 +2741,7 @@ export default function Dashboard() {
         onClose={()=>setSelectedPair(null)}
         isMobile={isMobile}
         confidence={confidenceMap[selectedPair.symbol]}
+        memoryIndex={memoryIndex}
       />
     )}
     </>
