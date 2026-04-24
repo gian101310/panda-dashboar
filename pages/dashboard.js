@@ -64,6 +64,16 @@ function getMaturity(sampleSize) {
   if (sampleSize >= 20) return 'developing';
   return null;
 }
+function getMomentumAction(momentum, bias, trend) {
+  const g = MOMENTUM_GUIDE[momentum];
+  if (!g) return null;
+  if (momentum !== 'STRONG') return g;
+  // RIDE IT requires trend alignment with bias
+  const t1 = trend?.trend1h;
+  const aligned = (bias === 'BUY' && t1 === 'STRONGER') || (bias === 'SELL' && t1 === 'WEAKER');
+  if (aligned) return g;
+  return { icon:'⚠️', action:'COUNTER — Trend opposes bias', desc:'Momentum strong but direction misaligned', color:'#ffaa44' };
+}
 function getEdgeMemory(row, memoryIndex) {
   if (!memoryIndex || !row) return null;
   const absGap = Math.abs(row.gap || 0);
@@ -963,7 +973,7 @@ function PairCard({ row, trend, cotBias, confidence }) {
           <span style={{fontFamily:mono,fontSize:10,color:t.momentumColor||'var(--text-muted)',background:(t.momentumColor||'var(--text-muted)')+'18',border:`1px solid ${(t.momentumColor||'var(--text-muted)')}30`,borderRadius:4,padding:'2px 8px',letterSpacing:1}}>{momIcons[t.momentum]||'▬'} {t.momentum||'NEUTRAL'}</span>
           {t.velocity&&t.velocity!=='STABLE'&&<span style={{fontFamily:mono,fontSize:9,color:t.velocity==='ACCELERATING'?'#00ff9f':'#ffaa44'}}>{t.velocity==='ACCELERATING'?'⚡ ACC':'↘ DEC'}</span>}
         </div>
-        {(() => { const g = MOMENTUM_GUIDE[t.momentum]; return g ? (
+        {(() => { const g = getMomentumAction(t.momentum, row.bias, t); return g ? (
           <div style={{display:'flex',alignItems:'center',gap:4}}>
             <span style={{fontFamily:mono,fontSize:9,color:g.color,background:g.color+'12',borderRadius:3,padding:'1px 6px',letterSpacing:0.5,fontWeight:700}}>👉 {g.action}</span>
           </div>
@@ -991,7 +1001,7 @@ function PairCardModal({ row, trend, cotBias, onClose, isMobile, confidence }) {
   const af = atrFill(row.atr);
   const sc = stateColor(row.state);
   const strVal = row.strength ?? 0;
-  const g = MOMENTUM_GUIDE[t.momentum || row.momentum];
+  const g = getMomentumAction(t.momentum || row.momentum, row.bias, t);
   const momColor = t.momentumColor || 'var(--text-muted)';
   const momIcons = {BUILDING:'🚀',EMERGING:'📈',FADING:'📉',COOLING:'🌡️',NEUTRAL:'▬',SPARK:'⚡',STRONG:'🔥',STABLE:'▬',CONSOLIDATING:'🔵',REVERSING:'⚠️'};
 
@@ -1171,7 +1181,7 @@ function ValidSetupsTab({ data, trends, cotMap, confidenceMap }) {
         const bias = gap > 0 ? { label:'BUY', color:'#00ff9f', border:'#00ff9f33', bg:'rgba(0,255,159,0.08)' }
                               : { label:'SELL', color:'#ff4d6d', border:'#ff4d6d33', bg:'rgba(255,77,109,0.08)' };
         const t = trends[row.symbol] || {};
-        const g = MOMENTUM_GUIDE[t.momentum];
+        const g = getMomentumAction(t.momentum, bias.label, t);
         const strVal = row.strength ?? 0;
         const strC = strVal >= 2 ? '#ffd166' : strVal >= 1 ? '#00b4ff' : 'var(--text-muted)';
         const cotBias = (function() {
@@ -1971,7 +1981,7 @@ function TrackerPanel() {
   );
 }
 
-const TABS = ['PANELS','SIGNALS','TABLE','GAP CHART','RESEARCH','CALCULATOR','SETUPS','VALID PAIRS','SPIKE LOG','CHART','ANALYTICS','SIGNAL LOG','PANDA AI'];
+const TABS = ['PANELS','SIGNALS','TABLE','GAP CHART','RESEARCH','CALCULATOR','SETUPS','VALID PAIRS','CHART','ANALYTICS','LOGS','PANDA AI'];
 // Maps each tab to the feature_access key that controls it
 const TAB_FEATURE = {
   'PANELS':      'panels',
@@ -1986,7 +1996,7 @@ const TAB_FEATURE = {
   'ENGINE':      'engine',
   'CHART':       'panels',
   'ANALYTICS':   'analytics',
-  'SIGNAL LOG':  'signal_log',
+  'LOGS':        'signal_log',
   'PANDA AI':    'panda_ai',
 };
 const FILTERS = ['VALID','ALL','BUY','SELL','STRONG','⚠️ CLOSE'];
@@ -2292,6 +2302,7 @@ export default function Dashboard() {
     return idx;
   }, [aiMemories]);
   const [tab,        setTab]        = useState('PANELS');
+  const [logSub,     setLogSub]     = useState('Signal Log');
   const [isAdmin,    setIsAdmin]    = useState(false);
   const [user,       setUser]       = useState(null);
   const [showAlertSettings, setShowAlertSettings] = useState(false);
@@ -2503,8 +2514,8 @@ export default function Dashboard() {
         )}
 
         {/* TABS */}
-        <div style={{display:'flex',alignItems:'center',gap:7,padding:isMobile?'0 12px 10px':'0 20px 10px',flexWrap:isMobile?'nowrap':'wrap',overflowX:isMobile?'auto':'visible',zIndex:1}}>
-          <div style={{display:'flex',background:'var(--bg-secondary)',border:'1px solid var(--border)',borderRadius:7,overflow:isMobile?'visible':'hidden',flexShrink:0}}>
+        <div style={{display:'flex',alignItems:'center',gap:7,padding:isMobile?'0 12px 10px':'0 20px 10px',flexWrap:'nowrap',overflowX:'auto',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',zIndex:1}}>
+          <div style={{display:'flex',background:'var(--bg-secondary)',border:'1px solid var(--border)',borderRadius:7,overflow:'visible',flexShrink:0}}>
             {TABS.filter(t=>{ const feat=TAB_FEATURE[t]; if(!feat) return true; if(isAdmin) return true; const fa=user?.feature_access||[]; return fa.includes(feat)||fa.includes('dashboard');}).map((t,i,arr)=><button key={t} onClick={()=>setTab(t)} style={{background:tab===t?'rgba(0,180,255,0.15)':'rgba(255,255,255,0.03)',border:'none',borderRight:i<TABS.length-1?'1px solid var(--border)':'none',color:tab===t?'#00b4ff':'#c8ddf0',fontFamily:mono,fontSize:9,fontWeight:tab===t?700:500,letterSpacing:2,padding:'7px 12px',cursor:'pointer',whiteSpace:'nowrap'}}>{t}</button>)}
             {isAdmin&&<><button onClick={()=>setTab('ENGINE')} style={{background:tab==='ENGINE'?'rgba(255,209,102,0.15)':'rgba(255,255,255,0.03)',border:'none',borderLeft:'1px solid var(--border)',color:tab==='ENGINE'?'#ffd166':'#c8ddf0',fontFamily:mono,fontSize:9,fontWeight:tab==='ENGINE'?700:500,letterSpacing:2,padding:'7px 12px',cursor:'pointer'}}>🏥 ENGINE</button></>}
           </div>
@@ -2537,7 +2548,15 @@ export default function Dashboard() {
               </div></>
           ):tab==='SETUPS'?(<ValidSetupsTab data={data} trends={trends} cotMap={cotMap} confidenceMap={confidenceMap}/>
 ):tab==='VALID PAIRS'?(<ValidPairsTab data={data} trends={trends} cotMap={cotMap} confidenceMap={confidenceMap}/>
-):tab==='SPIKE LOG'?(<SpikeLogTab/>
+):tab==='SPIKE LOG'||tab==='LOGS'?(
+<div>
+  <div style={{display:'flex',gap:8,marginBottom:12}}>
+    {['Signal Log','Spike Log'].map(st=>(
+      <button key={st} onClick={()=>setLogSub(st)} style={{fontFamily:mono,fontSize:10,letterSpacing:2,padding:'5px 14px',borderRadius:6,border:'1px solid',borderColor:logSub===st?'#00b4ff':'var(--border)',background:logSub===st?'#00b4ff15':'transparent',color:logSub===st?'#00b4ff':'var(--text-muted)',cursor:'pointer'}}>{st}</button>
+    ))}
+  </div>
+  {logSub==='Signal Log'?<SignalLogTab/>:<SpikeLogTab/>}
+</div>
 ):tab==='CHART'?(<ChartTab data={data}/>
 ):tab==='SIGNALS'?(
 <div style={{display:'flex',flexDirection:'column',gap:24}}>
@@ -2648,8 +2667,6 @@ export default function Dashboard() {
 <TrackerPanel/>
 <SignalAnalytics/>
 </div>
-):tab==='SIGNAL LOG'?(
-<SignalLogTab/>
 ):tab==='PANDA AI'?(
 <PandaAIChat/>
 ):tab==='TABLE'?(

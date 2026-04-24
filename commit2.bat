@@ -1,5 +1,4 @@
-@echo off
-cd /d C:\Users\Admin\panda-dashboard
+cd C:\Users\Admin\panda-dashboard
 git add -A
-git commit -m "update SKILL.md and CHANGELOG.md with current line numbers"
-git push origin main
+git commit -m "4B/4D/4E: Tab merge, getMomentumAction RIDE IT fix, mobile scroll"
+git push
