@@ -254,6 +254,28 @@ export default async function handler(req, res) {
         }
       }
 
+      // 6. Stale agent warning
+      let agentStale = false;
+      try {
+        const { count: totalSignals } = await supabase.from('signal_results').select('*', { count: 'exact', head: true });
+        const { data: lastAgent } = await supabase.from('ai_memory').select('sample_size')
+          .eq('factor', 'strategy_overall').eq('strategy', 'BB').limit(1);
+        if (lastAgent?.[0] && totalSignals) {
+          const delta = totalSignals - (lastAgent[0].sample_size || 0);
+          if (delta > 50) {
+            agentStale = true;
+            const TG_TOKEN = process.env.TELEGRAM_TOKEN || '';
+            const TG_CHAT = process.env.TELEGRAM_CHAT_ID || '';
+            if (TG_TOKEN && TG_CHAT) {
+              await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({ chat_id: TG_CHAT, text: `⚠️ Signal Agent stale — ${delta} new signals since last run. Re-run agents.` })
+              }).catch(()=>{});
+            }
+          }
+        }
+      } catch(e) { console.error('[STALE CHECK]', e.message); }
+
       return res.status(200).json({
         cycle_at: new Date().toISOString(),
         open_before: (openTrackers || []).length,
@@ -263,7 +285,8 @@ export default async function handler(req, res) {
         closed_details: closed,
         open_after: (openTrackers || []).length + newlyOpened.length - closed.length,
         new_trackers: newlyOpened,
-        price_updates: priceUpdates
+        price_updates: priceUpdates,
+        agent_stale: agentStale
       });
     } catch (err) {
       return res.status(500).json({ error: err.message });
