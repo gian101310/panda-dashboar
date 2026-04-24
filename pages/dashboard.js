@@ -1151,15 +1151,6 @@ function PairCardModal({ row, trend, cotBias, onClose, isMobile, confidence, mem
 
 // ===== VALID SETUPS TAB =====
 function ValidSetupsTab({ data, trends, cotMap, confidenceMap }) {
-  const MOMENTUM_GUIDE = {
-    STRONG:        { action:'RIDE IT',         color:'#ffd166' },
-    BUILDING:      { action:'ENTER NOW',       color:'#00ff9f' },
-    SPARK:         { action:'WATCH',           color:'#00b4ff' },
-    CONSOLIDATING: { action:'HOLD',            color:'#00b4ff' },
-    COOLING:       { action:'TIGHTEN SL',      color:'#ffaa44' },
-    FADING:        { action:'CONSIDER CLOSING',color:'#ff4d6d' },
-    REVERSING:     { action:'CLOSE POSITION',  color:'#ff4d6d' },
-  };
   const mono = "'Share Tech Mono',monospace";
   const orb  = "'Orbitron',sans-serif";
 
