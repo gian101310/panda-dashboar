@@ -55,6 +55,8 @@ async function fetchMemoryContext() {
     sections[key].push(`${desc} (n=${m.sample_size}${wr}${pips}${avg}${flat}${sess}${hold}${dir})`);
   }
   let ctx = 'HISTORICAL ANALYSIS (from ai_memory — validated findings, sample >= 20):\n';
+  const latest = data.reduce((best, m) => m.computed_at > best ? m.computed_at : best, '');
+  if (latest) ctx += `Data computed: ${latest.slice(0,10)} | ${data.length} memories\n`;
   if (sections.signal_pattern.length) ctx += '\nSIGNAL PATTERNS:\n' + sections.signal_pattern.join('\n');
   if (sections.edge_analysis.length) ctx += '\n\nEDGE ANALYSIS:\n' + sections.edge_analysis.join('\n');
   if (sections.confluence_validation.length) ctx += '\n\nCONFLUENCE VALIDATION:\n' + sections.confluence_validation.join('\n');

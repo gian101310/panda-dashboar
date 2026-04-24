@@ -231,6 +231,14 @@ export default async function handler(req, res) {
         ...findBehavioralInsights(memories),
       ];
 
+      // Log previous run summary
+      const { data: prevMem } = await supabase.from('ai_memory').select('sample_size')
+        .in('factor', ['alpha_pair','leak_pair','overtraded_weak','session_edge','hold_duration_edge','edge_gap','tbg_discipline']);
+      if (prevMem && prevMem.length > 0) {
+        const avgS = Math.round(prevMem.reduce((s,m) => s + m.sample_size, 0) / prevMem.length);
+        await supabase.from('engine_logs').insert({ timestamp: new Date().toISOString(), component: 'pattern_agent_summary', duration: 0, error: JSON.stringify({ memories: prevMem.length, avg_sample: avgS }) });
+      }
+
       // 4. Clear previous pattern agent memories
       await supabase.from('ai_memory').delete()
         .in('factor', ['alpha_pair', 'leak_pair', 'overtraded_weak', 'session_edge', 'hold_duration_edge', 'edge_gap', 'tbg_discipline']);

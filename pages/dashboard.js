@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Head from 'next/head';
 import ThemeToggle from '../components/ThemeToggle';
 
@@ -58,6 +58,33 @@ function isMarketOpen() {
   if (day === 0 && h < 22) return false; // Sunday before 22:00 UTC
   if (day === 5 && h >= 22) return false; // Friday after 22:00 UTC
   return true;
+}
+function getMaturity(sampleSize) {
+  if (sampleSize >= 50) return 'proven';
+  if (sampleSize >= 20) return 'developing';
+  return null;
+}
+function getEdgeMemory(row, memoryIndex) {
+  if (!memoryIndex || !row) return null;
+  const absGap = Math.abs(row.gap || 0);
+  if (absGap < 5) return null;
+  const gapBucket = String(Math.min(Math.floor(absGap), 12));
+  const zone = (row.tbg_zone || '').toUpperCase();
+  const bias = row.bias;
+  const tbgConfirmed = (bias === 'BUY' && zone === 'ABOVE') || (bias === 'SELL' && zone === 'BELOW');
+  const tbgStr = tbgConfirmed ? 'confirmed' : 'unconfirmed';
+  const mem = (memoryIndex.gap_tbg || {})[`BB_${gapBucket}_${tbgStr}`]
+           || (memoryIndex.gap_only || {})[`BB_${gapBucket}`]
+           || (memoryIndex.general || {})['BB_strategy_overall']
+           || null;
+  if (!mem) return null;
+  const maturity = getMaturity(mem.sample_size);
+  const wr = mem.win_rate;
+  const resRate = mem.metadata?.win_rate_total;
+  let flag = null;
+  if (maturity === 'proven' && wr >= 70 && (resRate == null || resRate >= 25)) flag = 'PROVEN_EDGE';
+  if (maturity === 'proven' && wr <= 30) flag = 'DEAD_ZONE';
+  return { flag, mem, maturity, winRate: wr, resRate, sample: mem.sample_size };
 }
 
 // ===== BOX TREND DETECTION =====
@@ -2242,6 +2269,28 @@ export default function Dashboard() {
   const [sort,       setSort]       = useState('symbol_asc');
   const [search,     setSearch]     = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [pdrData, setPdrData] = useState({});
+  const [aiMemories, setAiMemories] = useState([]);
+  const memoryLoaded = aiMemories.length > 0;
+  const memoryIndex = useMemo(() => {
+    const idx = { gap_tbg: {}, gap_only: {}, tbg_only: {}, general: {} };
+    aiMemories.forEach(m => {
+      const meta = m.metadata || {};
+      const s = m.strategy || 'unknown';
+      if (m.factor === 'gap_plus_tbg' && meta.gap_level && meta.tbg_status) {
+        idx.gap_tbg[`${s}_${meta.gap_level}_${meta.tbg_status}`] = m;
+      } else if (m.factor === 'gap_level' && meta.gap_level) {
+        idx.gap_only[`${s}_${meta.gap_level}`] = m;
+      } else if (m.factor === 'tbg_confirmation' && meta.tbg_status) {
+        idx.tbg_only[`${s}_${meta.tbg_status}`] = m;
+      } else if (m.factor === 'strategy_overall' && s !== 'unknown') {
+        idx.general[`${s}_strategy_overall`] = m;
+      } else if (m.factor === 'pair_performance' && m.pair) {
+        idx.general[`${s}_pair_${m.pair}`] = m;
+      }
+    });
+    return idx;
+  }, [aiMemories]);
   const [tab,        setTab]        = useState('PANELS');
   const [isAdmin,    setIsAdmin]    = useState(false);
   const [user,       setUser]       = useState(null);
@@ -2320,6 +2369,10 @@ export default function Dashboard() {
   },[]);
 
   useEffect(()=>{fetchData();},[fetchData]);
+  useEffect(()=>{
+    fetch('/api/ai-memory?limit=500').then(r=>r.json()).then(d=>{if(Array.isArray(d))setAiMemories(d);}).catch(()=>{});
+    fetch('/api/pdr').then(r=>r.json()).then(d=>{if(d.pdr)setPdrData(d.pdr);}).catch(()=>{});
+  },[]);
   useEffect(()=>{const t=setInterval(()=>fetchData(true),15000);return()=>clearInterval(t);},[fetchData]);
   useEffect(()=>{const t=setInterval(fetchSpikes,15000);fetchSpikes();return()=>clearInterval(t);},[fetchSpikes]);
   useEffect(()=>{if(tab==='RESEARCH'&&cotData.length===0) fetchCot();},[tab,cotData.length,fetchCot]);

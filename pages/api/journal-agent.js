@@ -209,6 +209,14 @@ export default async function handler(req, res) {
         ...analyzeByDirection(trades),
       ];
 
+      // Log previous run summary
+      const { data: prevMem } = await supabase.from('ai_memory').select('sample_size')
+        .in('factor', ['overall_performance','pair_trading_performance','monthly_pnl','session_performance','hold_duration_performance','direction_performance']);
+      if (prevMem && prevMem.length > 0) {
+        const avgS = Math.round(prevMem.reduce((s,m) => s + m.sample_size, 0) / prevMem.length);
+        await supabase.from('engine_logs').insert({ timestamp: new Date().toISOString(), component: 'journal_agent_summary', duration: 0, error: JSON.stringify({ memories: prevMem.length, avg_sample: avgS }) });
+      }
+
       // Clear previous journal agent memories
       await supabase.from('ai_memory').delete()
         .in('factor', ['overall_performance', 'pair_trading_performance', 'monthly_pnl', 'session_performance', 'hold_duration_performance', 'direction_performance']);

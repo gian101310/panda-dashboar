@@ -202,7 +202,15 @@ export default async function handler(req, res) {
         ...analyzeFlatRate(rows),          // FLAT rate as signal quality
       ];
 
-      // 3. Clear previous signal agent memories (idempotent re-runs)
+      // 3. Log previous run summary before clearing
+      const { data: prevMem } = await supabase.from('ai_memory').select('sample_size')
+        .in('factor', ['strategy_overall','gap_level','tbg_confirmation','gap_plus_tbg','pair_performance','flat_rate_by_gap']);
+      if (prevMem && prevMem.length > 0) {
+        const avgS = Math.round(prevMem.reduce((s,m) => s + m.sample_size, 0) / prevMem.length);
+        await supabase.from('engine_logs').insert({ timestamp: new Date().toISOString(), component: 'signal_agent_summary', duration: 0, error: JSON.stringify({ memories: prevMem.length, avg_sample: avgS }) });
+      }
+
+      // 4. Clear previous signal agent memories (idempotent re-runs)
       await supabase
         .from('ai_memory')
         .delete()
