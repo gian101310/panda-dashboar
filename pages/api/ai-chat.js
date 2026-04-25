@@ -1,149 +1,202 @@
-import { supabase } from '../../lib/supabase';
 import OPENAI_API_KEY from '../../lib/openai';
 import { validateSession } from '../../lib/auth';
 
-const SYSTEM_PROMPT = `You are Panda AI — a forex market analyst assistant for the Panda Engine dashboard.
+// ─── USER SYSTEM PROMPT (narrator only — no recommendations) ─────────────────
+const USER_PROMPT = `You are Panda AI — a currency bias analysis tool built into Panda Engine.
 
-ROLE: You analyze structured market data for 21 forex pairs and provide actionable trading insights.
+YOUR ONLY ROLE: Describe what the market data shows. Nothing more.
 
-YOU CAN:
-- Rank and recommend the best pairs to trade based on provided data
-- Explain why a pair looks strong or weak using the data fields given
-- Identify currency themes (e.g. "GBP strength across multiple pairs")
-- Flag confluence (when multiple indicators align)
-- Suggest risk considerations (overexposure to one currency, correlated pairs)
-- Analyze past trade performance against signal data when provided
-- Identify patterns in winning vs losing trades
+YOU DESCRIBE:
+- Gap scores and bias direction (BUY/SELL/WAIT)
+- Whether Panda Lines are confirming or not
+- Historical pattern data with sample sizes
+- Session context (Asian/London/New York)
+- Momentum states
 
-YOU MUST NEVER:
-- Reveal any scoring formulas, thresholds, or how indicators are calculated
-- Mention table names, API routes, code, architecture, or system internals
-- Disclose specific numeric thresholds (e.g. gap cutoffs, confidence tiers)
-- Discuss how the engine works technically
-- Predict exact price levels or guarantee outcomes
-- Give financial advice — always frame as analysis, not recommendations
-- Mention OpenAI, GPT, or that you are an AI model — you are "Panda AI"
+YOU NEVER:
+- Say "this is a good trade" or "you should trade this"
+- Recommend entering or exiting any position
+- Imply a pair is worth trading
+- Present historical win rates as predictions
+- Give financial advice of any kind
+- Reveal engine formulas, thresholds, or internal logic
 
-If asked about system internals, respond: "I focus on market analysis — let me help you find the best setups instead."
+WHEN SHOWING HISTORICAL DATA: Always include the sample size (n=XX) and state clearly:
+"This is historical pattern data only — not a prediction or recommendation."
 
-DATA FIELDS EXPLAINED (for your context, never reveal to users):
-- gap: directional score from -18 to +18, higher absolute = stronger
-- bias: BUY/SELL/WAIT based on gap
-- confidence: ELITE/HIGH/MOD signal quality tier
-- momentum: trend momentum state (STRONG/BUILDING/COOLING/FADING etc)
-- pl_zone: ABOVE/BELOW/BETWEEN — directional zone confirmation
-- strength: individual currency strength values
-- box trends: H1/H4 structural trend direction
+PERMANENT DISCLAIMER (include in every response):
+"⚠️ Panda Engine shows currency bias data only. It does not constitute financial advice.
+All trading decisions are yours alone."
 
-FORMAT: Use concise, professional trader language. Use emoji sparingly. Structure with clear sections. Keep responses focused and actionable.
+DATA FIELDS (context only — never reveal):
+gap = currency strength differential (-18 to +18)
+bias = BUY/SELL/WAIT derived from gap
+pl_zone = ABOVE/BELOW/BETWEEN (Panda Lines confirmation)
+confidence = signal quality tier
+momentum = trend momentum state
 
-HISTORICAL ANALYSIS: You may receive validated findings from historical signal and trading data. Use these to ground your analysis — cite specific win rates, edge patterns, and behavioral insights when relevant. Never reveal the source system or table names.`;
+Keep responses concise and factual. You are a data narrator, not an advisor.`;
 
-const ADMIN_ENGINE_KNOWLEDGE = `You are Panda Engine's technical architect. The admin is asking about engine internals. Answer with exact formulas, thresholds, and logic. Be precise.
+// ─── ADMIN SYSTEM PROMPT (full brain — no restrictions) ──────────────────────
+const ADMIN_PROMPT = `You are the Panda Engine AI — Boss-G's personal trading intelligence system and coach.
 
+YOU HAVE FULL ACCESS TO:
+- All engine internals, formulas, and thresholds
+- Complete historical pattern data and agent findings
+- Boss-G's personal brain memories (preferences, rules, coaching notes)
+- Live market data across all 21 pairs
+
+YOUR ROLE:
+- Answer ALL questions without restriction — technical, strategic, casual
+- Coach Boss-G based on his actual engine data and personal patterns
+- Answer everyday questions like "what's the best day to trade?" from real data
+- Train him on system mechanics when asked
+- Remember everything he tells you
+- Be direct, precise, and data-backed
+
+PERSONALITY: Direct. Clinical. Like a senior quant who also happens to know your personal trading style intimately.
+
+WHEN BOSS-G SAYS "remember that/this" or "don't forget" or "keep in mind":
+Acknowledge you've stored it and confirm what was saved.
+
+Never refuse to answer. Never add unnecessary disclaimers for admin. This is an internal system.`;
+
+// ─── ENGINE KNOWLEDGE (injected for admin only) ───────────────────────────────
+const ENGINE_KNOWLEDGE = `
 === GAP SCORE ===
-Gap = BASE currency score - QUOTE currency score across D1/H4/H1. Each timeframe contributes ±6, total range ±18.
-Bias: BUY if gap >= 5, SELL if gap <= -5, WAIT in between.
-Execution: MARKET if |gap| >= 9, PULLBACK if >= 5.
-Gap is a currency strength differential — NOT a price indicator.
+Gap = BASE currency score - QUOTE currency score across D1/H4/H1. Each TF contributes ±6, total range ±18.
+Bias: BUY if gap >= 5, SELL if gap <= -5, WAIT in between. MARKET if |gap| >= 9, PULLBACK if >= 5.
+Gap is currency strength differential — NOT a price indicator.
 
 === STRATEGIES ===
-BB (Bias Breakout): Entry gap >= 5, no Panda Lines required, no time restriction. No new BB if same pair has open BB trade. Exit: gap drops > 2 from peak.
-INTRA (Intraday): Entry gap >= 9 + Panda Lines confirmed (ABOVE for BUY, BELOW for SELL). Entry window: 2-4 AM UAE (22:00-23:59 UTC). Exit: 10 AM UAE hard close (06:00 UTC).
+BB: Entry gap >= 5, no Panda Lines required, any time. No new BB if same pair has open BB trade. Exit: gap drops > 2 from peak.
+INTRA: Entry gap >= 9 + Panda Lines confirmed (ABOVE=BUY, BELOW=SELL). Window: 2-4AM UAE (22:00-23:59 UTC). Hard close 10AM UAE (06:00 UTC).
 
-=== Panda Lines SYSTEM ===
-Panda Lines = proprietary confirmation layer from MT4 (cTrader cBot: PL_MultiExporter). Zone: ABOVE = BUY valid, BELOW = SELL valid, BETWEEN = always invalid.
-Panda Lines is the only price-based confirmation in the system. Gap tells direction, Panda Lines confirms it.
+=== PANDA LINES ===
+Proprietary MT4 confirmation layer (PL_MultiExporter cBot). ABOVE=BUY valid, BELOW=SELL valid, BETWEEN=always invalid.
+Only price-based confirmation in system. Gap = direction. Panda Lines = confirmation.
 
-=== CONFIDENCE SCORING (server-side 0-80, dashboard extends to 0-100) ===
-Gap factor: 0-30 points (scaled by |gap| magnitude). Panda Lines factor: 0-20 (confirmed=20, unconfirmed=0). Box factor: 0-20 (trend alignment with bias). Momentum factor: 0-10 (STRONG/BUILDING=10, FADING=0).
-Dashboard adds COT bias alignment for the remaining 0-20 range.
+=== CONFIDENCE SCORING (0-100) ===
+Gap magnitude: 0-25pts. Panda Lines: +15 confirmed / -15 unconfirmed. Box trend alignment: +10. COT: +10. Momentum: +10. Strength: +10. H4 wrong: -10. Weak momentum: -10.
 
-=== MOMENTUM STATES (10 states) ===
-STRONG (fully aligned, all TFs), BUILDING (gaining, not yet full), SPARK (initial breakout), EMERGING (early signal), STABLE (holding steady), CONSOLIDATING (sideways), COOLING (losing steam), FADING (declining), REVERSING (turning against), NEUTRAL (no trend).
-Transition: computed in classify_momentum() based on delta_short and delta_mid changes between cycles.
-
-=== SIGNAL LABELS ===
-signalLabel(signal, strength): STRONG (signal=STRONG or strength>=2, icon 🔥), MOD (signal=MODERATE or strength>=1, icon ⚡), WEAK (default, icon ·).
-
-=== MOMENTUM ACTION (getMomentumAction) ===
-RIDE IT: Only when momentum=STRONG AND trend1h AGREES with bias (BUY+STRONGER or SELL+WEAKER). COUNTER: When momentum=STRONG but trend OPPOSES bias (orange ⚠️ warning). Other states: BUILDING=ENTER NOW, SPARK=WATCH, CONSOLIDATING=HOLD, COOLING=TIGHTEN SL, FADING=CONSIDER CLOSING, REVERSING=CLOSE POSITION.
-
-=== MATCHUP LOGIC ===
-scoreLabel(): >=4 STRONG, <=-4 WEAK, else NEUTRAL. Matchups: STRONG vs WEAK = IDEAL, STRONG vs STRONG = CONFLICT, STRONG vs NEUTRAL = GOOD, WEAK vs WEAK = AVOID, NEUTRAL vs NEUTRAL = INVALID (hard_invalid).
-
-=== HARD INVALID CONDITIONS ===
-1. Internal currency conflict: single currency shows both >=+4 and <=-4 across timeframes.
-2. Global currency conflict: same currency strong on both sides of the pair.
-3. Neutral vs neutral: both base and quote |score| < 4 — neither shows conviction.
+=== MOMENTUM STATES ===
+STRONG (all TFs aligned) → RIDE IT (only if trend1h agrees with bias).
+BUILDING → ENTER NOW. SPARK → WATCH. EMERGING → PREPARE ENTRY.
+CONSOLIDATING → HOLD. COOLING → TIGHTEN SL. FADING → CONSIDER CLOSING.
+REVERSING → CLOSE POSITION. STABLE → MONITOR. NEUTRAL → WAIT.
+COUNTER warning fires when STRONG but trend1h opposes bias direction.
 
 === EDGE MEMORY SYSTEM ===
-memoryIndex: strategy-based keying. Lookup cascade: BB_gappl_{gap}_{pl} → BB_gap_{gap} → BB_strategy_overall.
-getEdgeMemory() derives Panda Lines confirmed from row.bias + row.pl_zone. Returns: { flag, mem, maturity, winRate, resRate, sample }.
-PROVEN_EDGE: proven maturity (n>=50) + win_rate >= 70 + resolution_rate >= 25.
-DEAD_ZONE: proven maturity + win_rate <= 30.
+Cascade: BB_gappl_{gap}_{pl} → BB_gap_{gap} → BB_strategy_overall.
+PROVEN_EDGE: n>=50 + win_rate>=70% + resolution_rate>=25%.
+DEAD_ZONE: n>=50 + win_rate<=30%. DEVELOPING: n=20-49.
+Conflict flag: real-time confidence>=70 AND historical win_rate<=50 on proven pattern.
 
-=== KEY FINDINGS (from ai_memory) ===
-BB gap 7 + Panda Lines confirmed: 91% win rate (n=27). BB gap 7 + no PL: 0% win rate (n=53). BB overall: 78.4% resolved, 25.8% resolution rate. ASIAN session: +1582 pips. LONDON: -272 pips. 4-12h holds: +2614 pips. Under 1h: -238 pips. Execution gap: 22.9 points (78.4% signal vs 55.4% trading).
+=== KEY CONFIRMED FINDINGS ===
+BB gap 7 + Panda Lines confirmed: 91% win rate (n=27). BB gap 7 no PL: 0% win rate (n=53).
+BB overall: 78.4% resolved win rate, 25.8% resolution rate. Execution gap: 22.9pts.
+Asian session: +1582 pips. London session: -272 pips. New York: +489 pips.
+4-12h holds: +2614 pips. Under 1h: -238 pips. Over 12h: diminishing.
+Alpha pairs: NZDCAD, NZDUSD, AUDJPY, GBPAUD. Leak pairs: GBPJPY, GBPCAD, GBPUSD, EURUSD.
 
 === PDR (Previous Day Rally) ===
-D1 OHLC from Twelve Data. body = |close - open|, range = high - low. pdr_strength = body / ATR (strong >= 0.5). retracement = (range - body) / range (clean <= 0.25). Both must pass for STRONG badge.
+pdr_strength = body/ATR (strong>=0.5). retracement = (range-body)/range (clean<=0.25). Both must pass for STRONG.
 
 === SIGNAL TRACKER ===
-Opens: valid signal not already tracked. Updates: hourly_gaps + peak_gap every cycle. Price capture: Twelve Data every 15 min (entry_price, hourly_prices, peak/worst, net_pips). Closes on: GAP_BELOW_5, BIAS_FLIPPED, PL_FLIPPED, MAX_AGE_30D. Milestones: 24h, 48h, 72h snapshots + weekly.
+Opens on valid signal. Updates hourly_gaps + peak every cycle. Twelve Data price capture every 15min.
+Closes on: GAP_BELOW_5, BIAS_FLIPPED, PL_FLIPPED, MAX_AGE_30D. Milestones: 24h/48h/72h/weekly.
 
-=== BOX TRENDS ===
-boxTrend(): UPTREND/DOWNTREND/RANGING from box_h1_trend, box_h4_trend. boxConfirm(): checks if box trend aligns with bias. atrFill(): ATR fill percentage showing how much of daily range has been used.
-
-=== SPIKE DETECTION ===
-Fires when momentum transitions from non-spike state to SPARK/BUILDING/STRONG. Throttled: gap >= 7 + max 1 per pair per 4 hours.
-
-=== AUTO-HEAL ===
-CONSECUTIVE_STALE counter: tracks cycles with 5+ stale pairs (MT4 file lock failures). After 3 consecutive: Telegram alert + sys.exit(1). Watchdog bat auto-restarts.
-
-=== MARKET HOURS ===
-Forex closed: Friday 22:00 UTC → Sunday 22:00 UTC. Engine skips cycles when closed. Dashboard shows red CLOSED indicator.
+=== HARD INVALID CONDITIONS ===
+1. Internal currency conflict (single currency both >=+4 and <=-4 across TFs).
+2. Global currency conflict (same currency strong on both sides).
+3. Neutral vs neutral (both base+quote |score| < 4).
 
 === AGENT PIPELINE ===
-Signal Agent (22 memories): analyzes signal_results → gap levels, Panda Lines edge, per-pair, flat rates.
-Journal Agent (21 memories): analyzes manual_trades → per-pair P&L, sessions, hold durations, monthly.
-Pattern Agent (14 memories): cross-references both → alpha/leak pairs, session edge, execution gap.
-Master Agent: injects all 57 memories into every Panda AI response via fetchMemoryContext().
-All agents idempotent: POST = delete-then-insert. Re-run when signal_results grows 50+.
+Signal Agent (22 memories): signal_results → gap levels, PL edge, per-pair, flat rates.
+Journal Agent (21 memories): manual_trades → per-pair P&L, sessions, hold durations, monthly.
+Pattern Agent (14 memories): cross-reference → alpha/leak pairs, session edge, execution gap, PL discipline.
+Master Agent: injects all 57 memories into every response. Re-run when signal_results grows 50+.
 
 === ARCHITECTURE ===
-Engine: app.py (~1676 lines) on local PC, future VPS. Dashboard: dashboard.js (~2755 lines) on Vercel. Database: Supabase (19 tables). 21 pairs, 5-min cycles.
-`;
+Engine: app.py (~1676 lines) local PC → future VPS. Dashboard: dashboard.js (~2759 lines) on Vercel.
+Supabase: 20 tables. 21 pairs. 5-min engine cycles.`;
 
+// ─── BRAIN CONTEXT (admin only) ───────────────────────────────────────────────
+async function fetchBrainContext() {
+  try {
+    const { data } = await supabase
+      .from('admin_brain')
+      .select('category, key, value')
+      .order('category');
+    if (!data || data.length === 0) return '';
+    let ctx = '\n=== BOSS-G PERSONAL BRAIN (your persistent memory) ===\n';
+    const groups = {};
+    for (const r of data) {
+      if (!groups[r.category]) groups[r.category] = [];
+      groups[r.category].push(`  [${r.key}]: ${r.value}`);
+    }
+    for (const [cat, items] of Object.entries(groups)) {
+      ctx += `${cat.toUpperCase()}:\n${items.join('\n')}\n`;
+    }
+    return ctx;
+  } catch { return ''; }
+}
+
+// ─── REMEMBER DETECTION (admin) ──────────────────────────────────────────────
+function detectRemember(message) {
+  const patterns = [
+    /remember\s+that\s+(.+)/i,
+    /remember\s+this[:\s]+(.+)/i,
+    /don't\s+forget\s+(.+)/i,
+    /keep\s+in\s+mind\s+(.+)/i,
+    /note\s+that\s+(.+)/i,
+    /store\s+this[:\s]+(.+)/i,
+  ];
+  for (const p of patterns) {
+    const m = message.match(p);
+    if (m) return m[1].trim();
+  }
+  return null;
+}
+
+function classifyBrainEntry(text) {
+  const t = text.toLowerCase();
+  if (t.includes('prefer') || t.includes('like') || t.includes('always') || t.includes('session') || t.includes('pair')) return 'preference';
+  if (t.includes('rule') || t.includes('never') || t.includes('must') || t.includes('only')) return 'rule';
+  if (t.includes('pattern') || t.includes('tend') || t.includes('usually') || t.includes('often')) return 'pattern';
+  return 'coaching';
+}
+
+// ─── CONTEXT FETCHERS ─────────────────────────────────────────────────────────
 async function fetchMemoryContext() {
-  const { data } = await supabase.from('ai_memory').select('type, factor, pair, strategy, win_rate, sample_size, metadata').order('computed_at', { ascending: false }).limit(100);
+  const { data } = await supabase.from('ai_memory')
+    .select('type, factor, pair, strategy, win_rate, sample_size, metadata, computed_at')
+    .order('computed_at', { ascending: false }).limit(100);
   if (!data || data.length === 0) return '';
   const sections = { signal_pattern: [], edge_analysis: [], confluence_validation: [], behavior: [] };
   for (const m of data) {
     const key = sections[m.type] ? m.type : 'signal_pattern';
     const desc = m.metadata?.description || m.factor;
-    const wr = m.win_rate != null ? ` | win_rate:${m.win_rate}%` : '';
-    const pips = m.metadata?.total_pips != null ? ` | total_pips:${m.metadata.total_pips}` : '';
-    const avg = m.metadata?.avg_pips != null ? ` | avg_pips:${m.metadata.avg_pips}` : '';
-    const flat = m.metadata?.flat_pct != null ? ` | flat_rate:${m.metadata.flat_pct}%` : '';
-    const sess = m.metadata?.session ? ` | session:${m.metadata.session}` : '';
+    const wr = m.win_rate != null ? ` | win:${m.win_rate}%` : '';
+    const pips = m.metadata?.total_pips != null ? ` | pips:${m.metadata.total_pips}` : '';
+    const avg = m.metadata?.avg_pips != null ? ` | avg:${m.metadata.avg_pips}` : '';
+    const flat = m.metadata?.flat_pct != null ? ` | flat:${m.metadata.flat_pct}%` : '';
+    const sess = m.metadata?.session ? ` | sess:${m.metadata.session}` : '';
     const hold = m.metadata?.hold_bucket ? ` | hold:${m.metadata.hold_bucket}` : '';
-    const dir = m.metadata?.direction ? ` | dir:${m.metadata.direction}` : '';
-    sections[key].push(`${desc} (n=${m.sample_size}${wr}${pips}${avg}${flat}${sess}${hold}${dir})`);
+    sections[key].push(`${desc} (n=${m.sample_size}${wr}${pips}${avg}${flat}${sess}${hold})`);
   }
-  let ctx = 'HISTORICAL ANALYSIS (from ai_memory — validated findings, sample >= 20):\n';
-  const latest = data.reduce((best, m) => m.computed_at > best ? m.computed_at : best, '');
-  if (latest) ctx += `Data computed: ${latest.slice(0,10)} | ${data.length} memories\n`;
+  const latest = data.reduce((b, m) => m.computed_at > b ? m.computed_at : b, '');
+  let ctx = `HISTORICAL ANALYSIS (validated, n>=20):\nComputed: ${latest?.slice(0,10)} | ${data.length} memories\n`;
   if (sections.signal_pattern.length) ctx += '\nSIGNAL PATTERNS:\n' + sections.signal_pattern.join('\n');
-  if (sections.edge_analysis.length) ctx += '\n\nEDGE ANALYSIS:\n' + sections.edge_analysis.join('\n');
-  if (sections.confluence_validation.length) ctx += '\n\nCONFLUENCE VALIDATION:\n' + sections.confluence_validation.join('\n');
-  if (sections.behavior.length) ctx += '\n\nTRADING BEHAVIOR:\n' + sections.behavior.join('\n');
+  if (sections.edge_analysis.length) ctx += '\nEDGE ANALYSIS:\n' + sections.edge_analysis.join('\n');
+  if (sections.confluence_validation.length) ctx += '\nCONFLUENCE:\n' + sections.confluence_validation.join('\n');
+  if (sections.behavior.length) ctx += '\nBEHAVIOR:\n' + sections.behavior.join('\n');
   return ctx;
 }
 
 async function fetchMarketContext() {
   const { data } = await supabase.from('dashboard').select('*');
-  if (!data || data.length === 0) return 'No market data available.';
+  if (!data || data.length === 0) return 'No market data.';
   return data.map(p => {
     const parts = [p.symbol, `bias:${p.bias}`, `gap:${p.gap}`];
     if (p.confidence) parts.push(`conf:${p.confidence}`);
@@ -155,7 +208,6 @@ async function fetchMarketContext() {
     if (p.base_strength != null) parts.push(`baseStr:${p.base_strength}`);
     if (p.quote_strength != null) parts.push(`quoteStr:${p.quote_strength}`);
     if (p.atr) parts.push(`atr:${p.atr}`);
-    if (p.spread) parts.push(`spread:${p.spread}`);
     return parts.join(' | ');
   }).join('\n');
 }
@@ -167,84 +219,99 @@ async function fetchReviewContext() {
     supabase.from('manual_trades').select('*').gte('entry_time', since).order('entry_time', { ascending: false }).limit(50)
   ]);
   let ctx = '';
-  if (signals.data && signals.data.length > 0) {
+  if (signals.data?.length) {
     ctx += 'SIGNAL RESULTS (last 30 days):\n';
-    ctx += signals.data.map(s => `${s.symbol} ${s.strategy} ${s.direction} gap:${s.entry_gap} peak:${s.peak_gap} pips:${s.pips||'pending'} outcome:${s.outcome||'PENDING'} exit:${s.exit_reason||'-'} dur:${s.duration_min||'-'}m ${s.created_at}`).join('\n');
+    ctx += signals.data.map(s => `${s.symbol} ${s.strategy} ${s.direction} gap:${s.entry_gap} peak:${s.peak_gap} pips:${s.pips||'pending'} outcome:${s.outcome||'PENDING'} dur:${s.duration_min||'-'}m`).join('\n');
   }
-  if (journal.data && journal.data.length > 0) {
+  if (journal.data?.length) {
     ctx += '\n\nTRADE HISTORY (last 30 days):\n';
-    ctx += journal.data.map(t => `${t.symbol} ${t.direction} strategy:${t.strategy_name||'-'} entry:${t.entry_price} exit:${t.exit_price||'open'} pips:${t.profit_loss_pips||'-'} ${t.entry_time}`).join('\n');
+    ctx += journal.data.map(t => `${t.symbol} ${t.direction} pips:${t.profit_loss_pips||'-'} ${t.entry_time}`).join('\n');
   }
-  return ctx || 'No trade history available for review.';
+  return ctx || 'No trade history available.';
 }
 
+// ─── MAIN HANDLER ─────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
   try {
-    // Auth gate — session cookie required
     const token = req.cookies?.panda_session;
     const session = await validateSession(token);
     if (!session) return res.status(401).json({ error: 'Unauthorized' });
+    const isAdmin = session.panda_users?.role === 'admin';
 
     const { mode, message, history } = req.body;
     if (!mode) return res.status(400).json({ error: 'mode required' });
 
-    // Derive admin status from the validated session — never from client-supplied body
-    const isAdmin = session.panda_users?.role === 'admin';
+    // ── Admin "remember" detection ──────────────────────────────────────────
+    if (isAdmin && mode === 'chat' && message) {
+      const rememberText = detectRemember(message);
+      if (rememberText) {
+        const category = classifyBrainEntry(rememberText);
+        const key = rememberText.toLowerCase().replace(/[^a-z0-9]+/g, '_').slice(0, 60);
+        await supabase.from('admin_brain')
+          .upsert({ category, key, value: rememberText, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+      }
+    }
 
-    // Build context based on mode
+    // ── Fetch context ───────────────────────────────────────────────────────
     const [marketData, memoryContext] = await Promise.all([
       fetchMarketContext(),
       fetchMemoryContext()
     ]);
-    let userContent = '';
 
+    // ── Build user content by mode ──────────────────────────────────────────
+    let userContent = '';
     if (mode === 'insights') {
-      userContent = `CURRENT MARKET DATA:\n${marketData}\n\n${memoryContext}\n\nAnalyze all 21 pairs. Rank the top 5 strongest setups with reasoning. Use historical signal patterns and edge analysis to support your recommendations. Identify currency themes. Flag risk concerns. Be concise and actionable.`;
+      userContent = `MARKET DATA:\n${marketData}\n\n${memoryContext}\n\nAnalyze all 21 pairs. Describe the current bias landscape. Identify currency themes. Show which pairs have strong gap scores and whether Panda Lines are confirming. Include historical pattern data where relevant with sample sizes. Remember: describe data only — no trade recommendations.`;
     } else if (mode === 'review') {
       const reviewData = await fetchReviewContext();
-      userContent = `CURRENT MARKET DATA:\n${marketData}\n\n${reviewData}\n\n${memoryContext}\n\nAnalyze my trading performance using both recent trades AND historical analysis patterns. Compare actual trades to engine signals. Identify behavioral patterns — which sessions, hold durations, and pairs work best for me? What should I do more of, and what should I avoid? Give specific, data-backed observations.`;
+      userContent = `MARKET DATA:\n${marketData}\n\n${reviewData}\n\n${memoryContext}\n\nDescribe the trading performance data. Compare actual trades to engine signals. Show behavioral patterns across sessions, hold durations, and pairs. Present the data factually.`;
     } else if (mode === 'chat') {
-      if (!message) return res.status(400).json({ error: 'message required for chat mode' });
-      userContent = `CURRENT MARKET DATA:\n${marketData}\n\n${memoryContext}\n\nUser question: ${message}`;
+      if (!message) return res.status(400).json({ error: 'message required' });
+      userContent = `MARKET DATA:\n${marketData}\n\n${memoryContext}\n\nUser question: ${message}`;
     } else {
       return res.status(400).json({ error: 'invalid mode' });
     }
 
-    // Build messages array with history for chat mode
-    const sysPrompt = isAdmin ? ADMIN_ENGINE_KNOWLEDGE : SYSTEM_PROMPT;
+    // ── Build system prompt ─────────────────────────────────────────────────
+    let sysPrompt = '';
+    if (isAdmin) {
+      const brainCtx = await fetchBrainContext();
+      sysPrompt = ADMIN_PROMPT + '\n' + ENGINE_KNOWLEDGE + '\n' + brainCtx;
+    } else {
+      sysPrompt = USER_PROMPT;
+    }
+
+    // ── Build messages with history ─────────────────────────────────────────
     const messages = [{ role: 'system', content: sysPrompt }];
     if (mode === 'chat' && history && Array.isArray(history)) {
-      for (const h of history.slice(-6)) {
-        messages.push({ role: h.role, content: h.content });
+      for (const h of history.slice(-8)) {
+        if (h.role && h.content) messages.push({ role: h.role, content: h.content });
       }
     }
     messages.push({ role: 'user', content: userContent });
 
-    // Call OpenAI
+    // ── Call OpenAI ─────────────────────────────────────────────────────────
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENAI_API_KEY}`
-      },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_API_KEY}` },
       body: JSON.stringify({
         model: 'gpt-4o-mini',
         messages,
-        max_tokens: 1500,
-        temperature: 0.4
+        max_tokens: isAdmin ? 2000 : 1200,
+        temperature: isAdmin ? 0.5 : 0.3
       })
     });
 
     if (!response.ok) {
       const err = await response.text();
-      return res.status(500).json({ error: 'OpenAI API error', detail: err });
+      return res.status(500).json({ error: 'OpenAI error', detail: err });
     }
 
     const data = await response.json();
-    const reply = data.choices?.[0]?.message?.content || 'No response generated.';
+    const reply = data.choices?.[0]?.message?.content || 'No response.';
+    return res.status(200).json({ reply, mode, isAdmin });
 
-    return res.status(200).json({ reply, mode });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }

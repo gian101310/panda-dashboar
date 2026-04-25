@@ -4,6 +4,18 @@
 
 ---
 
+## Apr 25, 2026 — Part A Complete (1 commit)
+
+**Bug Fix: Duplicate EDGE block removed from PairCard**
+
+- `getEdgeMemory()` was rendering twice — once correctly after CONF section (with tooltip), once as duplicate after state dot (no tooltip)
+- Removed the duplicate — EDGE now shows once, correctly, with full tooltip and dual win rate
+- Items 5 + 6 confirmed fully implemented from Apr 24 session
+- Part A (all 9 items) 100% complete ✅
+- Commit: 60d9398
+
+---
+
 ## Apr 25, 2026 — Full System Audit + Security Hardening + AI Refinements (17 commits)
 
 **Phase 1 — Data Integrity**
