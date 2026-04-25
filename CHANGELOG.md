@@ -4,6 +4,42 @@
 
 ---
 
+## Apr 25, 2026 — AI Brain System (commit aed6023)
+
+**New: admin_brain Supabase table**
+
+- Columns: id, category (preference/coaching/pattern/rule/question), key (UNIQUE), value, updated_at
+- Seeded with 10 brain memories: alpha pairs, leak pairs, optimal hold, sessions, BB/INTRA rules, London warning, execution gap
+- RLS: service_role only
+
+**New: /api/admin-brain.js**
+
+- GET: fetch all brain records
+- POST: upsert by key (auto-stores new memories)
+- DELETE: remove by key
+- Admin-only (validateSession + role check)
+
+**Rebuilt: /api/ai-chat.js (full rewrite)**
+
+- USER_PROMPT: narrator only — describes data, never recommends. Permanent disclaimer on every response.
+- ADMIN_PROMPT: unrestricted coach — full engine knowledge + brain injection + no guardrails
+- ENGINE_KNOWLEDGE: complete engine internals constant (\~80 lines)
+- fetchBrainContext(): queries admin_brain, formats into prompt sections by category
+- detectRemember(): regex patterns for "remember that/this", "don't forget", "keep in mind", "note that"
+- classifyBrainEntry(): auto-categorizes remembered content into preference/rule/pattern/coaching
+- Admin chat: auto-stores to admin_brain when "remember" keyword detected
+- Admin: max_tokens=2000, temperature=0.5. User: max_tokens=1200, temperature=0.3
+- History: last 8 turns for admin (was 6)
+
+**Product decisions locked tonight:**
+
+- AI is narrator for users (legal protection — not financial advice)
+- AI is unrestricted coach for admin only
+- Phase 2 upgrade path: once data sufficient + legal structure → expand coaching to Pro/Elite
+- Rule: "If AI output could be screenshot as financial advice — rewrite it"
+
+---
+
 ## Apr 25, 2026 — Part A Complete (1 commit)
 
 **Bug Fix: Duplicate EDGE block removed from PairCard**
@@ -15,7 +51,6 @@
 - Commit: 60d9398
 
 ---
-
 ## Apr 25, 2026 — Full System Audit + Security Hardening + AI Refinements (17 commits)
 
 **Phase 1 — Data Integrity**
