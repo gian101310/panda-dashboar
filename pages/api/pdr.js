@@ -109,6 +109,28 @@ export default async function handler(req, res) {
   if (!TWELVEDATA_KEY) return res.status(200).json({ pdr: {}, error: 'TWELVEDATA_API_KEY not set' });
 
   try {
+    // Check Supabase cache first — 15 minute TTL
+    const { data: cache } = await supabase
+      .from('pdr_cache')
+      .select('data, computed_at')
+      .eq('id', 1)
+      .single();
+
+    if (cache && cache.data && Object.keys(cache.data).length > 0) {
+      const age = (Date.now() - new Date(cache.computed_at).getTime()) / 1000;
+      if (age < 900) {
+        res.setHeader('Cache-Control', 'public, s-maxage=900, stale-while-revalidate=1800');
+        return res.status(200).json({
+          pdr: cache.data,
+          computed_at: cache.computed_at,
+          total: Object.keys(cache.data).length,
+          strong_count: Object.values(cache.data).filter(p => p.strong).length,
+          cached: true
+        });
+      }
+    }
+
+    // Cache miss or stale — fetch fresh from Twelve Data
     const candles = await fetchD1Candles(ALL_PAIRS);
     const pdr = {};
     let strong_count = 0;
@@ -122,13 +144,13 @@ export default async function handler(req, res) {
       }
     }
 
+    // Write to cache (fire and forget)
+    const now = new Date().toISOString();
+    supabase.from('pdr_cache').update({ data: pdr, computed_at: now }).eq('id', 1)
+      .then(() => {}).catch(() => {});
+
     res.setHeader('Cache-Control', 'public, s-maxage=900, stale-while-revalidate=1800');
-    return res.status(200).json({
-      pdr,
-      computed_at: new Date().toISOString(),
-      total: Object.keys(pdr).length,
-      strong_count
-    });
+    return res.status(200).json({ pdr, computed_at: now, total: Object.keys(pdr).length, strong_count, cached: false });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }

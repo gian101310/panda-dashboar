@@ -255,7 +255,7 @@ function getMatchup(row) {
   return { label: `${bl} / ${ql}`, color: 'var(--text-muted)', note: '' };
 }
 // ===== CONFIDENCE SCORING =====
-function computeConfidence(row, trend, cotBias) {
+function computeConfidence(row, trend, cotBias, memoryIndex) {
   if (!row) return null;
   const gap = Math.abs(row.gap ?? 0);
   const biasLabel = row.bias || biasFromGap(row.gap ?? 0).label;
@@ -295,7 +295,12 @@ function computeConfidence(row, trend, cotBias) {
   if (!flStValid) { score -= 15; reasons.push('FL-ST✗ -15'); }
   if (['FADING','REVERSING','COOLING','NEUTRAL'].includes(mom)) { score -= 10; reasons.push('MOMWK -10'); }
   score = Math.max(0, Math.min(100, score));
-  return { confidence: score, reasons };
+  // Historical edge lookup from memoryIndex
+  const edge = memoryIndex ? getEdgeMemory(row, memoryIndex) : null;
+  const historical = edge ? { winRate: edge.winRate, resRate: edge.resRate, sample: edge.sample, maturity: edge.maturity, flag: edge.flag } : null;
+  // Conflict: real-time confidence high but proven historical win rate low
+  const conflict = historical && historical.maturity === 'proven' && score >= 70 && historical.winRate != null && Math.round(historical.winRate * 100) <= 50;
+  return { confidence: score, reasons, historical, conflict };
 }
 function confStyle(c) {
   if (c == null) return null;
@@ -981,7 +986,7 @@ function PairCard({ row, trend, cotBias, confidence, memoryIndex, pdr }) {
 {[['H1',adv.verdicts.h1,adv.gaps.h1],['H4',adv.verdicts.h4,adv.gaps.h4],['D1',adv.verdicts.d1,adv.gaps.d1]].map(([tf,v,g])=><span key={tf} style={{fontFamily:mono,fontSize:7,color:v.c,background:v.c+'12',border:`1px solid ${v.c}28`,borderRadius:3,padding:'1px 5px',whiteSpace:'nowrap'}}>{tf} {v.tag} {g>0?'+':''}{g}</span>)}
 </div>
 </div>);})()}{cotBias&&<div style={{display:'flex',alignItems:'center',gap:4}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>COT</span><span style={{fontFamily:mono,fontSize:9,color:cotBias.bias==='BULLISH'?'#00ff9f':'#ff4d6d',background:cotBias.bias==='BULLISH'?'rgba(0,255,159,0.08)':'rgba(255,77,109,0.08)',border:`1px solid ${cotBias.bias==='BULLISH'?'#00ff9f33':'#ff4d6d33'}`,borderRadius:3,padding:'1px 5px'}}>{cotBias.bias==='BULLISH'?'▲':'▼'} {cotBias.bias}</span></div>}
-      {(()=>{if(!confidence)return null;const cs=confStyle(confidence.confidence);if(!cs)return null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>CONF</span><span style={{fontFamily:mono,fontSize:9,color:cs.color,background:cs.bg,border:`1px solid ${cs.border}`,borderRadius:4,padding:'1px 7px',fontWeight:700}}>{confidence.confidence} {cs.label}</span></div>);})()}
+      {(()=>{if(!confidence)return null;const cs=confStyle(confidence.confidence);if(!cs)return null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>CONF</span><span style={{fontFamily:mono,fontSize:9,color:cs.color,background:cs.bg,border:`1px solid ${cs.border}`,borderRadius:4,padding:'1px 7px',fontWeight:700}}>{confidence.confidence} {cs.label}</span>{confidence.conflict&&<span style={{fontFamily:mono,fontSize:8,color:'#ff4d6d',background:'rgba(255,77,109,0.1)',border:'1px solid rgba(255,77,109,0.3)',borderRadius:4,padding:'1px 6px',fontWeight:700}}>⚠️ CONFLICT</span>}</div>);})()}
       {(()=>{const em=getEdgeMemory(row,memoryIndex);if(!em)return null;const fc=em.flag==='PROVEN_EDGE'?'#00ff9f':em.flag==='DEAD_ZONE'?'#ff4d6d':'#00b4ff';const icon=em.flag==='PROVEN_EDGE'?'✅':em.flag==='DEAD_ZONE'?'⛔':'📊';const lbl=em.flag?em.flag.replace('_',' '):(em.maturity||'').toUpperCase();const wrPct=Math.round((em.winRate||0)*100);const resPct=em.resRate!=null?Math.round(em.resRate*100):null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2,flexWrap:'wrap'}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>EDGE</span><span style={{fontFamily:mono,fontSize:9,color:fc,background:fc+'12',border:`1px solid ${fc}33`,borderRadius:4,padding:'1px 7px',fontWeight:700}}>{icon} {lbl}</span><span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>Win:{wrPct}%{resPct!=null?` | Res:${resPct}%`:''} (n={em.sample})</span></div>);})()}
       {pdr&&<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>PDR</span><PdrBadge pdr={pdr}/></div>}
       <div style={{display:'flex',flexDirection:'column',gap:3}}>
@@ -2441,7 +2446,7 @@ export default function Dashboard() {
   // Confidence scoring — computed once, used everywhere
   const confidenceMap = {};
   data.forEach(row => {
-    const conf = computeConfidence(row, trends[row.symbol], getPairCotBias(row.symbol));
+    const conf = computeConfidence(row, trends[row.symbol], getPairCotBias(row.symbol), memoryIndex);
     if (conf) confidenceMap[row.symbol] = conf;
   });
 
