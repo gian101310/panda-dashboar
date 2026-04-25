@@ -45,7 +45,7 @@ async function fetchD1Candles(symbols) {
     } catch (e) {
       console.error('[PDR] Batch fetch error:', e.message);
     }
-    if (i + 8 < symbols.length) await new Promise(r => setTimeout(r, 1500));
+    if (i + 8 < symbols.length) await new Promise(r => setTimeout(r, 10000));
   }
   return results;
 }

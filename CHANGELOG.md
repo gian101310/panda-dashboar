@@ -39,7 +39,6 @@
 
 - `signal_results`: added `session` text column + index (ASIAN/LONDON/NEW_YORK)
 - `signal_snapshots`: added `gap_delta` numeric column (rate of change from previous cycle)
-
 [**app.py**](http://app.py)
 
 - `get_session()` helper — ASIAN 22:00-05:59 UTC, LONDON 06:00-13:59, NEW_YORK 14:00-21:59
