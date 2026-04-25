@@ -1,6 +1,6 @@
 @echo off
 cd /d C:\Users\Admin\panda-dashboard
 git add -A
-git commit -m "audit: post-refactor cleanup - zero TBG in dashboard codebase"
+git commit -m "cleanup: remove debug endpoint and temp build scripts"
 git push origin main
 pause
