@@ -93,6 +93,8 @@ async function openNewTrackers(dashboardPairs, openTrackers) {
       session_at_open: sessionFromHour(hour),
       pdr_strength_at_open: pdr ? pdr.pdr_strength : null,
       pdr_strong_at_open: pdr ? pdr.pdr_strong : null,
+      box_h1_at_open: pair.box_h1_trend || null,
+      box_h4_at_open: pair.box_h4_trend || null,
       peak_gap: Math.abs(pair.gap),
       hourly_gaps: [{ hour: 0, gap: Math.abs(pair.gap), ts: now.toISOString() }],
       status: 'OPEN'
