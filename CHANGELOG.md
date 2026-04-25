@@ -4,6 +4,35 @@
 
 ---
 
+## Apr 25, 2026 — PDR Tracking (commit e603ef1)
+
+**New: pdr_cache Supabase table**
+
+- Per-symbol rows: symbol (PK), pdr_strength, pdr_strong, pdr_direction, retracement, computed_at
+- RLS: service_role only
+
+**pdr.js — cache rewritten**
+
+- Old: single row id=1 with jsonb blob (broken schema mismatch)
+- New: per-symbol upsert on conflict(symbol) — each pair tracked individually
+- Cache read: checks if 20+ symbols exist and age &lt; 15min
+- Cache write: upserts all symbols after fresh Twelve Data fetch
+
+**signal-tracker.js — PDR at open**
+
+- openNewTrackers() now fetches pdr_cache for candidate symbols before inserting
+- pdrMap built from cache, non-blocking (fails silently if cache empty)
+- pdr_strength_at_open + pdr_strong_at_open stored on every new tracker
+- Future: PDR strategy filter reads these columns for analysis
+
+**signal_results + signal_tracker schema**
+
+- signal_results: pdr_strength, pdr_strong, pdr_direction columns added (nullable — for future PDR strategy)
+- signal_tracker: pdr_strength_at_open, pdr_strong_at_open columns added (populated from pdr_cache)
+- Index: idx_signal_results_pdr on pdr_strong
+
+---
+
 ## Apr 25, 2026 — Logging Patch (commit 8f96077)
 
 **Supabase migrations**
