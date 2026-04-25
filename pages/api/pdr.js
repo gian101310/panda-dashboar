@@ -109,22 +109,30 @@ export default async function handler(req, res) {
   if (!TWELVEDATA_KEY) return res.status(200).json({ pdr: {}, error: 'TWELVEDATA_API_KEY not set' });
 
   try {
-    // Check Supabase cache first — 15 minute TTL
-    const { data: cache } = await supabase
+    // Check per-symbol cache — 15 min TTL
+    const { data: cached } = await supabase
       .from('pdr_cache')
-      .select('data, computed_at')
-      .eq('id', 1)
-      .single();
+      .select('symbol, pdr_strength, pdr_strong, pdr_direction, retracement, computed_at')
+      .order('computed_at', { ascending: false });
 
-    if (cache && cache.data && Object.keys(cache.data).length > 0) {
-      const age = (Date.now() - new Date(cache.computed_at).getTime()) / 1000;
+    if (cached && cached.length >= 20) {
+      const age = (Date.now() - new Date(cached[0].computed_at).getTime()) / 1000;
       if (age < 900) {
+        const pdr = {};
+        for (const row of cached) {
+          pdr[row.symbol] = {
+            symbol: row.symbol,
+            strength: row.pdr_strength,
+            strong: row.pdr_strong,
+            direction: row.pdr_direction,
+            retracement: row.retracement,
+          };
+        }
         res.setHeader('Cache-Control', 'public, s-maxage=900, stale-while-revalidate=1800');
         return res.status(200).json({
-          pdr: cache.data,
-          computed_at: cache.computed_at,
-          total: Object.keys(cache.data).length,
-          strong_count: Object.values(cache.data).filter(p => p.strong).length,
+          pdr, computed_at: cached[0].computed_at,
+          total: Object.keys(pdr).length,
+          strong_count: Object.values(pdr).filter(p => p.strong).length,
           cached: true
         });
       }
@@ -133,7 +141,9 @@ export default async function handler(req, res) {
     // Cache miss or stale — fetch fresh from Twelve Data
     const candles = await fetchD1Candles(ALL_PAIRS);
     const pdr = {};
+    const cacheRows = [];
     let strong_count = 0;
+    const now = new Date().toISOString();
 
     for (const sym of ALL_PAIRS) {
       const result = computePDR(candles[sym]);
@@ -141,13 +151,23 @@ export default async function handler(req, res) {
         result.symbol = sym;
         pdr[sym] = result;
         if (result.strong) strong_count++;
+        cacheRows.push({
+          symbol: sym,
+          pdr_strength: result.strength,
+          pdr_strong: result.strong,
+          pdr_direction: result.direction,
+          retracement: result.retracement,
+          computed_at: now
+        });
       }
     }
 
-    // Write to cache (fire and forget)
-    const now = new Date().toISOString();
-    supabase.from('pdr_cache').update({ data: pdr, computed_at: now }).eq('id', 1)
-      .then(() => {}).catch(() => {});
+    // Write per-symbol rows to pdr_cache (fire and forget)
+    if (cacheRows.length > 0) {
+      supabase.from('pdr_cache')
+        .upsert(cacheRows, { onConflict: 'symbol' })
+        .then(() => {}).catch(() => {});
+    }
 
     res.setHeader('Cache-Control', 'public, s-maxage=900, stale-while-revalidate=1800');
     return res.status(200).json({ pdr, computed_at: now, total: Object.keys(pdr).length, strong_count, cached: false });

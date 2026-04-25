@@ -35,7 +35,6 @@
 - Columns: id, category (preference/coaching/pattern/rule/question), key (UNIQUE), value, updated_at
 - Seeded with 10 brain memories: alpha pairs, leak pairs, optimal hold, sessions, BB/INTRA rules, London warning, execution gap
 - RLS: service_role only
-
 **New: /api/admin-brain.js**
 
 - GET: fetch all brain records

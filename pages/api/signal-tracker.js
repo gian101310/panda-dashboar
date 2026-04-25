@@ -58,12 +58,30 @@ async function openNewTrackers(dashboardPairs, openTrackers) {
   const now = new Date();
   const hour = now.getUTCHours();
 
+  // Fetch PDR cache for all symbols being considered
+  const candidateSymbols = dashboardPairs
+    .filter(p => isValidSignal(p))
+    .map(p => p.symbol);
+  let pdrMap = {};
+  if (candidateSymbols.length > 0) {
+    try {
+      const { data: pdrRows } = await supabase
+        .from('pdr_cache')
+        .select('symbol, pdr_strength, pdr_strong')
+        .in('symbol', candidateSymbols);
+      if (pdrRows) {
+        for (const r of pdrRows) pdrMap[r.symbol] = r;
+      }
+    } catch (e) { /* non-blocking — PDR is optional */ }
+  }
+
   for (const pair of dashboardPairs) {
     if (!isValidSignal(pair)) continue;
     const strategy = classifyStrategy(pair);
     const key = `${pair.symbol}_${strategy}`;
-    if (openSymbols.has(key)) continue; // already tracking
+    if (openSymbols.has(key)) continue;
 
+    const pdr = pdrMap[pair.symbol] || null;
     newTrackers.push({
       symbol: pair.symbol,
       direction: pair.bias,
@@ -73,6 +91,8 @@ async function openNewTrackers(dashboardPairs, openTrackers) {
       momentum_at_open: pair.momentum || null,
       pl_zone_at_open: pair.pl_zone || null,
       session_at_open: sessionFromHour(hour),
+      pdr_strength_at_open: pdr ? pdr.pdr_strength : null,
+      pdr_strong_at_open: pdr ? pdr.pdr_strong : null,
       peak_gap: Math.abs(pair.gap),
       hourly_gaps: [{ hour: 0, gap: Math.abs(pair.gap), ts: now.toISOString() }],
       status: 'OPEN'
