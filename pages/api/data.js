@@ -1,6 +1,11 @@
 import { supabase } from '../../lib/supabase';
+import { validateSession } from '../../lib/auth';
 
 export default async function handler(req, res) {
+  const token = req.cookies?.panda_session;
+  const session = await validateSession(token);
+  if (!session) return res.status(401).json({ error: 'Unauthorized' });
+
   try {
     const { data, error } = await supabase
       .from('dashboard')

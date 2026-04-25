@@ -1,7 +1,12 @@
 import { supabase } from '../../lib/supabase';
+import { validateSession } from '../../lib/auth';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+
+  const token = req.cookies?.panda_session;
+  const session = await validateSession(token);
+  if (!session) return res.status(401).json({ error: 'Unauthorized' });
 
   const { symbol, bias, valid, from, to, limit = 500 } = req.query;
 

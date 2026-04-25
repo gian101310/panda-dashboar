@@ -1,6 +1,8 @@
 import { supabase } from '../../lib/supabase';
+import { validateSession } from '../../lib/auth';
 
 const TWELVEDATA_KEY = process.env.TWELVEDATA_API_KEY || '';
+const ENGINE_SECRET = process.env.ENGINE_SECRET || '';
 
 // Fetch spot prices from Twelve Data (free tier: 800/day, 8/min)
 async function fetchPrices(symbols) {
@@ -158,6 +160,9 @@ async function updateAndCloseTrackers(dashboardPairs, openTrackers) {
 export default async function handler(req, res) {
   // GET — list tracker records
   if (req.method === 'GET') {
+    const token = req.cookies?.panda_session;
+    const session = await validateSession(token);
+    if (!session) return res.status(401).json({ error: 'Unauthorized' });
     const { status = 'OPEN', symbol, limit = 50 } = req.query;
     let query = supabase.from('signal_tracker').select('*')
       .order('opened_at', { ascending: false })
@@ -169,8 +174,14 @@ export default async function handler(req, res) {
     return res.status(200).json({ trackers: data || [], count: (data || []).length });
   }
 
-  // POST — run tracker update cycle
+  // POST — run tracker update cycle (browser session OR engine secret)
   if (req.method === 'POST') {
+    const token = req.cookies?.panda_session;
+    const session = await validateSession(token);
+    const incomingSecret = req.headers['x-engine-secret'] || '';
+    const validEngine = ENGINE_SECRET && incomingSecret === ENGINE_SECRET;
+    if (!session && !validEngine) return res.status(401).json({ error: 'Unauthorized' });
+
     try {
       const { action } = req.body || {};
 

@@ -1,6 +1,11 @@
 import { supabase } from '../../lib/supabase';
+import { validateSession } from '../../lib/auth';
 
 export default async function handler(req, res) {
+  const token = req.cookies?.panda_session;
+  const session = await validateSession(token);
+  if (!session) return res.status(401).json({ error: 'Unauthorized' });
+
   try {
     // Get last 32 entries per symbol = 8 hours of 15min data
     const { data, error } = await supabase

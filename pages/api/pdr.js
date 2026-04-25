@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase';
+import { validateSession } from '../../lib/auth';
 
 const TWELVEDATA_KEY = process.env.TWELVEDATA_API_KEY || '';
 const ALL_PAIRS = [
@@ -100,6 +101,11 @@ function computePDR(candles) {
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'GET only' });
+
+  const token = req.cookies?.panda_session;
+  const session = await validateSession(token);
+  if (!session) return res.status(401).json({ error: 'Unauthorized' });
+
   if (!TWELVEDATA_KEY) return res.status(200).json({ pdr: {}, error: 'TWELVEDATA_API_KEY not set' });
 
   try {
