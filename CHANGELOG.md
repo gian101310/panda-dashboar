@@ -4,6 +4,30 @@
 
 ---
 
+## Apr 25, 2026 — Logging Patch (commit 8f96077)
+
+**Supabase migrations**
+
+- `signal_results`: added `session` text column + index (ASIAN/LONDON/NEW_YORK)
+- `signal_snapshots`: added `gap_delta` numeric column (rate of change from previous cycle)
+
+[**app.py**](http://app.py)
+
+- `get_session()` helper — ASIAN 22:00-05:59 UTC, LONDON 06:00-13:59, NEW_YORK 14:00-21:59
+- `log_signal()`: now writes `session` on every signal entry
+- Main loop: `gap_deltas = {}` tracks per-symbol gap velocity each cycle
+- `gap_deltas[symbol]` computed before PREV_GAP update (captures true delta)
+- Snapshot insert: `snap["gap_delta"]` injected from gap_deltas map
+
+**signal-tracker.js**
+
+- `sessionFromHour()` rewritten — TOKYO→ASIAN, OVERLAP→NEW_YORK, OFF_HOURS→ASIAN
+- Session labels now consistent with ai_memory / Journal Agent (ASIAN/LONDON/NEW_YORK)
+
+**Engine restart required** — [app.py](http://app.py) changes are not live until engine is restarted via START_PANDA.bat
+
+---
+
 ## Apr 25, 2026 — AI Brain System (commit aed6023)
 
 **New: admin_brain Supabase table**
