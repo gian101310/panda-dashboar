@@ -29,14 +29,11 @@ async function fetchPrices(symbols) {
   }
 }
 
-// Session from UTC hour
+// Session from UTC hour — matches ai_memory / Journal Agent labels
 function sessionFromHour(h) {
-  // UTC-based: Tokyo 0-7, London 8-12, Overlap 13-16, NY 17-21
-  if (h >= 0 && h <= 7) return 'TOKYO';
-  if (h >= 8 && h <= 12) return 'LONDON';
-  if (h >= 13 && h <= 16) return 'OVERLAP';
-  if (h >= 17 && h <= 21) return 'NEW_YORK';
-  return 'OFF_HOURS';
+  if (h >= 22 || h < 6)  return 'ASIAN';     // 22:00-05:59 UTC
+  if (h >= 6 && h < 14)  return 'LONDON';    // 06:00-13:59 UTC
+  return 'NEW_YORK';                           // 14:00-21:59 UTC
 }
 
 function isValidSignal(pair) {
