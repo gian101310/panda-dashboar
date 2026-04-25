@@ -42,7 +42,7 @@ function sessionFromHour(h) {
 function isValidSignal(pair) {
   const gap = Math.abs(pair.gap || 0);
   const bias = pair.bias;
-  // BB does not require TBG — gap >= 5 and directional bias is the only requirement
+  // BB does not require Panda Lines — gap >= 5 and directional bias is the only requirement
   if (gap < 5 || !bias || bias === 'WAIT') return false;
   return true;
 }
@@ -50,7 +50,7 @@ function isValidSignal(pair) {
 function classifyStrategy(pair) {
   const gap = Math.abs(pair.gap || 0);
   const h = new Date().getUTCHours();
-  // INTRA: gap >= 9, TBG confirmed, 22:00-23:59 UTC (2-4 AM UAE)
+  // INTRA: gap >= 9, Panda Lines confirmed, 22:00-23:59 UTC (2-4 AM UAE)
   if (gap >= 9 && h >= 22 && h <= 23) return 'INTRA';
   return 'BB';
 }
@@ -74,7 +74,7 @@ async function openNewTrackers(dashboardPairs, openTrackers) {
       gap_at_open: Math.abs(pair.gap),
       confidence_at_open: null,
       momentum_at_open: pair.momentum || null,
-      tbg_zone_at_open: pair.tbg_zone || null,
+      pl_zone_at_open: pair.pl_zone || null,
       session_at_open: sessionFromHour(hour),
       peak_gap: Math.abs(pair.gap),
       hourly_gaps: [{ hour: 0, gap: Math.abs(pair.gap), ts: now.toISOString() }],
@@ -115,12 +115,12 @@ async function updateAndCloseTrackers(dashboardPairs, openTrackers) {
     if (currentGap < 5) closeReason = 'GAP_BELOW_5';
     else if (tracker.direction === 'BUY' && pair.bias === 'SELL') closeReason = 'BIAS_FLIPPED';
     else if (tracker.direction === 'SELL' && pair.bias === 'BUY') closeReason = 'BIAS_FLIPPED';
-    else if (tracker.direction === 'BUY' && pair.tbg_zone === 'BELOW') closeReason = 'TBG_FLIPPED';
-    else if (tracker.direction === 'SELL' && pair.tbg_zone === 'ABOVE') closeReason = 'TBG_FLIPPED';
+    else if (tracker.direction === 'BUY' && pair.pl_zone === 'BELOW') closeReason = 'PL_FLIPPED';
+    else if (tracker.direction === 'SELL' && pair.pl_zone === 'ABOVE') closeReason = 'PL_FLIPPED';
     else if (ageDays > 30) closeReason = 'MAX_AGE_30D';
 
     // Milestone snapshots
-    const snapshot = { gap: currentGap, bias: pair.bias, tbg_zone: pair.tbg_zone, momentum: pair.momentum, ts: now.toISOString() };
+    const snapshot = { gap: currentGap, bias: pair.bias, pl_zone: pair.pl_zone, momentum: pair.momentum, ts: now.toISOString() };
     const h24 = tracker.h24_snapshot || (ageHours >= 24 && ageHours < 24.2 ? snapshot : null);
     const h48 = tracker.h48_snapshot || (ageHours >= 48 && ageHours < 48.2 ? snapshot : null);
     const h72 = tracker.h72_snapshot || (ageHours >= 72 && ageHours < 72.2 ? snapshot : null);
@@ -198,7 +198,7 @@ export default async function handler(req, res) {
       // Default action: full update cycle
       // 1. Get current dashboard data
       const { data: dashboardPairs, error: dashErr } = await supabase
-        .from('dashboard').select('symbol, gap, bias, confidence, momentum, tbg_zone');
+        .from('dashboard').select('symbol, gap, bias, confidence, momentum, pl_zone');
       if (dashErr) return res.status(500).json({ error: dashErr.message });
 
       // 2. Get all open trackers

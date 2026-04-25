@@ -12,7 +12,7 @@ async function fetchRawCrossData() {
   // Signal results per pair (including below-20 threshold)
   const { data: signals, error: sigErr } = await supabase
     .from('signal_results')
-    .select('symbol, direction, outcome, entry_gap, tbg_zone, strategy')
+    .select('symbol, direction, outcome, entry_gap, pl_zone, strategy')
     .not('outcome', 'is', null);
 
   // Manual trades per pair — query kept identical to journal-agent (known working)
@@ -184,23 +184,23 @@ function findBehavioralInsights(memories) {
     }
   }
 
-  // TBG discipline insight from confluence data
-  const tbgConf = memories.find(m => m.factor === 'tbg_confirmation' && m.strategy === 'BB' && m.metadata?.tbg_status === 'confirmed');
-  const tbgUnconf = memories.find(m => m.factor === 'tbg_confirmation' && m.strategy === 'BB' && m.metadata?.tbg_status === 'unconfirmed');
+  // Panda Lines discipline insight from confluence data
+  const plConf = memories.find(m => m.factor === 'pl_confirmation' && m.strategy === 'BB' && m.metadata?.pl_status === 'confirmed');
+  const plUnconf = memories.find(m => m.factor === 'pl_confirmation' && m.strategy === 'BB' && m.metadata?.pl_status === 'unconfirmed');
 
-  if (tbgConf && tbgUnconf) {
-    const confWR = parseFloat(tbgConf.win_rate) || 0;
-    const unconfWR = parseFloat(tbgUnconf.win_rate) || 0;
-    const confFlat = tbgConf.metadata?.flat_pct || 0;
-    const unconfFlat = tbgUnconf.metadata?.flat_pct || 0;
+  if (plConf && plUnconf) {
+    const confWR = parseFloat(plConf.win_rate) || 0;
+    const unconfWR = parseFloat(plUnconf.win_rate) || 0;
+    const confFlat = plConf.metadata?.flat_pct || 0;
+    const unconfFlat = plUnconf.metadata?.flat_pct || 0;
 
     insights.push({
-      type: 'market_theme', factor: 'tbg_discipline',
-      win_rate: confWR, sample_size: tbgConf.sample_size + tbgUnconf.sample_size,
+      type: 'market_theme', factor: 'pl_discipline',
+      win_rate: confWR, sample_size: plConf.sample_size + plUnconf.sample_size,
       metadata: {
         confirmed_win_rate: confWR, unconfirmed_win_rate: unconfWR,
-        confirmed_sample: tbgConf.sample_size, unconfirmed_sample: tbgUnconf.sample_size,
-        description: `TBG discipline: confirmed signals win ${confWR}% vs unconfirmed ${unconfWR}% — TBG confirmation adds ${Math.round(confWR - unconfWR)} points of edge`
+        confirmed_sample: plConf.sample_size, unconfirmed_sample: plUnconf.sample_size,
+        description: `Panda Lines discipline: confirmed signals win ${confWR}% vs unconfirmed ${unconfWR}% — Panda Lines confirmation adds ${Math.round(confWR - unconfWR)} points of edge`
       }
     });
   }
@@ -247,7 +247,7 @@ export default async function handler(req, res) {
 
       // Log previous run summary
       const { data: prevMem } = await supabase.from('ai_memory').select('sample_size')
-        .in('factor', ['alpha_pair','leak_pair','overtraded_weak','session_edge','hold_duration_edge','edge_gap','tbg_discipline']);
+        .in('factor', ['alpha_pair','leak_pair','overtraded_weak','session_edge','hold_duration_edge','edge_gap','pl_discipline']);
       if (prevMem && prevMem.length > 0) {
         const avgS = Math.round(prevMem.reduce((s,m) => s + m.sample_size, 0) / prevMem.length);
         await supabase.from('engine_logs').insert({ timestamp: new Date().toISOString(), component: 'pattern_agent_summary', duration: 0, error: JSON.stringify({ memories: prevMem.length, avg_sample: avgS }) });
@@ -255,7 +255,7 @@ export default async function handler(req, res) {
 
       // 4. Clear previous pattern agent memories
       await supabase.from('ai_memory').delete()
-        .in('factor', ['alpha_pair', 'leak_pair', 'overtraded_weak', 'session_edge', 'hold_duration_edge', 'edge_gap', 'tbg_discipline']);
+        .in('factor', ['alpha_pair', 'leak_pair', 'overtraded_weak', 'session_edge', 'hold_duration_edge', 'edge_gap', 'pl_discipline']);
 
       // 5. Batch insert
       let written = 0;

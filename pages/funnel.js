@@ -191,7 +191,7 @@ export default function FunnelPage() {
           <h2 style={{ fontFamily: orb, fontSize: 'clamp(20px,3.5vw,28px)', fontWeight: 700, margin: '0 0 40px' }}>THREE STEPS. EVERY SESSION.</h2>
           {[
             { n: '01', title: 'OPEN THE DASHBOARD', desc: 'See all 21 pairs ranked by gap score. Valid signals are highlighted. Invalid setups are greyed out.' },
-            { n: '02', title: 'CHECK CONFIRMATION', desc: 'Look at strength, momentum, and TBG zone. All three agree? The setup is confirmed.' },
+            { n: '02', title: 'CHECK CONFIRMATION', desc: 'Look at strength, momentum, and Panda Lines zone. All three agree? The setup is confirmed.' },
             { n: '03', title: 'EXECUTE WITH CONFIDENCE', desc: 'Use the position calculator, set your risk, and take the trade. The engine did the analysis — you just execute.' },
           ].map((step, i) => (
             <div key={i} style={{ display: 'flex', gap: 20, textAlign: 'left', marginBottom: 32, alignItems: 'flex-start' }}>

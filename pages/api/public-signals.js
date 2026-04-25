@@ -2,7 +2,7 @@ import { supabase } from '../../lib/supabase';
 
 // Public endpoint — returns limited signal data for landing page social proof
 // No auth required, returns top 5 strongest pairs only
-// No internal scores, no TBG data, no strategy details
+// No internal scores, no Panda Lines data, no strategy details
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'GET only' });
 

@@ -79,11 +79,11 @@ function getEdgeMemory(row, memoryIndex) {
   const absGap = Math.abs(row.gap || 0);
   if (absGap < 5) return null;
   const gapBucket = String(Math.min(Math.floor(absGap), 12));
-  const zone = (row.tbg_zone || '').toUpperCase();
+  const zone = (row.pl_zone || '').toUpperCase();
   const bias = row.bias;
-  const tbgConfirmed = (bias === 'BUY' && zone === 'ABOVE') || (bias === 'SELL' && zone === 'BELOW');
-  const tbgStr = tbgConfirmed ? 'confirmed' : 'unconfirmed';
-  const mem = (memoryIndex.gap_tbg || {})[`BB_${gapBucket}_${tbgStr}`]
+  const plConfirmed = (bias === 'BUY' && zone === 'ABOVE') || (bias === 'SELL' && zone === 'BELOW');
+  const plStr = plConfirmed ? 'confirmed' : 'unconfirmed';
+  const mem = (memoryIndex.gap_pl || {})[`BB_${gapBucket}_${plStr}`]
            || (memoryIndex.gap_only || {})[`BB_${gapBucket}`]
            || (memoryIndex.general || {})['BB_strategy_overall']
            || null;
@@ -133,11 +133,11 @@ function boxConfirm(bias, h4Trend, h1Trend) {
   if (h4Trend === bad)                         return { label:'❌ SKIP',     color:'#ff4d6d', bg:'rgba(255,77,109,0.10)',  border:'rgba(255,77,109,0.35)' };
   return { label:'⚠️ RANGING', color:'#ffd166', bg:'rgba(255,209,102,0.10)', border:'rgba(255,209,102,0.35)' };
 }
-// ===== FL-ST ZONE BADGE (CONTINUATIONday validity) =====
-// BUY  valid = price ABOVE both SuperTrend + FollowLine
-// SELL valid = price BELOW both SuperTrend + FollowLine
+// ===== PL ZONE BADGE (CONTINUATIONday validity) =====
+// BUY  valid = price ABOVE both Panda Lines
+// SELL valid = price BELOW both Panda Lines
 // BETWEEN   = not valid for intra game
-function tbgZoneBadge(zone, bias) {
+function plZoneBadge(zone, bias) {
   if (!zone) return null;
   const isBuy  = bias === 'BUY';
   const isSell = bias === 'SELL';
@@ -273,9 +273,9 @@ function computeConfidence(row, trend, cotBias, memoryIndex) {
   const diff = Math.abs(bsRaw - qsRaw);
   if (diff >= 8) { score += 20; reasons.push('MU≥8 +20'); }
   else if (diff >= 5) { score += 10; reasons.push('MU≥5 +10'); }
-  const tbg = tbgZoneBadge(row.tbg_zone, biasLabel);
-  const flStValid = tbg?.valid === true;
-  if (flStValid) { score += 15; reasons.push('FL-ST✅ +15'); }
+  const pl = plZoneBadge(row.pl_zone, biasLabel);
+  const flStValid = pl?.valid === true;
+  if (flStValid) { score += 15; reasons.push('PL✅ +15'); }
   const goodTrend = isBuy ? 'UPTREND' : 'DOWNTREND';
   const h1Ok = row.box_h1_trend === goodTrend;
   const h4Ok = row.box_h4_trend === goodTrend;
@@ -292,7 +292,7 @@ function computeConfidence(row, trend, cotBias, memoryIndex) {
   if (str >= 3) { score += 10; reasons.push('STR≥3 +10'); }
   else if (str >= 1) { score += 5; reasons.push('STR≥1 +5'); }
   if (row.box_h4_trend && row.box_h4_trend !== 'UNKNOWN' && !h4Ok) { score -= 10; reasons.push('H4✗ -10'); }
-  if (!flStValid) { score -= 15; reasons.push('FL-ST✗ -15'); }
+  if (!flStValid) { score -= 15; reasons.push('PL✗ -15'); }
   if (['FADING','REVERSING','COOLING','NEUTRAL'].includes(mom)) { score -= 10; reasons.push('MOMWK -10'); }
   score = Math.max(0, Math.min(100, score));
   // Historical edge lookup from memoryIndex
@@ -968,7 +968,7 @@ function PairCard({ row, trend, cotBias, confidence, memoryIndex, pdr }) {
       </div>
       {(()=>{const mu=getMatchup(row);if(!mu)return null;return(<div style={{display:'flex',alignItems:'center',gap:6,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>MATCHUP</span><span style={{fontFamily:mono,fontSize:9,color:mu.color,background:mu.color+'12',border:`1px solid ${mu.color}30`,borderRadius:4,padding:'1px 7px',whiteSpace:'nowrap'}}>{mu.label}</span>{mu.note==='IDEAL'&&<span style={{fontFamily:mono,fontSize:7,color:mu.color,letterSpacing:1,opacity:0.8}}>IDEAL</span>}{mu.note==='AVOID'&&<span style={{fontFamily:mono,fontSize:7,color:'#ffaa44',letterSpacing:1,opacity:0.8}}>AVOID</span>}</div>);})()}
       {(()=>{const bh1=boxTrend(row.box_h1_trend),bh4=boxTrend(row.box_h4_trend);if(!bh1&&!bh4)return null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>BOX</span>{bh4&&<span style={{fontFamily:mono,fontSize:8,color:bh4.color,background:bh4.bg,border:`1px solid ${bh4.border}`,borderRadius:3,padding:'1px 6px'}}>H4 {bh4.label}</span>}{bh1&&<span style={{fontFamily:mono,fontSize:8,color:bh1.color,background:bh1.bg,border:`1px solid ${bh1.border}`,borderRadius:3,padding:'1px 6px'}}>H1 {bh1.label}</span>}</div>);})()}
-      {(()=>{ const tbg=tbgZoneBadge(row.tbg_zone,row.bias); if(!tbg)return null; const tbgTip=tbg.valid?'TBG confirmed: SuperTrend + FollowLine agree with gap direction. This is the price confirmation layer.':'TBG not confirmed: price structure does not yet agree with gap direction. Wait for alignment or use as additional caution.'; return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>FL-ST</span><span title={tbgTip} style={{fontFamily:mono,fontSize:8,color:tbg.color,background:tbg.bg,border:`1px solid ${tbg.border}`,borderRadius:3,padding:'1px 6px',fontWeight:700,cursor:'help'}}>{tbg.label}</span>{tbg.valid&&<span style={{fontFamily:mono,fontSize:7,color:'#00ff9f',letterSpacing:1}}>✅</span>}{!tbg.valid&&<span style={{fontFamily:mono,fontSize:7,color:'#ff7744',letterSpacing:1}}>⛔</span>}</div>);})()}{(()=>{
+      {(()=>{ const pl=plZoneBadge(row.pl_zone,row.bias); if(!pl)return null; const plTip=pl.valid?'Panda Lines confirmed: Panda Lines agree with gap direction. This is the price confirmation layer.':'Panda Lines not confirmed: price structure does not yet agree with gap direction. Wait for alignment or use as additional caution.'; return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>PL</span><span title={plTip} style={{fontFamily:mono,fontSize:8,color:pl.color,background:pl.bg,border:`1px solid ${pl.border}`,borderRadius:3,padding:'1px 6px',fontWeight:700,cursor:'help'}}>{pl.label}</span>{pl.valid&&<span style={{fontFamily:mono,fontSize:7,color:'#00ff9f',letterSpacing:1}}>✅</span>}{!pl.valid&&<span style={{fontFamily:mono,fontSize:7,color:'#ff7744',letterSpacing:1}}>⛔</span>}</div>);})()}{(()=>{
   const bc=boxConfirm(row.bias,row.box_h4_trend,row.box_h1_trend);
   const af=atrFill(row.atr);
   if(!bc&&!af)return null;
@@ -1105,13 +1105,13 @@ function PairCardModal({ row, trend, cotBias, onClose, isMobile, confidence, mem
           </div>
         )}
 
-        {/* FL-ST Zone — CONTINUATIONday validity */}
-        {(()=>{ const tbg = tbgZoneBadge(row.tbg_zone, row.bias); if (!tbg) return null; return (
+        {/* PL Zone — CONTINUATIONday validity */}
+        {(()=>{ const pl = plZoneBadge(row.pl_zone, row.bias); if (!pl) return null; return (
           <div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',background:'rgba(0,0,0,0.15)',borderRadius:8}}>
-            <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2}}>FL-ST LINES</span>
-            <span style={{fontFamily:mono,fontSize:10,color:tbg.color,background:tbg.bg,border:`1px solid ${tbg.border}`,borderRadius:4,padding:'2px 10px',fontWeight:700}}>{tbg.label}</span>
-            {tbg.valid && <span style={{fontFamily:mono,fontSize:9,color:'#00ff9f',letterSpacing:1}}>✅ VALID</span>}
-            {!tbg.valid && <span style={{fontFamily:mono,fontSize:9,color:'#ff7744',letterSpacing:1}}>⛔ NOT VALID</span>}
+            <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2}}>PL LINES</span>
+            <span style={{fontFamily:mono,fontSize:10,color:pl.color,background:pl.bg,border:`1px solid ${pl.border}`,borderRadius:4,padding:'2px 10px',fontWeight:700}}>{pl.label}</span>
+            {pl.valid && <span style={{fontFamily:mono,fontSize:9,color:'#00ff9f',letterSpacing:1}}>✅ VALID</span>}
+            {!pl.valid && <span style={{fontFamily:mono,fontSize:9,color:'#ff7744',letterSpacing:1}}>⛔ NOT VALID</span>}
           </div>
         ); })()}
 
@@ -1227,7 +1227,7 @@ function ValidSetupsTab({ data, trends, cotMap, confidenceMap }) {
               <div style={{fontFamily:mono,fontSize:9,color:t.momentumColor||'var(--text-muted)',background:(t.momentumColor||'var(--text-muted)')+'18',border:`1px solid ${(t.momentumColor||'var(--text-muted)')}30`,borderRadius:4,padding:'2px 8px',display:'inline-block',marginBottom:4}}>{t.momentum||'NEUTRAL'}</div>
               {g && <div style={{fontFamily:mono,fontSize:10,color:g.color,fontWeight:700}}>👉 {g.action}</div>}{(()=>{const mu=getMatchup(row);if(!mu)return null;return(<div style={{fontFamily:mono,fontSize:9,color:mu.color,background:mu.color+'12',border:`1px solid ${mu.color}28`,borderRadius:4,padding:'2px 7px',display:'inline-block',marginTop:3,whiteSpace:'nowrap'}}>{mu.label}{mu.note&&<span style={{marginLeft:5,opacity:0.7,fontSize:8}}>{mu.note}</span>}</div>);})()}
               {(()=>{const bh4=boxTrend(row.box_h4_trend),bh1=boxTrend(row.box_h1_trend);if(!bh4&&!bh1)return null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>BOX</span>{bh4&&<span style={{fontFamily:mono,fontSize:8,color:bh4.color,background:bh4.bg,border:`1px solid ${bh4.border}`,borderRadius:3,padding:'1px 6px'}}>H4 {bh4.label}</span>}{bh1&&<span style={{fontFamily:mono,fontSize:8,color:bh1.color,background:bh1.bg,border:`1px solid ${bh1.border}`,borderRadius:3,padding:'1px 6px'}}>H1 {bh1.label}</span>}</div>);})()}
-              {(()=>{ const tbg=tbgZoneBadge(row.tbg_zone,row.bias); if(!tbg)return null; return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>FL-ST</span><span style={{fontFamily:mono,fontSize:9,color:tbg.color,background:tbg.bg,border:`1px solid ${tbg.border}`,borderRadius:4,padding:'1px 8px',fontWeight:700}}>{tbg.label}</span>{tbg.valid&&<span style={{fontFamily:mono,fontSize:8,color:'#00ff9f',fontWeight:700}}>G1 ✅</span>}{!tbg.valid&&<span style={{fontFamily:mono,fontSize:8,color:'#ff7744'}}>G1 ⛔</span>}</div>);})()}
+              {(()=>{ const pl=plZoneBadge(row.pl_zone,row.bias); if(!pl)return null; return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>PL</span><span style={{fontFamily:mono,fontSize:9,color:pl.color,background:pl.bg,border:`1px solid ${pl.border}`,borderRadius:4,padding:'1px 8px',fontWeight:700}}>{pl.label}</span>{pl.valid&&<span style={{fontFamily:mono,fontSize:8,color:'#00ff9f',fontWeight:700}}>G1 ✅</span>}{!pl.valid&&<span style={{fontFamily:mono,fontSize:8,color:'#ff7744'}}>G1 ⛔</span>}</div>);})()}
               {(()=>{
                 const bc=boxConfirm(row.bias,row.box_h4_trend,row.box_h1_trend);
                 const af=atrFill(row.atr);
@@ -1284,9 +1284,9 @@ function ValidPairsTab({ data, trends, cotMap, confidenceMap }) {
     const biasDir = gap > 0 ? 'BUY' : gap < 0 ? 'SELL' : 'WAIT';
     if (biasDir === 'WAIT') return;
     if (r.hard_invalid || isNeutralMatchup(r)) return;
-    const zone = (r.tbg_zone || '').toUpperCase();
-    const tbgValid = (biasDir === 'BUY' && zone === 'ABOVE') || (biasDir === 'SELL' && zone === 'BELOW');
-    if (absGap >= 9 && tbgValid && conf >= 60) {
+    const zone = (r.pl_zone || '').toUpperCase();
+    const plValid = (biasDir === 'BUY' && zone === 'ABOVE') || (biasDir === 'SELL' && zone === 'BELOW');
+    if (absGap >= 9 && plValid && conf >= 60) {
       itp.push(r);
     } else if (absGap >= 5 && absGap <= 8 && conf >= 50) {
       pbp.push(r);
@@ -1305,7 +1305,7 @@ function ValidPairsTab({ data, trends, cotMap, confidenceMap }) {
     <div style={{textAlign:'center',padding:80,display:'flex',flexDirection:'column',gap:12,alignItems:'center'}}>
       <div style={{fontFamily:"'Orbitron',sans-serif",fontSize:14,color:'var(--text-muted)',letterSpacing:3}}>NO VALID PLAYS RIGHT NOW</div>
       <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:'var(--text-muted)',lineHeight:1.8}}>
-        ITP: gap ≥ 9 + TBG valid + confidence ≥ 60<br/>
+        ITP: gap ≥ 9 + Panda Lines valid + confidence ≥ 60<br/>
         PBP: gap 5-8 + confidence ≥ 50
       </div>
     </div>
@@ -1356,12 +1356,12 @@ function ValidPairsTab({ data, trends, cotMap, confidenceMap }) {
               {bconf&&<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:bconf.color,background:bconf.bg,border:`1px solid ${bconf.border}`,borderRadius:4,padding:'1px 7px',fontWeight:700,marginLeft:4}}>{bconf.label}</span>}
             </div>);
           })()}
-          {(()=>{ const tbg=tbgZoneBadge(row.tbg_zone,row.bias); if(!tbg)return null; return(
+          {(()=>{ const pl=plZoneBadge(row.pl_zone,row.bias); if(!pl)return null; return(
             <div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}>
-              <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>FL-ST</span>
-              <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:tbg.color,background:tbg.bg,border:`1px solid ${tbg.border}`,borderRadius:4,padding:'1px 8px',fontWeight:700}}>{tbg.label}</span>
-              {tbg.valid&&<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:'#00ff9f',letterSpacing:1,fontWeight:700}}>CONTINUATION ✅</span>}
-              {!tbg.valid&&<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:'#ff7744',letterSpacing:1}}>CONTINUATION ⛔</span>}
+              <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>PL</span>
+              <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:pl.color,background:pl.bg,border:`1px solid ${pl.border}`,borderRadius:4,padding:'1px 8px',fontWeight:700}}>{pl.label}</span>
+              {pl.valid&&<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:'#00ff9f',letterSpacing:1,fontWeight:700}}>CONTINUATION ✅</span>}
+              {!pl.valid&&<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:'#ff7744',letterSpacing:1}}>CONTINUATION ⛔</span>}
             </div>
           );})()}
           <div style={{display:'flex',gap:8}}>
@@ -1403,7 +1403,7 @@ function ValidPairsTab({ data, trends, cotMap, confidenceMap }) {
         <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:0}}>
           <span style={{fontFamily:"'Orbitron',sans-serif",fontSize:12,fontWeight:900,color:'#00ff9f',letterSpacing:3,background:'rgba(0,255,159,0.08)',border:'1px solid rgba(0,255,159,0.30)',borderRadius:6,padding:'4px 14px'}}>ITP</span>
           <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:'#00ff9f',fontWeight:700}}>INTRADAY PLAY</span>
-          <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:'var(--text-muted)'}}>{itp.length} pair{itp.length!==1?'s':''} · gap ≥ 9 · TBG ✓ · conf ≥ 60</span>
+          <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:'var(--text-muted)'}}>{itp.length} pair{itp.length!==1?'s':''} · gap ≥ 9 · Panda Lines ✓ · conf ≥ 60</span>
         </div>
         <div style={{display:'flex',flexDirection:'column',gap:8}}>
           {itp.map(row => renderCard(row, 'ITP'))}
@@ -1765,7 +1765,7 @@ function SignalLogTab() {
         <table style={{width:'100%',borderCollapse:'collapse',fontFamily:mono,fontSize:10}}>
           <thead>
             <tr style={{background:'var(--bg-secondary)'}}>
-              {['TIME','PAIR','GAP','BIAS','CONF','EXEC','SCORE','MOMENTUM','STATE','STR','TBG','VALID'].map(h=>(
+              {['TIME','PAIR','GAP','BIAS','CONF','EXEC','SCORE','MOMENTUM','STATE','STR','PL','VALID'].map(h=>(
                 <th key={h} style={{padding:'8px 6px',color:'var(--text-muted)',fontWeight:600,fontSize:9,letterSpacing:1,textAlign:'left',borderBottom:'1px solid var(--border)',whiteSpace:'nowrap'}}>{h}</th>
               ))}
             </tr>
@@ -1787,7 +1787,7 @@ function SignalLogTab() {
                   <td style={{padding:'6px',color:r.momentum==='STRONG'?'#00ff9f':r.momentum==='BUILDING'?'#00b4ff':'var(--text-muted)'}}>{r.momentum||'—'}</td>
                   <td style={{padding:'6px',color:'var(--text-muted)'}}>{r.state||'—'}</td>
                   <td style={{padding:'6px',fontWeight:700,color:r.strength>=2?'#00ff9f':r.strength>=1?'#ffd166':'var(--text-muted)'}}>{Number(r.strength||0).toFixed(1)}</td>
-                  <td style={{padding:'6px'}}>{r.tbg_zone?<span style={{fontSize:9,color:r.tbg_zone==='ABOVE'?'#00ff9f':r.tbg_zone==='BELOW'?'#ff4d6d':'#ffd166'}}>{r.tbg_zone}</span>:'—'}</td>
+                  <td style={{padding:'6px'}}>{r.pl_zone?<span style={{fontSize:9,color:r.pl_zone==='ABOVE'?'#00ff9f':r.pl_zone==='BELOW'?'#ff4d6d':'#ffd166'}}>{r.pl_zone}</span>:'—'}</td>
                   <td style={{padding:'6px',textAlign:'center'}}>{valid?<span style={{color:'#00ff9f'}}>✅</span>:<span style={{color:'var(--text-muted)'}}>⛔</span>}</td>
                 </tr>
               );
@@ -2296,16 +2296,16 @@ export default function Dashboard() {
   const [aiMemories, setAiMemories] = useState([]);
   const memoryLoaded = aiMemories.length > 0;
   const memoryIndex = useMemo(() => {
-    const idx = { gap_tbg: {}, gap_only: {}, tbg_only: {}, general: {} };
+    const idx = { gap_pl: {}, gap_only: {}, pl_only: {}, general: {} };
     aiMemories.forEach(m => {
       const meta = m.metadata || {};
       const s = m.strategy || 'unknown';
-      if (m.factor === 'gap_plus_tbg' && meta.gap_level && meta.tbg_status) {
-        idx.gap_tbg[`${s}_${meta.gap_level}_${meta.tbg_status}`] = m;
+      if (m.factor === 'gap_plus_pl' && meta.gap_level && meta.pl_status) {
+        idx.gap_pl[`${s}_${meta.gap_level}_${meta.pl_status}`] = m;
       } else if (m.factor === 'gap_level' && meta.gap_level) {
         idx.gap_only[`${s}_${meta.gap_level}`] = m;
-      } else if (m.factor === 'tbg_confirmation' && meta.tbg_status) {
-        idx.tbg_only[`${s}_${meta.tbg_status}`] = m;
+      } else if (m.factor === 'pl_confirmation' && meta.pl_status) {
+        idx.pl_only[`${s}_${meta.pl_status}`] = m;
       } else if (m.factor === 'strategy_overall' && s !== 'unknown') {
         idx.general[`${s}_strategy_overall`] = m;
       } else if (m.factor === 'pair_performance' && m.pair) {
@@ -2686,7 +2686,7 @@ export default function Dashboard() {
 
             <div style={{overflowX:'auto'}}>
               <table style={{width:'100%',borderCollapse:'collapse',background:'var(--bg-secondary)',border:'1px solid var(--border)',borderRadius:10,overflow:'hidden'}}>
-                <thead><tr style={{background:'var(--bg-hover)'}}>{['#','SYMBOL','GAP','▲▼','BIAS','CONF','MOMENTUM','MATCHUP','PDR','1H','4H','8H','CHART','STATE','STR','SIG','COT','FL-ST','⚠️'].map(h=><th key={h} style={hdr}>{h}</th>)}</tr></thead>
+                <thead><tr style={{background:'var(--bg-hover)'}}>{['#','SYMBOL','GAP','▲▼','BIAS','CONF','MOMENTUM','MATCHUP','PDR','1H','4H','8H','CHART','STATE','STR','SIG','COT','PL','⚠️'].map(h=><th key={h} style={hdr}>{h}</th>)}</tr></thead>
                 <tbody>
                   {displayed.length===0?<tr><td colSpan={15} style={{textAlign:'center',padding:40,fontFamily:mono,fontSize:10,color:'var(--text-muted)'}}>NO DATA</td></tr>
                   :displayed.map((row,idx)=>{
@@ -2709,7 +2709,7 @@ export default function Dashboard() {
                         <td style={tdc}><div style={{display:'flex',alignItems:'center',gap:5}}><div style={{flex:1,height:4,background:'var(--border)',borderRadius:2,overflow:'hidden',minWidth:40}}><div style={{width:`${Math.min(100,(Math.abs(sv)/30)*100)}%`,height:'100%',background:strColor(sv),borderRadius:2}}/></div><span style={{fontFamily:orb,fontSize:10,color:strColor(sv),fontWeight:700,minWidth:28}}>{Number(sv).toFixed(1)}</span></div></td>
                         <td style={tdc}>{(()=>{const s=signalLabel(row.signal,sv);return<span style={{fontFamily:mono,fontSize:9,color:s.color}}>{s.icon}</span>;})()}</td>
                         <td style={tdc}>{cotB?<span style={{fontFamily:mono,fontSize:9,color:cotB.bias==='BULLISH'?'#00ff9f':'#ff4d6d'}}>{cotB.bias==='BULLISH'?'▲':'▼'}</span>:<span style={{color:'var(--text-muted)'}}>—</span>}</td>
-                        <td style={tdc}>{(()=>{const tbg=tbgZoneBadge(row.tbg_zone,row.bias);if(!tbg)return <span style={{color:'var(--text-muted)'}}>—</span>;return <span style={{fontFamily:mono,fontSize:9,color:tbg.color,background:tbg.bg,border:`1px solid ${tbg.border}`,borderRadius:3,padding:'1px 6px',whiteSpace:'nowrap'}}>{tbg.valid?'✅':'⛔'} {tbg.label}</span>;})()}</td>
+                        <td style={tdc}>{(()=>{const pl=plZoneBadge(row.pl_zone,row.bias);if(!pl)return <span style={{color:'var(--text-muted)'}}>—</span>;return <span style={{fontFamily:mono,fontSize:9,color:pl.color,background:pl.bg,border:`1px solid ${pl.border}`,borderRadius:3,padding:'1px 6px',whiteSpace:'nowrap'}}>{pl.valid?'✅':'⛔'} {pl.label}</span>;})()}</td>
                         <td style={tdc}>{t.closeAlert?<span style={{fontFamily:mono,fontSize:9,color:'#ff4d6d'}}>⚠️</span>:<span style={{color:'var(--text-muted)'}}>—</span>}</td>
                       </tr>
                     );

@@ -83,7 +83,7 @@ export default async function handler(req, res) {
       entryGap: s.entry_gap, peakGap: s.peak_gap, exitGap: s.exit_gap,
       entryPrice: s.entry_price, exitPrice: s.exit_price, pips: s.pips,
       exitReason: s.exit_reason, outcome: s.outcome, status: s.status,
-      durationMin: s.duration_min, bias: s.bias, tbgZone: s.tbg_zone,
+      durationMin: s.duration_min, bias: s.bias, plZone: s.pl_zone,
       baseScore: s.base_score, quoteScore: s.quote_score,
       snapshotCount: (s.snapshots || []).length,
       timestamp: s.created_at, closedAt: s.closed_at

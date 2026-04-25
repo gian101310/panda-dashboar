@@ -18,9 +18,9 @@ function gapBucket(entry_gap) {
   return g >= 12 ? '12+' : String(g);
 }
 
-function tbgConfirmed(direction, tbg_zone) {
-  return (direction === 'BUY' && tbg_zone === 'ABOVE') ||
-         (direction === 'SELL' && tbg_zone === 'BELOW');
+function plConfirmed(direction, pl_zone) {
+  return (direction === 'BUY' && pl_zone === 'ABOVE') ||
+         (direction === 'SELL' && pl_zone === 'BELOW');
 }
 
 // --- ANALYSIS FUNCTIONS ---
@@ -69,12 +69,12 @@ function analyzeGapLevels(rows) {
   return memories;
 }
 
-function analyzeTBGConfirmation(rows) {
+function analyzePLConfirmation(rows) {
   const buckets = {};
   for (const r of rows) {
-    const confirmed = tbgConfirmed(r.direction, r.tbg_zone);
+    const confirmed = plConfirmed(r.direction, r.pl_zone);
     const key = `${r.strategy}_${confirmed ? 'confirmed' : 'unconfirmed'}`;
-    if (!buckets[key]) buckets[key] = { strategy: r.strategy, tbg: confirmed ? 'confirmed' : 'unconfirmed', wins: 0, losses: 0, flats: 0 };
+    if (!buckets[key]) buckets[key] = { strategy: r.strategy, pl: confirmed ? 'confirmed' : 'unconfirmed', wins: 0, losses: 0, flats: 0 };
     if (r.outcome === 'WIN') buckets[key].wins++;
     else if (r.outcome === 'LOSS') buckets[key].losses++;
     else if (r.outcome === 'FLAT') buckets[key].flats++;
@@ -84,21 +84,21 @@ function analyzeTBGConfirmation(rows) {
     const wr = winRates(b.wins, b.losses, b.flats);
     if (wr.total < MIN_SAMPLE) continue;
     memories.push({
-      type: 'edge_analysis', factor: 'tbg_confirmation',
+      type: 'edge_analysis', factor: 'pl_confirmation',
       strategy: b.strategy, win_rate: wr.win_rate_resolved, sample_size: wr.total,
-      metadata: { tbg_status: b.tbg, ...wr, description: `${b.strategy} with TBG ${b.tbg}` }
+      metadata: { pl_status: b.pl, ...wr, description: `${b.strategy} with Panda Lines ${b.pl}` }
     });
   }
   return memories;
 }
 
-function analyzeGapPlusTBG(rows) {
+function analyzeGapPlusPL(rows) {
   const buckets = {};
   for (const r of rows) {
     const gap = gapBucket(r.entry_gap);
-    const confirmed = tbgConfirmed(r.direction, r.tbg_zone);
+    const confirmed = plConfirmed(r.direction, r.pl_zone);
     const key = `${r.strategy}_${gap}_${confirmed ? 'confirmed' : 'unconfirmed'}`;
-    if (!buckets[key]) buckets[key] = { strategy: r.strategy, gap, tbg: confirmed ? 'confirmed' : 'unconfirmed', wins: 0, losses: 0, flats: 0 };
+    if (!buckets[key]) buckets[key] = { strategy: r.strategy, gap, pl: confirmed ? 'confirmed' : 'unconfirmed', wins: 0, losses: 0, flats: 0 };
     if (r.outcome === 'WIN') buckets[key].wins++;
     else if (r.outcome === 'LOSS') buckets[key].losses++;
     else if (r.outcome === 'FLAT') buckets[key].flats++;
@@ -108,10 +108,10 @@ function analyzeGapPlusTBG(rows) {
     const wr = winRates(b.wins, b.losses, b.flats);
     if (wr.total < MIN_SAMPLE) continue;
     memories.push({
-      type: 'confluence_validation', factor: 'gap_plus_tbg',
+      type: 'confluence_validation', factor: 'gap_plus_pl',
       strategy: b.strategy, win_rate: wr.win_rate_resolved, sample_size: wr.total,
-      metadata: { gap_level: b.gap, tbg_status: b.tbg, ...wr,
-        description: `${b.strategy} gap ${b.gap} + TBG ${b.tbg}` }
+      metadata: { gap_level: b.gap, pl_status: b.pl, ...wr,
+        description: `${b.strategy} gap ${b.gap} + Panda Lines ${b.pl}` }
     });
   }
   return memories;
@@ -185,7 +185,7 @@ export default async function handler(req, res) {
       // 1. Fetch all resolved signal_results
       const { data: rows, error: fetchErr } = await supabase
         .from('signal_results')
-        .select('symbol, direction, strategy, entry_gap, peak_gap, outcome, tbg_zone, momentum, confidence, duration_min')
+        .select('symbol, direction, strategy, entry_gap, peak_gap, outcome, pl_zone, momentum, confidence, duration_min')
         .not('outcome', 'is', null)
         .order('created_at', { ascending: false });
 
@@ -196,15 +196,15 @@ export default async function handler(req, res) {
       const allMemories = [
         ...analyzeByStrategy(rows),       // Overall strategy stats
         ...analyzeGapLevels(rows),         // Step 1: gap alone
-        ...analyzeTBGConfirmation(rows),   // Step 2: TBG confirmation effect
-        ...analyzeGapPlusTBG(rows),        // Step 2b: gap + TBG combined
+        ...analyzePLConfirmation(rows),   // Step 2: Panda Lines confirmation effect
+        ...analyzeGapPlusPL(rows),        // Step 2b: gap + Panda Lines combined
         ...analyzePairs(rows),             // Per-pair performance
         ...analyzeFlatRate(rows),          // FLAT rate as signal quality
       ];
 
       // 3. Log previous run summary before clearing
       const { data: prevMem } = await supabase.from('ai_memory').select('sample_size')
-        .in('factor', ['strategy_overall','gap_level','tbg_confirmation','gap_plus_tbg','pair_performance','flat_rate_by_gap']);
+        .in('factor', ['strategy_overall','gap_level','pl_confirmation','gap_plus_pl','pair_performance','flat_rate_by_gap']);
       if (prevMem && prevMem.length > 0) {
         const avgS = Math.round(prevMem.reduce((s,m) => s + m.sample_size, 0) / prevMem.length);
         await supabase.from('engine_logs').insert({ timestamp: new Date().toISOString(), component: 'signal_agent_summary', duration: 0, error: JSON.stringify({ memories: prevMem.length, avg_sample: avgS }) });
@@ -214,7 +214,7 @@ export default async function handler(req, res) {
       await supabase
         .from('ai_memory')
         .delete()
-        .in('factor', ['strategy_overall', 'gap_level', 'tbg_confirmation', 'gap_plus_tbg', 'pair_performance', 'flat_rate_by_gap']);
+        .in('factor', ['strategy_overall', 'gap_level', 'pl_confirmation', 'gap_plus_pl', 'pair_performance', 'flat_rate_by_gap']);
 
       // 4. Batch insert all memories in one call
       const { data: inserted, error: writeErr } = await supabase.from('ai_memory').insert(allMemories).select('id');
@@ -232,8 +232,8 @@ export default async function handler(req, res) {
         analysis_types: [
           'strategy_overall — BB and INTRA overall win rates',
           'gap_level — win rate at each gap level (5,6,7,8,9,10+)',
-          'tbg_confirmation — TBG confirmed vs unconfirmed edge',
-          'gap_plus_tbg — combined gap level + TBG confirmation',
+          'pl_confirmation — Panda Lines confirmed vs unconfirmed edge',
+          'gap_plus_pl — combined gap level + Panda Lines confirmation',
           'pair_performance — per-pair stats (sample >= 20 only)',
           'flat_rate_by_gap — FLAT % as signal quality indicator'
         ],

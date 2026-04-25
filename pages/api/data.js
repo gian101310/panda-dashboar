@@ -19,7 +19,7 @@ export default async function handler(req, res) {
         adv_quote_d1, adv_quote_h4, adv_quote_h1,
         atr, atr_reference, spread,
         box_h1_trend, box_h4_trend,
-        tbg_zone, tbg_bias, tbg_g1_valid
+        pl_zone, pl_bias, pl_g1_valid
       `);
 
     if (error) return res.status(500).json({ error: error.message });
