@@ -1,50 +1,62 @@
-> # PANDA ENGINE — CHANGELOG
->
+# PANDA ENGINE — CHANGELOG
+
 > Claude updates this at the end of every session. Most recent entries first. Keep only last 15 sessions.
 
 ---
 
-## Apr 25, 2026 — Phase 2 Security & Stability Fixes (2 commits)
+## Apr 25, 2026 — Full System Audit + Security Hardening + AI Refinements (17 commits)
 
-**Fix 1: lib/auth.js — `expires_at` enforced in `validateSession()`**
-- Expired users with active session cookies can no longer bypass expiry
-- Auto-disables account + revokes all sessions on expiry detection (same as login.js)
+**Phase 1 — Data Integrity**
+- signal-tracker.js: `isValidSignal()` TBG gate removed for BB (bc66567)
+- app.py: `is_valid` snapshot flag corrected for BB (90ddbac)
 
-**Fix 2: api/logout.js — DB session revoked on logout**
-- `panda_sessions.is_revoked = true` set on logout, not just cookie cleared
-- Captured session tokens are now invalidated immediately on logout
+**Phase 2 — Security**
+- lib/auth.js: `expires_at` enforced in `validateSession()` (e50bc49)
+- logout.js: DB session revoked on logout (e50bc49)
+- ai-chat.js: Auth gate + `isAdmin` from session cookie, not body (e50bc49)
+- ai-memory.js: `validateSession` on POST/DELETE (e50bc49)
+- telegram-webhook.js: `TG_WEBHOOK_SECRET` header validation (e50bc49)
+- pattern-agent.js: `strategy: 'BB'` on alpha/leak/overtraded memories + error guard (ae3a1c5, c441c5a)
+- app.py: CORS add pandaengine.app, fix login alert URL, PREV_GAP pre-load on restart (737efb2)
 
-**Fix 3: api/ai-chat.js — Auth gate + isAdmin from session cookie**
-- Endpoint was fully unauthenticated — any external actor could call it
-- `userId` from `req.body` removed — admin role now derived from validated session only
-- Closes admin knowledge spoofing vector
+**Phase 3 — Security (S1+S2)**
+- lib/supabase.js: service_role key moved to `SUPABASE_SERVICE_KEY` env var (af2ca7b)
+- Auth gates added: data.js, signal-analytics.js, signal-log.js, strength-history.js, pdr.js, signal-tracker.js (af2ca7b)
+- signal-tracker POST: dual auth (session cookie OR `ENGINE_SECRET` header) (af2ca7b)
+- app.py: `ENGINE_SECRET` header sent with tracker POST (41d6387)
 
-**Fix 4: api/ai-memory.js — validateSession on POST and DELETE**
-- Write and delete operations on agent memories now require valid session
-- GET remains open (read-only, used on dashboard mount)
+**Feature Gating**
+- pf-approve.js: Tier feature keys aligned with TAB_FEATURE, `panda_ai` added to Pro+Elite (82e5ee1)
+- admin/index.js: PANDA AI + SIGNAL LOG toggles in admin panel (397264a)
 
-**Fix 5: api/telegram-webhook.js — TG_WEBHOOK_SECRET header validation**
-- `X-Telegram-Bot-Api-Secret-Token` header checked on every incoming request
-- Blocks mass account creation from non-Telegram POST requests
-- Requires TG_WEBHOOK_SECRET in Vercel env vars + webhook re-registered ✅
+**AI Memory Cleanup**
+- Deleted 24 orphaned behavior + pattern memories (manual_trades source data deleted)
+- ai_memory: 47 → 23 (22 signal + 1 tbg_discipline), all traceable to live engine data
 
-**Fix 6: api/pattern-agent.js — strategy: 'BB' added to pair memories**
-- alpha_pair, leak_pair, overtraded_weak memories were missing strategy field
-- Without it, memoryIndex keyed them as `unknown_pair_X` — invisible to edge badges
-- Now correctly indexed as `BB_pair_NZDCAD` etc.
+**F1 — PDR Supabase Cache (2f6e11a)**
+- `pdr_cache` table (single-row, 15-min TTL)
+- Cache-first: check Supabase → return cached if <15 min → else fetch Twelve Data → write cache
+- Prevents quota burn under concurrent users
 
-**Fix 7: app.py — CORS, login alert URL, PREV_GAP pre-load**
-- CORS: added pandaengine.app + www.pandaengine.app, removed duplicate origin
-- Login alert URL fixed: panda-dashboard.vercel.app → pandaengine.app
-- PREV_GAP pre-loaded from dashboard table on first cycle — eliminates phantom BB signals after every engine restart
+**A5 — Confidence + Historical Merge (2f6e11a)**
+- `computeConfidence()` now accepts `memoryIndex`, returns `historical` + `conflict`
+- CONFLICT flag: fires when confidence ≥70 but proven historical win rate ≤50%
+- Conflict badge renders inline with confidence on PairCard
 
-**Commits:** e50bc49 (dashboard), 737efb2 (engine)
-**Engine restart required** for app.py changes to take effect.
+**Env vars added to Vercel:** SUPABASE_SERVICE_KEY, ENGINE_SECRET, TG_WEBHOOK_SECRET
+**Telegram webhook re-registered** with secret_token
 
 ---
 
-## Apr 25, 2026 — Phase 1 Data Integrity Fixes (2 commits)
+## Apr 24, 2026 — Major Build Session (AI Refinements + PDR + Engine Hardening)
 
-**Fix 1: signal-tracker.js —** `isValidSignal()` **TBG gate removed**
+See CHANGELOG archive for full details of 10-commit session.
 
-- BB strategy does NOT require TBG confirmation — only gap &gt;= 5 + BUY/SELL bias
+---
+
+## PENDING / NEXT UP
+- Phase 8: Signal Agent v2 on tracker data (needs 30+ days — earliest May 20, 2026)
+- NowPayments USDT integration (monetization)
+- VPS migration (Hyonix HS-2)
+- Landing pages, PWA
+- Per-user AI analysis (Part C — Pro/Elite feature)
