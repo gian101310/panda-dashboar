@@ -1,5 +1,6 @@
 import OPENAI_API_KEY from '../../lib/openai';
 import { validateSession } from '../../lib/auth';
+import { supabase } from '../../lib/supabase';
 
 // ─── USER SYSTEM PROMPT (narrator only — no recommendations) ─────────────────
 const USER_PROMPT = `You are Panda AI — a currency bias analysis tool built into Panda Engine.

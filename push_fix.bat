@@ -1,5 +1,4 @@
-@echo off
-cd /d C:\Users\Admin\panda-dashboard
+cd C:\Users\Admin\panda-dashboard
 git add -A
-git commit -m "fix: batch insert ai_memory to avoid Vercel timeout"
+git commit -m "fix: add missing supabase import to ai-chat.js"
 git push origin main

@@ -1,6 +1,4 @@
-# PANDA ENGINE — CHANGELOG
-
-> Claude updates this at the end of every session. Most recent entries first. Keep only last 15 sessions.
+# PANDA ENGINE — CHANGELOG&gt; Claude updates this at the end of every session. Most recent entries first. Keep only last 15 sessions.
 
 ---
 
@@ -9,13 +7,15 @@
 **New: pdr_cache Supabase table**
 
 - Per-symbol rows: symbol (PK), pdr_strength, pdr_strong, pdr_direction, retracement, computed_at
-- RLS: service_role only
 
-**pdr.js — cache rewritten**
+- RLS: service_role only **pdr.js — cache rewritten**
 
 - Old: single row id=1 with jsonb blob (broken schema mismatch)
+
 - New: per-symbol upsert on conflict(symbol) — each pair tracked individually
+
 - Cache read: checks if 20+ symbols exist and age &lt; 15min
+
 - Cache write: upserts all symbols after fresh Twelve Data fetch
 
 **signal-tracker.js — PDR at open**
@@ -38,13 +38,17 @@
 **Supabase migrations**
 
 - `signal_results`: added `session` text column + index (ASIAN/LONDON/NEW_YORK)
-- `signal_snapshots`: added `gap_delta` numeric column (rate of change from previous cycle)
-[**app.py**](http://app.py)
+
+- `signal_snapshots`: added `gap_delta` numeric column (rate of change from previous cycle) [**app.py**](http://app.py)
 
 - `get_session()` helper — ASIAN 22:00-05:59 UTC, LONDON 06:00-13:59, NEW_YORK 14:00-21:59
+
 - `log_signal()`: now writes `session` on every signal entry
+
 - Main loop: `gap_deltas = {}` tracks per-symbol gap velocity each cycle
+
 - `gap_deltas[symbol]` computed before PREV_GAP update (captures true delta)
+
 - Snapshot insert: `snap["gap_delta"]` injected from gap_deltas map
 
 **signal-tracker.js**
@@ -61,13 +65,17 @@
 **New: admin_brain Supabase table**
 
 - Columns: id, category (preference/coaching/pattern/rule/question), key (UNIQUE), value, updated_at
+
 - Seeded with 10 brain memories: alpha pairs, leak pairs, optimal hold, sessions, BB/INTRA rules, London warning, execution gap
-- RLS: service_role only
-**New: /api/admin-brain.js**
+
+- RLS: service_role only **New: /api/admin-brain.js**
 
 - GET: fetch all brain records
+
 - POST: upsert by key (auto-stores new memories)
+
 - DELETE: remove by key
+
 - Admin-only (validateSession + role check)
 
 **Rebuilt: /api/ai-chat.js (full rewrite)**
@@ -102,6 +110,7 @@
 - Commit: 60d9398
 
 ---
+
 ## Apr 25, 2026 — Full System Audit + Security Hardening + AI Refinements (17 commits)
 
 **Phase 1 — Data Integrity**
