@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Head from 'next/head';
 import ThemeToggle from '../components/ThemeToggle';
+import { AreaChart, Area, ResponsiveContainer } from 'recharts';
+import { TrendingUp, AlertTriangle, Shield, Zap, Activity, Eye, Radio, Brain, Crosshair, Gauge } from 'lucide-react';
 
 const mono = "'Share Tech Mono',monospace";
 const orb  = "'Orbitron',sans-serif";
@@ -1995,407 +1997,441 @@ function TrackerPanel() {
 }
 
 // ===== OVERVIEW TAB =====
+// ═══════ OVERVIEW TAB — Dark Matter Design ═══════
+const OV_COLORS = {
+  buy:'#00ff9f',buyDim:'rgba(0,255,159,0.12)',buyGlow:'rgba(0,255,159,0.25)',
+  sell:'#ff4d6d',sellDim:'rgba(255,77,109,0.12)',sellGlow:'rgba(255,77,109,0.25)',
+  accent:'#00b4ff',accentDim:'rgba(0,180,255,0.12)',
+  warn:'#ffd166',warnDim:'rgba(255,209,102,0.10)',
+  ai:'#7C3AED',aiDim:'rgba(124,58,237,0.12)',
+  proven:'#10B981',dead:'#EF4444',
+  bgCard:'rgba(12,18,32,0.65)',bgCardSolid:'#0c1220',
+  border:'rgba(255,255,255,0.06)',borderBright:'rgba(255,255,255,0.12)',
+  textPrimary:'#e8f0ff',textSecondary:'#8899bb',textMuted:'#4a5578',
+};
+const ovGlass = { background:OV_COLORS.bgCard, backdropFilter:'blur(16px)', WebkitBackdropFilter:'blur(16px)', border:`1px solid ${OV_COLORS.border}`, borderRadius:12 };
+const ovMomColors = { STRONG:'#00ff9f',BUILDING:'#66ffcc',SPARK:'#ffd166',EMERGING:'#66ffcc',STABLE:'#6b7fa8',CONSOLIDATING:'#5a6d8a',COOLING:'#ffaa44',FADING:'#ff7744',REVERSING:'#ff4d6d',NEUTRAL:'#3a4568' };
+const ovMomStates = ['STRONG','BUILDING','SPARK','EMERGING','STABLE','CONSOLIDATING','COOLING','FADING','REVERSING','NEUTRAL'];
+
+function AnimNum({ value, delay=0 }) {
+  const [d, setD] = useState(0);
+  useEffect(() => {
+    const t = setTimeout(() => { let s=0; const step=value/20; const iv=setInterval(()=>{ s+=step; if(s>=value){setD(value);clearInterval(iv);}else setD(Math.round(s)); },30); return ()=>clearInterval(iv); }, delay);
+    return () => clearTimeout(t);
+  }, [value, delay]);
+  return <span>{d}</span>;
+}
+
+function MiniSpark({ data, color, w=80, h=28 }) {
+  const gid = `sp-${color.replace('#','')}`;
+  return <ResponsiveContainer width={w} height={h}><AreaChart data={data} margin={{top:2,right:2,bottom:2,left:2}}>
+    <defs><linearGradient id={gid} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={color} stopOpacity={0.4}/><stop offset="100%" stopColor={color} stopOpacity={0}/></linearGradient></defs>
+    <Area type="monotone" dataKey="v" stroke={color} strokeWidth={1.5} fill={`url(#${gid})`} dot={false} isAnimationActive={false}/>
+  </AreaChart></ResponsiveContainer>;
+}
+
+function OvMarketGauge({ mode, color, glow }) {
+  const angle = mode==='TRENDING'?-45:mode==='CHAOTIC'?45:0;
+  return <div style={{position:'relative',width:100,height:56}}>
+    <svg viewBox="0 0 100 56" style={{width:'100%',height:'100%'}}>
+      <defs>
+        <linearGradient id="gaugeG" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stopColor="#00ff9f"/><stop offset="50%" stopColor="#ffd166"/><stop offset="100%" stopColor="#ff4d6d"/></linearGradient>
+        <filter id="gaugeGl"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      </defs>
+      <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="url(#gaugeG)" strokeWidth="4" strokeLinecap="round" opacity="0.6"/>
+      <line x1="50" y1="50" x2={50+28*Math.cos((angle-90)*Math.PI/180)} y2={50+28*Math.sin((angle-90)*Math.PI/180)} stroke={color} strokeWidth="2.5" strokeLinecap="round" filter="url(#gaugeGl)" style={{transition:'all 0.8s ease'}}/>
+      <circle cx="50" cy="50" r="3" fill={color} filter="url(#gaugeGl)"/>
+    </svg>
+    <div style={{position:'absolute',bottom:0,left:'50%',transform:'translateX(-50%)',fontFamily:mono,fontSize:8,color,letterSpacing:2,textAlign:'center',textShadow:`0 0 8px ${glow}`}}>{mode}</div>
+  </div>;
+}
+
+function OvSessionTimeline({ sessionInfo, isMobile }) {
+  const { sessions, isOn, total } = sessionInfo;
+  const barW = isMobile?220:340, barH = 24;
+  const toX = (min) => (min/1440)*barW;
+  const nowX = toX(total);
+  return <div style={{position:'relative'}}>
+    <svg viewBox={`0 0 ${barW} ${barH+14}`} style={{width:barW,height:barH+14,display:'block'}}>
+      <rect x="0" y="6" width={barW} height={barH} rx="4" fill="rgba(255,255,255,0.03)" stroke={OV_COLORS.border} strokeWidth="0.5"/>
+      {sessions.map(s => {
+        const on=isOn(s), x1=toX(s.open), x2=toX(s.close);
+        if(s.open>s.close) return <g key={s.name}>
+          <rect x={x1} y="8" width={barW-x1} height={barH-4} rx="2" fill={on?s.color+'30':'rgba(255,255,255,0.02)'} stroke={on?s.color+'60':'none'} strokeWidth="0.5"/>
+          <rect x="0" y="8" width={x2} height={barH-4} rx="2" fill={on?s.color+'30':'rgba(255,255,255,0.02)'} stroke={on?s.color+'60':'none'} strokeWidth="0.5"/>
+          <text x={(x1+barW)/2} y="22" fill={on?s.color:OV_COLORS.textMuted} fontSize="7" fontFamily={mono} textAnchor="middle" letterSpacing="1">{s.name}</text>
+        </g>;
+        return <g key={s.name}>
+          <rect x={x1} y="8" width={x2-x1} height={barH-4} rx="2" fill={on?s.color+'30':'rgba(255,255,255,0.02)'} stroke={on?s.color+'60':'none'} strokeWidth="0.5"/>
+          <text x={(x1+x2)/2} y="22" fill={on?s.color:OV_COLORS.textMuted} fontSize="7" fontFamily={mono} textAnchor="middle" letterSpacing="1">{s.name}</text>
+        </g>;
+      })}
+      <line x1={nowX} y1="4" x2={nowX} y2={barH+8} stroke={OV_COLORS.accent} strokeWidth="1.5" strokeLinecap="round" opacity="0.9"/>
+      <circle cx={nowX} cy="4" r="2.5" fill={OV_COLORS.accent}><animate attributeName="opacity" values="1;0.3;1" dur="2s" repeatCount="indefinite"/></circle>
+      <text x={nowX} y={barH+14} fill={OV_COLORS.accent} fontSize="6" fontFamily={mono} textAnchor="middle">NOW</text>
+    </svg>
+  </div>;
+}
+
+function OvExposureRings({ exposure }) {
+  return <div style={{display:'flex',flexDirection:'column',gap:6}}>
+    {exposure.map(({currency,exposure:exp,abs:a})=>{
+      const pct=Math.min(a/4,1); const c=a>=3?OV_COLORS.sell:a>=2?OV_COLORS.warn:OV_COLORS.buy;
+      return <div key={currency} style={{display:'flex',alignItems:'center',gap:8}}>
+        <span style={{fontFamily:mono,fontSize:10,color:OV_COLORS.textSecondary,width:28,letterSpacing:1}}>{currency}</span>
+        <div style={{flex:1,height:6,background:'rgba(255,255,255,0.04)',borderRadius:3,overflow:'hidden',position:'relative'}}>
+          <div style={{width:`${pct*100}%`,height:'100%',background:`linear-gradient(90deg,${c}88,${c})`,borderRadius:3,transition:'width 0.6s ease',boxShadow:a>=3?`0 0 8px ${c}40`:'none'}}/>
+        </div>
+        <span style={{fontFamily:mono,fontSize:9,color:c,width:20,textAlign:'right'}}>{exp>0?'+':''}{exp}</span>
+      </div>;
+    })}
+  </div>;
+}
+
+function OvCurrencyChart({ data }) {
+  const flowColors={ACCELERATING:'#00ff9f',STRENGTHENING:'#66ffcc',NEUTRAL:'#6b7fa8',SOFTENING:'#ffaa44',WEAKENING:'#ff4d6d'};
+  const flowIcons={ACCELERATING:'↑↑',STRENGTHENING:'↑',NEUTRAL:'—',SOFTENING:'↓',WEAKENING:'↓↓'};
+  return <div style={{display:'flex',flexDirection:'column',gap:6}}>
+    {data.map(({currency,strength,flow})=>{
+      const pct=Math.min(Math.abs(strength)/6,1);const c=strength>0?OV_COLORS.buy:strength<0?OV_COLORS.sell:OV_COLORS.textMuted;
+      return <div key={currency} style={{display:'flex',alignItems:'center',gap:8}}>
+        <span style={{fontFamily:mono,fontSize:10,color:OV_COLORS.textSecondary,width:28,letterSpacing:1}}>{currency}</span>
+        <div style={{flex:1,height:8,background:'rgba(255,255,255,0.03)',borderRadius:4,overflow:'hidden',position:'relative'}}>
+          {strength>=0?<div style={{position:'absolute',left:'50%',width:`${pct*50}%`,height:'100%',background:`linear-gradient(90deg,${c}44,${c})`,borderRadius:'0 4px 4px 0',transition:'width 0.6s ease'}}/>
+          :<div style={{position:'absolute',right:'50%',width:`${pct*50}%`,height:'100%',background:`linear-gradient(270deg,${c}44,${c})`,borderRadius:'4px 0 0 4px',transition:'width 0.6s ease'}}/>}
+          <div style={{position:'absolute',left:'50%',top:0,width:1,height:'100%',background:'rgba(255,255,255,0.1)'}}/>
+        </div>
+        <span style={{fontFamily:mono,fontSize:8,color:flowColors[flow]||'#6b7fa8',width:44,textAlign:'right',letterSpacing:0.5}}>{flowIcons[flow]||'—'} {(flow||'').slice(0,4)}</span>
+      </div>;
+    })}
+  </div>;
+}
+
+function OvSignalCard({ pair, tier, onClick, delay }) {
+  const [hov,setHov]=useState(false);
+  const bc=pair.bias==='BUY'?OV_COLORS.buy:pair.bias==='SELL'?OV_COLORS.sell:OV_COLORS.textMuted;
+  const isH=tier==='HIGH',isL=tier==='LOW';
+  const tags=[];
+  if(pair.edge==='PROVEN_EDGE') tags.push({label:'PROVEN',color:OV_COLORS.proven,bg:'rgba(16,185,129,0.15)'});
+  if(pair.edge==='DEAD_ZONE') tags.push({label:'DEAD ZONE',color:OV_COLORS.dead,bg:'rgba(239,68,68,0.15)'});
+  if(pair.news) tags.push({label:'NEWS',color:OV_COLORS.warn,bg:OV_COLORS.warnDim});
+  if(pair.conf<40&&pair.bias!=='WAIT') tags.push({label:'LOW CONF',color:'#ff8844',bg:'rgba(255,136,68,0.12)'});
+  if(pair.conflict) tags.push({label:'CONFLICT',color:OV_COLORS.sell,bg:OV_COLORS.sellDim});
+  return <div onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)} onClick={onClick} style={{
+    ...ovGlass,padding:isH?'16px 18px':isL?'8px 12px':'12px 14px',cursor:'pointer',position:'relative',overflow:'hidden',
+    opacity:isL?0.5:1,transform:hov?'translateY(-3px)':'translateY(0)',transition:'all 0.25s ease',
+    boxShadow:hov?`0 8px 32px ${bc}15, 0 0 0 1px ${bc}20`:isH?`0 0 20px ${bc}08`:'none',
+    borderColor:isH?`${bc}30`:OV_COLORS.border,animation:`fadeSlideUp 0.4s ease ${delay}ms both`,
+  }}>
+    {isH&&<div style={{position:'absolute',top:0,left:0,right:0,height:2,background:`linear-gradient(90deg,transparent,${bc},transparent)`}}/>}
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:isL?4:8}}>
+      <div style={{display:'flex',alignItems:'center',gap:isL?6:8}}>
+        <span style={{fontFamily:orb,fontSize:isH?16:isL?11:13,fontWeight:700,color:isL?OV_COLORS.textMuted:OV_COLORS.textPrimary,letterSpacing:isH?2:1}}>{pair.symbol}</span>
+        <span style={{fontFamily:mono,fontSize:isL?8:10,fontWeight:700,color:bc,background:`${bc}15`,border:`1px solid ${bc}40`,borderRadius:4,padding:isL?'1px 4px':'2px 8px',letterSpacing:1}}>{pair.bias}</span>
+      </div>
+      <span style={{fontFamily:isL?mono:orb,fontSize:isH?22:isL?9:16,fontWeight:isL?400:900,color:bc,lineHeight:1}}>{pair.gap>0?'+':''}{Number(pair.gap).toFixed(1)}</span>
+    </div>
+    {!isL&&<div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginBottom:6}}>
+      <span style={{fontFamily:mono,fontSize:9,padding:'2px 6px',borderRadius:4,color:pair.conf>=70?OV_COLORS.buy:pair.conf>=50?OV_COLORS.warn:OV_COLORS.textMuted,background:pair.conf>=70?OV_COLORS.buyDim:pair.conf>=50?OV_COLORS.warnDim:'rgba(255,255,255,0.04)',border:`1px solid ${pair.conf>=70?OV_COLORS.buy+'30':pair.conf>=50?OV_COLORS.warn+'30':OV_COLORS.border}`}}>{pair.conf}%</span>
+      <span style={{fontFamily:mono,fontSize:9,color:ovMomColors[pair.momentum]||'#4a5578',padding:'2px 6px',borderRadius:4,background:`${ovMomColors[pair.momentum]||'#4a5578'}12`,border:`1px solid ${ovMomColors[pair.momentum]||'#4a5578'}25`}}>{pair.momentum}</span>
+      <span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted,letterSpacing:1}}>{Math.abs(pair.gap)>=9&&pair.pl_zone!=='BETWEEN'?'INTRA':'BB'}</span>
+      {pair.pdr_strong&&<span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.buy,background:OV_COLORS.buyDim,border:`1px solid ${OV_COLORS.buy}25`,borderRadius:3,padding:'1px 4px'}}>PDR ✓</span>}
+    </div>}
+    {tags.length>0&&<div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+      {tags.map(t=><span key={t.label} style={{fontFamily:mono,fontSize:7,color:t.color,background:t.bg,border:`1px solid ${t.color}30`,borderRadius:3,padding:'1px 5px',letterSpacing:1}}>{t.label}</span>)}
+    </div>}
+    {hov&&!isL&&<div style={{marginTop:8,paddingTop:8,borderTop:`1px solid ${OV_COLORS.border}`,display:'flex',gap:8,flexWrap:'wrap',animation:'fadeIn 0.15s ease'}}>
+      <span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted}}>PL: {pair.pl_zone}</span>
+      <span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted}}>H4: {pair.box_h4}</span>
+      <span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted}}>PDR: {Number(pair.pdr_strength||0).toFixed(2)}</span>
+    </div>}
+  </div>;
+}
+
+function OvStatCard({ label, value, icon:Icon, color, sparkData, delay, subtitle }) {
+  return <div style={{...ovGlass,padding:'16px 18px',flex:1,minWidth:140,position:'relative',overflow:'hidden',animation:`fadeSlideUp 0.4s ease ${delay}ms both`}}>
+    <div style={{position:'absolute',top:10,right:12,opacity:0.08}}><Icon size={36} color={color}/></div>
+    <div style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted,letterSpacing:2,marginBottom:8}}>{label}</div>
+    <div style={{fontFamily:orb,fontSize:28,fontWeight:900,color,lineHeight:1,marginBottom:4}}><AnimNum value={value} delay={delay+200}/></div>
+    {subtitle&&<div style={{fontFamily:mono,fontSize:9,color:OV_COLORS.textSecondary,marginBottom:4}}>{subtitle}</div>}
+    {sparkData&&<MiniSpark data={sparkData} color={color}/>}
+  </div>;
+}
+
+function OvMomentumBar({ pairs }) {
+  const counts={}; ovMomStates.forEach(s=>counts[s]=pairs.filter(p=>p.momentum===s).length);
+  const [hovS,setHovS]=useState(null);
+  return <div style={{...ovGlass,padding:'14px 16px'}}>
+    <div style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted,letterSpacing:2,marginBottom:10}}>MOMENTUM DISTRIBUTION</div>
+    <div style={{display:'flex',height:20,borderRadius:4,overflow:'hidden',gap:1}}>
+      {ovMomStates.filter(s=>counts[s]>0).map(s=><div key={s} onMouseEnter={()=>setHovS(s)} onMouseLeave={()=>setHovS(null)} style={{
+        flex:counts[s],background:hovS===s?ovMomColors[s]:`${ovMomColors[s]}80`,transition:'all 0.2s ease',position:'relative',cursor:'pointer',minWidth:4
+      }}>{hovS===s&&<div style={{position:'absolute',bottom:'calc(100% + 6px)',left:'50%',transform:'translateX(-50%)',background:OV_COLORS.bgCardSolid,border:`1px solid ${ovMomColors[s]}40`,borderRadius:6,padding:'4px 8px',whiteSpace:'nowrap',zIndex:10,fontFamily:mono,fontSize:8,color:ovMomColors[s],letterSpacing:1,boxShadow:'0 4px 12px rgba(0,0,0,0.4)'}}>{s}: {counts[s]}</div>}</div>)}
+    </div>
+    <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:8}}>
+      {ovMomStates.filter(s=>counts[s]>0).map(s=><div key={s} style={{display:'flex',alignItems:'center',gap:3}}>
+        <div style={{width:6,height:6,borderRadius:1,background:ovMomColors[s]}}/><span style={{fontFamily:mono,fontSize:7,color:OV_COLORS.textMuted}}>{s} {counts[s]}</span>
+      </div>)}
+    </div>
+  </div>;
+}
+
+function OvAIPanel() {
+  const [reply,setReply]=useState(null);const [loading,setLoading]=useState(false);const [error,setError]=useState(null);const [lastFetch,setLastFetch]=useState(null);const fetched=useRef(false);
+  async function fetchInsight(){setLoading(true);setError(null);try{const r=await fetch('/api/ai-chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'insights'})});const d=await r.json();if(r.ok&&d.reply){setReply(d.reply);setLastFetch(new Date());}else setError(d.error||'Failed');}catch{setError('Connection error');}setLoading(false);}
+  useEffect(()=>{if(!fetched.current){fetched.current=true;fetchInsight();}},[]); // eslint-disable-line
+  function parseSections(text){if(!text)return null;const lines=text.split('\n').filter(l=>l.trim());let summary='',opportunity='',risk='',cur='summary';
+    for(const line of lines){const lo=line.toLowerCase();if(lo.includes('opportunit')||lo.includes('best setup')||lo.includes('top pick')||lo.includes('strongest')){cur='opportunity';continue;}if(lo.includes('risk')||lo.includes('avoid')||lo.includes('caution')||lo.includes('warning')||lo.includes('dead zone')){cur='risk';continue;}
+    const clean=line.replace(/^[\*\-\•#]+\s*/,'').replace(/\*\*/g,'');if(cur==='summary')summary+=(summary?' ':'')+clean;else if(cur==='opportunity')opportunity+=(opportunity?' ':'')+clean;else risk+=(risk?' ':'')+clean;}
+    if(!opportunity&&!risk)return{summary:text.replace(/\*\*/g,''),opportunity:'',risk:''};return{summary,opportunity,risk};}
+  const sections=parseSections(reply);const timeAgo=lastFetch?`${Math.round((Date.now()-lastFetch.getTime())/60000)}m ago`:null;
+  return <div style={{...ovGlass,padding:'16px 18px',borderColor:`${OV_COLORS.ai}25`,background:`linear-gradient(135deg,${OV_COLORS.aiDim},${OV_COLORS.bgCard})`}}>
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+      <div style={{display:'flex',alignItems:'center',gap:8}}><Brain size={14} color={OV_COLORS.ai}/><span style={{fontFamily:mono,fontSize:9,color:OV_COLORS.ai,letterSpacing:2,fontWeight:700}}>PANDA AI INSIGHT</span></div>
+      {timeAgo&&<span style={{fontFamily:mono,fontSize:7,color:OV_COLORS.textMuted}}>{timeAgo}</span>}
+    </div>
+    {loading&&<div style={{display:'flex',flexDirection:'column',gap:10}}>
+      {[1,2,3].map(i=><div key={i} style={{display:'flex',flexDirection:'column',gap:4}}><div style={{width:60,height:8,borderRadius:3,background:`${OV_COLORS.ai}15`,animation:'pulse 1.5s ease-in-out infinite'}}/><div style={{width:'100%',height:12,borderRadius:3,background:'rgba(255,255,255,0.03)',animation:`pulse 1.5s ease-in-out ${i*0.2}s infinite`}}/></div>)}
+      <div style={{fontFamily:mono,fontSize:9,color:OV_COLORS.ai,textAlign:'center',padding:4}}>🐼 Analyzing market data...</div>
+    </div>}
+    {error&&!loading&&<div style={{fontFamily:mono,fontSize:10,color:OV_COLORS.sell,padding:'12px 0',lineHeight:1.5}}>⚠️ {error}</div>}
+    {sections&&!loading&&<div style={{display:'flex',flexDirection:'column',gap:10}}>
+      {sections.summary&&<div><div style={{fontFamily:mono,fontSize:7,color:OV_COLORS.textMuted,letterSpacing:2,marginBottom:3}}>SUMMARY</div><div style={{fontFamily:raj,fontSize:13,color:OV_COLORS.textSecondary,lineHeight:1.4}}>{sections.summary}</div></div>}
+      {sections.opportunity&&<><div style={{height:1,background:`linear-gradient(90deg,transparent,${OV_COLORS.ai}30,transparent)`}}/><div><div style={{fontFamily:mono,fontSize:7,color:OV_COLORS.buy,letterSpacing:2,marginBottom:3}}>OPPORTUNITY</div><div style={{fontFamily:raj,fontSize:12,color:OV_COLORS.textSecondary,lineHeight:1.4}}>{sections.opportunity}</div></div></>}
+      {sections.risk&&<><div style={{height:1,background:`linear-gradient(90deg,transparent,${OV_COLORS.ai}30,transparent)`}}/><div><div style={{fontFamily:mono,fontSize:7,color:OV_COLORS.sell,letterSpacing:2,marginBottom:3}}>RISK</div><div style={{fontFamily:raj,fontSize:12,color:OV_COLORS.textSecondary,lineHeight:1.4}}>{sections.risk}</div></div></>}
+    </div>}
+    <button onClick={fetchInsight} disabled={loading} style={{marginTop:12,width:'100%',padding:'8px 0',fontFamily:mono,fontSize:9,color:loading?OV_COLORS.textMuted:OV_COLORS.ai,background:loading?'rgba(255,255,255,0.02)':`${OV_COLORS.ai}10`,border:`1px solid ${loading?OV_COLORS.border:OV_COLORS.ai+'30'}`,borderRadius:6,cursor:loading?'not-allowed':'pointer',letterSpacing:2,transition:'all 0.2s'}}>{loading?'⏳ ANALYZING...':'⟳ REFRESH INSIGHT'}</button>
+  </div>;
+}
+
+function OvNewsPanel({ upcomingNews }) {
+  const events = upcomingNews?.events || [];
+  if(events.length===0) return null;
+  return <div style={{...ovGlass,padding:'14px 16px'}}>
+    <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:10}}>
+      <AlertTriangle size={12} color={OV_COLORS.warn}/>
+      <span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.warn,letterSpacing:2,fontWeight:700}}>UPCOMING NEWS</span>
+      <span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted}}>({events.length})</span>
+    </div>
+    {events.slice(0,4).map((ev,i)=>{
+      const mins=ev.minutes_until||0;const urgent=mins<30;const critical=mins<10;
+      const c=critical?OV_COLORS.sell:urgent?OV_COLORS.warn:OV_COLORS.textSecondary;
+      return <div key={i} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 10px',borderRadius:6,marginBottom:4,
+        background:critical?'rgba(255,77,109,0.08)':urgent?'rgba(255,209,102,0.06)':'rgba(255,255,255,0.02)',
+        border:`1px solid ${critical?OV_COLORS.sell+'30':urgent?OV_COLORS.warn+'20':OV_COLORS.border}`}}>
+        <div style={{display:'flex',flexDirection:'column',gap:2}}>
+          <span style={{fontFamily:mono,fontSize:9,color:c,fontWeight:700}}>{ev.currency||'—'} — {ev.title||ev.event||'Event'}</span>
+          {ev.affected_pairs&&<span style={{fontFamily:mono,fontSize:7,color:OV_COLORS.textMuted}}>Affects: {ev.affected_pairs.join(', ')}</span>}
+        </div>
+        <div style={{fontFamily:orb,fontSize:13,fontWeight:700,color:c,padding:'4px 10px',borderRadius:4,background:`${c}15`,
+          animation:critical?'pulse 1s ease-in-out infinite':'none'}}>{mins}m</div>
+      </div>;
+    })}
+  </div>;
+}
+
+function OvTrackerSummary({ trackers, closed }) {
+  const avgGap=trackers.length?(trackers.reduce((s,t)=>s+(t.gap_at_open||0),0)/trackers.length).toFixed(1):'—';
+  const oldest=trackers.length?(()=>{const h=Math.round((Date.now()-new Date(trackers[trackers.length-1].opened_at).getTime())/3600000);return h<24?h+'h':Math.round(h/24)+'d';})():'—';
+  const reasonCounts={};closed.forEach(c=>{reasonCounts[c.close_reason]=(reasonCounts[c.close_reason]||0)+1;});
+  return <div style={{...ovGlass,padding:'14px 18px',animation:'fadeSlideUp 0.4s ease 600ms both'}}>
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+      <div style={{display:'flex',alignItems:'center',gap:8}}><Crosshair size={12} color={OV_COLORS.accent}/><span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted,letterSpacing:2}}>SIGNAL TRACKER</span></div>
+      <div style={{display:'flex',gap:12}}>
+        {[{v:trackers.length,l:'ACTIVE',c:OV_COLORS.accent},{v:avgGap,l:'AVG GAP',c:OV_COLORS.textSecondary},{v:oldest,l:'OLDEST',c:OV_COLORS.textSecondary}].map(s=>
+          <div key={s.l} style={{textAlign:'center'}}><div style={{fontFamily:orb,fontSize:18,fontWeight:900,color:s.c}}>{s.v}</div><div style={{fontFamily:mono,fontSize:7,color:OV_COLORS.textMuted,letterSpacing:1}}>{s.l}</div></div>
+        )}
+      </div>
+    </div>
+    <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:10}}>
+      {trackers.map(t=>{const dc=t.direction==='BUY'?OV_COLORS.buy:OV_COLORS.sell;return <div key={t.symbol} style={{display:'flex',alignItems:'center',gap:6,padding:'4px 10px',borderRadius:6,background:`${dc}08`,border:`1px solid ${dc}20`}}>
+        <span style={{fontFamily:orb,fontSize:10,fontWeight:700,color:OV_COLORS.textPrimary}}>{t.symbol}</span>
+        <span style={{fontFamily:mono,fontSize:8,color:dc}}>{t.direction}</span>
+        <span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted}}>{Number(t.gap_at_open||0).toFixed(1)}→{Number(t.peak_gap||0).toFixed(1)}</span>
+      </div>;})}
+    </div>
+    {closed.length>0&&<><div style={{fontFamily:mono,fontSize:7,color:OV_COLORS.textMuted,letterSpacing:2,marginBottom:6}}>RECENTLY CLOSED</div>
+    <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+      {closed.slice(0,3).map((t,i)=>{const dur=t.closed_at&&t.opened_at?Math.round((new Date(t.closed_at)-new Date(t.opened_at))/3600000):0;
+        return <div key={i} style={{display:'flex',alignItems:'center',gap:6,padding:'3px 8px',borderRadius:4,background:'rgba(255,255,255,0.02)',border:`1px solid ${OV_COLORS.border}`}}>
+          <span style={{fontFamily:mono,fontSize:9,color:OV_COLORS.textSecondary}}>{t.symbol}</span><span style={{fontFamily:mono,fontSize:7,color:'#ffaa44'}}>{t.close_reason}</span><span style={{fontFamily:mono,fontSize:7,color:OV_COLORS.textMuted}}>{dur}h</span></div>;})}
+    </div></>}
+    {Object.keys(reasonCounts).length>0&&<div style={{display:'flex',gap:6,marginTop:8}}>
+      {Object.entries(reasonCounts).map(([r,c])=><span key={r} style={{fontFamily:mono,fontSize:7,color:OV_COLORS.textMuted,background:'rgba(255,255,255,0.03)',borderRadius:3,padding:'2px 6px'}}>{r}: {c}</span>)}
+    </div>}
+  </div>;
+}
+
 function OverviewTab({ data, trends, pdrData, upcomingNews, spikes, confidenceMap, memoryIndex, onSelectPair, isMobile, lastUpdate }) {
-  const [aiReply, setAiReply] = useState(null);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiError, setAiError] = useState(null);
-  const [trackers, setTrackers] = useState([]);
-  const [closedTrackers, setClosedTrackers] = useState([]);
-  const aiFetched = useRef(false);
+  const [selectedPair,setSelectedPair]=useState(null);
+  const [trackers,setTrackers]=useState([]);
+  const [closedTrackers,setClosedTrackers]=useState([]);
+  const [time,setTime]=useState(new Date());
+  useEffect(()=>{const t=setInterval(()=>setTime(new Date()),10000);return()=>clearInterval(t);},[]);
+  useEffect(()=>{(async()=>{try{const[oR,cR]=await Promise.all([fetch('/api/signal-tracker?status=OPEN').then(r=>r.json()),fetch('/api/signal-tracker?status=CLOSED&limit=5').then(r=>r.json())]);setTrackers(oR.trackers||[]);setClosedTrackers(cR.trackers||[]);}catch{}})();},[]);
 
-  // Fetch AI insight on mount
-  useEffect(() => {
-    if (aiFetched.current) return;
-    aiFetched.current = true;
-    fetchAI();
-  }, []);
-  // Fetch trackers on mount
-  useEffect(() => {
-    (async () => {
-      try {
-        const [oR, cR] = await Promise.all([
-          fetch('/api/signal-tracker?status=OPEN').then(r=>r.json()),
-          fetch('/api/signal-tracker?status=CLOSED&limit=5').then(r=>r.json()),
-        ]);
-        setTrackers(oR.trackers || []);
-        setClosedTrackers(cR.trackers || []);
-      } catch {}
-    })();
-  }, []);
+  // Normalize pairs from dashboard data into enriched objects
+  const pairs = useMemo(()=> data.map(row => ({
+    symbol:row.symbol, gap:row.gap??0, bias:row.bias||'WAIT',
+    momentum:trends[row.symbol]?.momentum||'NEUTRAL', closeAlert:trends[row.symbol]?.closeAlert||false,
+    pl_zone:row.pl_zone||'BETWEEN', box_h4:row.box_h4_trend||'RANGING', box_h1:row.box_h1_trend||'RANGING',
+    pdr_strong:pdrData[row.symbol]?.pdr_strong||false, pdr_strength:pdrData[row.symbol]?.pdr_strength||0,
+    pdr_direction:pdrData[row.symbol]?.pdr_direction||'NEUTRAL',
+    edge:confidenceMap[row.symbol]?.historical?.flag||null, conf:confidenceMap[row.symbol]?.confidence||0,
+    conflict:confidenceMap[row.symbol]?.conflict||false,
+    news:upcomingNews?.affected_pairs?.includes(row.symbol)||false, hard_invalid:row.hard_invalid||false,
+  })).sort((a,b)=>b.conf-a.conf), [data,trends,pdrData,confidenceMap,upcomingNews]);
 
-  async function fetchAI() {
-    setAiLoading(true); setAiError(null);
-    try {
-      const r = await fetch('/api/ai-chat', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ mode:'insights' }) });
-      const d = await r.json();
-      if (r.ok && d.reply) setAiReply(d.reply);
-      else setAiError(d.error || 'Failed');
-    } catch { setAiError('Connection error'); }
-    setAiLoading(false);
-  }
+  // Session + market mode
+  const now=new Date();const h=now.getUTCHours(),m=now.getUTCMinutes(),totalMin=h*60+m;
+  const ovSessions=[{name:'SYDNEY',color:'#00b4ff',open:21*60,close:6*60},{name:'TOKYO',color:'#ffd166',open:23*60,close:8*60},{name:'LONDON',color:'#cc77ff',open:7*60,close:16*60},{name:'NEW YORK',color:'#00ff9f',open:12*60,close:21*60}];
+  const isOn=(s)=>s.open>s.close?(totalMin>=s.open||totalMin<s.close):(totalMin>=s.open&&totalMin<s.close);
+  const activeS=ovSessions.filter(isOn);let nextClose=null;
+  if(activeS.length>0){const s=activeS[0];let cl=s.close;if(s.open>s.close&&totalMin>=s.open)cl+=1440;let diff=cl-totalMin;if(diff<0)diff+=1440;nextClose={hours:Math.floor(diff/60),minutes:diff%60};}
+  const sessionInfo={sessions:ovSessions,active:activeS,isOn,nextClose,total:totalMin};
 
-  // Parse AI reply into sections
-  function parseAI(text) {
-    if (!text) return null;
-    const lines = text.split('\n').filter(l=>l.trim());
-    let summary='', opportunity='', risk='', current='summary';
-    for (const line of lines) {
-      const lo = line.toLowerCase();
-      if (lo.includes('opportunit') || lo.includes('best setup') || lo.includes('top pick') || lo.includes('strongest')) { current='opportunity'; continue; }
-      if (lo.includes('risk') || lo.includes('avoid') || lo.includes('caution') || lo.includes('warning') || lo.includes('dead zone')) { current='risk'; continue; }
-      const clean = line.replace(/^[\*\-\•#]+\s*/, '').replace(/\*\*/g,'');
-      if (current==='summary') summary += (summary?' ':'')+clean;
-      else if (current==='opportunity') opportunity += (opportunity?' ':'')+clean;
-      else risk += (risk?' ':'')+clean;
-    }
-    if (!opportunity && !risk) return { summary:text.replace(/\*\*/g,''), opportunity:'', risk:'' };
-    return { summary, opportunity, risk };
-  }
+  const valid=pairs.filter(p=>Math.abs(p.gap)>=5&&!p.hard_invalid);
+  const strongMom=pairs.filter(p=>['STRONG','BUILDING'].includes(p.momentum)).length;
+  const chaotic=pairs.filter(p=>['REVERSING','FADING'].includes(p.momentum)).length;
+  const marketMode=valid.length>=6&&strongMom>=4?{mode:'TRENDING',color:OV_COLORS.buy,glow:OV_COLORS.buyGlow}:chaotic>=4?{mode:'CHAOTIC',color:OV_COLORS.sell,glow:OV_COLORS.sellGlow}:{mode:'RANGING',color:OV_COLORS.warn,glow:'rgba(255,209,102,0.2)'};
 
-  // Session info with countdown
-  function getSessionFull() {
-    const now = new Date();
-    const h = now.getUTCHours(), m = now.getUTCMinutes(), total = h*60+m;
-    const sessions = [
-      { name:'SYDNEY', color:'#00b4ff', open:21*60, close:6*60 },
-      { name:'TOKYO', color:'#ffd166', open:23*60, close:8*60 },
-      { name:'LONDON', color:'#cc77ff', open:7*60, close:16*60 },
-      { name:'NEW YORK', color:'#00ff9f', open:12*60, close:21*60 },
-    ];
-    const isOn = (s) => s.open > s.close ? (total >= s.open || total < s.close) : (total >= s.open && total < s.close);
-    const active = sessions.filter(isOn);
-    let countdown = null;
-    if (active.length > 0) {
-      let closeMin = active[0].close;
-      if (active[0].open > active[0].close && total >= active[0].open) closeMin += 1440;
-      let diff = closeMin - total; if (diff<0) diff+=1440;
-      countdown = { h:Math.floor(diff/60), m:diff%60 };
-    }
-    return { sessions, active, isOn, countdown, total };
-  }
-
-  // Market mode
-  function getMarketMode() {
-    const valid = data.filter(r => Math.abs(r.gap??0) >= 5 && !r.hard_invalid);
-    const strongMom = Object.values(trends).filter(t=>['STRONG','BUILDING'].includes(t.momentum)).length;
-    const chaotic = Object.values(trends).filter(t=>['REVERSING','FADING'].includes(t.momentum)).length;
-    if (valid.length >= 6 && strongMom >= 4) return { mode:'TRENDING', color:'#00ff9f', bg:'rgba(0,255,159,0.08)' };
-    if (chaotic >= 4 || (valid.length >= 5 && strongMom <= 1)) return { mode:'CHAOTIC', color:'#ff4d6d', bg:'rgba(255,77,109,0.08)' };
-    return { mode:'RANGING', color:'#ffd166', bg:'rgba(255,209,102,0.08)' };
-  }
-
-  // Currency strength
-  function getCurrStrength() {
-    const str = {}, cnt = {};
-    ['USD','EUR','GBP','JPY','AUD','CAD','NZD'].forEach(c => { str[c]=0; cnt[c]=0; });
-    data.forEach(r => {
-      const b=r.symbol?.slice(0,3), q=r.symbol?.slice(3,6), g=r.gap??0;
-      if (b && str[b]!==undefined) { str[b]+=g; cnt[b]++; }
-      if (q && str[q]!==undefined) { str[q]-=g; cnt[q]++; }
-    });
-    return Object.entries(str).map(([c,v]) => {
-      const avg = cnt[c] ? v/cnt[c] : 0;
-      let flow = 'NEUTRAL';
-      if (avg > 2) flow='STRONG'; else if (avg > 0.5) flow='RISING';
-      else if (avg < -2) flow='WEAK'; else if (avg < -0.5) flow='FALLING';
-      return { currency:c, strength:avg, flow };
-    }).sort((a,b) => b.strength - a.strength);
-  }
-
-  // Exposure across valid signals
-  function getExposure() {
-    const exp = {};
-    ['USD','EUR','GBP','JPY','AUD','CAD','NZD'].forEach(c => exp[c]=0);
-    data.filter(r => r.bias==='BUY'||r.bias==='SELL').forEach(r => {
-      const b=r.symbol?.slice(0,3), q=r.symbol?.slice(3,6);
-      if (r.bias==='BUY') { exp[b]=(exp[b]||0)+1; exp[q]=(exp[q]||0)-1; }
-      else { exp[b]=(exp[b]||0)-1; exp[q]=(exp[q]||0)+1; }
-    });
-    return Object.entries(exp).map(([c,v]) => ({ currency:c, exposure:v, abs:Math.abs(v) })).sort((a,b)=>b.abs-a.abs);
-  }
+  // Currency strength + exposure
+  const str={USD:0,EUR:0,GBP:0,JPY:0,AUD:0,CAD:0,NZD:0},cnt={...str};
+  pairs.forEach(p=>{const b=p.symbol.slice(0,3),q=p.symbol.slice(3,6);str[b]=(str[b]||0)+p.gap;cnt[b]=(cnt[b]||0)+1;str[q]=(str[q]||0)-p.gap;cnt[q]=(cnt[q]||0)+1;});
+  const currStr=Object.entries(str).map(([c,v])=>{const avg=cnt[c]?v/cnt[c]:0;let flow='NEUTRAL';if(avg>2)flow='ACCELERATING';else if(avg>0.5)flow='STRENGTHENING';else if(avg<-2)flow='WEAKENING';else if(avg<-0.5)flow='SOFTENING';return{currency:c,strength:avg,flow};}).sort((a,b)=>b.strength-a.strength);
+  const exp={};['USD','EUR','GBP','JPY','AUD','CAD','NZD'].forEach(c=>exp[c]=0);
+  pairs.filter(p=>p.bias==='BUY'||p.bias==='SELL').forEach(p=>{const b=p.symbol.slice(0,3),q=p.symbol.slice(3,6);if(p.bias==='BUY'){exp[b]++;exp[q]--;}else{exp[b]--;exp[q]++;}});
+  const exposure=Object.entries(exp).map(([c,v])=>({currency:c,exposure:v,abs:Math.abs(v)})).sort((a,b)=>b.abs-a.abs);
 
   // Tier classification
-  function getTier(row) {
-    const cf = confidenceMap[row.symbol];
-    const conf = cf?.confidence || 0;
-    const edge = cf?.historical?.flag;
-    const mom = trends[row.symbol]?.momentum || '';
-    if (conf >= 70 && edge !== 'DEAD_ZONE' && ['STRONG','BUILDING','SPARK'].includes(mom)) return 'HIGH';
-    if (conf >= 45 && edge !== 'DEAD_ZONE' && row.bias !== 'WAIT') return 'MID';
-    return 'LOW';
-  }
+  function ovGetTier(p){if(p.conf>=70&&p.edge!=='DEAD_ZONE'&&['STRONG','BUILDING','SPARK'].includes(p.momentum))return'HIGH';if(p.conf>=50&&p.edge!=='DEAD_ZONE')return'MID';return'LOW';}
+  const highTier=pairs.filter(p=>ovGetTier(p)==='HIGH');const midTier=pairs.filter(p=>ovGetTier(p)==='MID');const lowTier=pairs.filter(p=>ovGetTier(p)==='LOW');
 
-  // Tags
-  function getTags(row) {
-    const tags = [];
-    const cf = confidenceMap[row.symbol];
-    const edge = cf?.historical?.flag;
-    if (edge === 'PROVEN_EDGE') tags.push({ label:'PROVEN', color:'#10B981', bg:'rgba(16,185,129,0.12)' });
-    if (edge === 'DEAD_ZONE') tags.push({ label:'DEAD ZONE', color:'#EF4444', bg:'rgba(239,68,68,0.12)' });
-    if (upcomingNews?.affected_pairs?.includes(row.symbol)) tags.push({ label:'NEWS', color:'#ffd166', bg:'rgba(255,209,102,0.10)' });
-    if ((cf?.confidence||0) < 40 && row.bias !== 'WAIT') tags.push({ label:'LOW CONF', color:'#ff8844', bg:'rgba(255,136,68,0.10)' });
-    if (cf?.conflict) tags.push({ label:'CONFLICT', color:'#ff4d6d', bg:'rgba(255,77,109,0.10)' });
-    return tags;
-  }
-
-  // Computed values
-  const sess = getSessionFull();
-  const mktMode = getMarketMode();
-  const currStr = getCurrStrength();
-  const exposure = getExposure();
-  const aiSections = parseAI(aiReply);
-  const sorted = [...data].sort((a,b) => (confidenceMap[b.symbol]?.confidence||0) - (confidenceMap[a.symbol]?.confidence||0));
-  const highTier = sorted.filter(r => getTier(r)==='HIGH');
-  const midTier = sorted.filter(r => getTier(r)==='MID');
-  const lowTier = sorted.filter(r => getTier(r)==='LOW');
-  const validPairs = data.filter(r => Math.abs(r.gap??0)>=5 && !r.hard_invalid && !isNeutralMatchup(r));
-  const buyC = validPairs.filter(r=>(r.gap??0)>=5).length;
-  const sellC = validPairs.filter(r=>(r.gap??0)<=-5).length;
-  const spikeC = spikes?.length || 0;
-  const momBuild = Object.values(trends).filter(t=>['STRONG','BUILDING'].includes(t.momentum)).length;
-  const closeAlertC = Object.values(trends).filter(t=>t.closeAlert).length;
-  const strongest = sorted[0];
-  const momStates = ['STRONG','BUILDING','SPARK','EMERGING','STABLE','CONSOLIDATING','COOLING','FADING','REVERSING','NEUTRAL'];
-  const momColors = { STRONG:'#00ff9f', BUILDING:'#66ffcc', SPARK:'#ffd166', EMERGING:'#66ffcc', STABLE:'#6b7fa8', CONSOLIDATING:'#5a6d8a', COOLING:'#ffaa44', FADING:'#ff7744', REVERSING:'#ff4d6d', NEUTRAL:'#3a4568' };
-  const momCounts = {};
-  momStates.forEach(s => momCounts[s] = Object.values(trends).filter(t=>t.momentum===s).length);
-  const formatTime = (d) => { try { const dt=new Date(d); return dt.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}); } catch { return ''; } };
+  // Stats
+  const buyC=valid.filter(p=>p.gap>=5).length,sellC=valid.filter(p=>p.gap<=-5).length;
+  const spikeC=spikes?.length||0;const momBuild=strongMom;const closeAlerts=pairs.filter(p=>['FADING','REVERSING'].includes(p.momentum)&&Math.abs(p.gap)>=5).length;
+  const strongest=pairs[0];const sparkD=Array.from({length:12},(_,i)=>({v:4+Math.sin(i*0.8)*3+Math.random()*2}));
 
   return (
-    <div style={{display:'flex',flexDirection:'column',gap:isMobile?14:20}}>
+    <div style={{color:OV_COLORS.textPrimary,fontFamily:raj,position:'relative'}}>
+      {/* Background grid */}
+      <div style={{position:'fixed',inset:0,zIndex:0,pointerEvents:'none',backgroundImage:'linear-gradient(rgba(0,180,255,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(0,180,255,0.02) 1px,transparent 1px)',backgroundSize:'40px 40px'}}/>
+      <div style={{position:'relative',zIndex:1,display:'flex',flexDirection:'column',gap:20}}>
 
       {/* ROW 1 — MARKET PULSE BAR */}
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:16,padding:isMobile?'10px 14px':'12px 20px',background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:12,flexWrap:'wrap'}}>
-        {/* Left — Session pills */}
-        <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-          <div style={{display:'flex',alignItems:'center',gap:6}}>
-            <div style={{width:8,height:8,borderRadius:'50%',background:isMarketOpen()?'#00ff9f':'#ff4d6d',boxShadow:`0 0 10px ${isMarketOpen()?'#00ff9f':'#ff4d6d'}`,animation:'blink 2s infinite'}}/>
-            <span style={{fontFamily:mono,fontSize:10,color:isMarketOpen()?'#00ff9f':'#ff4d6d',letterSpacing:2,fontWeight:700}}>{isMarketOpen()?'LIVE':'CLOSED'}</span>
-          </div>
-          {sess.sessions.map(s => {
-            const on = sess.isOn(s);
-            return <div key={s.name} style={{display:'flex',alignItems:'center',gap:4,padding:'4px 10px',borderRadius:6,background:on?s.color+'15':'rgba(255,255,255,0.02)',border:`1px solid ${on?s.color+'40':'rgba(255,255,255,0.04)'}`,transition:'all 0.3s'}}>
-              <div style={{width:6,height:6,borderRadius:'50%',background:on?s.color:'rgba(255,255,255,0.1)',boxShadow:on?`0 0 6px ${s.color}`:'none'}}/>
-              <span style={{fontFamily:mono,fontSize:isMobile?7:9,fontWeight:on?700:400,color:on?s.color:'rgba(255,255,255,0.25)',letterSpacing:1}}>{s.name}</span>
-            </div>;
-          })}
-          {sess.active.length>1&&<span style={{fontFamily:mono,fontSize:8,color:'#ffd166',background:'rgba(255,209,102,0.08)',border:'1px solid rgba(255,209,102,0.25)',borderRadius:4,padding:'2px 6px',fontWeight:700}}>OVERLAP</span>}
-        </div>
-        {/* Right — Mode + Countdown + News */}
-        <div style={{display:'flex',alignItems:'center',gap:12}}>
-          {sess.countdown&&<div style={{textAlign:'center'}}>
-            <div style={{fontFamily:mono,fontSize:7,color:'var(--text-muted)',letterSpacing:1}}>NEXT CLOSE</div>
-            <div style={{fontFamily:orb,fontSize:13,fontWeight:700,color:'#00b4ff'}}>{sess.countdown.h}h {sess.countdown.m}m</div>
-          </div>}
-          <div style={{padding:'5px 12px',borderRadius:6,background:mktMode.bg,border:`1px solid ${mktMode.color}30`}}>
-            <span style={{fontFamily:mono,fontSize:9,color:mktMode.color,fontWeight:700,letterSpacing:2}}>{mktMode.mode}</span>
-          </div>
-          {upcomingNews?.events?.length>0&&<div style={{display:'flex',alignItems:'center',gap:4,padding:'5px 10px',borderRadius:6,background:'rgba(255,77,109,0.08)',border:'1px solid rgba(255,77,109,0.25)'}}>
-            <span style={{fontFamily:mono,fontSize:9,color:'#ff4d6d',fontWeight:700}}>📰 {upcomingNews.events.length} NEWS</span>
-          </div>}
-          {lastUpdate&&<span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>{formatTime(lastUpdate)}</span>}
-        </div>
-      </div>
-
-      {/* ROW 2 — QUICK STATS */}
-      <div style={{display:'grid',gridTemplateColumns:isMobile?'repeat(3,1fr)':'repeat(6,1fr)',gap:isMobile?6:10}}>
-        {[
-          {label:'VALID',value:validPairs.length,color:'#00b4ff',icon:'📊'},
-          {label:'BUY',value:buyC,color:'#00ff9f',icon:'📈'},
-          {label:'SELL',value:sellC,color:'#ff4d6d',icon:'📉'},
-          {label:'BUILDING',value:momBuild,color:'#66ffcc',icon:'🔥'},
-          {label:'SPIKES',value:spikeC,color:spikeC>0?'#ffd166':'#3a4568',icon:'⚡'},
-          {label:'ALERTS',value:closeAlertC,color:closeAlertC>0?'#ff4d6d':'#3a4568',icon:'⚠️'},
-        ].map(s=>(
-          <div key={s.label} style={{padding:isMobile?'8px 6px':'10px 14px',background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:10,textAlign:'center'}}>
-            <div style={{fontSize:isMobile?14:16,marginBottom:2}}>{s.icon}</div>
-            <div style={{fontFamily:orb,fontSize:isMobile?16:20,fontWeight:700,color:s.color}}>{s.value}</div>
-            <div style={{fontFamily:mono,fontSize:7,color:'var(--text-muted)',letterSpacing:2,marginTop:2}}>{s.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* ROW 3 — AI BRIEFING + CURRENCY FLOW */}
-      <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:isMobile?14:20}}>
-
-        {/* AI BRIEFING */}
-        <div style={{background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:12,padding:isMobile?14:18,display:'flex',flexDirection:'column',gap:12}}>
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-            <div style={{display:'flex',alignItems:'center',gap:8}}>
-              <span style={{fontSize:16}}>🧠</span>
-              <span style={{fontFamily:orb,fontSize:11,color:'#7C3AED',letterSpacing:2,fontWeight:700}}>AI BRIEFING</span>
-            </div>
-            <button onClick={()=>{aiFetched.current=false;fetchAI();}} style={{background:'rgba(124,58,237,0.1)',border:'1px solid rgba(124,58,237,0.3)',borderRadius:6,padding:'3px 10px',fontFamily:mono,fontSize:8,color:'#7C3AED',cursor:'pointer',letterSpacing:1}}>REFRESH</button>
-          </div>
-          {aiLoading?(
-            <div style={{display:'flex',alignItems:'center',gap:8,padding:20,justifyContent:'center'}}>
-              <div style={{width:8,height:8,borderRadius:'50%',background:'#7C3AED',animation:'dotpulse 1s ease-in-out infinite'}}/>
-              <span style={{fontFamily:mono,fontSize:10,color:'var(--text-muted)',letterSpacing:2}}>ANALYZING...</span>
-            </div>
-          ):aiError?(
-            <div style={{padding:12,background:'rgba(255,77,109,0.06)',borderRadius:8,fontFamily:raj,fontSize:13,color:'#ff4d6d'}}>{aiError}</div>
-          ):aiSections?(
-            <div style={{display:'flex',flexDirection:'column',gap:10}}>
-              {aiSections.summary&&<div style={{fontFamily:raj,fontSize:14,color:'var(--text-primary)',lineHeight:1.5}}>{aiSections.summary}</div>}
-              {aiSections.opportunity&&<div style={{padding:'8px 12px',background:'rgba(0,255,159,0.06)',border:'1px solid rgba(0,255,159,0.15)',borderRadius:8}}>
-                <div style={{fontFamily:mono,fontSize:8,color:'#00ff9f',letterSpacing:2,marginBottom:4,fontWeight:700}}>OPPORTUNITIES</div>
-                <div style={{fontFamily:raj,fontSize:13,color:'rgba(0,255,159,0.85)',lineHeight:1.4}}>{aiSections.opportunity}</div>
-              </div>}
-              {aiSections.risk&&<div style={{padding:'8px 12px',background:'rgba(255,77,109,0.06)',border:'1px solid rgba(255,77,109,0.15)',borderRadius:8}}>
-                <div style={{fontFamily:mono,fontSize:8,color:'#ff4d6d',letterSpacing:2,marginBottom:4,fontWeight:700}}>RISKS</div>
-                <div style={{fontFamily:raj,fontSize:13,color:'rgba(255,77,109,0.85)',lineHeight:1.4}}>{aiSections.risk}</div>
-              </div>}
-            </div>
-          ):<div style={{fontFamily:mono,fontSize:10,color:'var(--text-muted)',textAlign:'center',padding:20}}>No data</div>}
-        </div>
-
-        {/* CURRENCY FLOW */}
-        <div style={{background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:12,padding:isMobile?14:18,display:'flex',flexDirection:'column',gap:10}}>
+      <div style={{...ovGlass,padding:isMobile?'10px 14px':'12px 20px',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:16,animation:'fadeSlideUp 0.4s ease both'}}>
+        <div style={{display:'flex',alignItems:'center',gap:isMobile?10:16}}>
           <div style={{display:'flex',alignItems:'center',gap:8}}>
-            <span style={{fontSize:16}}>💱</span>
-            <span style={{fontFamily:orb,fontSize:11,color:'#00b4ff',letterSpacing:2,fontWeight:700}}>CURRENCY FLOW</span>
+            <div style={{width:8,height:8,borderRadius:'50%',background:isMarketOpen()?OV_COLORS.buy:OV_COLORS.sell,boxShadow:`0 0 12px ${isMarketOpen()?OV_COLORS.buy:OV_COLORS.sell}`,animation:'pulse 2s ease-in-out infinite'}}/>
+            <span style={{fontFamily:mono,fontSize:10,color:isMarketOpen()?OV_COLORS.buy:OV_COLORS.sell,letterSpacing:2,fontWeight:700}}>{isMarketOpen()?'LIVE':'CLOSED'}</span>
           </div>
-          {currStr.map((c,i)=>{
-            const pct=Math.min(Math.abs(c.strength)/4*100,100);
-            const clr=c.strength>0?'#00ff9f':'#ff4d6d';
-            const flowClr=c.flow==='STRONG'?'#00ff9f':c.flow==='RISING'?'#66ffcc':c.flow==='WEAK'?'#ff4d6d':c.flow==='FALLING'?'#ff7744':'#3a4568';
-            return <div key={c.currency} style={{display:'flex',alignItems:'center',gap:8}}>
-              <span style={{fontFamily:orb,fontSize:12,fontWeight:700,color:i===0?'#00ff9f':i===currStr.length-1?'#ff4d6d':'var(--text-primary)',width:32}}>{c.currency}</span>
-              <div style={{flex:1,height:6,background:'rgba(255,255,255,0.04)',borderRadius:3,overflow:'hidden',position:'relative'}}>
-                <div style={{position:'absolute',left:c.strength>=0?'50%':'auto',right:c.strength<0?'50%':'auto',width:`${pct/2}%`,height:'100%',background:clr,borderRadius:3,boxShadow:`0 0 6px ${clr}40`,transition:'width 0.5s'}}/>
-                <div style={{position:'absolute',left:'50%',top:0,width:1,height:'100%',background:'rgba(255,255,255,0.1)'}}/>
-              </div>
-              <span style={{fontFamily:mono,fontSize:9,color:clr,fontWeight:700,width:36,textAlign:'right'}}>{c.strength>0?'+':''}{c.strength.toFixed(1)}</span>
-              <span style={{fontFamily:mono,fontSize:7,color:flowClr,letterSpacing:1,width:50,textAlign:'right'}}>{c.flow}</span>
-            </div>;
-          })}
-          {/* Exposure */}
-          {exposure.some(e=>e.abs>=2)&&<div style={{marginTop:4,padding:'6px 10px',background:'rgba(255,209,102,0.06)',border:'1px solid rgba(255,209,102,0.15)',borderRadius:6}}>
-            <div style={{fontFamily:mono,fontSize:7,color:'#ffd166',letterSpacing:2,marginBottom:4}}>EXPOSURE WARNING</div>
-            <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-              {exposure.filter(e=>e.abs>=2).map(e=>(
-                <span key={e.currency} style={{fontFamily:mono,fontSize:9,color:e.exposure>0?'#00ff9f':'#ff4d6d',background:e.exposure>0?'rgba(0,255,159,0.08)':'rgba(255,77,109,0.08)',border:`1px solid ${e.exposure>0?'rgba(0,255,159,0.2)':'rgba(255,77,109,0.2)'}`,borderRadius:4,padding:'2px 6px'}}>{e.currency} {e.exposure>0?'+':''}{e.exposure}</span>
-              ))}
-            </div>
+          {!isMobile&&<OvSessionTimeline sessionInfo={sessionInfo} isMobile={isMobile}/>}
+          {nextClose&&<div style={{display:'flex',flexDirection:'column',alignItems:'center'}}>
+            <span style={{fontFamily:mono,fontSize:7,color:OV_COLORS.textMuted,letterSpacing:1}}>NEXT CLOSE</span>
+            <span style={{fontFamily:orb,fontSize:14,fontWeight:700,color:OV_COLORS.accent}}>{nextClose.hours}h {nextClose.minutes}m</span>
           </div>}
         </div>
+        <div style={{display:'flex',alignItems:'center',gap:isMobile?10:20}}>
+          <OvMarketGauge {...marketMode}/>
+          {upcomingNews?.events?.length>0&&<div style={{display:'flex',alignItems:'center',gap:6,padding:'6px 12px',borderRadius:6,background:OV_COLORS.warnDim,border:`1px solid ${OV_COLORS.warn}30`}}>
+            <AlertTriangle size={12} color={OV_COLORS.warn}/><span style={{fontFamily:mono,fontSize:9,color:OV_COLORS.warn,fontWeight:700}}>{upcomingNews.events.length} NEWS</span>
+          </div>}
+          <span style={{fontFamily:mono,fontSize:10,color:OV_COLORS.textMuted}}>{time.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})} UTC+4</span>
+        </div>
       </div>
 
-      {/* ROW 4 — MOMENTUM DISTRIBUTION */}
-      <div style={{background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:12,padding:isMobile?'10px 14px':'12px 18px'}}>
-        <div style={{fontFamily:orb,fontSize:10,color:'var(--text-muted)',letterSpacing:2,marginBottom:10}}>MOMENTUM DISTRIBUTION</div>
-        <div style={{display:'flex',gap:3,height:28,borderRadius:6,overflow:'hidden'}}>
-          {momStates.filter(s=>momCounts[s]>0).map(s=>{
-            const pct=(momCounts[s]/21)*100;
-            return <div key={s} title={`${s}: ${momCounts[s]}`} style={{width:`${pct}%`,background:momColors[s]||'#3a4568',display:'flex',alignItems:'center',justifyContent:'center',transition:'width 0.5s',minWidth:momCounts[s]>0?16:0,cursor:'default'}}>
-              <span style={{fontFamily:mono,fontSize:7,color:'#0a0e17',fontWeight:700,whiteSpace:'nowrap'}}>{momCounts[s]}</span>
-            </div>;
-          })}
-        </div>
-        <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:8}}>
-          {momStates.filter(s=>momCounts[s]>0).map(s=>(
-            <div key={s} style={{display:'flex',alignItems:'center',gap:4}}>
-              <div style={{width:6,height:6,borderRadius:2,background:momColors[s]}}/>
-              <span style={{fontFamily:mono,fontSize:7,color:'var(--text-muted)',letterSpacing:1}}>{s} ({momCounts[s]})</span>
+      {/* ROW 2 — STAT CARDS */}
+      <div style={{display:'flex',gap:12,flexWrap:'wrap'}}>
+        <OvStatCard label="VALID SIGNALS" value={valid.length} icon={Activity} color={OV_COLORS.accent} delay={100} subtitle={`${buyC} BUY · ${sellC} SELL`} sparkData={sparkD}/>
+        <OvStatCard label="STRONGEST" value={Math.abs(Math.round(strongest?.gap??0))} icon={TrendingUp} color={OV_COLORS.buy} delay={200} subtitle={strongest?.symbol||'—'}/>
+        <OvStatCard label="SPIKES ≥7" value={spikeC} icon={Zap} color={OV_COLORS.warn} delay={300} sparkData={sparkD.map(d=>({v:d.v*0.6}))}/>
+        <OvStatCard label="MOMENTUM" value={momBuild} icon={Gauge} color="#66ffcc" delay={400} subtitle="BUILDING + STRONG"/>
+        <OvStatCard label="CLOSE ALERTS" value={closeAlerts} icon={AlertTriangle} color={closeAlerts>0?OV_COLORS.sell:OV_COLORS.textMuted} delay={500}/>
+      </div>
+
+      {/* ROW 3 — MAIN GRID: Signals Left + Panels Right */}
+      <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 380px',gap:20}}>
+        {/* LEFT — Signal Board */}
+        <div style={{display:'flex',flexDirection:'column',gap:16}}>
+          {highTier.length>0&&<div>
+            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
+              <Shield size={12} color={OV_COLORS.buy}/><span style={{fontFamily:mono,fontSize:9,color:OV_COLORS.buy,letterSpacing:3,fontWeight:700}}>HIGH QUALITY</span><span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted}}>{highTier.length} pairs</span>
             </div>
-          ))}
+            <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(auto-fill,minmax(220px,1fr))',gap:10}}>
+              {highTier.map((p,i)=><OvSignalCard key={p.symbol} pair={p} tier="HIGH" onClick={()=>{setSelectedPair(p);if(onSelectPair)onSelectPair(p);}} delay={i*80}/>)}
+            </div>
+          </div>}
+          {midTier.length>0&&<div>
+            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
+              <Eye size={12} color={OV_COLORS.textSecondary}/><span style={{fontFamily:mono,fontSize:9,color:OV_COLORS.textSecondary,letterSpacing:3}}>MID QUALITY</span><span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted}}>{midTier.length} pairs</span>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(auto-fill,minmax(200px,1fr))',gap:8}}>
+              {midTier.map((p,i)=><OvSignalCard key={p.symbol} pair={p} tier="MID" onClick={()=>{setSelectedPair(p);if(onSelectPair)onSelectPair(p);}} delay={i*60+300}/>)}
+            </div>
+          </div>}
+          {lowTier.length>0&&<div>
+            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+              <Radio size={10} color={OV_COLORS.textMuted}/><span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted,letterSpacing:2}}>LOW QUALITY / INACTIVE</span><span style={{fontFamily:mono,fontSize:7,color:OV_COLORS.textMuted}}>{lowTier.length}</span>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(auto-fill,minmax(170px,1fr))',gap:6}}>
+              {lowTier.map((p,i)=><OvSignalCard key={p.symbol} pair={p} tier="LOW" onClick={()=>{setSelectedPair(p);if(onSelectPair)onSelectPair(p);}} delay={i*40+500}/>)}
+            </div>
+          </div>}
+          <OvMomentumBar pairs={pairs}/>
+        </div>
+
+        {/* RIGHT — Context Panels */}
+        <div style={{display:'flex',flexDirection:'column',gap:12}}>
+          <div style={{...ovGlass,padding:'14px 16px',animation:'fadeSlideUp 0.4s ease 200ms both'}}>
+            <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:10}}>
+              <Activity size={12} color={OV_COLORS.accent}/><span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted,letterSpacing:2}}>CURRENCY STRENGTH</span>
+            </div>
+            <OvCurrencyChart data={currStr}/>
+          </div>
+          <div style={{animation:'fadeSlideUp 0.4s ease 300ms both'}}><OvNewsPanel upcomingNews={upcomingNews}/></div>
+          <div style={{...ovGlass,padding:'14px 16px',animation:'fadeSlideUp 0.4s ease 400ms both'}}>
+            <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:10}}>
+              <Activity size={12} color={OV_COLORS.accent}/><span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted,letterSpacing:2}}>CURRENCY EXPOSURE</span>
+            </div>
+            <OvExposureRings exposure={exposure}/>
+          </div>
+          <div style={{animation:'fadeSlideUp 0.4s ease 500ms both'}}><OvAIPanel/></div>
         </div>
       </div>
 
-      {/* ROW 5 — TOP SIGNALS */}
-      {highTier.length>0&&<div style={{background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:12,padding:isMobile?14:18}}>
-        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}>
-          <span style={{fontSize:14}}>🎯</span>
-          <span style={{fontFamily:orb,fontSize:10,color:'#00ff9f',letterSpacing:2,fontWeight:700}}>HIGH CONVICTION</span>
-          <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>({highTier.length})</span>
-        </div>
-        <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(auto-fill,minmax(200px,1fr))',gap:8}}>
-          {highTier.slice(0,6).map(row=>{
-            const gap=row.gap??0;const bias=biasFromGap(gap);const cf=confidenceMap[row.symbol];const conf=cf?.confidence||0;const cs=confStyle(conf);
-            const edge=cf?.historical?.flag;const mom=trends[row.symbol]?.momentum||'';const tags=getTags(row);
-            return <div key={row.symbol} onClick={()=>onSelectPair(row)} style={{padding:'10px 14px',background:'rgba(0,255,159,0.03)',border:'1px solid rgba(0,255,159,0.12)',borderRadius:10,cursor:'pointer',transition:'all 0.2s',display:'flex',flexDirection:'column',gap:6}} onMouseOver={e=>e.currentTarget.style.borderColor='rgba(0,255,159,0.35)'} onMouseOut={e=>e.currentTarget.style.borderColor='rgba(0,255,159,0.12)'}>
-              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                <span style={{fontFamily:orb,fontSize:13,fontWeight:700,color:'var(--text-primary)'}}>{row.symbol}</span>
-                <span style={{fontFamily:mono,fontSize:11,color:bias.color,fontWeight:700}}>{gap>0?'+':''}{Number(gap).toFixed(1)}</span>
-              </div>
-              <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
-                <span style={{fontFamily:mono,fontSize:9,color:bias.color,background:bias.bg,border:`1px solid ${bias.border}`,borderRadius:3,padding:'1px 6px'}}>{bias.label}</span>
-                <span style={{fontFamily:mono,fontSize:9,color:cs.color,background:cs.bg,border:`1px solid ${cs.border}`,borderRadius:3,padding:'1px 6px'}}>{conf}</span>
-                <span style={{fontFamily:mono,fontSize:8,color:momColors[mom]||'#3a4568',letterSpacing:1}}>{mom}</span>
-              </div>
-              {tags.length>0&&<div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
-                {tags.map(t=><span key={t.label} style={{fontFamily:mono,fontSize:7,color:t.color,background:t.bg,borderRadius:3,padding:'1px 5px',letterSpacing:1}}>{t.label}</span>)}
-              </div>}
-            </div>;
-          })}
-        </div>
-      </div>}
+      {/* ROW 4 — TRACKER SUMMARY */}
+      <OvTrackerSummary trackers={trackers} closed={closedTrackers}/>
 
-      {/* ROW 5B — MID TIER (collapsed) */}
-      {midTier.length>0&&<div style={{background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:12,padding:isMobile?14:18}}>
-        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
-          <span style={{fontSize:14}}>📋</span>
-          <span style={{fontFamily:orb,fontSize:10,color:'#ffd166',letterSpacing:2,fontWeight:700}}>MID CONVICTION</span>
-          <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>({midTier.length})</span>
-        </div>
-        <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-          {midTier.slice(0,12).map(row=>{
-            const gap=row.gap??0;const bias=biasFromGap(gap);
-            return <div key={row.symbol} onClick={()=>onSelectPair(row)} style={{padding:'6px 12px',background:'rgba(255,209,102,0.04)',border:'1px solid rgba(255,209,102,0.12)',borderRadius:8,cursor:'pointer',display:'flex',alignItems:'center',gap:8,transition:'all 0.2s'}} onMouseOver={e=>e.currentTarget.style.borderColor='rgba(255,209,102,0.35)'} onMouseOut={e=>e.currentTarget.style.borderColor='rgba(255,209,102,0.12)'}>
-              <span style={{fontFamily:orb,fontSize:11,fontWeight:700,color:'var(--text-primary)'}}>{row.symbol}</span>
-              <span style={{fontFamily:mono,fontSize:10,color:bias.color,fontWeight:700}}>{gap>0?'+':''}{Number(gap).toFixed(1)}</span>
-              <span style={{fontFamily:mono,fontSize:8,color:bias.color,background:bias.bg,border:`1px solid ${bias.border}`,borderRadius:3,padding:'0px 5px'}}>{bias.label}</span>
-            </div>;
-          })}
-        </div>
-      </div>}
-
-      {/* ROW 6 — ACTIVE TRACKERS */}
-      {trackers.length>0&&<div style={{background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:12,padding:isMobile?14:18}}>
-        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}>
-          <span style={{fontSize:14}}>📡</span>
-          <span style={{fontFamily:orb,fontSize:10,color:'#00b4ff',letterSpacing:2,fontWeight:700}}>ACTIVE TRACKERS</span>
-          <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>({trackers.length})</span>
-        </div>
-        <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(auto-fill,minmax(180px,1fr))',gap:8}}>
-          {trackers.slice(0,8).map(tk=>{
-            const bias=tk.direction==='BUY'?{color:'#00ff9f',bg:'rgba(0,255,159,0.08)'}:{color:'#ff4d6d',bg:'rgba(255,77,109,0.08)'};
-            const age=tk.opened_at?Math.round((Date.now()-new Date(tk.opened_at).getTime())/3600000):0;
-            return <div key={tk.id||tk.symbol} style={{padding:'8px 12px',background:bias.bg,border:`1px solid ${bias.color}20`,borderRadius:8}}>
-              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
-                <span style={{fontFamily:orb,fontSize:12,fontWeight:700,color:'var(--text-primary)'}}>{tk.symbol}</span>
-                <span style={{fontFamily:mono,fontSize:9,color:bias.color,fontWeight:700}}>{tk.direction}</span>
-              </div>
-              <div style={{display:'flex',alignItems:'center',gap:8}}>
-                <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>Gap: {Number(tk.gap_at_open||0).toFixed(1)}</span>
-                <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>Peak: {Number(tk.peak_gap||0).toFixed(1)}</span>
-                {age>0&&<span style={{fontFamily:mono,fontSize:8,color:'#00b4ff'}}>{age}h</span>}
-              </div>
-            </div>;
-          })}
-        </div>
-      </div>}
-
-      {/* ROW 7 — STRONGEST SIGNAL HIGHLIGHT */}
-      {strongest&&Math.abs(strongest.gap??0)>=5&&<div style={{padding:isMobile?'10px 14px':'12px 20px',background:'linear-gradient(135deg,rgba(0,180,255,0.06),rgba(124,58,237,0.06))',border:'1px solid rgba(0,180,255,0.15)',borderRadius:12,display:'flex',alignItems:isMobile?'flex-start':'center',gap:isMobile?10:20,flexDirection:isMobile?'column':'row',cursor:'pointer'}} onClick={()=>onSelectPair(strongest)}>
-        <div style={{display:'flex',alignItems:'center',gap:8}}>
-          <span style={{fontSize:18}}>👑</span>
-          <div>
-            <div style={{fontFamily:mono,fontSize:7,color:'var(--text-muted)',letterSpacing:2}}>STRONGEST SIGNAL</div>
-            <div style={{fontFamily:orb,fontSize:16,fontWeight:700,color:'var(--text-primary)'}}>{strongest.symbol}</div>
+      {/* SELECTED PAIR MODAL */}
+      {selectedPair&&<div onClick={()=>setSelectedPair(null)} style={{position:'fixed',inset:0,zIndex:2000,background:'rgba(0,0,0,0.7)',backdropFilter:'blur(8px)',display:'flex',alignItems:'center',justifyContent:'center',animation:'fadeIn 0.2s ease'}}>
+        <div onClick={e=>e.stopPropagation()} style={{...ovGlass,padding:28,maxWidth:480,width:'90%',background:OV_COLORS.bgCardSolid,border:`1px solid ${selectedPair.bias==='BUY'?OV_COLORS.buy+'40':selectedPair.bias==='SELL'?OV_COLORS.sell+'40':OV_COLORS.border}`,animation:'slideUpModal 0.3s ease'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:16}}>
+            <div><div style={{fontFamily:orb,fontSize:28,fontWeight:900,color:OV_COLORS.textPrimary,letterSpacing:3}}>{selectedPair.symbol}</div>
+              <span style={{fontFamily:mono,fontSize:12,fontWeight:700,color:selectedPair.bias==='BUY'?OV_COLORS.buy:selectedPair.bias==='SELL'?OV_COLORS.sell:OV_COLORS.textMuted,letterSpacing:2}}>{selectedPair.bias}</span></div>
+            <div style={{fontFamily:orb,fontSize:36,fontWeight:900,color:selectedPair.bias==='BUY'?OV_COLORS.buy:selectedPair.bias==='SELL'?OV_COLORS.sell:OV_COLORS.textMuted}}>{selectedPair.gap>0?'+':''}{Number(selectedPair.gap).toFixed(1)}</div>
           </div>
-        </div>
-        <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-          <span style={{fontFamily:mono,fontSize:13,color:biasFromGap(strongest.gap??0).color,fontWeight:700}}>{(strongest.gap??0)>0?'+':''}{Number(strongest.gap??0).toFixed(1)} GAP</span>
-          <span style={{fontFamily:mono,fontSize:10,color:biasFromGap(strongest.gap??0).color,background:biasFromGap(strongest.gap??0).bg,border:`1px solid ${biasFromGap(strongest.gap??0).border}`,borderRadius:4,padding:'2px 8px'}}>{biasFromGap(strongest.gap??0).label}</span>
-          {confidenceMap[strongest.symbol]&&<span style={{fontFamily:mono,fontSize:10,color:confStyle(confidenceMap[strongest.symbol].confidence).color,background:confStyle(confidenceMap[strongest.symbol].confidence).bg,border:`1px solid ${confStyle(confidenceMap[strongest.symbol].confidence).border}`,borderRadius:4,padding:'2px 8px'}}>CONF {confidenceMap[strongest.symbol].confidence}</span>}
-          <span style={{fontFamily:mono,fontSize:9,color:momColors[trends[strongest.symbol]?.momentum]||'#3a4568',letterSpacing:1}}>{trends[strongest.symbol]?.momentum||''}</span>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:16}}>
+            {[{l:'CONFIDENCE',v:`${selectedPair.conf}%`},{l:'MOMENTUM',v:selectedPair.momentum},{l:'PL ZONE',v:selectedPair.pl_zone},{l:'BOX H4',v:selectedPair.box_h4},{l:'BOX H1',v:selectedPair.box_h1},{l:'PDR',v:selectedPair.pdr_strong?`STRONG (${Number(selectedPair.pdr_strength||0).toFixed(2)})`:`WEAK (${Number(selectedPair.pdr_strength||0).toFixed(2)})`}].map(item=><div key={item.l}>
+              <div style={{fontFamily:mono,fontSize:7,color:OV_COLORS.textMuted,letterSpacing:2,marginBottom:2}}>{item.l}</div>
+              <div style={{fontFamily:raj,fontSize:14,color:OV_COLORS.textSecondary}}>{item.v}</div>
+            </div>)}
+          </div>
+          <button onClick={()=>setSelectedPair(null)} style={{marginTop:16,width:'100%',padding:'10px 0',fontFamily:mono,fontSize:10,color:OV_COLORS.textMuted,background:'rgba(255,255,255,0.04)',border:`1px solid ${OV_COLORS.border}`,borderRadius:6,cursor:'pointer',letterSpacing:2}}>CLOSE</button>
         </div>
       </div>}
 
+      </div>
+      {/* CSS Animations */}
+      <style jsx>{`
+        @keyframes fadeSlideUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+        @keyframes slideUpModal { from { opacity:0; transform:translateY(20px) scale(0.97); } to { opacity:1; transform:translateY(0) scale(1); } }
+        @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+      `}</style>
     </div>
   );
 }
+
 
 const TABS = ['OVERVIEW','PANELS','SIGNALS','TABLE','GAP CHART','RESEARCH','CALCULATOR','SETUPS','VALID PAIRS','CHART','ANALYTICS','LOGS','PANDA AI'];
 // Maps each tab to the feature_access key that controls it
