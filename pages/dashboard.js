@@ -2178,10 +2178,8 @@ function OvMomentumBar({ pairs }) {
 }
 
 function OvAIPanel() {
-  const [reply,setReply]=useState(null);const [loading,setLoading]=useState(false);const [error,setError]=useState(null);const fetched=useRef(false);const [expanded,setExpanded]=useState(false);
+  const [reply,setReply]=useState(null);const [loading,setLoading]=useState(false);const [error,setError]=useState(null);const [expanded,setExpanded]=useState(false);
   async function fetchInsight(){setLoading(true);setError(null);try{const r=await fetch('/api/ai-chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'insights'})});const d=await r.json();if(r.ok&&d.reply){setReply(d.reply);}else setError(d.error||'Failed');}catch{setError('Connection error');}setLoading(false);}
-  useEffect(()=>{if(!fetched.current){fetched.current=true;fetchInsight();}},[]); // eslint-disable-line
-  // Extract short bullets from AI reply
   function parseBullets(text){if(!text)return[];const clean=text.replace(/\*\*/g,'').replace(/^[\*\-\•#]+\s*/gm,'');const sentences=clean.split(/(?<=[.!?])\s+/).filter(s=>s.trim().length>10);return sentences.slice(0,4).map(s=>s.length>120?s.slice(0,117)+'...':s);}
   const bullets=parseBullets(reply);
   return <div style={{...ovGlass,padding:'12px 14px',borderColor:`${OV_COLORS.ai}25`,background:`linear-gradient(135deg,${OV_COLORS.aiDim},${OV_COLORS.bgCard})`}}>
@@ -2193,6 +2191,7 @@ function OvAIPanel() {
     </div>
     {loading&&<div style={{padding:'8px 0',textAlign:'center'}}><span style={{fontFamily:mono,fontSize:9,color:OV_COLORS.ai}}>🐼 Analyzing...</span></div>}
     {error&&!loading&&<div style={{fontFamily:mono,fontSize:10,color:OV_COLORS.sell,padding:'4px 0'}}>⚠️ {error}</div>}
+    {!reply&&!loading&&!error&&<div style={{padding:'10px 0',textAlign:'center'}}><button onClick={fetchInsight} style={{fontFamily:mono,fontSize:9,color:OV_COLORS.ai,background:`${OV_COLORS.ai}10`,border:`1px solid ${OV_COLORS.ai}30`,borderRadius:6,padding:'8px 20px',cursor:'pointer',letterSpacing:2}}>🐼 ANALYZE MARKET</button></div>}
     {bullets.length>0&&!loading&&<div style={{display:'flex',flexDirection:'column',gap:6}}>
       {(expanded?bullets:bullets.slice(0,2)).map((b,i)=><div key={i} style={{display:'flex',gap:6,alignItems:'flex-start'}}>
         <span style={{fontFamily:mono,fontSize:10,color:OV_COLORS.ai,marginTop:2,flexShrink:0}}>{i===0?'📊':i===1?'🎯':'⚠️'}</span>
@@ -2262,7 +2261,6 @@ function OvTrackerSummary({ trackers, closed }) {
 }
 
 function OverviewTab({ data, trends, pdrData, upcomingNews, spikes, confidenceMap, memoryIndex, onSelectPair, isMobile, lastUpdate }) {
-  const [selectedPair,setSelectedPair]=useState(null);
   const [trackers,setTrackers]=useState([]);
   const [closedTrackers,setClosedTrackers]=useState([]);
   const [time,setTime]=useState(new Date());
@@ -2311,6 +2309,9 @@ function OverviewTab({ data, trends, pdrData, upcomingNews, spikes, confidenceMa
   const spikeC=spikes?.length||0;const momBuild=strongMom;const closeAlerts=pairs.filter(p=>['FADING','REVERSING'].includes(p.momentum)&&Math.abs(p.gap)>=5).length;
   const strongest=pairs[0];
 
+  // Find original data row for PairCardModal
+  const findRow = (sym) => data.find(r=>r.symbol===sym);
+
   return (
     <div style={{color:OV_COLORS.textPrimary,fontFamily:raj,position:'relative'}}>
       {/* Background grid */}
@@ -2357,7 +2358,7 @@ function OverviewTab({ data, trends, pdrData, upcomingNews, spikes, confidenceMa
               <Shield size={12} color={OV_COLORS.buy}/><span style={{fontFamily:mono,fontSize:9,color:OV_COLORS.buy,letterSpacing:3,fontWeight:700}}>HIGH QUALITY</span><span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted}}>{highTier.length} pairs</span>
             </div>
             <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(auto-fill,minmax(280px,1fr))',gap:12}}>
-              {highTier.map((p,i)=><OvSignalCard key={p.symbol} pair={p} tier="HIGH" onClick={()=>{setSelectedPair(p);if(onSelectPair)onSelectPair(p);}} delay={i*80}/>)}
+              {highTier.map((p,i)=><OvSignalCard key={p.symbol} pair={p} tier="HIGH" onClick={()=>{const r=findRow(p.symbol);if(r)onSelectPair(r);}} delay={i*80}/>)}
             </div>
           </div>}
           {midTier.length>0&&<div>
@@ -2365,7 +2366,7 @@ function OverviewTab({ data, trends, pdrData, upcomingNews, spikes, confidenceMa
               <Eye size={12} color={OV_COLORS.textSecondary}/><span style={{fontFamily:mono,fontSize:9,color:OV_COLORS.textSecondary,letterSpacing:3}}>MID QUALITY</span><span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted}}>{midTier.length} pairs</span>
             </div>
             <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(auto-fill,minmax(240px,1fr))',gap:10}}>
-              {midTier.map((p,i)=><OvSignalCard key={p.symbol} pair={p} tier="MID" onClick={()=>{setSelectedPair(p);if(onSelectPair)onSelectPair(p);}} delay={i*60+300}/>)}
+              {midTier.map((p,i)=><OvSignalCard key={p.symbol} pair={p} tier="MID" onClick={()=>{const r=findRow(p.symbol);if(r)onSelectPair(r);}} delay={i*60+300}/>)}
             </div>
           </div>}
           {lowTier.length>0&&<div>
@@ -2373,7 +2374,7 @@ function OverviewTab({ data, trends, pdrData, upcomingNews, spikes, confidenceMa
               <Radio size={10} color={OV_COLORS.textMuted}/><span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted,letterSpacing:2}}>LOW QUALITY / INACTIVE</span><span style={{fontFamily:mono,fontSize:7,color:OV_COLORS.textMuted}}>{lowTier.length}</span>
             </div>
             <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(auto-fill,minmax(170px,1fr))',gap:6}}>
-              {lowTier.map((p,i)=><OvSignalCard key={p.symbol} pair={p} tier="LOW" onClick={()=>{setSelectedPair(p);if(onSelectPair)onSelectPair(p);}} delay={i*40+500}/>)}
+              {lowTier.map((p,i)=><OvSignalCard key={p.symbol} pair={p} tier="LOW" onClick={()=>{const r=findRow(p.symbol);if(r)onSelectPair(r);}} delay={i*40+500}/>)}
             </div>
           </div>}
           <OvMomentumBar pairs={pairs}/>
@@ -2400,24 +2401,6 @@ function OverviewTab({ data, trends, pdrData, upcomingNews, spikes, confidenceMa
 
       {/* ROW 4 — TRACKER SUMMARY */}
       <OvTrackerSummary trackers={trackers} closed={closedTrackers}/>
-
-      {/* SELECTED PAIR MODAL */}
-      {selectedPair&&<div onClick={()=>setSelectedPair(null)} style={{position:'fixed',inset:0,zIndex:2000,background:'rgba(0,0,0,0.7)',backdropFilter:'blur(8px)',display:'flex',alignItems:'center',justifyContent:'center',animation:'fadeIn 0.2s ease'}}>
-        <div onClick={e=>e.stopPropagation()} style={{...ovGlass,padding:28,maxWidth:480,width:'90%',background:OV_COLORS.bgCardSolid,border:`1px solid ${selectedPair.bias==='BUY'?OV_COLORS.buy+'40':selectedPair.bias==='SELL'?OV_COLORS.sell+'40':OV_COLORS.border}`,animation:'slideUpModal 0.3s ease'}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:16}}>
-            <div><div style={{fontFamily:orb,fontSize:28,fontWeight:900,color:OV_COLORS.textPrimary,letterSpacing:3}}>{selectedPair.symbol}</div>
-              <span style={{fontFamily:mono,fontSize:12,fontWeight:700,color:selectedPair.bias==='BUY'?OV_COLORS.buy:selectedPair.bias==='SELL'?OV_COLORS.sell:OV_COLORS.textMuted,letterSpacing:2}}>{selectedPair.bias}</span></div>
-            <div style={{fontFamily:orb,fontSize:36,fontWeight:900,color:selectedPair.bias==='BUY'?OV_COLORS.buy:selectedPair.bias==='SELL'?OV_COLORS.sell:OV_COLORS.textMuted}}>{selectedPair.gap>0?'+':''}{Number(selectedPair.gap).toFixed(1)}</div>
-          </div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:16}}>
-            {[{l:'CONFIDENCE',v:`${selectedPair.conf}%`},{l:'MOMENTUM',v:selectedPair.momentum},{l:'PL ZONE',v:selectedPair.pl_zone},{l:'BOX H4',v:selectedPair.box_h4},{l:'BOX H1',v:selectedPair.box_h1},{l:'PDR',v:selectedPair.pdr_strong?`STRONG (${Number(selectedPair.pdr_strength||0).toFixed(2)})`:`WEAK (${Number(selectedPair.pdr_strength||0).toFixed(2)})`}].map(item=><div key={item.l}>
-              <div style={{fontFamily:mono,fontSize:7,color:OV_COLORS.textMuted,letterSpacing:2,marginBottom:2}}>{item.l}</div>
-              <div style={{fontFamily:raj,fontSize:14,color:OV_COLORS.textSecondary}}>{item.v}</div>
-            </div>)}
-          </div>
-          <button onClick={()=>setSelectedPair(null)} style={{marginTop:16,width:'100%',padding:'10px 0',fontFamily:mono,fontSize:10,color:OV_COLORS.textMuted,background:'rgba(255,255,255,0.04)',border:`1px solid ${OV_COLORS.border}`,borderRadius:6,cursor:'pointer',letterSpacing:2}}>CLOSE</button>
-        </div>
-      </div>}
 
       </div>
       {/* CSS Animations */}
