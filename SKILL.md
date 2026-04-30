@@ -7,7 +7,6 @@
 > Last updated: April 25, 2026
 
 ---
-
 ## 1. FILE MAP
 
 ### Engine (Python/FastAPI — local PC, future VPS)

@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Head from 'next/head';
-import ThemeToggle from '../components/ThemeToggle';
 
 const mono = "'Share Tech Mono',monospace";
 const orb  = "'Orbitron',sans-serif";
@@ -353,7 +352,6 @@ export default function JournalPage() {
             <div><div style={{fontFamily:orb,fontWeight:900,fontSize:13,letterSpacing:4,color:'#ffd166'}}>TRADE JOURNAL</div><div style={{fontFamily:mono,fontSize:8,letterSpacing:3,color:'var(--text-muted)'}}>{user?.username} · {user?.role?.toUpperCase()}</div></div>
           </div>
           <div style={{display:'flex',gap:7,alignItems:'center'}}>
-            <ThemeToggle />
             <button onClick={()=>window.location.href='/dashboard'} style={{background:'rgba(0,255,159,0.08)',border:'1px solid #00ff9f44',borderRadius:5,color:'#00ff9f',fontFamily:mono,fontSize:9,padding:'5px 10px',cursor:'pointer'}}>DASHBOARD</button>
             {isAdmin&&<button onClick={()=>window.location.href='/admin'} style={{background:'rgba(255,209,102,0.08)',border:'1px solid #ffd16644',borderRadius:5,color:'#ffd166',fontFamily:mono,fontSize:9,padding:'5px 10px',cursor:'pointer'}}>ADMIN</button>}
           </div>

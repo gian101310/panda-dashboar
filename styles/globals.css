@@ -33,38 +33,6 @@
   --glow-green:    radial-gradient(circle, rgba(0,255,159,0.06) 0%, transparent 70%);
 }
 
-/* ===== LIGHT THEME ===== */
-[data-theme="light"] {
-  --bg-primary:    #f0f2f5;
-  --bg-secondary:  #e8eaed;
-  --bg-card:       #ffffff;
-  --bg-hover:      #dde0e6;
-  --border:        #d0d4dc;
-  --border-bright: #b0b8c8;
-
-  --text-primary:  #1a1f2e;
-  --text-secondary:#4a5568;
-  --text-muted:    #8896aa;
-
-  --accent:        #00aa6e;
-  --accent-dim:    rgba(0,170,110,0.12);
-  --accent-glow:   rgba(0,170,110,0.3);
-
-  --buy:           #00aa6e;
-  --sell:          #e03050;
-  --warn:          #d4960a;
-  --invalid:       #cc5522;
-  --hard-invalid:  #cc6622;
-
-  --scrollbar-track: #e8eaed;
-  --scrollbar-thumb: #b0b8c8;
-
-  --shadow:        0 4px 24px rgba(0,0,0,0.10);
-  --shadow-card:   0 2px 12px rgba(0,0,0,0.07);
-  --grid-line:     rgba(0,100,180,0.05);
-  --glow-green:    radial-gradient(circle, rgba(0,170,110,0.05) 0%, transparent 70%);
-}
-
 /* ===== BASE RESET ===== */
 *, *::before, *::after {
   box-sizing: border-box;

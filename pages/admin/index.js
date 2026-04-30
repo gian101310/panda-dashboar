@@ -4,16 +4,17 @@ import Head from 'next/head';
 const mono = "'Share Tech Mono', monospace";
 // ── TAB ACCESS ──
 const ALL_FEATURES = [
-  'panels','table','setups','valid_pairs','spike_log','signal_log',
+  'overview','panels','table','setups','valid_pairs','spike_log','signal_log',
   'signals','gap_chart','analytics','panda_ai',
   'cot','calendar','calculator','journal','engine',
   'heatmap','spike_banner',
 ];
 const FEATURE_GROUPS = {
-  'TABS': ['panels','table','setups','valid_pairs','spike_log','signal_log','signals','gap_chart','analytics','panda_ai','cot','calendar','calculator','journal','engine'],
+  'TABS': ['overview','panels','table','setups','valid_pairs','spike_log','signal_log','signals','gap_chart','analytics','panda_ai','cot','calendar','calculator','journal','engine'],
   'WIDGETS': ['heatmap','spike_banner'],
 };
 const FEATURE_LABELS = {
+  overview:     '🏠 OVERVIEW tab',
   panels:       '📊 PANELS tab',
   table:        '📋 TABLE tab',
   setups:       '🎯 SETUPS tab',
@@ -33,9 +34,9 @@ const FEATURE_LABELS = {
   spike_banner: '🔔 Spike Banner widget',
 };
 const ROLE_DEFAULTS = {
-  user:  ['panels','gap_chart','cot','calendar','calculator','heatmap','spike_banner'],
-  vip:   ['panels','table','setups','valid_pairs','spike_log','signal_log','signals','gap_chart','analytics','panda_ai','cot','calendar','calculator','heatmap','spike_banner'],
-  admin: ['panels','table','setups','valid_pairs','spike_log','signal_log','signals','gap_chart','analytics','panda_ai','cot','calendar','calculator','journal','engine','heatmap','spike_banner'],
+  user:  ['overview','panels','gap_chart','cot','calendar','calculator','heatmap','spike_banner'],
+  vip:   ['overview','panels','table','setups','valid_pairs','spike_log','signal_log','signals','gap_chart','analytics','panda_ai','cot','calendar','calculator','heatmap','spike_banner'],
+  admin: ['overview','panels','table','setups','valid_pairs','spike_log','signal_log','signals','gap_chart','analytics','panda_ai','cot','calendar','calculator','journal','engine','heatmap','spike_banner'],
 };
 const orb = "'Orbitron', sans-serif";
 const raj = "'Rajdhani', sans-serif";

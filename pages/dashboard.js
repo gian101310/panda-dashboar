@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Head from 'next/head';
-import ThemeToggle from '../components/ThemeToggle';
+
 import { AreaChart, Area, ResponsiveContainer } from 'recharts';
 import { TrendingUp, AlertTriangle, Shield, Zap, Activity, Eye, Radio, Brain, Crosshair, Gauge } from 'lucide-react';
 
@@ -696,23 +696,8 @@ function GapChart() {
   const [charts,setCharts]=useState({});
   const [loading,setLoading]=useState(false);
   const [hover,setHover]=useState(null);
-  const [showAllPairs,setShowAllPairs]=useState(false);
   const svgRef=useRef(null);
   const COLORS=['#00b4ff','#00ff9f','#ffd166','#ff4d6d','#ff9944','#cc77ff','#ff77cc','#77ffcc','#ffcc77','#4499ff','#ff9977','#99ff77'];
-
-  async function loadAllPairs() {
-    setShowAllPairs(true);setLoading(true);setCharts({});
-    const allTf='ALL';
-    await Promise.all(ALL_PAIRS.map(async(sym)=>{
-      try{
-        const res=await fetch(`/api/gap-chart?symbol=${sym}&timeframe=${allTf}`);
-        if(!res.ok) return;
-        const d=await res.json();
-        setCharts(prev=>({...prev,[sym]:d}));
-      }catch{}
-    }));
-    setLoading(false);
-  }
 
   async function loadSymbol(sym) {
     try {
@@ -757,29 +742,25 @@ function GapChart() {
     <div style={{background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:10,padding:'16px 18px',display:'flex',flexDirection:'column',gap:12}}>
       <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
         <div style={{fontFamily:orb,fontSize:12,fontWeight:700,color:'#00b4ff',letterSpacing:3}}>GAP HISTORY CHART</div>
-        <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>SELECT PAIRS · OR LOAD ALL HISTORY</span>
+        <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>SELECT UP TO 3 PAIRS</span>
         <div style={{display:'flex',gap:4,marginLeft:'auto'}}>
           {TFS.map(t=><button key={t} onClick={()=>setTf(t)} style={{background:tf===t?'rgba(0,180,255,0.15)':'transparent',border:`1px solid ${tf===t?'#00b4ff':'var(--border)'}`,borderRadius:4,color:tf===t?'#00b4ff':'var(--text-muted)',fontFamily:mono,fontSize:9,padding:'4px 9px',cursor:'pointer'}}>{t}</button>)}
         </div>
       </div>
-      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:2}}>
-        <button onClick={loadAllPairs} style={{background:showAllPairs?'rgba(255,209,102,0.15)':'rgba(0,180,255,0.06)',border:`1px solid ${showAllPairs?'#ffd166':'rgba(0,180,255,0.4)'}`,borderRadius:5,color:showAllPairs?'#ffd166':'#00b4ff',fontFamily:mono,fontSize:9,letterSpacing:1,padding:'5px 12px',cursor:'pointer',fontWeight:700}}>ALL PAIRS (FULL HISTORY)</button>
-        {showAllPairs&&<button onClick={()=>{setShowAllPairs(false);setCharts({});}} style={{background:'transparent',border:'1px solid var(--border)',borderRadius:5,color:'var(--text-muted)',fontFamily:mono,fontSize:8,padding:'4px 10px',cursor:'pointer'}}>CLEAR</button>}
-      </div>
       <div style={{display:'flex',flexWrap:'wrap',gap:5}}>
-        {ALL_PAIRS.map((s,i)=>{const active=symbols.includes(s);const ci=symbols.indexOf(s);const col=active?COLORS[ci]:'var(--border)';return <button key={s} onClick={()=>{setShowAllPairs(false);toggleSymbol(s);}} style={{background:active?col+'18':'transparent',border:`1px solid ${col}`,borderRadius:4,color:active?col:'var(--text-muted)',fontFamily:mono,fontSize:9,padding:'3px 8px',cursor:'pointer',fontWeight:active?700:400}}>{s}</button>;})}
+        {ALL_PAIRS.map((s,i)=>{const active=symbols.includes(s);const ci=symbols.indexOf(s);const col=active?COLORS[ci]:'var(--border)';return <button key={s} onClick={()=>toggleSymbol(s)} style={{background:active?col+'18':'transparent',border:`1px solid ${col}`,borderRadius:4,color:active?col:'var(--text-muted)',fontFamily:mono,fontSize:9,padding:'3px 8px',cursor:'pointer',fontWeight:active?700:400}}>{s}</button>;})}
       </div>
       <div style={{display:'flex',gap:14,flexWrap:'wrap'}}>
-        {(showAllPairs?ALL_PAIRS.filter(s=>charts[s]?.data?.length>0):symbols).map((s,i)=>{const trend=charts[s]?.trend||'STABLE';return(<div key={s} style={{display:'flex',alignItems:'center',gap:6}}><div style={{width:18,height:3,background:COLORS[i],borderRadius:2}}/><span style={{fontFamily:orb,fontSize:11,fontWeight:700,color:COLORS[i]}}>{s}</span><TrendArrow trend={trend} size={13}/><span style={{fontFamily:mono,fontSize:9,color:trend==='STRONGER'?'#00ff9f':trend==='WEAKER'?'#ff4d6d':'var(--text-muted)'}}>{trend}</span></div>);})}
+        {symbols.map((s,i)=>{const trend=charts[s]?.trend||'STABLE';return(<div key={s} style={{display:'flex',alignItems:'center',gap:6}}><div style={{width:18,height:3,background:COLORS[i],borderRadius:2}}/><span style={{fontFamily:orb,fontSize:11,fontWeight:700,color:COLORS[i]}}>{s}</span><TrendArrow trend={trend} size={13}/><span style={{fontFamily:mono,fontSize:9,color:trend==='STRONGER'?'#00ff9f':trend==='WEAKER'?'#ff4d6d':'var(--text-muted)'}}>{trend}</span></div>);})}
       </div>
-      {hover&&<div style={{display:'flex',gap:16,padding:'6px 10px',background:'var(--bg-card)',borderRadius:6,border:'1px solid var(--border)',flexWrap:'wrap'}}><span style={{fontFamily:mono,fontSize:10,color:'var(--text-muted)'}}>{hover.ts}</span>{Object.entries(hover.vals).map(([s,v],i)=>{const arr=showAllPairs?ALL_PAIRS:symbols;return <span key={s} style={{fontFamily:mono,fontSize:10,color:COLORS[arr.indexOf(s)%COLORS.length],fontWeight:700}}>{s}: {v>0?'+':''}{v.toFixed(0)}</span>;})}</div>}
+      {hover&&<div style={{display:'flex',gap:16,padding:'6px 10px',background:'var(--bg-card)',borderRadius:6,border:'1px solid var(--border)',flexWrap:'wrap'}}><span style={{fontFamily:mono,fontSize:10,color:'var(--text-muted)'}}>{hover.ts}</span>{Object.entries(hover.vals).map(([s,v],i)=>{ return <span key={s} style={{fontFamily:mono,fontSize:10,color:COLORS[symbols.indexOf(s)%COLORS.length],fontWeight:700}}>{s}: {v>0?'+':''}{v.toFixed(0)}</span>;})}</div>}
       {loading?<div style={{display:'flex',alignItems:'center',justifyContent:'center',height:H}}><span style={{fontFamily:mono,fontSize:11,color:'var(--text-muted)',letterSpacing:2}}>LOADING...</span></div>:(
         <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} style={{width:'100%',height:'auto',cursor:'crosshair'}} onMouseMove={handleMouseMove} onMouseLeave={()=>setHover(null)}>
           {gridVals.map(g=><g key={g}><line x1={PAD.left} y1={toY(g)} x2={W-PAD.right} y2={toY(g)} stroke={g===0?'var(--text-muted)':g===5||g===-5?'#223344':'var(--border)'} strokeWidth={g===0?1.5:0.5} strokeDasharray={g===5||g===-5?'4,4':g===0?undefined:'2,4'}/><text x={PAD.left-5} y={toY(g)+4} fill={g===0?'var(--text-muted)':g===5?'#00ff9f66':g===-5?'#ff4d6d66':'var(--text-muted)'} fontSize={9} textAnchor="end" fontFamily={mono}>{g>0?'+':''}{g}</text></g>)}
           <rect x={PAD.left} y={toY(12)} width={cW} height={toY(5)-toY(12)} fill="rgba(0,255,159,0.03)"/>
           <rect x={PAD.left} y={toY(-5)} width={cW} height={toY(-12)-toY(-5)} fill="rgba(255,77,109,0.03)"/>
-          {(showAllPairs?ALL_PAIRS:symbols).map((s,ci)=>{const cd=charts[s]?.data;if(!cd||cd.length<2) return null;const col=COLORS[ci];const linePath=cd.map((d,i)=>`${i===0?'M':'L'}${toX(i,cd.length).toFixed(1)},${toY(parseFloat(d.gap)||0).toFixed(1)}`).join(' ');const fX=toX(0,cd.length).toFixed(1),lX=toX(cd.length-1,cd.length).toFixed(1);const aP=cd.map((d,i)=>`${i===0?'M':'L'}${toX(i,cd.length).toFixed(1)},${toY(Math.max(parseFloat(d.gap)||0,0)).toFixed(1)}`).join(' ')+` L${lX},${zeroY.toFixed(1)} L${fX},${zeroY.toFixed(1)} Z`;const bP=cd.map((d,i)=>`${i===0?'M':'L'}${toX(i,cd.length).toFixed(1)},${toY(Math.min(parseFloat(d.gap)||0,0)).toFixed(1)}`).join(' ')+` L${lX},${zeroY.toFixed(1)} L${fX},${zeroY.toFixed(1)} Z`;return(<g key={s}><path d={aP} fill={col+'14'}/><path d={bP} fill="#ff4d6d0a"/><path d={linePath} fill="none" stroke={col} strokeWidth="2" strokeLinejoin="round"/></g>);})}
-          {hover&&xData.length>0&&<><line x1={toX(hover.idx,xData.length)} y1={PAD.top} x2={toX(hover.idx,xData.length)} y2={H-PAD.bottom} stroke="#ffffff22" strokeWidth={1} strokeDasharray="3,3"/>{(showAllPairs?ALL_PAIRS:symbols).map((s,ci)=>{const cd=charts[s]?.data;if(!cd) return null;const ri=Math.round(hover.idx*(cd.length-1)/(xData.length-1||1));const g=parseFloat(cd[Math.min(ri,cd.length-1)]?.gap)||0;return <circle key={s} cx={toX(hover.idx,xData.length)} cy={toY(g)} r={4} fill={COLORS[ci]} stroke="#fff" strokeWidth={1.5}/>;})}</>}
+          {symbols.map((s,ci)=>{const cd=charts[s]?.data;if(!cd||cd.length<2) return null;const col=COLORS[ci];const linePath=cd.map((d,i)=>`${i===0?'M':'L'}${toX(i,cd.length).toFixed(1)},${toY(parseFloat(d.gap)||0).toFixed(1)}`).join(' ');const fX=toX(0,cd.length).toFixed(1),lX=toX(cd.length-1,cd.length).toFixed(1);const aP=cd.map((d,i)=>`${i===0?'M':'L'}${toX(i,cd.length).toFixed(1)},${toY(Math.max(parseFloat(d.gap)||0,0)).toFixed(1)}`).join(' ')+` L${lX},${zeroY.toFixed(1)} L${fX},${zeroY.toFixed(1)} Z`;const bP=cd.map((d,i)=>`${i===0?'M':'L'}${toX(i,cd.length).toFixed(1)},${toY(Math.min(parseFloat(d.gap)||0,0)).toFixed(1)}`).join(' ')+` L${lX},${zeroY.toFixed(1)} L${fX},${zeroY.toFixed(1)} Z`;return(<g key={s}><path d={aP} fill={col+'14'}/><path d={bP} fill="#ff4d6d0a"/><path d={linePath} fill="none" stroke={col} strokeWidth="2" strokeLinejoin="round"/></g>);})}
+          {hover&&xData.length>0&&<><line x1={toX(hover.idx,xData.length)} y1={PAD.top} x2={toX(hover.idx,xData.length)} y2={H-PAD.bottom} stroke="#ffffff22" strokeWidth={1} strokeDasharray="3,3"/>{symbols.map((s,ci)=>{const cd=charts[s]?.data;if(!cd) return null;const ri=Math.round(hover.idx*(cd.length-1)/(xData.length-1||1));const g=parseFloat(cd[Math.min(ri,cd.length-1)]?.gap)||0;return <circle key={s} cx={toX(hover.idx,xData.length)} cy={toY(g)} r={4} fill={COLORS[ci]} stroke="#fff" strokeWidth={1.5}/>;})}</>}
           {xData.filter((_,i)=>{const step=Math.max(1,Math.floor(xData.length/7));return i%step===0||i===xData.length-1;}).map(d=>{const i=xData.indexOf(d);return <text key={i} x={toX(i,xData.length)} y={H-PAD.bottom+14} fill="var(--text-muted)" fontSize={8} textAnchor="middle" fontFamily={mono}>{(d.timestamp||'').slice(5,16)}</text>;})}
         </svg>
       )}
@@ -2418,7 +2399,7 @@ function OverviewTab({ data, trends, pdrData, upcomingNews, spikes, confidenceMa
 const TABS = ['OVERVIEW','PANELS','SIGNALS','TABLE','GAP CHART','RESEARCH','CALCULATOR','SETUPS','VALID PAIRS','CHART','ANALYTICS','LOGS','PANDA AI'];
 // Maps each tab to the feature_access key that controls it
 const TAB_FEATURE = {
-  'OVERVIEW':    'panels',
+  'OVERVIEW':    'overview',
   'PANELS':      'panels',
   'SIGNALS':     'signals',
   'TABLE':       'table',

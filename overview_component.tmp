@@ -1,0 +1,202 @@
+// ===== OVERVIEW TAB =====
+function OverviewTab({ data, trends, pdrData, upcomingNews, spikes, confidenceMap, memoryIndex, onSelectPair, isMobile, lastUpdate }) {
+  const [aiReply, setAiReply] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState(null);
+  const [trackers, setTrackers] = useState([]);
+  const [closedTrackers, setClosedTrackers] = useState([]);
+  const aiFetched = useRef(false);
+
+  // Fetch AI insight on mount
+  useEffect(() => {
+    if (aiFetched.current) return;
+    aiFetched.current = true;
+    fetchAI();
+  }, []);
+  // Fetch trackers on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const [oR, cR] = await Promise.all([
+          fetch('/api/signal-tracker?status=OPEN').then(r=>r.json()),
+          fetch('/api/signal-tracker?status=CLOSED&limit=5').then(r=>r.json()),
+        ]);
+        setTrackers(oR.trackers || []);
+        setClosedTrackers(cR.trackers || []);
+      } catch {}
+    })();
+  }, []);
+
+  async function fetchAI() {
+    setAiLoading(true); setAiError(null);
+    try {
+      const r = await fetch('/api/ai-chat', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ mode:'insights' }) });
+      const d = await r.json();
+      if (r.ok && d.reply) setAiReply(d.reply);
+      else setAiError(d.error || 'Failed');
+    } catch { setAiError('Connection error'); }
+    setAiLoading(false);
+  }
+
+  // Parse AI reply into sections
+  function parseAI(text) {
+    if (!text) return null;
+    const lines = text.split('\n').filter(l=>l.trim());
+    let summary='', opportunity='', risk='', current='summary';
+    for (const line of lines) {
+      const lo = line.toLowerCase();
+      if (lo.includes('opportunit') || lo.includes('best setup') || lo.includes('top pick') || lo.includes('strongest')) { current='opportunity'; continue; }
+      if (lo.includes('risk') || lo.includes('avoid') || lo.includes('caution') || lo.includes('warning') || lo.includes('dead zone')) { current='risk'; continue; }
+      const clean = line.replace(/^[\*\-\•#]+\s*/, '').replace(/\*\*/g,'');
+      if (current==='summary') summary += (summary?' ':'')+clean;
+      else if (current==='opportunity') opportunity += (opportunity?' ':'')+clean;
+      else risk += (risk?' ':'')+clean;
+    }
+    if (!opportunity && !risk) return { summary:text.replace(/\*\*/g,''), opportunity:'', risk:'' };
+    return { summary, opportunity, risk };
+  }
+
+  // Session info with countdown
+  function getSessionFull() {
+    const now = new Date();
+    const h = now.getUTCHours(), m = now.getUTCMinutes(), total = h*60+m;
+    const sessions = [
+      { name:'SYDNEY', color:'#00b4ff', open:21*60, close:6*60 },
+      { name:'TOKYO', color:'#ffd166', open:23*60, close:8*60 },
+      { name:'LONDON', color:'#cc77ff', open:7*60, close:16*60 },
+      { name:'NEW YORK', color:'#00ff9f', open:12*60, close:21*60 },
+    ];
+    const isOn = (s) => s.open > s.close ? (total >= s.open || total < s.close) : (total >= s.open && total < s.close);
+    const active = sessions.filter(isOn);
+    let countdown = null;
+    if (active.length > 0) {
+      let closeMin = active[0].close;
+      if (active[0].open > active[0].close && total >= active[0].open) closeMin += 1440;
+      let diff = closeMin - total; if (diff<0) diff+=1440;
+      countdown = { h:Math.floor(diff/60), m:diff%60 };
+    }
+    return { sessions, active, isOn, countdown, total };
+  }
+
+  // Market mode
+  function getMarketMode() {
+    const valid = data.filter(r => Math.abs(r.gap??0) >= 5 && !r.hard_invalid);
+    const strongMom = Object.values(trends).filter(t=>['STRONG','BUILDING'].includes(t.momentum)).length;
+    const chaotic = Object.values(trends).filter(t=>['REVERSING','FADING'].includes(t.momentum)).length;
+    if (valid.length >= 6 && strongMom >= 4) return { mode:'TRENDING', color:'#00ff9f', bg:'rgba(0,255,159,0.08)' };
+    if (chaotic >= 4 || (valid.length >= 5 && strongMom <= 1)) return { mode:'CHAOTIC', color:'#ff4d6d', bg:'rgba(255,77,109,0.08)' };
+    return { mode:'RANGING', color:'#ffd166', bg:'rgba(255,209,102,0.08)' };
+  }
+
+  // Currency strength
+  function getCurrStrength() {
+    const str = {}, cnt = {};
+    ['USD','EUR','GBP','JPY','AUD','CAD','NZD'].forEach(c => { str[c]=0; cnt[c]=0; });
+    data.forEach(r => {
+      const b=r.symbol?.slice(0,3), q=r.symbol?.slice(3,6), g=r.gap??0;
+      if (b && str[b]!==undefined) { str[b]+=g; cnt[b]++; }
+      if (q && str[q]!==undefined) { str[q]-=g; cnt[q]++; }
+    });
+    return Object.entries(str).map(([c,v]) => {
+      const avg = cnt[c] ? v/cnt[c] : 0;
+      let flow = 'NEUTRAL';
+      if (avg > 2) flow='STRONG'; else if (avg > 0.5) flow='RISING';
+      else if (avg < -2) flow='WEAK'; else if (avg < -0.5) flow='FALLING';
+      return { currency:c, strength:avg, flow };
+    }).sort((a,b) => b.strength - a.strength);
+  }
+
+  // Exposure across valid signals
+  function getExposure() {
+    const exp = {};
+    ['USD','EUR','GBP','JPY','AUD','CAD','NZD'].forEach(c => exp[c]=0);
+    data.filter(r => r.bias==='BUY'||r.bias==='SELL').forEach(r => {
+      const b=r.symbol?.slice(0,3), q=r.symbol?.slice(3,6);
+      if (r.bias==='BUY') { exp[b]=(exp[b]||0)+1; exp[q]=(exp[q]||0)-1; }
+      else { exp[b]=(exp[b]||0)-1; exp[q]=(exp[q]||0)+1; }
+    });
+    return Object.entries(exp).map(([c,v]) => ({ currency:c, exposure:v, abs:Math.abs(v) })).sort((a,b)=>b.abs-a.abs);
+  }
+
+  // Tier classification
+  function getTier(row) {
+    const cf = confidenceMap[row.symbol];
+    const conf = cf?.confidence || 0;
+    const edge = cf?.historical?.flag;
+    const mom = trends[row.symbol]?.momentum || '';
+    if (conf >= 70 && edge !== 'DEAD_ZONE' && ['STRONG','BUILDING','SPARK'].includes(mom)) return 'HIGH';
+    if (conf >= 45 && edge !== 'DEAD_ZONE' && row.bias !== 'WAIT') return 'MID';
+    return 'LOW';
+  }
+
+  // Tags
+  function getTags(row) {
+    const tags = [];
+    const cf = confidenceMap[row.symbol];
+    const edge = cf?.historical?.flag;
+    if (edge === 'PROVEN_EDGE') tags.push({ label:'PROVEN', color:'#10B981', bg:'rgba(16,185,129,0.12)' });
+    if (edge === 'DEAD_ZONE') tags.push({ label:'DEAD ZONE', color:'#EF4444', bg:'rgba(239,68,68,0.12)' });
+    if (upcomingNews?.affected_pairs?.includes(row.symbol)) tags.push({ label:'NEWS', color:'#ffd166', bg:'rgba(255,209,102,0.10)' });
+    if ((cf?.confidence||0) < 40 && row.bias !== 'WAIT') tags.push({ label:'LOW CONF', color:'#ff8844', bg:'rgba(255,136,68,0.10)' });
+    if (cf?.conflict) tags.push({ label:'CONFLICT', color:'#ff4d6d', bg:'rgba(255,77,109,0.10)' });
+    return tags;
+  }
+
+  // Computed values
+  const sess = getSessionFull();
+  const mktMode = getMarketMode();
+  const currStr = getCurrStrength();
+  const exposure = getExposure();
+  const aiSections = parseAI(aiReply);
+  const sorted = [...data].sort((a,b) => (confidenceMap[b.symbol]?.confidence||0) - (confidenceMap[a.symbol]?.confidence||0));
+  const highTier = sorted.filter(r => getTier(r)==='HIGH');
+  const midTier = sorted.filter(r => getTier(r)==='MID');
+  const lowTier = sorted.filter(r => getTier(r)==='LOW');
+  const validPairs = data.filter(r => Math.abs(r.gap??0)>=5 && !r.hard_invalid && !isNeutralMatchup(r));
+  const buyC = validPairs.filter(r=>(r.gap??0)>=5).length;
+  const sellC = validPairs.filter(r=>(r.gap??0)<=-5).length;
+  const spikeC = spikes?.length || 0;
+  const momBuild = Object.values(trends).filter(t=>['STRONG','BUILDING'].includes(t.momentum)).length;
+  const closeAlertC = Object.values(trends).filter(t=>t.closeAlert).length;
+  const strongest = sorted[0];
+  const momStates = ['STRONG','BUILDING','SPARK','EMERGING','STABLE','CONSOLIDATING','COOLING','FADING','REVERSING','NEUTRAL'];
+  const momColors = { STRONG:'#00ff9f', BUILDING:'#66ffcc', SPARK:'#ffd166', EMERGING:'#66ffcc', STABLE:'#6b7fa8', CONSOLIDATING:'#5a6d8a', COOLING:'#ffaa44', FADING:'#ff7744', REVERSING:'#ff4d6d', NEUTRAL:'#3a4568' };
+  const momCounts = {};
+  momStates.forEach(s => momCounts[s] = Object.values(trends).filter(t=>t.momentum===s).length);
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:isMobile?14:20}}>
+
+      {/* ROW 1 — MARKET PULSE BAR */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:16,padding:isMobile?'10px 14px':'12px 20px',background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:12,flexWrap:'wrap'}}>
+        {/* Left — Session pills */}
+        <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+          <div style={{display:'flex',alignItems:'center',gap:6}}>
+            <div style={{width:8,height:8,borderRadius:'50%',background:isMarketOpen()?'#00ff9f':'#ff4d6d',boxShadow:`0 0 10px ${isMarketOpen()?'#00ff9f':'#ff4d6d'}`,animation:'blink 2s infinite'}}/>
+            <span style={{fontFamily:mono,fontSize:10,color:isMarketOpen()?'#00ff9f':'#ff4d6d',letterSpacing:2,fontWeight:700}}>{isMarketOpen()?'LIVE':'CLOSED'}</span>
+          </div>
+          {sess.sessions.map(s => {
+            const on = sess.isOn(s);
+            return <div key={s.name} style={{display:'flex',alignItems:'center',gap:4,padding:'4px 10px',borderRadius:6,background:on?s.color+'15':'rgba(255,255,255,0.02)',border:`1px solid ${on?s.color+'40':'rgba(255,255,255,0.04)'}`,transition:'all 0.3s'}}>
+              <div style={{width:6,height:6,borderRadius:'50%',background:on?s.color:'rgba(255,255,255,0.1)',boxShadow:on?`0 0 6px ${s.color}`:'none'}}/>
+              <span style={{fontFamily:mono,fontSize:isMobile?7:9,fontWeight:on?700:400,color:on?s.color:'rgba(255,255,255,0.25)',letterSpacing:1}}>{s.name}</span>
+            </div>;
+          })}
+          {sess.active.length>1&&<span style={{fontFamily:mono,fontSize:8,color:'#ffd166',background:'rgba(255,209,102,0.08)',border:'1px solid rgba(255,209,102,0.25)',borderRadius:4,padding:'2px 6px',fontWeight:700}}>OVERLAP</span>}
+        </div>
+        {/* Right — Mode + Countdown + News */}
+        <div style={{display:'flex',alignItems:'center',gap:12}}>
+          {sess.countdown&&<div style={{textAlign:'center'}}>
+            <div style={{fontFamily:mono,fontSize:7,color:'var(--text-muted)',letterSpacing:1}}>NEXT CLOSE</div>
+            <div style={{fontFamily:orb,fontSize:13,fontWeight:700,color:'#00b4ff'}}>{sess.countdown.h}h {sess.countdown.m}m</div>
+          </div>}
+          <div style={{padding:'5px 12px',borderRadius:6,background:mktMode.bg,border:`1px solid ${mktMode.color}30`}}>
+            <span style={{fontFamily:mono,fontSize:9,color:mktMode.color,fontWeight:700,letterSpacing:2}}>{mktMode.mode}</span>
+          </div>
+          {upcomingNews?.events?.length>0&&<div style={{display:'flex',alignItems:'center',gap:4,padding:'5px 10px',borderRadius:6,background:'rgba(255,77,109,0.08)',border:'1px solid rgba(255,77,109,0.25)'}}>
+            <span style={{fontFamily:mono,fontSize:9,color:'#ff4d6d',fontWeight:700}}>📰 {upcomingNews.events.length} NEWS</span>
+          </div>}
+          {lastUpdate&&<span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>{formatTime(lastUpdate)}</span>}
+        </div>
+      </div>
+

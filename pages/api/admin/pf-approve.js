@@ -24,9 +24,9 @@ async function pfSendUserDM(tgUsername, text) {
 }
 
 const PF_TIER_FEATURES = {
-  starter: ['signals','calendar','calculator','cot'],
-  pro:     ['signals','table','gap_chart','calendar','calculator','cot','setups','spike_log','panda_ai'],
-  elite:   ['signals','table','gap_chart','calendar','calculator','cot','setups','spike_log','signal_log','alerts','journal','panels','analytics','valid_pairs','panda_ai']
+  starter: ['overview','signals','calendar','calculator','cot'],
+  pro:     ['overview','signals','table','gap_chart','calendar','calculator','cot','setups','spike_log','panda_ai'],
+  elite:   ['overview','signals','table','gap_chart','calendar','calculator','cot','setups','spike_log','signal_log','alerts','journal','panels','analytics','valid_pairs','panda_ai']
 };
 
 async function pfRequireAdmin(req, res) {
