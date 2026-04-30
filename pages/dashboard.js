@@ -2118,43 +2118,44 @@ function OvSignalCard({ pair, tier, onClick, delay }) {
   if(pair.conf<40&&pair.bias!=='WAIT') tags.push({label:'LOW CONF',color:'#ff8844',bg:'rgba(255,136,68,0.12)'});
   if(pair.conflict) tags.push({label:'CONFLICT',color:OV_COLORS.sell,bg:OV_COLORS.sellDim});
   return <div onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)} onClick={onClick} style={{
-    ...ovGlass,padding:isH?'16px 18px':isL?'8px 12px':'12px 14px',cursor:'pointer',position:'relative',overflow:'hidden',
-    opacity:isL?0.5:1,transform:hov?'translateY(-3px)':'translateY(0)',transition:'all 0.25s ease',
-    boxShadow:hov?`0 8px 32px ${bc}15, 0 0 0 1px ${bc}20`:isH?`0 0 20px ${bc}08`:'none',
-    borderColor:isH?`${bc}30`:OV_COLORS.border,animation:`fadeSlideUp 0.4s ease ${delay}ms both`,
+    ...ovGlass,padding:isH?'18px 20px':isL?'10px 14px':'14px 16px',cursor:'pointer',position:'relative',overflow:'hidden',
+    opacity:isL?0.55:1,transform:hov?'translateY(-2px)':'translateY(0)',transition:'all 0.25s ease',
+    boxShadow:hov?`0 8px 24px ${bc}20`:isH?`0 4px 16px ${bc}10`:'none',
+    borderColor:hov?`${bc}50`:isH?`${bc}25`:OV_COLORS.border,
   }}>
     {isH&&<div style={{position:'absolute',top:0,left:0,right:0,height:2,background:`linear-gradient(90deg,transparent,${bc},transparent)`}}/>}
-    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:isL?4:8}}>
-      <div style={{display:'flex',alignItems:'center',gap:isL?6:8}}>
-        <span style={{fontFamily:orb,fontSize:isH?16:isL?11:13,fontWeight:700,color:isL?OV_COLORS.textMuted:OV_COLORS.textPrimary,letterSpacing:isH?2:1}}>{pair.symbol}</span>
-        <span style={{fontFamily:mono,fontSize:isL?8:10,fontWeight:700,color:bc,background:`${bc}15`,border:`1px solid ${bc}40`,borderRadius:4,padding:isL?'1px 4px':'2px 8px',letterSpacing:1}}>{pair.bias}</span>
+    {/* Header: Symbol + Bias + Gap */}
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:isL?4:10}}>
+      <div style={{display:'flex',alignItems:'center',gap:isL?6:10}}>
+        <span style={{fontFamily:orb,fontSize:isH?18:isL?12:15,fontWeight:700,color:isL?OV_COLORS.textMuted:OV_COLORS.textPrimary,letterSpacing:isH?2:1}}>{pair.symbol}</span>
+        <span style={{fontFamily:mono,fontSize:isL?8:11,fontWeight:700,color:bc,background:`${bc}12`,border:`1px solid ${bc}35`,borderRadius:4,padding:isL?'1px 5px':'3px 10px',letterSpacing:1}}>{pair.bias}</span>
       </div>
-      <span style={{fontFamily:isL?mono:orb,fontSize:isH?22:isL?9:16,fontWeight:isL?400:900,color:bc,lineHeight:1}}>{pair.gap>0?'+':''}{Number(pair.gap).toFixed(1)}</span>
+      <span style={{fontFamily:orb,fontSize:isH?26:isL?11:18,fontWeight:900,color:bc,textShadow:isH?`0 0 16px ${bc}40`:'none'}}>{pair.gap>0?'+':''}{Number(pair.gap).toFixed(1)}</span>
     </div>
-    {!isL&&<div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginBottom:6}}>
-      <span style={{fontFamily:mono,fontSize:9,padding:'2px 6px',borderRadius:4,color:pair.conf>=70?OV_COLORS.buy:pair.conf>=50?OV_COLORS.warn:OV_COLORS.textMuted,background:pair.conf>=70?OV_COLORS.buyDim:pair.conf>=50?OV_COLORS.warnDim:'rgba(255,255,255,0.04)',border:`1px solid ${pair.conf>=70?OV_COLORS.buy+'30':pair.conf>=50?OV_COLORS.warn+'30':OV_COLORS.border}`}}>{pair.conf}%</span>
-      <span style={{fontFamily:mono,fontSize:9,color:ovMomColors[pair.momentum]||'#4a5578',padding:'2px 6px',borderRadius:4,background:`${ovMomColors[pair.momentum]||'#4a5578'}12`,border:`1px solid ${ovMomColors[pair.momentum]||'#4a5578'}25`}}>{pair.momentum}</span>
-      <span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted,letterSpacing:1}}>{Math.abs(pair.gap)>=9&&pair.pl_zone!=='BETWEEN'?'INTRA':'BB'}</span>
-      {pair.pdr_strong&&<span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.buy,background:OV_COLORS.buyDim,border:`1px solid ${OV_COLORS.buy}25`,borderRadius:3,padding:'1px 4px'}}>PDR ✓</span>}
+    {/* Metrics row */}
+    {!isL&&<div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:8}}>
+      <span style={{fontFamily:mono,fontSize:10,padding:'3px 8px',borderRadius:4,color:pair.conf>=70?OV_COLORS.buy:pair.conf>=50?OV_COLORS.warn:OV_COLORS.textMuted,background:pair.conf>=70?OV_COLORS.buyDim:pair.conf>=50?OV_COLORS.warnDim:'rgba(255,255,255,0.04)',border:`1px solid ${pair.conf>=70?OV_COLORS.buy+'30':pair.conf>=50?OV_COLORS.warn+'30':OV_COLORS.border}`}}>{pair.conf}%</span>
+      <span style={{fontFamily:mono,fontSize:10,color:ovMomColors[pair.momentum]||'#4a5578',padding:'3px 8px',borderRadius:4,background:`${ovMomColors[pair.momentum]||'#4a5578'}12`,border:`1px solid ${ovMomColors[pair.momentum]||'#4a5578'}25`}}>{pair.momentum}</span>
+      <span style={{fontFamily:mono,fontSize:9,color:OV_COLORS.textMuted,letterSpacing:1}}>{Math.abs(pair.gap)>=9&&pair.pl_zone!=='BETWEEN'?'INTRA':'BB'}</span>
+      {pair.pdr_strong&&<span style={{fontFamily:mono,fontSize:9,color:OV_COLORS.buy,background:OV_COLORS.buyDim,border:`1px solid ${OV_COLORS.buy}25`,borderRadius:3,padding:'2px 6px'}}>PDR ✓</span>}
     </div>}
     {tags.length>0&&<div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
-      {tags.map(t=><span key={t.label} style={{fontFamily:mono,fontSize:7,color:t.color,background:t.bg,border:`1px solid ${t.color}30`,borderRadius:3,padding:'1px 5px',letterSpacing:1}}>{t.label}</span>)}
+      {tags.map(t=><span key={t.label} style={{fontFamily:mono,fontSize:8,color:t.color,background:t.bg,border:`1px solid ${t.color}30`,borderRadius:3,padding:'2px 6px',letterSpacing:1}}>{t.label}</span>)}
     </div>}
-    {hov&&!isL&&<div style={{marginTop:8,paddingTop:8,borderTop:`1px solid ${OV_COLORS.border}`,display:'flex',gap:8,flexWrap:'wrap',animation:'fadeIn 0.15s ease'}}>
-      <span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted}}>PL: {pair.pl_zone}</span>
-      <span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted}}>H4: {pair.box_h4}</span>
-      <span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted}}>PDR: {Number(pair.pdr_strength||0).toFixed(2)}</span>
+    {hov&&!isL&&<div style={{marginTop:10,paddingTop:8,borderTop:`1px solid ${OV_COLORS.border}`,display:'flex',gap:10,flexWrap:'wrap'}}>
+      <span style={{fontFamily:mono,fontSize:9,color:OV_COLORS.textMuted}}>PL: {pair.pl_zone}</span>
+      <span style={{fontFamily:mono,fontSize:9,color:OV_COLORS.textMuted}}>H4: {pair.box_h4}</span>
+      <span style={{fontFamily:mono,fontSize:9,color:OV_COLORS.textMuted}}>PDR: {Number(pair.pdr_strength||0).toFixed(2)}</span>
     </div>}
   </div>;
 }
 
-function OvStatCard({ label, value, icon:Icon, color, sparkData, delay, subtitle }) {
-  return <div style={{...ovGlass,padding:'16px 18px',flex:1,minWidth:140,position:'relative',overflow:'hidden',animation:`fadeSlideUp 0.4s ease ${delay}ms both`}}>
-    <div style={{position:'absolute',top:10,right:12,opacity:0.08}}><Icon size={36} color={color}/></div>
-    <div style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted,letterSpacing:2,marginBottom:8}}>{label}</div>
-    <div style={{fontFamily:orb,fontSize:28,fontWeight:900,color,lineHeight:1,marginBottom:4}}><AnimNum value={value} delay={delay+200}/></div>
-    {subtitle&&<div style={{fontFamily:mono,fontSize:9,color:OV_COLORS.textSecondary,marginBottom:4}}>{subtitle}</div>}
-    {sparkData&&<MiniSpark data={sparkData} color={color}/>}
+function OvStatCard({ label, value, icon:Icon, color, delay, subtitle, displayValue }) {
+  return <div style={{...ovGlass,padding:'18px 20px',flex:1,minWidth:150,position:'relative',overflow:'hidden',animation:`fadeSlideUp 0.4s ease ${delay}ms both`,boxShadow:`0 0 20px ${color}08`}}>
+    <div style={{position:'absolute',top:10,right:12,opacity:0.06}}><Icon size={40} color={color}/></div>
+    <div style={{fontFamily:mono,fontSize:9,color:OV_COLORS.textMuted,letterSpacing:2,marginBottom:6}}>{label}</div>
+    <div style={{fontFamily:orb,fontSize:32,fontWeight:900,color,lineHeight:1,marginBottom:6,textShadow:`0 0 20px ${color}30`}}>{displayValue!==undefined?displayValue:<AnimNum value={value} delay={delay+200}/>}</div>
+    {subtitle&&<div style={{fontFamily:mono,fontSize:10,color:OV_COLORS.textSecondary}}>{subtitle}</div>}
   </div>;
 }
 
@@ -2308,7 +2309,7 @@ function OverviewTab({ data, trends, pdrData, upcomingNews, spikes, confidenceMa
   // Stats
   const buyC=valid.filter(p=>p.gap>=5).length,sellC=valid.filter(p=>p.gap<=-5).length;
   const spikeC=spikes?.length||0;const momBuild=strongMom;const closeAlerts=pairs.filter(p=>['FADING','REVERSING'].includes(p.momentum)&&Math.abs(p.gap)>=5).length;
-  const strongest=pairs[0];const sparkD=Array.from({length:12},(_,i)=>({v:4+Math.sin(i*0.8)*3+Math.random()*2}));
+  const strongest=pairs[0];
 
   return (
     <div style={{color:OV_COLORS.textPrimary,fontFamily:raj,position:'relative'}}>
@@ -2340,9 +2341,9 @@ function OverviewTab({ data, trends, pdrData, upcomingNews, spikes, confidenceMa
 
       {/* ROW 2 — STAT CARDS */}
       <div style={{display:'flex',gap:12,flexWrap:'wrap'}}>
-        <OvStatCard label="VALID SIGNALS" value={valid.length} icon={Activity} color={OV_COLORS.accent} delay={100} subtitle={`${buyC} BUY · ${sellC} SELL`} sparkData={sparkD}/>
-        <OvStatCard label="STRONGEST" value={Math.abs(Math.round(strongest?.gap??0))} icon={TrendingUp} color={OV_COLORS.buy} delay={200} subtitle={strongest?.symbol||'—'}/>
-        <OvStatCard label="SPIKES ≥7" value={spikeC} icon={Zap} color={OV_COLORS.warn} delay={300} sparkData={sparkD.map(d=>({v:d.v*0.6}))}/>
+        <OvStatCard label="VALID SIGNALS" value={valid.length} icon={Activity} color={OV_COLORS.accent} delay={100} subtitle={`${buyC} BUY · ${sellC} SELL`}/>
+        <OvStatCard label="STRONGEST" icon={TrendingUp} color={(strongest?.gap??0)>=0?OV_COLORS.buy:OV_COLORS.sell} delay={200} displayValue={`${(strongest?.gap??0)>0?'+':''}${Number(strongest?.gap??0).toFixed(1)}`} subtitle={`${strongest?.symbol||'—'} · ${strongest?.bias||'—'}`}/>
+        <OvStatCard label="SPIKES ≥7" value={spikeC} icon={Zap} color={OV_COLORS.warn} delay={300}/>
         <OvStatCard label="MOMENTUM" value={momBuild} icon={Gauge} color="#66ffcc" delay={400} subtitle="BUILDING + STRONG"/>
         <OvStatCard label="CLOSE ALERTS" value={closeAlerts} icon={AlertTriangle} color={closeAlerts>0?OV_COLORS.sell:OV_COLORS.textMuted} delay={500}/>
       </div>
@@ -2355,7 +2356,7 @@ function OverviewTab({ data, trends, pdrData, upcomingNews, spikes, confidenceMa
             <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
               <Shield size={12} color={OV_COLORS.buy}/><span style={{fontFamily:mono,fontSize:9,color:OV_COLORS.buy,letterSpacing:3,fontWeight:700}}>HIGH QUALITY</span><span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted}}>{highTier.length} pairs</span>
             </div>
-            <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(auto-fill,minmax(220px,1fr))',gap:10}}>
+            <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(auto-fill,minmax(280px,1fr))',gap:12}}>
               {highTier.map((p,i)=><OvSignalCard key={p.symbol} pair={p} tier="HIGH" onClick={()=>{setSelectedPair(p);if(onSelectPair)onSelectPair(p);}} delay={i*80}/>)}
             </div>
           </div>}
@@ -2363,7 +2364,7 @@ function OverviewTab({ data, trends, pdrData, upcomingNews, spikes, confidenceMa
             <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
               <Eye size={12} color={OV_COLORS.textSecondary}/><span style={{fontFamily:mono,fontSize:9,color:OV_COLORS.textSecondary,letterSpacing:3}}>MID QUALITY</span><span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted}}>{midTier.length} pairs</span>
             </div>
-            <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(auto-fill,minmax(200px,1fr))',gap:8}}>
+            <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(auto-fill,minmax(240px,1fr))',gap:10}}>
               {midTier.map((p,i)=><OvSignalCard key={p.symbol} pair={p} tier="MID" onClick={()=>{setSelectedPair(p);if(onSelectPair)onSelectPair(p);}} delay={i*60+300}/>)}
             </div>
           </div>}
