@@ -2177,30 +2177,28 @@ function OvMomentumBar({ pairs }) {
 }
 
 function OvAIPanel() {
-  const [reply,setReply]=useState(null);const [loading,setLoading]=useState(false);const [error,setError]=useState(null);const [lastFetch,setLastFetch]=useState(null);const fetched=useRef(false);
-  async function fetchInsight(){setLoading(true);setError(null);try{const r=await fetch('/api/ai-chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'insights'})});const d=await r.json();if(r.ok&&d.reply){setReply(d.reply);setLastFetch(new Date());}else setError(d.error||'Failed');}catch{setError('Connection error');}setLoading(false);}
+  const [reply,setReply]=useState(null);const [loading,setLoading]=useState(false);const [error,setError]=useState(null);const fetched=useRef(false);const [expanded,setExpanded]=useState(false);
+  async function fetchInsight(){setLoading(true);setError(null);try{const r=await fetch('/api/ai-chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'insights'})});const d=await r.json();if(r.ok&&d.reply){setReply(d.reply);}else setError(d.error||'Failed');}catch{setError('Connection error');}setLoading(false);}
   useEffect(()=>{if(!fetched.current){fetched.current=true;fetchInsight();}},[]); // eslint-disable-line
-  function parseSections(text){if(!text)return null;const lines=text.split('\n').filter(l=>l.trim());let summary='',opportunity='',risk='',cur='summary';
-    for(const line of lines){const lo=line.toLowerCase();if(lo.includes('opportunit')||lo.includes('best setup')||lo.includes('top pick')||lo.includes('strongest')){cur='opportunity';continue;}if(lo.includes('risk')||lo.includes('avoid')||lo.includes('caution')||lo.includes('warning')||lo.includes('dead zone')){cur='risk';continue;}
-    const clean=line.replace(/^[\*\-\•#]+\s*/,'').replace(/\*\*/g,'');if(cur==='summary')summary+=(summary?' ':'')+clean;else if(cur==='opportunity')opportunity+=(opportunity?' ':'')+clean;else risk+=(risk?' ':'')+clean;}
-    if(!opportunity&&!risk)return{summary:text.replace(/\*\*/g,''),opportunity:'',risk:''};return{summary,opportunity,risk};}
-  const sections=parseSections(reply);const timeAgo=lastFetch?`${Math.round((Date.now()-lastFetch.getTime())/60000)}m ago`:null;
-  return <div style={{...ovGlass,padding:'16px 18px',borderColor:`${OV_COLORS.ai}25`,background:`linear-gradient(135deg,${OV_COLORS.aiDim},${OV_COLORS.bgCard})`}}>
-    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
-      <div style={{display:'flex',alignItems:'center',gap:8}}><Brain size={14} color={OV_COLORS.ai}/><span style={{fontFamily:mono,fontSize:9,color:OV_COLORS.ai,letterSpacing:2,fontWeight:700}}>PANDA AI INSIGHT</span></div>
-      {timeAgo&&<span style={{fontFamily:mono,fontSize:7,color:OV_COLORS.textMuted}}>{timeAgo}</span>}
+  // Extract short bullets from AI reply
+  function parseBullets(text){if(!text)return[];const clean=text.replace(/\*\*/g,'').replace(/^[\*\-\•#]+\s*/gm,'');const sentences=clean.split(/(?<=[.!?])\s+/).filter(s=>s.trim().length>10);return sentences.slice(0,4).map(s=>s.length>120?s.slice(0,117)+'...':s);}
+  const bullets=parseBullets(reply);
+  return <div style={{...ovGlass,padding:'12px 14px',borderColor:`${OV_COLORS.ai}25`,background:`linear-gradient(135deg,${OV_COLORS.aiDim},${OV_COLORS.bgCard})`}}>
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+      <div style={{display:'flex',alignItems:'center',gap:6}}><Brain size={12} color={OV_COLORS.ai}/><span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.ai,letterSpacing:2,fontWeight:700}}>AI INSIGHT</span></div>
+      <div style={{display:'flex',gap:6}}>
+        <button onClick={fetchInsight} disabled={loading} style={{fontFamily:mono,fontSize:7,color:OV_COLORS.ai,background:'none',border:`1px solid ${OV_COLORS.ai}30`,borderRadius:4,padding:'2px 6px',cursor:loading?'not-allowed':'pointer',letterSpacing:1}}>{loading?'...':'⟳'}</button>
+      </div>
     </div>
-    {loading&&<div style={{display:'flex',flexDirection:'column',gap:10}}>
-      {[1,2,3].map(i=><div key={i} style={{display:'flex',flexDirection:'column',gap:4}}><div style={{width:60,height:8,borderRadius:3,background:`${OV_COLORS.ai}15`,animation:'pulse 1.5s ease-in-out infinite'}}/><div style={{width:'100%',height:12,borderRadius:3,background:'rgba(255,255,255,0.03)',animation:`pulse 1.5s ease-in-out ${i*0.2}s infinite`}}/></div>)}
-      <div style={{fontFamily:mono,fontSize:9,color:OV_COLORS.ai,textAlign:'center',padding:4}}>🐼 Analyzing market data...</div>
+    {loading&&<div style={{padding:'8px 0',textAlign:'center'}}><span style={{fontFamily:mono,fontSize:9,color:OV_COLORS.ai}}>🐼 Analyzing...</span></div>}
+    {error&&!loading&&<div style={{fontFamily:mono,fontSize:10,color:OV_COLORS.sell,padding:'4px 0'}}>⚠️ {error}</div>}
+    {bullets.length>0&&!loading&&<div style={{display:'flex',flexDirection:'column',gap:6}}>
+      {(expanded?bullets:bullets.slice(0,2)).map((b,i)=><div key={i} style={{display:'flex',gap:6,alignItems:'flex-start'}}>
+        <span style={{fontFamily:mono,fontSize:10,color:OV_COLORS.ai,marginTop:2,flexShrink:0}}>{i===0?'📊':i===1?'🎯':'⚠️'}</span>
+        <span style={{fontFamily:raj,fontSize:13,color:OV_COLORS.textSecondary,lineHeight:1.35}}>{b}</span>
+      </div>)}
+      {bullets.length>2&&<button onClick={()=>setExpanded(!expanded)} style={{fontFamily:mono,fontSize:8,color:OV_COLORS.ai,background:'none',border:'none',cursor:'pointer',textAlign:'left',padding:0,letterSpacing:1}}>{expanded?'▲ LESS':'▼ MORE ('+bullets.length+')'}</button>}
     </div>}
-    {error&&!loading&&<div style={{fontFamily:mono,fontSize:10,color:OV_COLORS.sell,padding:'12px 0',lineHeight:1.5}}>⚠️ {error}</div>}
-    {sections&&!loading&&<div style={{display:'flex',flexDirection:'column',gap:10}}>
-      {sections.summary&&<div><div style={{fontFamily:mono,fontSize:7,color:OV_COLORS.textMuted,letterSpacing:2,marginBottom:3}}>SUMMARY</div><div style={{fontFamily:raj,fontSize:13,color:OV_COLORS.textSecondary,lineHeight:1.4}}>{sections.summary}</div></div>}
-      {sections.opportunity&&<><div style={{height:1,background:`linear-gradient(90deg,transparent,${OV_COLORS.ai}30,transparent)`}}/><div><div style={{fontFamily:mono,fontSize:7,color:OV_COLORS.buy,letterSpacing:2,marginBottom:3}}>OPPORTUNITY</div><div style={{fontFamily:raj,fontSize:12,color:OV_COLORS.textSecondary,lineHeight:1.4}}>{sections.opportunity}</div></div></>}
-      {sections.risk&&<><div style={{height:1,background:`linear-gradient(90deg,transparent,${OV_COLORS.ai}30,transparent)`}}/><div><div style={{fontFamily:mono,fontSize:7,color:OV_COLORS.sell,letterSpacing:2,marginBottom:3}}>RISK</div><div style={{fontFamily:raj,fontSize:12,color:OV_COLORS.textSecondary,lineHeight:1.4}}>{sections.risk}</div></div></>}
-    </div>}
-    <button onClick={fetchInsight} disabled={loading} style={{marginTop:12,width:'100%',padding:'8px 0',fontFamily:mono,fontSize:9,color:loading?OV_COLORS.textMuted:OV_COLORS.ai,background:loading?'rgba(255,255,255,0.02)':`${OV_COLORS.ai}10`,border:`1px solid ${loading?OV_COLORS.border:OV_COLORS.ai+'30'}`,borderRadius:6,cursor:loading?'not-allowed':'pointer',letterSpacing:2,transition:'all 0.2s'}}>{loading?'⏳ ANALYZING...':'⟳ REFRESH INSIGHT'}</button>
   </div>;
 }
 
