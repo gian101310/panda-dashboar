@@ -306,7 +306,7 @@ const styles = `
   }
 
   .hero-metrics {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    display: grid; grid-template-columns: repeat(3, 1fr);
     gap: 1px; background: var(--border2); border: 1px solid var(--border2); max-width: 680px;
   }
 
