@@ -354,7 +354,7 @@ const styles = `
     display: grid; grid-template-columns: 1fr 1fr; gap: 1px;
     background: var(--border2); border: 1px solid var(--border2); margin-bottom: 24px;
   }
-  .arch-cell { background: var(--bg2); padding: 24px 28px; }
+  .arch-cell { background: var(--bg2); padding: 24px 28px; height: 100%; }
   .arch-layer { font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 8px; }
   .arch-name { font-family: var(--display); font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 10px; }
   .arch-stack { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
@@ -370,7 +370,7 @@ const styles = `
     display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px;
     background: var(--border2); border: 1px solid var(--border2);
   }
-  .cap-card { background: var(--bg2); padding: 28px 32px; transition: background 0.2s; cursor: default; }
+  .cap-card { background: var(--bg2); padding: 28px 32px; transition: background 0.2s; cursor: default; height: 100%; }
   .cap-card:hover { background: var(--bg3); }
   .cap-icon { font-size: 20px; margin-bottom: 12px; }
   .cap-title { font-family: var(--display); font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 8px; }
@@ -400,7 +400,7 @@ const styles = `
   .data-note { font-size: 11px; color: var(--text3); line-height: 1.5; }
 
   .pso-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--border2); border: 1px solid var(--border2); }
-  .pso-card { background: var(--bg2); padding: 28px; }
+  .pso-card { background: var(--bg2); padding: 28px; height: 100%; }
   .pso-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border2); }
   .pso-label-p { color: var(--red); }
   .pso-label-s { color: var(--blue); }
@@ -409,7 +409,7 @@ const styles = `
   .pso-body { font-size: 12px; color: var(--text2); line-height: 1.8; }
 
   .stack-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--border2); border: 1px solid var(--border2); }
-  .stack-row { background: var(--bg2); padding: 16px 24px; display: flex; align-items: baseline; gap: 16px; }
+  .stack-row { background: var(--bg2); padding: 16px 24px; display: flex; align-items: baseline; gap: 16px; height: 100%; }
   .stack-layer { font-family: var(--mono); font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.1em; min-width: 120px; flex-shrink: 0; }
   .stack-detail { font-size: 12px; color: var(--text2); line-height: 1.6; }
 
@@ -617,7 +617,7 @@ export default function Portfolio() {
               { color: "var(--amber)", layer: "SaaS Product",    name: "Monetization Layer",    tags: [["3 Tiers","amber"],["Telegram","amber"],["Admin Panel","dim"]], desc: "Free / Pro $29 / Elite $79. Landing page, pricing funnel, approval flow. Telegram bot auto-registers free users and delivers hourly AI narration. Admin panel with user management, tier gating, and feature flags." },
             ].map((cell, i) => (
               <ScrollFade key={i} delay={i * 60}>
-                <div className="arch-cell" style={{ height: "100%" }}>
+                <div className="arch-cell">
                   <div className="arch-layer" style={{ color: cell.color }}>{cell.layer}</div>
                   <div className="arch-name">{cell.name}</div>
                   <div className="arch-stack">
