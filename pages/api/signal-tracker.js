@@ -217,7 +217,7 @@ export default async function handler(req, res) {
       // Default action: full update cycle
       // 1. Get current dashboard data
       const { data: dashboardPairs, error: dashErr } = await supabase
-        .from('dashboard').select('symbol, gap, bias, confidence, momentum, pl_zone');
+        .from('dashboard').select('symbol, gap, bias, confidence, momentum, pl_zone, box_h1_trend, box_h4_trend');
       if (dashErr) return res.status(500).json({ error: dashErr.message });
 
       // 2. Get all open trackers
