@@ -87,7 +87,7 @@ function computePDR(candles) {
     strength: Math.round(strength * 100) / 100,
     retracement: Math.round(retracement * 100) / 100,
     direction,
-    strong: strength >= 0.5 && retracement <= 0.25,
+    strong: retracement <= 0.50 && body > 0,
     body: Math.round(body * 100000) / 100000,
     range: Math.round(range * 100000) / 100000,
     atr: Math.round(atr * 100000) / 100000,
