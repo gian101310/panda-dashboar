@@ -115,7 +115,7 @@ export default async function handler(req, res) {
       .select('symbol, pdr_strength, pdr_strong, pdr_direction, retracement, computed_at')
       .order('computed_at', { ascending: false });
 
-    if (cached && cached.length >= 20) {
+    if (cached && cached.length >= 1) {
       const age = (Date.now() - new Date(cached[0].computed_at).getTime()) / 1000;
       if (age < 900) {
         const pdr = {};

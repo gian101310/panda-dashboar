@@ -107,14 +107,14 @@ function getEdgeMemory(row, memoryIndex) {
 
 // ===== PDR BADGE =====
 function PdrBadge({ pdr }) {
-  if (!pdr) return null;
+  if (!pdr || pdr.strength == null) return null;
   const mono = "'Share Tech Mono',monospace";
   const color = pdr.strong ? '#00ff9f' : '#6b7280';
   return (
     <span style={{fontFamily:mono,fontSize:8,padding:'1px 5px',borderRadius:4,
       background:pdr.strong?'rgba(0,255,159,0.12)':'rgba(107,114,128,0.12)',
       color,border:`1px solid ${color}40`,marginLeft:4,letterSpacing:1}}>
-      PDR {pdr.strength.toFixed(2)} {pdr.direction==='BULLISH'?'▲':'▼'} {pdr.strong?'STRONG':'WEAK'}
+      PDR {Number(pdr.strength).toFixed(2)} {pdr.direction==='BULLISH'?'▲':'▼'} {pdr.strong?'STRONG':'WEAK'}
     </span>
   );
 }
@@ -2129,11 +2129,14 @@ function OvSignalCard({ pair, tier, onClick, delay }) {
   if(pair.news) tags.push({label:'NEWS',color:OV_COLORS.warn,bg:OV_COLORS.warnDim});
   if(pair.conf<40&&pair.bias!=='WAIT') tags.push({label:'LOW CONF',color:'#ff8844',bg:'rgba(255,136,68,0.12)'});
   if(pair.conflict) tags.push({label:'CONFLICT',color:OV_COLORS.sell,bg:OV_COLORS.sellDim});
+  const glowColor=pair.bias==='BUY'?'rgba(0,255,159,0.35)':pair.bias==='SELL'?'rgba(255,77,109,0.35)':'none';
+  const glowHover=pair.bias==='BUY'?'0 0 24px rgba(0,255,159,0.5), 0 4px 20px rgba(0,255,159,0.25)':pair.bias==='SELL'?'0 0 24px rgba(255,77,109,0.5), 0 4px 20px rgba(255,77,109,0.25)':`0 8px 24px ${bc}20`;
+  const glowBase=pair.bias==='BUY'?`0 0 16px rgba(0,255,159,0.3), 0 2px 12px rgba(0,255,159,0.15)`:pair.bias==='SELL'?`0 0 16px rgba(255,77,109,0.3), 0 2px 12px rgba(255,77,109,0.15)`:`0 4px 16px ${bc}10`;
   return <div onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)} onClick={onClick} style={{
-    ...ovGlass,padding:isH?'18px 20px':isL?'10px 14px':'14px 16px',cursor:'pointer',position:'relative',overflow:'hidden',
-    opacity:isL?0.55:1,transform:hov?'translateY(-2px)':'translateY(0)',transition:'all 0.25s ease',
-    boxShadow:hov?`0 8px 24px ${bc}20`:isH?`0 4px 16px ${bc}10`:'none',
-    borderColor:hov?`${bc}50`:isH?`${bc}25`:OV_COLORS.border,
+    ...ovGlass,padding:isH?'22px 24px':isL?'12px 14px':'18px 20px',cursor:'pointer',position:'relative',overflow:'hidden',
+    opacity:isL?0.55:1,transform:hov?'translateY(-3px) scale(1.01)':'translateY(0)',transition:'all 0.25s ease',
+    boxShadow:hov?glowHover:isH?glowBase:'none',
+    borderColor:hov?`${bc}60`:isH?`${bc}35`:OV_COLORS.border,
   }}>
     {isH&&<div style={{position:'absolute',top:0,left:0,right:0,height:2,background:`linear-gradient(90deg,transparent,${bc},transparent)`}}/>}
     {/* Header: Symbol + Bias + Gap */}
@@ -2287,8 +2290,8 @@ function OverviewTab({ data, trends, pdrData, upcomingNews, spikes, confidenceMa
     symbol:row.symbol, gap:row.gap??0, bias:row.bias||'WAIT',
     momentum:trends[row.symbol]?.momentum||'NEUTRAL', closeAlert:trends[row.symbol]?.closeAlert||false,
     pl_zone:row.pl_zone||'BETWEEN', box_h4:row.box_h4_trend||'RANGING', box_h1:row.box_h1_trend||'RANGING',
-    pdr_strong:pdrData[row.symbol]?.pdr_strong||false, pdr_strength:pdrData[row.symbol]?.pdr_strength||0,
-    pdr_direction:pdrData[row.symbol]?.pdr_direction||'NEUTRAL',
+    pdr_strong:pdrData[row.symbol]?.strong||false, pdr_strength:pdrData[row.symbol]?.strength||0,
+    pdr_direction:pdrData[row.symbol]?.direction||'NEUTRAL',
     edge:confidenceMap[row.symbol]?.historical?.flag||null, conf:confidenceMap[row.symbol]?.confidence||0,
     conflict:confidenceMap[row.symbol]?.conflict||false,
     news:upcomingNews?.affected_pairs?.includes(row.symbol)||false, hard_invalid:row.hard_invalid||false,
@@ -2316,8 +2319,8 @@ function OverviewTab({ data, trends, pdrData, upcomingNews, spikes, confidenceMa
   const exposure=Object.entries(exp).map(([c,v])=>({currency:c,exposure:v,abs:Math.abs(v)})).sort((a,b)=>b.abs-a.abs);
 
   // Tier classification
-  function ovGetTier(p){if(p.conf>=70&&p.edge!=='DEAD_ZONE'&&['STRONG','BUILDING','SPARK'].includes(p.momentum))return'HIGH';if(p.conf>=50&&p.edge!=='DEAD_ZONE')return'MID';return'LOW';}
-  const highTier=pairs.filter(p=>ovGetTier(p)==='HIGH');const midTier=pairs.filter(p=>ovGetTier(p)==='MID');const lowTier=pairs.filter(p=>ovGetTier(p)==='LOW');
+  function ovGetTier(p){if(p.hard_invalid||Math.abs(p.gap)<5)return'INVALID';if(p.conf>=70&&p.edge!=='DEAD_ZONE'&&['STRONG','BUILDING','SPARK'].includes(p.momentum))return'HIGH';if(p.conf>=50&&p.edge!=='DEAD_ZONE')return'MID';return'LOW';}
+  const highTier=pairs.filter(p=>ovGetTier(p)==='HIGH');const midTier=pairs.filter(p=>ovGetTier(p)==='MID');const lowTier=pairs.filter(p=>ovGetTier(p)==='LOW');const invalidTier=pairs.filter(p=>ovGetTier(p)==='INVALID');
 
   // Stats
   const buyC=valid.filter(p=>p.gap>=5).length,sellC=valid.filter(p=>p.gap<=-5).length;
@@ -2372,7 +2375,7 @@ function OverviewTab({ data, trends, pdrData, upcomingNews, spikes, confidenceMa
             <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
               <Shield size={12} color={OV_COLORS.buy}/><span style={{fontFamily:mono,fontSize:9,color:OV_COLORS.buy,letterSpacing:3,fontWeight:700}}>HIGH QUALITY</span><span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted}}>{highTier.length} pairs</span>
             </div>
-            <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(auto-fill,minmax(280px,1fr))',gap:12}}>
+            <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(auto-fill,minmax(320px,1fr))',gap:14}}>
               {highTier.map((p,i)=><OvSignalCard key={p.symbol} pair={p} tier="HIGH" onClick={()=>{const r=findRow(p.symbol);if(r)onSelectPair(r);}} delay={i*80}/>)}
             </div>
           </div>}
@@ -2380,16 +2383,24 @@ function OverviewTab({ data, trends, pdrData, upcomingNews, spikes, confidenceMa
             <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
               <Eye size={12} color={OV_COLORS.textSecondary}/><span style={{fontFamily:mono,fontSize:9,color:OV_COLORS.textSecondary,letterSpacing:3}}>MID QUALITY</span><span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted}}>{midTier.length} pairs</span>
             </div>
-            <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(auto-fill,minmax(240px,1fr))',gap:10}}>
+            <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(auto-fill,minmax(280px,1fr))',gap:12}}>
               {midTier.map((p,i)=><OvSignalCard key={p.symbol} pair={p} tier="MID" onClick={()=>{const r=findRow(p.symbol);if(r)onSelectPair(r);}} delay={i*60+300}/>)}
             </div>
           </div>}
           {lowTier.length>0&&<div>
             <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
-              <Radio size={10} color={OV_COLORS.textMuted}/><span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted,letterSpacing:2}}>LOW QUALITY / INACTIVE</span><span style={{fontFamily:mono,fontSize:7,color:OV_COLORS.textMuted}}>{lowTier.length}</span>
+              <Radio size={10} color={OV_COLORS.textMuted}/><span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted,letterSpacing:2}}>LOW QUALITY</span><span style={{fontFamily:mono,fontSize:7,color:OV_COLORS.textMuted}}>{lowTier.length}</span>
             </div>
             <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(auto-fill,minmax(170px,1fr))',gap:6}}>
               {lowTier.map((p,i)=><OvSignalCard key={p.symbol} pair={p} tier="LOW" onClick={()=>{const r=findRow(p.symbol);if(r)onSelectPair(r);}} delay={i*40+500}/>)}
+            </div>
+          </div>}
+          {invalidTier.length>0&&<div>
+            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+              <Radio size={10} color='#ff4d6d'/><span style={{fontFamily:mono,fontSize:8,color:'#ff4d6d',letterSpacing:2}}>INVALID PAIRS</span><span style={{fontFamily:mono,fontSize:7,color:OV_COLORS.textMuted}}>{invalidTier.length}</span>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(auto-fill,minmax(140px,1fr))',gap:5}}>
+              {invalidTier.map((p,i)=><OvSignalCard key={p.symbol} pair={p} tier="LOW" onClick={()=>{const r=findRow(p.symbol);if(r)onSelectPair(r);}} delay={i*30+700}/>)}
             </div>
           </div>}
           <OvMomentumBar pairs={pairs}/>

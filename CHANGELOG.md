@@ -2,6 +2,28 @@
 
 ---
 
+## May 1, 2026 — UI Cleanup + Admin Feature Access (commit 7c09d14)
+
+**Light Mode Deleted**
+- Removed ThemeToggle component, ThemeProvider wrapper, and light CSS variables
+- Dashboard is dark-only — hardcoded hex colors across 3000+ lines made light mode broken
+- Cleaned: dashboard.js, strength.js, journal.js, _app.js, globals.css
+- ThemeToggle.js and lib/theme.js stubbed (safe to delete)
+
+**OVERVIEW Tab — Admin Feature Access**
+- Added 'overview' as independent feature key in admin panel
+- Updated: ALL_FEATURES, FEATURE_GROUPS, FEATURE_LABELS, ROLE_DEFAULTS
+- TAB_FEATURE in dashboard.js now maps OVERVIEW → 'overview' (was 'panels')
+- PF_TIER_FEATURES in pf-approve.js updated for all tiers (starter/pro/elite)
+
+**Gap Chart — ALL PAIRS Removed**
+- Removed loadAllPairs() function and showAllPairs state
+- Removed "ALL PAIRS (FULL HISTORY)" button + CLEAR button
+- SVG, legend, and hover tooltip simplified to use symbols array only
+- Max 3 pairs selectable (unchanged)
+
+---
+
 ## Apr 25, 2026 — PDR Tracking (commit e603ef1)
 
 **New: pdr_cache Supabase table**
