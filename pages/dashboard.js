@@ -69,12 +69,18 @@ function getMaturity(sampleSize) {
 function getMomentumAction(momentum, bias, trend) {
   const g = MOMENTUM_GUIDE[momentum];
   if (!g) return null;
-  if (momentum !== 'STRONG') return g;
-  // RIDE IT requires trend alignment with bias
-  const t1 = trend?.trend1h;
-  const aligned = (bias === 'BUY' && t1 === 'STRONGER') || (bias === 'SELL' && t1 === 'WEAKER');
-  if (aligned) return g;
-  return { icon:'⚠️', action:'COUNTER — Trend opposes bias', desc:'Momentum strong but direction misaligned', color:'#ffaa44' };
+  // Entry-action states must agree with bias direction
+  const entryStates = ['STRONG','BUILDING','SPARK','EMERGING'];
+  if (entryStates.includes(momentum)) {
+    const t1 = trend?.trend1h;
+    const t4 = trend?.trend4h;
+    const aligned = (bias === 'BUY' && (t1 === 'STRONGER' || t4 === 'STRONGER'))
+                 || (bias === 'SELL' && (t1 === 'WEAKER' || t4 === 'WEAKER'));
+    if (aligned) return g;
+    if (bias === 'WAIT') return { icon:'▬', action:'WAIT — No valid bias yet', desc:'Momentum building but gap below ±5', color:'var(--text-muted)' };
+    return { icon:'⚠️', action:'COUNTER — Momentum opposes bias', desc:`${momentum} momentum but trend misaligned with ${bias}`, color:'#ffaa44' };
+  }
+  return g;
 }
 function getEdgeMemory(row, memoryIndex) {
   if (!memoryIndex || !row) return null;
