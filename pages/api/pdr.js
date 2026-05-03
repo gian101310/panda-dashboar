@@ -12,8 +12,8 @@ const ALL_PAIRS = [
 async function fetchD1Candles(symbols) {
   if (!TWELVEDATA_KEY) return {};
   const results = {};
-  for (let i = 0; i < symbols.length; i += 8) {
-    const batch = symbols.slice(i, i + 8);
+  for (let i = 0; i < symbols.length; i += 11) {
+    const batch = symbols.slice(i, i + 11);
     const tdSymbols = batch.map(s => s.slice(0,3) + '/' + s.slice(3)).join(',');
     try {
       const r = await fetch(
@@ -45,7 +45,7 @@ async function fetchD1Candles(symbols) {
     } catch (e) {
       console.error('[PDR] Batch fetch error:', e.message);
     }
-    if (i + 8 < symbols.length) await new Promise(r => setTimeout(r, 10000));
+    if (i + 11 < symbols.length) await new Promise(r => setTimeout(r, 1500));
   }
   return results;
 }
