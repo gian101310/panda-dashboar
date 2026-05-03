@@ -2017,9 +2017,9 @@ const OV_COLORS = {
   warn:'#ffd166',warnDim:'rgba(255,209,102,0.10)',
   ai:'#7C3AED',aiDim:'rgba(124,58,237,0.12)',
   proven:'#10B981',dead:'#EF4444',
-  bgCard:'rgba(14,22,38,0.85)',bgCardSolid:'#0e1626',
-  border:'rgba(255,255,255,0.10)',borderBright:'rgba(255,255,255,0.18)',
-  textPrimary:'#ffffff',textSecondary:'#c8d8f0',textMuted:'#7b8faa',
+  bgCard:'rgba(14,22,38,0.90)',bgCardSolid:'#0e1626',
+  border:'rgba(255,255,255,0.12)',borderBright:'rgba(255,255,255,0.22)',
+  textPrimary:'#ffffff',textSecondary:'#e0e8f8',textMuted:'#a0b0cc',
 };
 const ovGlass = { background:OV_COLORS.bgCard, backdropFilter:'blur(16px)', WebkitBackdropFilter:'blur(16px)', border:`1px solid ${OV_COLORS.border}`, borderRadius:12 };
 const ovMomColors = { STRONG:'#00ff9f',BUILDING:'#66ffcc',SPARK:'#ffd166',EMERGING:'#66ffcc',STABLE:'#6b7fa8',CONSOLIDATING:'#5a6d8a',COOLING:'#ffaa44',FADING:'#ff7744',REVERSING:'#ff4d6d',NEUTRAL:'#3a4568' };
