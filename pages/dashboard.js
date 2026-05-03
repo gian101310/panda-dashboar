@@ -994,7 +994,7 @@ function PairCard({ row, trend, cotBias, confidence, memoryIndex, pdr, newsAlert
 
 
 // ===== PAIR CARD MODAL =====
-function PairCardModal({ row, trend, cotBias, onClose, isMobile, confidence, memoryIndex }) {
+function PairCardModal({ row, trend, cotBias, onClose, isMobile, confidence, memoryIndex, pdr, newsAlert }) {
   if (!row) return null;
   const gap = row.gap ?? 0;
   const bias = biasFromGap(gap);
@@ -1097,6 +1097,31 @@ function PairCardModal({ row, trend, cotBias, onClose, isMobile, confidence, mem
             {!pl.valid && <span style={{fontFamily:mono,fontSize:9,color:'#ff7744',letterSpacing:1}}>⛔ NOT VALID</span>}
           </div>
         ); })()}
+
+        {/* News Alert */}
+        {newsAlert&&<div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',background:'rgba(255,209,102,0.08)',borderRadius:8,border:'1px solid rgba(255,209,102,0.35)'}}>
+          <span style={{fontSize:12}}>📰</span><span style={{fontFamily:mono,fontSize:10,color:'#ffd166',letterSpacing:1,fontWeight:700}}>HIGH IMPACT NEWS — CHECK CALENDAR</span>
+        </div>}
+
+        {/* Edge Memory */}
+        {(()=>{const em=getEdgeMemory(row,memoryIndex);if(!em)return null;const fc=em.flag==='PROVEN_EDGE'?'#00ff9f':em.flag==='DEAD_ZONE'?'#ff4d6d':'#00b4ff';const icon=em.flag==='PROVEN_EDGE'?'✅':em.flag==='DEAD_ZONE'?'⛔':'📊';const lbl=em.flag?em.flag.replace('_',' '):(em.maturity||'').toUpperCase();const wrPct=Math.round((em.winRate||0)*100);const resPct=em.resRate!=null?Math.round(em.resRate*100):null;const edgeTip=em.flag==='PROVEN_EDGE'?`Proven edge: ${wrPct}% win rate from ${em.sample} resolved signals.`:em.flag==='DEAD_ZONE'?`Dead zone: only ${wrPct}% win rate from ${em.sample} signals.`:`${(em.maturity||'').toUpperCase()}: ${wrPct}% win rate from ${em.sample} signals.`;return(
+          <div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',background:'rgba(0,0,0,0.15)',borderRadius:8}}>
+            <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2}}>EDGE</span>
+            <span title={edgeTip} style={{fontFamily:mono,fontSize:10,color:fc,background:fc+'12',border:`1px solid ${fc}33`,borderRadius:5,padding:'2px 10px',fontWeight:700,cursor:'help'}}>{icon} {lbl}</span>
+            <span style={{fontFamily:mono,fontSize:10,color:'var(--text-muted)'}}>Win:{wrPct}%{resPct!=null?` | Res:${resPct}%`:''} (n={em.sample})</span>
+          </div>);})()}
+
+        {/* Confidence Conflict */}
+        {confidence&&confidence.conflict&&<div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',background:'rgba(255,77,109,0.08)',borderRadius:8,border:'1px solid rgba(255,77,109,0.25)'}}>
+          <span style={{fontFamily:mono,fontSize:10,color:'#ff4d6d',fontWeight:700}}>⚠️ CONFLICT</span>
+          <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>High real-time confidence but historical win rate ≤50% at this gap level</span>
+        </div>}
+
+        {/* PDR */}
+        {pdr&&<div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',background:'rgba(0,0,0,0.15)',borderRadius:8}}>
+          <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2}}>PDR</span>
+          <PdrBadge pdr={pdr}/>
+        </div>}
 
         {/* Momentum */}
         <div style={{padding:'10px 14px',background:'rgba(0,0,0,0.15)',borderRadius:8,display:'flex',flexDirection:'column',gap:6}}>
@@ -2123,10 +2148,13 @@ function OvSignalCard({ pair, tier, onClick, delay }) {
     {tags.length>0&&<div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
       {tags.map(t=><span key={t.label} style={{fontFamily:mono,fontSize:8,color:t.color,background:t.bg,border:`1px solid ${t.color}30`,borderRadius:3,padding:'2px 6px',letterSpacing:1}}>{t.label}</span>)}
     </div>}
-    {hov&&!isL&&<div style={{marginTop:10,paddingTop:8,borderTop:`1px solid ${OV_COLORS.border}`,display:'flex',gap:10,flexWrap:'wrap'}}>
-      <span style={{fontFamily:mono,fontSize:9,color:OV_COLORS.textMuted}}>PL: {pair.pl_zone}</span>
-      <span style={{fontFamily:mono,fontSize:9,color:OV_COLORS.textMuted}}>H4: {pair.box_h4}</span>
-      <span style={{fontFamily:mono,fontSize:9,color:OV_COLORS.textMuted}}>PDR: {Number(pair.pdr_strength||0).toFixed(2)}</span>
+    {hov&&!isL&&<div style={{marginTop:10,paddingTop:8,borderTop:`1px solid ${OV_COLORS.border}`,display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
+      {(()=>{const plv=pair.pl_zone==='ABOVE'&&pair.bias==='BUY'||pair.pl_zone==='BELOW'&&pair.bias==='SELL';const plc=plv?OV_COLORS.buy:'#ff7744';return <span style={{fontFamily:mono,fontSize:8,color:plc,background:plc+'12',border:`1px solid ${plc}30`,borderRadius:3,padding:'1px 6px'}}>PL {pair.pl_zone} {plv?'✅':'⛔'}</span>;})()}
+      {pair.box_h4&&pair.box_h4!=='UNKNOWN'&&(()=>{const c=pair.box_h4==='UPTREND'?OV_COLORS.buy:pair.box_h4==='DOWNTREND'?OV_COLORS.sell:OV_COLORS.warn;return <span style={{fontFamily:mono,fontSize:8,color:c,background:c+'12',border:`1px solid ${c}30`,borderRadius:3,padding:'1px 6px'}}>H4 {pair.box_h4==='UPTREND'?'▲ UP':pair.box_h4==='DOWNTREND'?'▼ DN':'↔ RNG'}</span>;})()}
+      {pair.box_h1&&pair.box_h1!=='UNKNOWN'&&(()=>{const c=pair.box_h1==='UPTREND'?OV_COLORS.buy:pair.box_h1==='DOWNTREND'?OV_COLORS.sell:OV_COLORS.warn;return <span style={{fontFamily:mono,fontSize:8,color:c,background:c+'12',border:`1px solid ${c}30`,borderRadius:3,padding:'1px 6px'}}>H1 {pair.box_h1==='UPTREND'?'▲ UP':pair.box_h1==='DOWNTREND'?'▼ DN':'↔ RNG'}</span>;})()}
+      <span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted,background:'rgba(255,255,255,0.04)',borderRadius:3,padding:'1px 6px'}}>PDR {Number(pair.pdr_strength||0).toFixed(2)} {pair.pdr_strong?'✓':''}</span>
+      {pair.edge==='PROVEN_EDGE'&&<span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.proven,background:'rgba(16,185,129,0.12)',border:`1px solid ${OV_COLORS.proven}30`,borderRadius:3,padding:'1px 6px'}}>✅ PROVEN</span>}
+      {pair.edge==='DEAD_ZONE'&&<span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.dead,background:'rgba(239,68,68,0.12)',border:`1px solid ${OV_COLORS.dead}30`,borderRadius:3,padding:'1px 6px'}}>⛔ DEAD</span>}
     </div>}
   </div>;
 }
@@ -3179,6 +3207,8 @@ export default function Dashboard() {
         isMobile={isMobile}
         confidence={confidenceMap[selectedPair.symbol]}
         memoryIndex={memoryIndex}
+        pdr={pdrData[selectedPair.symbol]}
+        newsAlert={upcomingNews.affected_pairs?.includes(selectedPair.symbol)}
       />
     )}
     </>
