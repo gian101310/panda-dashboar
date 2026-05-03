@@ -2017,9 +2017,9 @@ const OV_COLORS = {
   warn:'#ffd166',warnDim:'rgba(255,209,102,0.10)',
   ai:'#7C3AED',aiDim:'rgba(124,58,237,0.12)',
   proven:'#10B981',dead:'#EF4444',
-  bgCard:'rgba(12,18,32,0.65)',bgCardSolid:'#0c1220',
-  border:'rgba(255,255,255,0.06)',borderBright:'rgba(255,255,255,0.12)',
-  textPrimary:'#e8f0ff',textSecondary:'#8899bb',textMuted:'#4a5578',
+  bgCard:'rgba(14,22,38,0.85)',bgCardSolid:'#0e1626',
+  border:'rgba(255,255,255,0.10)',borderBright:'rgba(255,255,255,0.18)',
+  textPrimary:'#ffffff',textSecondary:'#c8d8f0',textMuted:'#7b8faa',
 };
 const ovGlass = { background:OV_COLORS.bgCard, backdropFilter:'blur(16px)', WebkitBackdropFilter:'blur(16px)', border:`1px solid ${OV_COLORS.border}`, borderRadius:12 };
 const ovMomColors = { STRONG:'#00ff9f',BUILDING:'#66ffcc',SPARK:'#ffd166',EMERGING:'#66ffcc',STABLE:'#6b7fa8',CONSOLIDATING:'#5a6d8a',COOLING:'#ffaa44',FADING:'#ff7744',REVERSING:'#ff4d6d',NEUTRAL:'#3a4568' };
@@ -2145,7 +2145,7 @@ function OvSignalCard({ pair, tier, onClick, delay }) {
         <span style={{fontFamily:orb,fontSize:isH?18:isL?12:15,fontWeight:700,color:isL?OV_COLORS.textMuted:OV_COLORS.textPrimary,letterSpacing:isH?2:1}}>{pair.symbol}</span>
         <span style={{fontFamily:mono,fontSize:isL?8:11,fontWeight:700,color:bc,background:`${bc}12`,border:`1px solid ${bc}35`,borderRadius:4,padding:isL?'1px 5px':'3px 10px',letterSpacing:1}}>{pair.bias}</span>
       </div>
-      <span style={{fontFamily:orb,fontSize:isH?26:isL?11:18,fontWeight:900,color:bc,textShadow:isH?`0 0 16px ${bc}40`:'none'}}>{pair.gap>0?'+':''}{Number(pair.gap).toFixed(1)}</span>
+      <span style={{fontFamily:orb,fontSize:isH?28:isL?11:20,fontWeight:900,color:bc,textShadow:`0 0 ${isH?20:12}px ${bc}66`}}>{pair.gap>0?'+':''}{Number(pair.gap).toFixed(1)}</span>
     </div>
     {/* Metrics row */}
     {!isL&&<div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:8}}>
@@ -2371,33 +2371,48 @@ function OverviewTab({ data, trends, pdrData, upcomingNews, spikes, confidenceMa
       <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 380px',gap:20}}>
         {/* LEFT — Signal Board */}
         <div style={{display:'flex',flexDirection:'column',gap:16}}>
-          {highTier.length>0&&<div>
-            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
-              <Shield size={12} color={OV_COLORS.buy}/><span style={{fontFamily:mono,fontSize:9,color:OV_COLORS.buy,letterSpacing:3,fontWeight:700}}>HIGH QUALITY</span><span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted}}>{highTier.length} pairs</span>
+          {/* BUY SIGNALS */}
+          {(()=>{const buyHigh=highTier.filter(p=>p.bias==='BUY');const buyMid=midTier.filter(p=>p.bias==='BUY');const buyLow=lowTier.filter(p=>p.bias==='BUY');const buyAll=[...buyHigh,...buyMid,...buyLow];if(!buyAll.length)return null;return(<div style={{borderLeft:'3px solid #00ff9f',paddingLeft:14,marginBottom:8}}>
+            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}>
+              <Shield size={14} color='#00ff9f'/><span style={{fontFamily:orb,fontSize:12,color:'#00ff9f',letterSpacing:3,fontWeight:900,textShadow:'0 0 10px rgba(0,255,159,0.4)'}}>BUY SIGNALS</span><span style={{fontFamily:mono,fontSize:9,color:'#ffffff',background:'rgba(0,255,159,0.15)',border:'1px solid rgba(0,255,159,0.3)',borderRadius:4,padding:'2px 8px'}}>{buyAll.length}</span>
             </div>
-            <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(auto-fill,minmax(320px,1fr))',gap:14}}>
-              {highTier.map((p,i)=><OvSignalCard key={p.symbol} pair={p} tier="HIGH" onClick={()=>{const r=findRow(p.symbol);if(r)onSelectPair(r);}} delay={i*80}/>)}
-            </div>
-          </div>}
-          {midTier.length>0&&<div>
-            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
-              <Eye size={12} color={OV_COLORS.textSecondary}/><span style={{fontFamily:mono,fontSize:9,color:OV_COLORS.textSecondary,letterSpacing:3}}>MID QUALITY</span><span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted}}>{midTier.length} pairs</span>
-            </div>
-            <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(auto-fill,minmax(280px,1fr))',gap:12}}>
-              {midTier.map((p,i)=><OvSignalCard key={p.symbol} pair={p} tier="MID" onClick={()=>{const r=findRow(p.symbol);if(r)onSelectPair(r);}} delay={i*60+300}/>)}
-            </div>
-          </div>}
-          {lowTier.length>0&&<div>
-            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
-              <Radio size={10} color={OV_COLORS.textMuted}/><span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted,letterSpacing:2}}>LOW QUALITY</span><span style={{fontFamily:mono,fontSize:7,color:OV_COLORS.textMuted}}>{lowTier.length}</span>
-            </div>
+            {buyHigh.length>0&&<><div style={{fontFamily:mono,fontSize:8,color:'#00ff9f',letterSpacing:2,marginBottom:6,fontWeight:700}}>HIGH QUALITY · {buyHigh.length}</div>
+            <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(auto-fill,minmax(320px,1fr))',gap:14,marginBottom:14}}>
+              {buyHigh.map((p,i)=><OvSignalCard key={p.symbol} pair={p} tier="HIGH" onClick={()=>{const r=findRow(p.symbol);if(r)onSelectPair(r);}} delay={i*80}/>)}
+            </div></>}
+            {buyMid.length>0&&<><div style={{fontFamily:mono,fontSize:8,color:'#c8d8f0',letterSpacing:2,marginBottom:6}}>MID QUALITY · {buyMid.length}</div>
+            <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(auto-fill,minmax(280px,1fr))',gap:12,marginBottom:14}}>
+              {buyMid.map((p,i)=><OvSignalCard key={p.symbol} pair={p} tier="MID" onClick={()=>{const r=findRow(p.symbol);if(r)onSelectPair(r);}} delay={i*60+200}/>)}
+            </div></>}
+            {buyLow.length>0&&<><div style={{fontFamily:mono,fontSize:8,color:'#7b8faa',letterSpacing:2,marginBottom:6}}>LOW · {buyLow.length}</div>
             <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(auto-fill,minmax(170px,1fr))',gap:6}}>
-              {lowTier.map((p,i)=><OvSignalCard key={p.symbol} pair={p} tier="LOW" onClick={()=>{const r=findRow(p.symbol);if(r)onSelectPair(r);}} delay={i*40+500}/>)}
+              {buyLow.map((p,i)=><OvSignalCard key={p.symbol} pair={p} tier="LOW" onClick={()=>{const r=findRow(p.symbol);if(r)onSelectPair(r);}} delay={i*40+400}/>)}
+            </div></>}
+          </div>);})()}
+
+          {/* SELL SIGNALS */}
+          {(()=>{const sellHigh=highTier.filter(p=>p.bias==='SELL');const sellMid=midTier.filter(p=>p.bias==='SELL');const sellLow=lowTier.filter(p=>p.bias==='SELL');const sellAll=[...sellHigh,...sellMid,...sellLow];if(!sellAll.length)return null;return(<div style={{borderLeft:'3px solid #ff4d6d',paddingLeft:14,marginBottom:8}}>
+            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}>
+              <Shield size={14} color='#ff4d6d'/><span style={{fontFamily:orb,fontSize:12,color:'#ff4d6d',letterSpacing:3,fontWeight:900,textShadow:'0 0 10px rgba(255,77,109,0.4)'}}>SELL SIGNALS</span><span style={{fontFamily:mono,fontSize:9,color:'#ffffff',background:'rgba(255,77,109,0.15)',border:'1px solid rgba(255,77,109,0.3)',borderRadius:4,padding:'2px 8px'}}>{sellAll.length}</span>
             </div>
-          </div>}
-          {invalidTier.length>0&&<div>
+            {sellHigh.length>0&&<><div style={{fontFamily:mono,fontSize:8,color:'#ff4d6d',letterSpacing:2,marginBottom:6,fontWeight:700}}>HIGH QUALITY · {sellHigh.length}</div>
+            <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(auto-fill,minmax(320px,1fr))',gap:14,marginBottom:14}}>
+              {sellHigh.map((p,i)=><OvSignalCard key={p.symbol} pair={p} tier="HIGH" onClick={()=>{const r=findRow(p.symbol);if(r)onSelectPair(r);}} delay={i*80}/>)}
+            </div></>}
+            {sellMid.length>0&&<><div style={{fontFamily:mono,fontSize:8,color:'#c8d8f0',letterSpacing:2,marginBottom:6}}>MID QUALITY · {sellMid.length}</div>
+            <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(auto-fill,minmax(280px,1fr))',gap:12,marginBottom:14}}>
+              {sellMid.map((p,i)=><OvSignalCard key={p.symbol} pair={p} tier="MID" onClick={()=>{const r=findRow(p.symbol);if(r)onSelectPair(r);}} delay={i*60+200}/>)}
+            </div></>}
+            {sellLow.length>0&&<><div style={{fontFamily:mono,fontSize:8,color:'#7b8faa',letterSpacing:2,marginBottom:6}}>LOW · {sellLow.length}</div>
+            <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(auto-fill,minmax(170px,1fr))',gap:6}}>
+              {sellLow.map((p,i)=><OvSignalCard key={p.symbol} pair={p} tier="LOW" onClick={()=>{const r=findRow(p.symbol);if(r)onSelectPair(r);}} delay={i*40+400}/>)}
+            </div></>}
+          </div>);})()}
+
+          {/* INVALID PAIRS */}
+          {invalidTier.length>0&&<div style={{opacity:0.5,marginTop:8}}>
             <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
-              <Radio size={10} color='#ff4d6d'/><span style={{fontFamily:mono,fontSize:8,color:'#ff4d6d',letterSpacing:2}}>INVALID PAIRS</span><span style={{fontFamily:mono,fontSize:7,color:OV_COLORS.textMuted}}>{invalidTier.length}</span>
+              <Radio size={10} color='#ff4d6d'/><span style={{fontFamily:mono,fontSize:9,color:'#ff4d6d',letterSpacing:2,fontWeight:700}}>INVALID PAIRS</span><span style={{fontFamily:mono,fontSize:8,color:'#7b8faa'}}>{invalidTier.length}</span>
             </div>
             <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(auto-fill,minmax(140px,1fr))',gap:5}}>
               {invalidTier.map((p,i)=><OvSignalCard key={p.symbol} pair={p} tier="LOW" onClick={()=>{const r=findRow(p.symbol);if(r)onSelectPair(r);}} delay={i*30+700}/>)}
