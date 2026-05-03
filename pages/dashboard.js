@@ -939,8 +939,8 @@ function PairCard({ row, trend, cotBias, confidence, memoryIndex, pdr, newsAlert
   const gapTrend=(row.delta_short??0)>0.5?'STRONGER':(row.delta_short??0)<-0.5?'WEAKER':'STABLE';
   if(!valid) return (
     <div style={{background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:10,padding:'12px 14px',display:'flex',flexDirection:'column',gap:7,height:'100%',boxSizing:'border-box',flex:1}}>
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}><span style={{fontFamily:orb,fontSize:12,fontWeight:700,letterSpacing:2,color:'var(--border)'}}>{row.symbol}</span><span style={{fontFamily:mono,fontSize:9,color:'var(--border)',background:'var(--border)',border:'1px solid var(--border)',borderRadius:4,padding:'2px 7px'}}>WAIT</span></div>
-      <div style={{display:'flex',alignItems:'baseline',gap:4}}><span style={{fontFamily:orb,fontSize:22,fontWeight:900,color:'#1e2840',lineHeight:1}}>{gap>0?'+':''}{Number(gap).toFixed(1)}</span><span style={{fontFamily:mono,fontSize:9,color:'var(--border)'}}>GAP</span></div>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}><span style={{fontFamily:orb,fontSize:12,fontWeight:700,letterSpacing:2,color:'var(--text-secondary)'}}>{row.symbol}</span><span style={{fontFamily:mono,fontSize:9,color:'var(--bg-card)',background:'var(--text-muted)',border:'1px solid var(--border)',borderRadius:4,padding:'2px 7px'}}>WAIT</span></div>
+      <div style={{display:'flex',alignItems:'baseline',gap:4}}><span style={{fontFamily:orb,fontSize:22,fontWeight:900,color:'var(--text-muted)',lineHeight:1}}>{gap>0?'+':''}{Number(gap).toFixed(1)}</span><span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>GAP</span></div>
     </div>
   );
   return (
