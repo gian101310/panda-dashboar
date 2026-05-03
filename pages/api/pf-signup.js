@@ -48,6 +48,8 @@ export default async function handler(req, res) {
     if (safeTier === 'starter') {
       const password = pfGenPassword();
 
+      const expiresAt = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString();
+
       await supabase.from('panda_users').insert({
         username: safeUser,
         password_hash: hashPassword(password),
@@ -57,6 +59,7 @@ export default async function handler(req, res) {
         feature_access: PF_STARTER_FEATURES,
         max_devices: 1,
         is_active: true,
+        expires_at: expiresAt,
       });
 
       await supabase.from('pf_signup_requests').insert({
