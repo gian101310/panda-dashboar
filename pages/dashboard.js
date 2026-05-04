@@ -2132,20 +2132,23 @@ function OvSignalCard({ pair, tier, onClick, delay }) {
   const glowColor=pair.bias==='BUY'?'rgba(0,255,159,0.35)':pair.bias==='SELL'?'rgba(255,77,109,0.35)':'none';
   const glowHover=pair.bias==='BUY'?'0 0 24px rgba(0,255,159,0.5), 0 4px 20px rgba(0,255,159,0.25)':pair.bias==='SELL'?'0 0 24px rgba(255,77,109,0.5), 0 4px 20px rgba(255,77,109,0.25)':`0 8px 24px ${bc}20`;
   const glowBase=pair.bias==='BUY'?`0 0 16px rgba(0,255,159,0.3), 0 2px 12px rgba(0,255,159,0.15)`:pair.bias==='SELL'?`0 0 16px rgba(255,77,109,0.3), 0 2px 12px rgba(255,77,109,0.15)`:`0 4px 16px ${bc}10`;
+  const biasGradient=pair.bias==='BUY'?'linear-gradient(135deg,rgba(0,255,159,0.08),rgba(14,22,38,0.92))':pair.bias==='SELL'?'linear-gradient(135deg,rgba(255,77,109,0.08),rgba(14,22,38,0.92))':OV_COLORS.bgCard;
   return <div onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)} onClick={onClick} style={{
     ...ovGlass,padding:isH?'22px 24px':isL?'12px 14px':'18px 20px',cursor:'pointer',position:'relative',overflow:'hidden',
-    opacity:isL?0.55:1,transform:hov?'translateY(-3px) scale(1.01)':'translateY(0)',transition:'all 0.25s ease',
-    boxShadow:hov?glowHover:isH?glowBase:'none',
-    borderColor:hov?`${bc}60`:isH?`${bc}35`:OV_COLORS.border,
+    background:biasGradient,
+    opacity:isL?0.75:1,transform:hov?'translateY(-3px) scale(1.01)':'translateY(0)',transition:'all 0.25s ease',
+    boxShadow:hov?glowHover:isH?glowBase:`0 0 8px ${bc}10`,
+    borderColor:hov?`${bc}60`:isH?`${bc}35`:`${bc}20`,
+    borderLeft:`3px solid ${bc}`,
   }}>
-    {isH&&<div style={{position:'absolute',top:0,left:0,right:0,height:2,background:`linear-gradient(90deg,transparent,${bc},transparent)`}}/>}
+    {<div style={{position:'absolute',top:0,left:0,right:0,height:2,background:`linear-gradient(90deg,transparent,${bc},transparent)`}}/>}
     {/* Header: Symbol + Bias + Gap */}
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:isL?4:10}}>
       <div style={{display:'flex',alignItems:'center',gap:isL?6:10}}>
-        <span style={{fontFamily:orb,fontSize:isH?18:isL?12:15,fontWeight:700,color:isL?OV_COLORS.textMuted:OV_COLORS.textPrimary,letterSpacing:isH?2:1}}>{pair.symbol}</span>
-        <span style={{fontFamily:mono,fontSize:isL?8:11,fontWeight:700,color:bc,background:`${bc}12`,border:`1px solid ${bc}35`,borderRadius:4,padding:isL?'1px 5px':'3px 10px',letterSpacing:1}}>{pair.bias}</span>
+        <span style={{fontFamily:orb,fontSize:isH?18:isL?13:15,fontWeight:700,color:OV_COLORS.textPrimary,letterSpacing:isH?2:1}}>{pair.symbol}</span>
+        <span style={{fontFamily:mono,fontSize:isL?9:11,fontWeight:900,color:bc,background:`${bc}18`,border:`1px solid ${bc}45`,borderRadius:4,padding:isL?'2px 6px':'3px 10px',letterSpacing:1,textShadow:`0 0 8px ${bc}44`}}>{pair.bias}</span>
       </div>
-      <span style={{fontFamily:orb,fontSize:isH?28:isL?11:20,fontWeight:900,color:bc,textShadow:`0 0 ${isH?20:12}px ${bc}66`}}>{pair.gap>0?'+':''}{Number(pair.gap).toFixed(1)}</span>
+      <span style={{fontFamily:orb,fontSize:isH?28:isL?14:20,fontWeight:900,color:bc,textShadow:`0 0 ${isH?20:14}px ${bc}66`}}>{pair.gap>0?'+':''}{Number(pair.gap).toFixed(1)}</span>
     </div>
     {/* Metrics row */}
     {!isL&&<div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:8}}>
