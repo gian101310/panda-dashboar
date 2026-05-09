@@ -114,7 +114,7 @@ Closes on: GAP_BELOW_5, BIAS_FLIPPED, PL_FLIPPED, MAX_AGE_30D. Milestones: 24h/4
 
 === AGENT PIPELINE ===
 Signal Agent (22 memories): signal_results → gap levels, PL edge, per-pair, flat rates.
-Journal Agent (21 memories): manual_trades → per-pair P&L, sessions, hold durations, monthly.
+Journal Agent: signal_results + signal_tracker → per-pair outcomes, sessions, hold durations, entry conditions.
 Pattern Agent (14 memories): cross-reference → alpha/leak pairs, session edge, execution gap, PL discipline.
 Master Agent: injects all 57 memories into every response. Re-run when signal_results grows 50+.
 
@@ -215,20 +215,32 @@ async function fetchMarketContext() {
 
 async function fetchReviewContext() {
   const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-  const [signals, journal] = await Promise.all([
-    supabase.from('signal_results').select('*').gte('created_at', since).order('created_at', { ascending: false }).limit(100),
-    supabase.from('manual_trades').select('*').gte('entry_time', since).order('entry_time', { ascending: false }).limit(50)
+  const [signals, tracker] = await Promise.all([
+    supabase.from('signal_results')
+      .select('symbol,strategy,direction,entry_gap,peak_gap,pips,outcome,momentum,pl_zone,duration_min,created_at')
+      .gte('created_at', since)
+      .order('created_at', { ascending: false })
+      .limit(100),
+    supabase.from('signal_tracker')
+      .select('symbol,strategy,direction,gap_at_open,peak_gap,net_pips,close_reason,momentum_at_open,pl_zone_at_open,session_at_open,opened_at,closed_at,status')
+      .gte('opened_at', since)
+      .order('opened_at', { ascending: false })
+      .limit(50)
   ]);
   let ctx = '';
   if (signals.data?.length) {
     ctx += 'SIGNAL RESULTS (last 30 days):\n';
-    ctx += signals.data.map(s => `${s.symbol} ${s.strategy} ${s.direction} gap:${s.entry_gap} peak:${s.peak_gap} pips:${s.pips||'pending'} outcome:${s.outcome||'PENDING'} dur:${s.duration_min||'-'}m`).join('\n');
+    ctx += signals.data.map(s =>
+      `${s.symbol} ${s.strategy} ${s.direction} gap:${s.entry_gap} peak:${s.peak_gap} pips:${s.pips ?? 'pending'} outcome:${s.outcome || 'PENDING'} pl:${s.pl_zone || '-'} mom:${s.momentum || '-'} dur:${s.duration_min || '-'}m`
+    ).join('\n');
   }
-  if (journal.data?.length) {
-    ctx += '\n\nTRADE HISTORY (last 30 days):\n';
-    ctx += journal.data.map(t => `${t.symbol} ${t.direction} pips:${t.profit_loss_pips||'-'} ${t.entry_time}`).join('\n');
+  if (tracker.data?.length) {
+    ctx += '\n\nSIGNAL TRACKER (last 30 days):\n';
+    ctx += tracker.data.map(t =>
+      `${t.symbol} ${t.strategy} ${t.direction} gap:${t.gap_at_open} peak:${t.peak_gap || '-'} pips:${t.net_pips ?? '-'} close:${t.close_reason || t.status} pl:${t.pl_zone_at_open || '-'} sess:${t.session_at_open || '-'}`
+    ).join('\n');
   }
-  return ctx || 'No trade history available.';
+  return ctx || 'No signal data available for review.';
 }
 
 // ─── MAIN HANDLER ─────────────────────────────────────────────────────────────
@@ -266,7 +278,7 @@ export default async function handler(req, res) {
       userContent = `MARKET DATA:\n${marketData}\n\n${memoryContext}\n\nAnalyze all 21 pairs. Describe the current bias landscape. Identify currency themes. Show which pairs have strong gap scores and whether Panda Lines are confirming. Include historical pattern data where relevant with sample sizes. Remember: describe data only — no trade recommendations.`;
     } else if (mode === 'review') {
       const reviewData = await fetchReviewContext();
-      userContent = `MARKET DATA:\n${marketData}\n\n${reviewData}\n\n${memoryContext}\n\nDescribe the trading performance data. Compare actual trades to engine signals. Show behavioral patterns across sessions, hold durations, and pairs. Present the data factually.`;
+      userContent = `MARKET DATA:\n${marketData}\n\n${reviewData}\n\n${memoryContext}\n\nDescribe the signal performance data. Analyze outcomes by gap level, Panda Lines confirmation, session, and hold duration. Show which pairs and conditions produced wins vs losses vs flats. Identify behavioral patterns. Present data factually — no trade recommendations.`;
     } else if (mode === 'chat') {
       if (!message) return res.status(400).json({ error: 'message required' });
       userContent = `MARKET DATA:\n${marketData}\n\n${memoryContext}\n\nUser question: ${message}`;
