@@ -16,10 +16,11 @@ async function fetchD1Candles(symbols) {
     const batch = symbols.slice(i, i + 11);
     const tdSymbols = batch.map(s => s.slice(0,3) + '/' + s.slice(3)).join(',');
     try {
-      const r = await fetch(
-        `https://api.twelvedata.com/time_series?symbol=${tdSymbols}&interval=1day&outputsize=15&apikey=${TWELVEDATA_KEY}`
-      );
+      const url = `https://api.twelvedata.com/time_series?symbol=${tdSymbols}&interval=1day&outputsize=15&apikey=${TWELVEDATA_KEY}`;
+      console.log('[PDR] Fetching batch', i, ':', batch.join(','));
+      const r = await fetch(url);
       const data = await r.json();
+      if (data.code || data.status === 'error') console.error('[PDR] API error:', JSON.stringify(data));
       if (batch.length === 1) {
         const sym = batch[0];
         if (data.values && data.values.length >= 2) {
