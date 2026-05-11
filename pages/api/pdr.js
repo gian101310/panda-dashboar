@@ -20,8 +20,14 @@ async function fetchD1Candles(symbols) {
       console.log('[PDR] Fetching batch', i, ':', batch.join(','));
       const r = await fetch(url);
       const data = await r.json();
-      console.log('[PDR] Response keys:', Object.keys(data).join(','), '| status:', r.status);
-      if (data.code || data.status === 'error') console.error('[PDR] API error:', JSON.stringify(data).slice(0,500));
+      const keys = Object.keys(data);
+      console.log('[PDR] batch', i, 'keys:', keys.slice(0,5).join(','), 'total:', keys.length);
+      if (data.code) console.error('[PDR] ERR code:', data.code, data.message);
+      if (keys.length > 0 && !data.code) {
+        const firstKey = keys[0];
+        const sample = data[firstKey];
+        console.log('[PDR] first key:', firstKey, 'has values:', !!(sample && sample.values));
+      }
       if (batch.length === 1) {
         const sym = batch[0];
         if (data.values && data.values.length >= 2) {
