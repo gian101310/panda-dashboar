@@ -1282,6 +1282,7 @@ function ValidSetupsTab({ data, trends, cotMap, confidenceMap }) {
               })()}
               {(()=>{const adv=advScore(row);if(!adv)return null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}><span style={{fontFamily:mono,fontSize:9,color:adv.color,background:adv.bg,border:`1px solid ${adv.border}`,borderRadius:4,padding:'2px 8px',fontWeight:700}}>{adv.label}</span><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)'}}>{adv.detail}</span></div>);})()}
               {(()=>{const cf=confidenceMap&&confidenceMap[row.symbol];if(!cf)return null;const cs=confStyle(cf.confidence);if(!cs)return null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>CONF</span><span style={{fontFamily:mono,fontSize:9,color:cs.color,background:cs.bg,border:`1px solid ${cs.border}`,borderRadius:4,padding:'2px 8px',fontWeight:700}}>{cf.confidence} {cs.label}</span></div>);})()}
+              {(()=>{const isBuy=bias.label==='BUY',isSell=bias.label==='SELL';if(!isBuy&&!isSell)return null;const isJpy=row.symbol?.includes('JPY');const dec=isJpy?3:5;const levels=isBuy?[{l:'PDL',v:row.pdl},{l:'PWL',v:row.pwl},{l:'PML',v:row.pml}].filter(x=>x.v!=null).sort((a,b)=>b.v-a.v):[{l:'PDH',v:row.pdh},{l:'PWH',v:row.pwh},{l:'PMH',v:row.pmh}].filter(x=>x.v!=null).sort((a,b)=>a.v-b.v);const top2=levels.slice(0,2);if(!top2.length)return null;const c1=isBuy?'#00ff9f':'#ff4d6d';const c2='#00b4ff';return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>ENTRY</span>{top2.map((lv,i)=><span key={lv.l} style={{fontFamily:mono,fontSize:9,color:i===0?c1:c2,background:(i===0?c1:c2)+'12',border:`1px solid ${(i===0?c1:c2)}28`,borderRadius:3,padding:'1px 6px',fontWeight:600}}>{lv.l} {Number(lv.v).toFixed(dec)}</span>)}</div>);})()}
             </div>
 
             {/* STRENGTH */}
@@ -1407,6 +1408,7 @@ function ValidPairsTab({ data, trends, cotMap, confidenceMap }) {
               {!pl.valid&&<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:'#ff7744',letterSpacing:1}}>CONTINUATION ⛔</span>}
             </div>
           );})()}
+          {(()=>{const isBuy=bias.label==='BUY',isSell=bias.label==='SELL';if(!isBuy&&!isSell)return null;const isJpy=row.symbol?.includes('JPY');const dec=isJpy?3:5;const levels=isBuy?[{l:'PDL',v:row.pdl},{l:'PWL',v:row.pwl},{l:'PML',v:row.pml}].filter(x=>x.v!=null).sort((a,b)=>b.v-a.v):[{l:'PDH',v:row.pdh},{l:'PWH',v:row.pwh},{l:'PMH',v:row.pmh}].filter(x=>x.v!=null).sort((a,b)=>a.v-b.v);const top2=levels.slice(0,2);if(!top2.length)return null;const c1=isBuy?'#00ff9f':'#ff4d6d';const c2='#00b4ff';return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}><span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>ENTRY</span>{top2.map((lv,i)=><span key={lv.l} style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:i===0?c1:c2,background:(i===0?c1:c2)+'12',border:`1px solid ${(i===0?c1:c2)}28`,borderRadius:3,padding:'1px 6px',fontWeight:600}}>{lv.l} {Number(lv.v).toFixed(dec)}</span>)}</div>);})()}
           <div style={{display:'flex',gap:8}}>
             {[['1H',t.delta1h],['4H',t.delta4h],['8H',t.delta8h]].map(([l,v])=>{const val=v??0;const c=Math.abs(val)<0.1?'var(--text-muted)':val>0?'#00ff9f':'#ff4d6d';return(<div key={l} style={{display:'flex',alignItems:'center',gap:3}}><span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:'var(--text-muted)'}}>{l}</span><span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:c,fontWeight:700}}>{Math.abs(val)<0.1?'±0':(val>0?'+':'')+val}</span></div>);})}
           </div>
@@ -1612,6 +1614,12 @@ function SpikeLogTab() {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('ALL');
+  const [filterSym, setFilterSym] = useState('');
+  const [filterMom, setFilterMom] = useState('ALL');
+  const [filterFrom, setFilterFrom] = useState('');
+  const [filterTo, setFilterTo] = useState('');
+  const ALL_SYMS = ['AUDJPY','AUDCAD','AUDNZD','AUDUSD','CADJPY','EURAUD','EURCAD','EURGBP','EURJPY','EURNZD','EURUSD','GBPAUD','GBPCAD','GBPJPY','GBPNZD','GBPUSD','NZDCAD','NZDJPY','NZDUSD','USDCAD','USDJPY'];
+  const MOM_STATES = ['STRONG','BUILDING','SPARK','CONSOLIDATING','COOLING','FADING','REVERSING'];
 
   useEffect(() => {
     fetch('/api/spikes?limit=500')
@@ -1620,18 +1628,41 @@ function SpikeLogTab() {
       .catch(()=>setLoading(false));
   }, []);
 
-  const filtered = filter==='ALL' ? logs : logs.filter(s => s.bias===filter);
+  const filtered = logs.filter(s => {
+    if (filter !== 'ALL' && s.bias !== filter) return false;
+    if (filterSym && s.symbol !== filterSym) return false;
+    if (filterMom !== 'ALL' && s.momentum !== filterMom) return false;
+    if (filterFrom) { try { if (new Date(s.fired_at) < new Date(filterFrom)) return false; } catch {} }
+    if (filterTo) { try { if (new Date(s.fired_at) > new Date(filterTo + 'T23:59:59')) return false; } catch {} }
+    return true;
+  });
+
+  const sel = { fontFamily:"'Share Tech Mono',monospace", fontSize:10, padding:'5px 8px', borderRadius:5, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text-primary)', cursor:'pointer' };
+  const inp = { ...sel, minWidth:120 };
 
   return (
     <div style={{display:'flex',flexDirection:'column',gap:10}}>
       <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
         <span style={{fontFamily:"'Orbitron',sans-serif",fontSize:11,fontWeight:700,color:'#ffd166',letterSpacing:3}}>SPIKE LOG</span>
-        <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:'var(--text-muted)'}}>{logs.length} total signals</span>
+        <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:'var(--text-muted)'}}>{filtered.length} of {logs.length} spikes</span>
         <div style={{display:'flex',gap:5,marginLeft:'auto'}}>
           {['ALL','BUY','SELL'].map(f=>(
             <button key={f} onClick={()=>setFilter(f)} style={{background:filter===f?'rgba(255,209,102,0.12)':'transparent',border:`1px solid ${filter===f?'#ffd166':'var(--border)'}`,borderRadius:4,color:filter===f?'#ffd166':'var(--text-muted)',fontFamily:"'Share Tech Mono',monospace",fontSize:9,padding:'3px 10px',cursor:'pointer'}}>{f}</button>
           ))}
         </div>
+      </div>
+      <div style={{display:'flex',flexWrap:'wrap',gap:8,alignItems:'center'}}>
+        <select value={filterSym} onChange={e=>setFilterSym(e.target.value)} style={sel}>
+          <option value="">ALL PAIRS</option>
+          {ALL_SYMS.map(s=><option key={s} value={s}>{s}</option>)}
+        </select>
+        <select value={filterMom} onChange={e=>setFilterMom(e.target.value)} style={sel}>
+          <option value="ALL">ALL MOMENTUM</option>
+          {MOM_STATES.map(m=><option key={m} value={m}>{m}</option>)}
+        </select>
+        <input type="date" value={filterFrom} onChange={e=>setFilterFrom(e.target.value)} style={inp} title="From date"/>
+        <input type="date" value={filterTo} onChange={e=>setFilterTo(e.target.value)} style={inp} title="To date"/>
+        {(filterSym||filterMom!=='ALL'||filterFrom||filterTo)&&<button onClick={()=>{setFilterSym('');setFilterMom('ALL');setFilterFrom('');setFilterTo('');setFilter('ALL');}} style={{...sel,color:'#ff4d6d',border:'1px solid rgba(255,77,109,0.4)',fontWeight:700}}>✕ CLEAR</button>}
       </div>
       {loading ? (
         <div style={{textAlign:'center',padding:40,fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:'var(--text-muted)',letterSpacing:2}}>LOADING...</div>
@@ -3209,7 +3240,7 @@ export default function Dashboard() {
 
             <div style={{overflowX:'auto'}}>
               <table style={{width:'100%',borderCollapse:'collapse',background:'var(--bg-secondary)',border:'1px solid var(--border)',borderRadius:10,overflow:'hidden'}}>
-                <thead><tr style={{background:'var(--bg-hover)'}}>{['#','SYMBOL','GAP','▲▼','BIAS','CONF','MOMENTUM','MATCHUP','PDR','1H','4H','8H','CHART','STATE','STR','SIG','COT','PL','⚠️'].map(h=><th key={h} style={hdr}>{h}</th>)}</tr></thead>
+                <thead><tr style={{background:'var(--bg-hover)'}}>{['#','SYMBOL','GAP','▲▼','BIAS','CONF','MOMENTUM','MATCHUP','PDR','1H','4H','8H','CHART','STATE','STR','SIG','COT','PL','ENTRY','⚠️'].map(h=><th key={h} style={hdr}>{h}</th>)}</tr></thead>
                 <tbody>
                   {displayed.length===0?<tr><td colSpan={15} style={{textAlign:'center',padding:40,fontFamily:mono,fontSize:10,color:'var(--text-muted)'}}>NO DATA</td></tr>
                   :displayed.map((row,idx)=>{
@@ -3233,6 +3264,7 @@ export default function Dashboard() {
                         <td style={tdc}>{(()=>{const s=signalLabel(row.signal,sv);return<span style={{fontFamily:mono,fontSize:9,color:s.color}}>{s.icon}</span>;})()}</td>
                         <td style={tdc}>{cotB?<span style={{fontFamily:mono,fontSize:9,color:cotB.bias==='BULLISH'?'#00ff9f':'#ff4d6d'}}>{cotB.bias==='BULLISH'?'▲':'▼'}</span>:<span style={{color:'var(--text-muted)'}}>—</span>}</td>
                         <td style={tdc}>{(()=>{const pl=plZoneBadge(row.pl_zone,row.bias);if(!pl)return <span style={{color:'var(--text-muted)'}}>—</span>;return <span style={{fontFamily:mono,fontSize:9,color:pl.color,background:pl.bg,border:`1px solid ${pl.border}`,borderRadius:3,padding:'1px 6px',whiteSpace:'nowrap'}}>{pl.valid?'✅':'⛔'} {pl.label}</span>;})()}</td>
+                        <td style={tdc}>{(()=>{const isBuy=bias.label==='BUY',isSell=bias.label==='SELL';if(!isBuy&&!isSell)return <span style={{color:'var(--text-muted)'}}>—</span>;const isJpy=row.symbol?.includes('JPY');const dec=isJpy?3:5;const levels=isBuy?[{l:'PDL',v:row.pdl},{l:'PWL',v:row.pwl}].filter(x=>x.v!=null).sort((a,b)=>b.v-a.v):[{l:'PDH',v:row.pdh},{l:'PWH',v:row.pwh}].filter(x=>x.v!=null).sort((a,b)=>a.v-b.v);if(!levels.length)return <span style={{color:'var(--text-muted)'}}>—</span>;const c1=isBuy?'#00ff9f':'#ff4d6d';return <div style={{display:'flex',gap:4}}>{levels.map((lv,i)=><span key={lv.l} style={{fontFamily:mono,fontSize:8,color:i===0?c1:'#00b4ff',whiteSpace:'nowrap'}}>{lv.l} {Number(lv.v).toFixed(dec)}</span>)}</div>;})()}</td>
                         <td style={tdc}>{t.closeAlert?<span style={{fontFamily:mono,fontSize:9,color:'#ff4d6d'}}>⚠️</span>:<span style={{color:'var(--text-muted)'}}>—</span>}</td>
                       </tr>
                     );
