@@ -979,6 +979,7 @@ function PairCard({ row, trend, cotBias, confidence, memoryIndex, pdr, newsAlert
       {(()=>{if(!confidence)return null;const cs=confStyle(confidence.confidence);if(!cs)return null;const tip=confidence.reasons?confidence.reasons.join(' · '):'';return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>CONF</span><span title={tip} style={{fontFamily:mono,fontSize:9,color:cs.color,background:cs.bg,border:`1px solid ${cs.border}`,borderRadius:4,padding:'1px 7px',fontWeight:700,cursor:'help'}}>{confidence.confidence} {cs.label}</span>{confidence.conflict&&<span title="Real-time confidence is high but historical win rate for this gap level is ≤50%. Proceed with caution." style={{fontFamily:mono,fontSize:8,color:'#ff4d6d',background:'rgba(255,77,109,0.1)',border:'1px solid rgba(255,77,109,0.3)',borderRadius:4,padding:'1px 6px',fontWeight:700,cursor:'help'}}>⚠️ CONFLICT</span>}</div>);})()}
       {(()=>{const em=getEdgeMemory(row,memoryIndex);if(!em)return null;const fc=em.flag==='PROVEN_EDGE'?'#00ff9f':em.flag==='DEAD_ZONE'?'#ff4d6d':'#00b4ff';const icon=em.flag==='PROVEN_EDGE'?'✅':em.flag==='DEAD_ZONE'?'⛔':'📊';const lbl=em.flag?em.flag.replace('_',' '):(em.maturity||'').toUpperCase();const wrPct=Math.round((em.winRate||0)*100);const resPct=em.resRate!=null?Math.round(em.resRate*100):null;const edgeTip=em.flag==='PROVEN_EDGE'?`Proven edge: ${wrPct}% win rate from ${em.sample} resolved signals at this gap level. High probability setup.`:em.flag==='DEAD_ZONE'?`Dead zone: only ${wrPct}% win rate from ${em.sample} signals. Historically this gap level loses money.`:`${(em.maturity||'').toUpperCase()}: ${wrPct}% win rate from ${em.sample} signals. Needs more data to confirm edge.`;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2,flexWrap:'wrap'}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>EDGE</span><span title={edgeTip} style={{fontFamily:mono,fontSize:9,color:fc,background:fc+'12',border:`1px solid ${fc}33`,borderRadius:4,padding:'1px 7px',fontWeight:700,cursor:'help'}}>{icon} {lbl}</span><span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>Win:{wrPct}%{resPct!=null?` | Res:${resPct}%`:''} (n={em.sample})</span></div>);})()}
       {pdr&&<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>PDR</span><PdrBadge pdr={pdr}/></div>}
+      {(()=>{const isBuy=bias.label==='BUY',isSell=bias.label==='SELL';if(!isBuy&&!isSell)return null;const isJpy=row.symbol?.includes('JPY');const dec=isJpy?3:5;const levels=isBuy?[{l:'PDL',v:row.pdl},{l:'PWL',v:row.pwl},{l:'PML',v:row.pml},{l:'PYL',v:row.pyl}].filter(x=>x.v!=null).sort((a,b)=>b.v-a.v):[{l:'PDH',v:row.pdh},{l:'PWH',v:row.pwh},{l:'PMH',v:row.pmh},{l:'PYH',v:row.pyh}].filter(x=>x.v!=null).sort((a,b)=>a.v-b.v);const top2=levels.slice(0,2);if(!top2.length)return null;const c1=isBuy?'#00ff9f':'#ff4d6d';const c2='#00b4ff';return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2,flexWrap:'wrap'}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>ENTRY</span>{top2.map((lv,i)=><span key={lv.l} style={{fontFamily:mono,fontSize:9,color:i===0?c1:c2,background:(i===0?c1:c2)+'12',border:`1px solid ${(i===0?c1:c2)}28`,borderRadius:3,padding:'1px 6px',fontWeight:600}}>{lv.l} {Number(lv.v).toFixed(dec)}</span>)}</div>);})()}
       <div style={{display:'flex',flexDirection:'column',gap:3}}>
         <div style={{display:'flex',alignItems:'center',gap:6}}>
           <span style={{fontFamily:mono,fontSize:10,color:t.momentumColor||'var(--text-muted)',background:(t.momentumColor||'var(--text-muted)')+'18',border:`1px solid ${(t.momentumColor||'var(--text-muted)')}30`,borderRadius:4,padding:'2px 8px',letterSpacing:1}}>{momIcons[t.momentum]||'▬'} {t.momentum||'NEUTRAL'}</span>
@@ -1128,6 +1129,34 @@ function PairCardModal({ row, trend, cotBias, onClose, isMobile, confidence, mem
           <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2}}>PDR</span>
           <PdrBadge pdr={pdr}/>
         </div>}
+
+        {/* Pullback Entry Levels */}
+        {(()=>{const isBuy=bias.label==='BUY',isSell=bias.label==='SELL';if(!isBuy&&!isSell)return null;if(!row.pdh&&!row.pdl&&!row.pwh&&!row.pwl)return null;const isJpy=row.symbol?.includes('JPY');const dec=isJpy?3:5;const fmt=v=>v!=null?Number(v).toFixed(dec):'—';const entryColor=isBuy?'#00ff9f':'#ff4d6d';const primaryD=isBuy?row.pdl:row.pdh;const primaryW=isBuy?row.pwl:row.pwh;const secondaryD=isBuy?row.pdh:row.pdl;const secondaryW=isBuy?row.pwh:row.pwl;return(
+          <div style={{padding:'10px 14px',background:'rgba(0,0,0,0.15)',borderRadius:8,display:'flex',flexDirection:'column',gap:8}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+              <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2}}>PULLBACK ENTRY ZONES</span>
+              <span style={{fontFamily:mono,fontSize:8,color:entryColor,letterSpacing:1}}>{isBuy?'BUY THE DIP':'SELL THE RALLY'}</span>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+              <div style={{background:entryColor+'0a',border:`1px solid ${entryColor}25`,borderRadius:6,padding:'8px 10px'}}>
+                <div style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1,marginBottom:4}}>{isBuy?'PDL — DAILY SUPPORT':'PDH — DAILY RESIST'}</div>
+                <div style={{fontFamily:orb,fontSize:16,fontWeight:700,color:entryColor}}>{fmt(primaryD)}</div>
+              </div>
+              <div style={{background:'rgba(0,180,255,0.06)',border:'1px solid rgba(0,180,255,0.2)',borderRadius:6,padding:'8px 10px'}}>
+                <div style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1,marginBottom:4}}>{isBuy?'PWL — WEEKLY SUPPORT':'PWH — WEEKLY RESIST'}</div>
+                <div style={{fontFamily:orb,fontSize:16,fontWeight:700,color:'#00b4ff'}}>{fmt(primaryW)}</div>
+              </div>
+              <div style={{background:'rgba(255,255,255,0.02)',border:'1px solid var(--border)',borderRadius:6,padding:'8px 10px',opacity:0.6}}>
+                <div style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1,marginBottom:4}}>{isBuy?'PDH — DAILY HIGH':'PDL — DAILY LOW'}</div>
+                <div style={{fontFamily:mono,fontSize:13,fontWeight:600,color:'var(--text-muted)'}}>{fmt(secondaryD)}</div>
+              </div>
+              <div style={{background:'rgba(255,255,255,0.02)',border:'1px solid var(--border)',borderRadius:6,padding:'8px 10px',opacity:0.6}}>
+                <div style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1,marginBottom:4}}>{isBuy?'PWH — WEEKLY HIGH':'PWL — WEEKLY LOW'}</div>
+                <div style={{fontFamily:mono,fontSize:13,fontWeight:600,color:'var(--text-muted)'}}>{fmt(secondaryW)}</div>
+              </div>
+            </div>
+          </div>
+        );})()}
 
         {/* Momentum */}
         <div style={{padding:'10px 14px',background:'rgba(0,0,0,0.15)',borderRadius:8,display:'flex',flexDirection:'column',gap:6}}>
@@ -2157,6 +2186,10 @@ function OvSignalCard({ pair, tier, onClick, delay }) {
       <span style={{fontFamily:mono,fontSize:9,color:OV_COLORS.textMuted,letterSpacing:1}}>{Math.abs(pair.gap)>=9&&pair.pl_zone!=='BETWEEN'?'INTRA':'BB'}</span>
       {pair.pdr_strong&&<span style={{fontFamily:mono,fontSize:9,color:OV_COLORS.buy,background:OV_COLORS.buyDim,border:`1px solid ${OV_COLORS.buy}25`,borderRadius:3,padding:'2px 6px'}}>PDR ✓</span>}
     </div>}
+    {!isL&&(()=>{const isBuy=pair.bias==='BUY',isSell=pair.bias==='SELL';if(!isBuy&&!isSell)return null;const isJpy=pair.symbol?.includes('JPY');const dec=isJpy?3:5;const levels=isBuy?[{l:'PDL',v:pair.pdl},{l:'PWL',v:pair.pwl},{l:'PML',v:pair.pml},{l:'PYL',v:pair.pyl}].filter(x=>x.v!=null).sort((a,b)=>b.v-a.v):[{l:'PDH',v:pair.pdh},{l:'PWH',v:pair.pwh},{l:'PMH',v:pair.pmh},{l:'PYH',v:pair.pyh}].filter(x=>x.v!=null).sort((a,b)=>a.v-b.v);const top2=levels.slice(0,2);if(!top2.length)return null;const c1=isBuy?OV_COLORS.buy:OV_COLORS.sell;const c2='#00b4ff';return(<div style={{display:'flex',alignItems:'center',gap:6,marginBottom:8}}>
+      <span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted,letterSpacing:2,fontWeight:600}}>ENTRY</span>
+      {top2.map((lv,i)=><span key={lv.l} style={{fontFamily:mono,fontSize:isH?11:10,color:i===0?c1:c2,background:(i===0?c1:c2)+'12',border:`1px solid ${(i===0?c1:c2)}28`,borderRadius:4,padding:'2px 8px',fontWeight:700,letterSpacing:0.5}}>{lv.l} {Number(lv.v).toFixed(dec)}</span>)}
+    </div>);})()}
     {tags.length>0&&<div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
       {tags.map(t=><span key={t.label} style={{fontFamily:mono,fontSize:8,color:t.color,background:t.bg,border:`1px solid ${t.color}30`,borderRadius:3,padding:'2px 6px',letterSpacing:1}}>{t.label}</span>)}
     </div>}
@@ -2298,6 +2331,7 @@ function OverviewTab({ data, trends, pdrData, upcomingNews, spikes, confidenceMa
     edge:confidenceMap[row.symbol]?.historical?.flag||null, conf:confidenceMap[row.symbol]?.confidence||0,
     conflict:confidenceMap[row.symbol]?.conflict||false,
     news:upcomingNews?.affected_pairs?.includes(row.symbol)||false, hard_invalid:row.hard_invalid||false,
+    pdl:row.pdl, pdh:row.pdh, pwl:row.pwl, pwh:row.pwh, pml:row.pml, pmh:row.pmh, pyl:row.pyl, pyh:row.pyh,
   })).sort((a,b)=>b.conf-a.conf), [data,trends,pdrData,confidenceMap,upcomingNews]);
 
   // Session + market mode
