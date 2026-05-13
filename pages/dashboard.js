@@ -2876,6 +2876,8 @@ export default function Dashboard() {
   const [user,       setUser]       = useState(null);
   const [showAlertSettings, setShowAlertSettings] = useState(false);
   const [popup,      setPopup]      = useState(null);
+  const [maintenance, setMaintenance] = useState(false);
+  const [maintenanceChecked, setMaintenanceChecked] = useState(false);
 
   // Mobile detection
   const [isMobile, setIsMobile] = useState(false);
@@ -2966,6 +2968,20 @@ export default function Dashboard() {
   useEffect(()=>{fetchCot();},[fetchCot]);
   useEffect(()=>{fetch('/api/me').then(r=>r.json()).then(d=>{setUser(d);if(d.role==='admin') setIsAdmin(true);}).catch(()=>{});},[]);
 
+  // Maintenance mode check
+  useEffect(()=>{
+    fetch('/api/maintenance').then(r=>r.json()).then(d=>{
+      setMaintenance(d.maintenance===true);
+      setMaintenanceChecked(true);
+    }).catch(()=>setMaintenanceChecked(true));
+  },[]);
+
+  async function toggleMaintenance() {
+    const next = !maintenance;
+    const res = await fetch('/api/maintenance',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:next})});
+    if(res.ok) setMaintenance(next);
+  }
+
   async function handleLogout(){await fetch('/api/logout',{method:'POST'});window.location.href='/login';}
 
   function toggleHeatmap() { setPrefs(p=>({...p,heatmap_visible:!p?.heatmap_visible})); }
@@ -3013,6 +3029,27 @@ export default function Dashboard() {
     if (conf) confidenceMap[row.symbol] = conf;
   });
 
+  // ===== MAINTENANCE MODE GATE =====
+  if (maintenanceChecked && maintenance && !isAdmin) {
+    return (
+      <>
+        <Head><title>PANDA ENGINE — Maintenance</title></Head>
+        <div style={{minHeight:'100vh',background:'#0a0a14',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:"'Share Tech Mono',monospace"}}>
+          <div style={{textAlign:'center',maxWidth:440,padding:40}}>
+            <div style={{fontSize:48,marginBottom:16}}>🐼</div>
+            <div style={{fontFamily:"'Orbitron',sans-serif",fontSize:20,fontWeight:900,color:'#ffaa44',letterSpacing:6,marginBottom:12}}>MAINTENANCE MODE</div>
+            <div style={{fontSize:12,color:'#8892b0',lineHeight:1.8,marginBottom:24}}>
+              Panda Engine is temporarily offline for maintenance.<br/>
+              We'll be back shortly. Thanks for your patience.
+            </div>
+            <div style={{width:60,height:2,background:'linear-gradient(90deg,transparent,#ffaa44,transparent)',margin:'0 auto 24px',borderRadius:2}}/>
+            <div style={{fontSize:9,color:'#4a5568',letterSpacing:3}}>SYSTEM OFFLINE</div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       <Head>
@@ -3058,6 +3095,7 @@ export default function Dashboard() {
             {(isAdmin||user?.role==='vip'||user?.feature_access?.includes('journal'))&&<button onClick={()=>window.location.href='/journal'} style={{background:'rgba(255,209,102,0.06)',border:'1px solid #ffd16633',borderRadius:5,color:'#ffd166',fontFamily:mono,fontSize:9,padding:'5px 10px',cursor:'pointer'}}>📓 JOURNAL</button>}
             <button onClick={()=>window.location.href='/strength'} style={{background:'rgba(78,154,241,0.06)',border:'1px solid #4e9af133',borderRadius:5,color:'#4e9af1',fontFamily:mono,fontSize:9,padding:'5px 10px',cursor:'pointer'}}>STRENGTH</button>
             {isAdmin&&<button onClick={()=>window.location.href='/admin'} style={{background:'rgba(255,209,102,0.08)',border:'1px solid #ffd16644',borderRadius:5,color:'#ffd166',fontFamily:mono,fontSize:9,padding:'5px 10px',cursor:'pointer'}}>🛡️ ADMIN</button>}
+            {isAdmin&&<button onClick={toggleMaintenance} style={{background:maintenance?'rgba(255,77,109,0.12)':'rgba(0,255,159,0.06)',border:`1px solid ${maintenance?'#ff4d6d33':'#00ff9f33'}`,borderRadius:5,color:maintenance?'#ff4d6d':'#00ff9f',fontFamily:mono,fontSize:9,padding:'5px 10px',cursor:'pointer'}}>{maintenance?'🔴 SITE OFF':'🟢 SITE ON'}</button>}
             <button onClick={handleLogout} style={{background:'transparent',border:'1px solid #2a1525',borderRadius:5,color:'#ff4d6d',fontFamily:mono,fontSize:9,padding:'5px 10px',cursor:'pointer'}}>LOGOUT</button>
           </div>
         </header>
