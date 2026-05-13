@@ -1943,8 +1943,32 @@ function PandaAIChat({ userId }) {
 
       <div style={{flex:1,minHeight:300,maxHeight:500,overflowY:'auto',display:'flex',flexDirection:'column',gap:8,padding:8,background:'var(--bg-secondary)',borderRadius:8,border:'1px solid var(--border)'}}>
         {messages.length===0&&!loading&&(
-          <div style={{textAlign:'center',padding:40,color:'var(--text-muted)',fontFamily:mono,fontSize:10}}>
-            Click ANALYZE MARKET for AI insights, REVIEW TRADES to analyze performance, or ask a question below.
+          <div style={{textAlign:'center',padding:30,color:'var(--text-muted)',fontFamily:mono,fontSize:10}}>
+            <div style={{fontSize:28,marginBottom:8}}>🐼</div>
+            <div style={{fontFamily:orb,fontSize:13,color:'#00b4ff',letterSpacing:3,fontWeight:700,marginBottom:6}}>WELCOME TO PANDA AI</div>
+            <div style={{fontSize:10,color:'var(--text-muted)',marginBottom:18,lineHeight:1.6,maxWidth:420,margin:'0 auto 18px'}}>
+              Your personal dashboard assistant. Ask me anything about how to use the dashboard, what the numbers mean, or what's happening in the market.
+            </div>
+            <div style={{display:'flex',flexDirection:'column',gap:6,maxWidth:360,margin:'0 auto'}}>
+              {[
+                {icon:'🗺️',label:'How do I use this dashboard?',color:'#00b4ff'},
+                {icon:'📊',label:'What do the colors and numbers mean?',color:'#00ff9f'},
+                {icon:'🔍',label:'Which tabs should I check first?',color:'#ffd166'},
+                {icon:'⚡',label:'What looks strong right now?',color:'#00ff9f'},
+              ].map((q,i)=>(
+                <button key={i} onClick={()=>sendRequest('chat',q.label)} style={{
+                  fontFamily:mono,fontSize:10,padding:'8px 14px',borderRadius:6,cursor:'pointer',textAlign:'left',
+                  border:`1px solid ${q.color}33`,background:`${q.color}08`,color:q.color,
+                  display:'flex',alignItems:'center',gap:8,letterSpacing:0.5,
+                  transition:'background 0.15s',
+                }} onMouseEnter={e=>e.currentTarget.style.background=`${q.color}18`} onMouseLeave={e=>e.currentTarget.style.background=`${q.color}08`}>
+                  <span style={{fontSize:14}}>{q.icon}</span>{q.label}
+                </button>
+              ))}
+            </div>
+            <div style={{marginTop:16,fontSize:9,color:'var(--text-muted)',opacity:0.6,letterSpacing:1}}>
+              Or use the buttons above for market analysis & trade reviews
+            </div>
           </div>
         )}
         {messages.map((m,i)=>(
