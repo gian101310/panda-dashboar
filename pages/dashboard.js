@@ -2877,7 +2877,6 @@ export default function Dashboard() {
   const [showAlertSettings, setShowAlertSettings] = useState(false);
   const [popup,      setPopup]      = useState(null);
   const [maintenance, setMaintenance] = useState(false);
-  const [maintenanceChecked, setMaintenanceChecked] = useState(false);
 
   // Mobile detection
   const [isMobile, setIsMobile] = useState(false);
@@ -2972,8 +2971,7 @@ export default function Dashboard() {
   useEffect(()=>{
     fetch('/api/maintenance').then(r=>r.json()).then(d=>{
       setMaintenance(d.maintenance===true);
-      setMaintenanceChecked(true);
-    }).catch(()=>setMaintenanceChecked(true));
+    }).catch(()=>{});
   },[]);
 
   async function toggleMaintenance() {
@@ -3028,27 +3026,6 @@ export default function Dashboard() {
     const conf = computeConfidence(row, trends[row.symbol], getPairCotBias(row.symbol), memoryIndex);
     if (conf) confidenceMap[row.symbol] = conf;
   });
-
-  // ===== MAINTENANCE MODE GATE =====
-  if (maintenanceChecked && maintenance && !isAdmin) {
-    return (
-      <>
-        <Head><title>PANDA ENGINE — Maintenance</title></Head>
-        <div style={{minHeight:'100vh',background:'#0a0a14',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:"'Share Tech Mono',monospace"}}>
-          <div style={{textAlign:'center',maxWidth:440,padding:40}}>
-            <div style={{fontSize:48,marginBottom:16}}>🐼</div>
-            <div style={{fontFamily:"'Orbitron',sans-serif",fontSize:20,fontWeight:900,color:'#ffaa44',letterSpacing:6,marginBottom:12}}>MAINTENANCE MODE</div>
-            <div style={{fontSize:12,color:'#8892b0',lineHeight:1.8,marginBottom:24}}>
-              Panda Engine is temporarily offline for maintenance.<br/>
-              We'll be back shortly. Thanks for your patience.
-            </div>
-            <div style={{width:60,height:2,background:'linear-gradient(90deg,transparent,#ffaa44,transparent)',margin:'0 auto 24px',borderRadius:2}}/>
-            <div style={{fontSize:9,color:'#4a5568',letterSpacing:3}}>SYSTEM OFFLINE</div>
-          </div>
-        </div>
-      </>
-    );
-  }
 
   return (
     <>
