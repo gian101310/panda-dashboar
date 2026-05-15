@@ -20,7 +20,7 @@ export default async function handler(req, res) {
       toEnd.setHours(23,59,59,999);
       query = query.lte('created_at', toEnd.toISOString());
     }
-    query = query.limit(2000);
+    query = query.limit(5000);
 
     const { data: signals, error } = await query;
 

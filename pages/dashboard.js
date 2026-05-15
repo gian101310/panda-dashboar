@@ -1997,23 +1997,26 @@ function TrackerPanel() {
   const [trackers, setTrackers] = useState([]);
   const [closed, setClosed] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [trackerError, setTrackerError] = useState(null);
   const [showClosed, setShowClosed] = useState(false);
   const mono = "'Share Tech Mono',monospace", orb = "'Orbitron',sans-serif";
 
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      try {
-        const [openR, closedR] = await Promise.all([
-          fetch('/api/signal-tracker?status=OPEN').then(r => r.json()),
-          fetch('/api/signal-tracker?status=CLOSED&limit=20').then(r => r.json())
-        ]);
-        setTrackers(openR.trackers || []);
-        setClosed(closedR.trackers || []);
-      } catch {}
-      setLoading(false);
-    })();
+  const loadTrackers = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [openR, closedR] = await Promise.all([
+        fetch('/api/signal-tracker?status=OPEN'),
+        fetch('/api/signal-tracker?status=CLOSED&limit=20')
+      ]);
+      if (!openR.ok || !closedR.ok) { setTrackerError('API returned ' + (openR.ok ? closedR.status : openR.status)); setLoading(false); return; }
+      const [openD, closedD] = await Promise.all([openR.json(), closedR.json()]);
+      setTrackers(openD.trackers || []);
+      setClosed(closedD.trackers || []);
+      setTrackerError(null);
+    } catch (e) { setTrackerError(e.message || 'Connection error'); }
+    setLoading(false);
   }, []);
+  useEffect(() => { loadTrackers(); }, [loadTrackers]);
 
   const ageStr = (opened) => {
     const h = Math.round((Date.now() - new Date(opened).getTime()) / 3600000);
@@ -2022,6 +2025,7 @@ function TrackerPanel() {
   const gapColor = (g) => g >= 9 ? '#00ff9f' : g >= 7 ? '#ffd166' : '#ffaa44';
 
   if (loading) return <div style={{textAlign:'center',padding:20,fontFamily:mono,fontSize:10,color:'var(--text-muted)'}}>LOADING TRACKERS...</div>;
+  if (trackerError) return <div style={{textAlign:'center',padding:20,fontFamily:mono,fontSize:10,color:'#ff4d6d'}}>⚠️ {trackerError} — <span style={{cursor:'pointer',textDecoration:'underline'}} onClick={loadTrackers}>RETRY</span></div>;
 
   return (
     <div style={{display:'flex',flexDirection:'column',gap:12}}>
@@ -2581,6 +2585,7 @@ const SORTS   = [
 function SignalAnalytics() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [stratFilter, setStratFilter] = useState('ALL');
   const [pairFilter, setPairFilter] = useState('ALL');
   const [dateFrom, setDateFrom] = useState('');
@@ -2594,12 +2599,14 @@ function SignalAnalytics() {
       if (dateTo) params.set('to', dateTo);
       const qs = params.toString();
       const r = await fetch('/api/signal-analytics' + (qs ? '?' + qs : ''));
-      if (r.ok) setStats(await r.json());
-    } catch {}
+      if (r.ok) { setStats(await r.json()); setError(null); }
+      else setError('API returned ' + r.status);
+    } catch (e) { setError(e.message || 'Connection error'); }
     setLoading(false);
   }, [pairFilter, dateFrom, dateTo]);
   useEffect(() => { load(); }, [load]);
   if (loading) return <div style={{textAlign:'center',padding:40,fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:'var(--text-muted)'}}>LOADING ANALYTICS...</div>;
+  if (error) return <div style={{textAlign:'center',padding:40,fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:'#ff4d6d'}}>⚠️ {error} — <span style={{cursor:'pointer',textDecoration:'underline'}} onClick={load}>RETRY</span></div>;
   if (!stats || !stats.summary) return <div style={{textAlign:'center',padding:40,fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:'var(--text-muted)'}}>NO SIGNAL DATA YET</div>;
   const s = stats.summary || {};
   const mono = "'Share Tech Mono',monospace", orb = "'Orbitron',sans-serif";
