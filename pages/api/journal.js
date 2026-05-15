@@ -56,7 +56,7 @@ export default async function handler(req, res) {
 
     const ctTrades = (ctRes.data || []).map(t => ({
       ...t,
-      source: 'ctrader',
+      source: 'journal',
     }));
 
     const manTrades = (manRes.data || []).map(t => ({

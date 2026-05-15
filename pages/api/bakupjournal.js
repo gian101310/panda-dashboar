@@ -12,11 +12,11 @@ export default async function handler(req, res) {
 
   const userId = session.user_id;
 
-  // GET — fetch trades (cTrader sync + manual)
+  // GET — fetch trades (journal + manual)
   if (req.method === 'GET') {
     const { symbol, direction, status, limit = 200 } = req.query;
 
-    // Get cTrader synced trades
+    // Get journal trades
     let ctQuery = supabase.from('trade_journal').select('*').eq('account_id', userId).order('entry_time', { ascending: false }).limit(parseInt(limit));
     if (symbol) ctQuery = ctQuery.eq('symbol', symbol);
     if (direction) ctQuery = ctQuery.eq('direction', direction);
@@ -29,7 +29,7 @@ export default async function handler(req, res) {
     if (status) manQuery = manQuery.eq('status', status);
 
     const [ctRes, manRes] = await Promise.all([ctQuery, manQuery]);
-    const ctTrades = (ctRes.data || []).map(t => ({ ...t, source: 'ctrader' }));
+    const ctTrades = (ctRes.data || []).map(t => ({ ...t, source: 'journal' }));
     const manTrades = (manRes.data || []).map(t => ({ ...t, source: 'manual', id: t.id }));
 
     const all = [...ctTrades, ...manTrades].sort((a, b) => new Date(b.entry_time) - new Date(a.entry_time));

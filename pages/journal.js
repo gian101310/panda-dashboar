@@ -127,7 +127,7 @@ function FileUpload({ onUploaded }) {
   }
   return (
     <div style={{background:'rgba(0,180,255,0.05)',border:'1px solid rgba(0,180,255,0.2)',borderRadius:8,padding:'14px 16px',display:'flex',flexDirection:'column',gap:8}}>
-      <div style={{fontFamily:orb,fontSize:10,fontWeight:700,color:'#00b4ff',letterSpacing:3}}>IMPORT FROM CTRADER</div>
+      <div style={{fontFamily:orb,fontSize:10,fontWeight:700,color:'#00b4ff',letterSpacing:3}}>IMPORT TRADES</div>
       <div style={{display:'flex',gap:20,flexWrap:'wrap'}}>
         <div><div style={{fontFamily:mono,fontSize:9,color:'#00ff9f',marginBottom:3}}>XLSX (Recommended)</div><div style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)'}}>History: right-click Export - Excel format</div></div>
         <div><div style={{fontFamily:mono,fontSize:9,color:'#ffd166',marginBottom:3}}>HTML</div><div style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)'}}>History: right-click Export - HTML format</div></div>
@@ -417,7 +417,7 @@ export default function JournalPage() {
                           'GAP@ENTRY':<span style={{fontFamily:mono,fontSize:10,color:t.gap_at_entry>=5?'#00ff9f':t.gap_at_entry<=-5?'#ff4d6d':'var(--text-muted)'}}>{t.gap_at_entry!==null?`${t.gap_at_entry>0?'+':''}${t.gap_at_entry}`:'-'}</span>,
                           'MOMENTUM':<span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>{t.momentum_at_entry||'-'}</span>,
                           'STRATEGY':t.strategy_name?<span style={{fontFamily:mono,fontSize:9,color:stratColor,background:stratColor+'18',border:`1px solid ${stratColor}33`,borderRadius:3,padding:'1px 5px'}}>{t.strategy_name}</span>:<span style={{color:'var(--text-muted)'}}>-</span>,
-                          'SOURCE':<span style={{fontFamily:mono,fontSize:8,color:t.source==='ctrader'?'#00b4ff':'var(--text-muted)'}}>{t.source==='ctrader'?'cTrader':'manual'}</span>,
+                          'SOURCE':<span style={{fontFamily:mono,fontSize:8,color:t.source==='journal'?'#00b4ff':'var(--text-muted)'}}>{t.source==='journal'?'JOURNAL':'MANUAL'}</span>,
                           'NOTES':<span style={{fontFamily:raj,fontSize:12,color:'var(--text-muted)',maxWidth:150,overflow:'hidden',textOverflow:'ellipsis',display:'block'}}>{t.notes||'-'}</span>,
                           'ACTION':t.source==='manual'?<button onClick={()=>deleteTrade(t.id)} style={{background:'rgba(255,77,109,0.08)',border:'1px solid #ff4d6d44',borderRadius:4,color:'#ff4d6d',fontFamily:mono,fontSize:8,padding:'3px 7px',cursor:'pointer'}}>DEL</button>:<span style={{color:'var(--text-muted)',fontFamily:mono,fontSize:8}}>sync</span>,
                         };

@@ -1519,7 +1519,7 @@ function OpenTradesPanel() {
 
       {trades.length === 0 ? (
         <div style={{textAlign:'center',padding:60,fontFamily:mono,fontSize:11,color:'var(--text-muted)',letterSpacing:3}}>
-          NO OPEN POSITIONS — Run ctrader_journal.py to sync
+          NO OPEN POSITIONS
         </div>
       ) : (
         <div style={{display:'flex',flexDirection:'column',gap:6}}>

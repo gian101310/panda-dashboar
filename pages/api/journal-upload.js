@@ -3,7 +3,7 @@ import { validateSession } from '../../lib/auth';
 
 export const config = { api: { bodyParser: { sizeLimit: '10mb' } } };
 
-// Parse DD/MM/YYYY HH:MM:SS.mmm format from cTrader
+// Parse DD/MM/YYYY HH:MM:SS.mmm format from trade history CSV
 function parseDate(val) {
   if (!val || val === '') return null;
   const s = val.toString().trim();
