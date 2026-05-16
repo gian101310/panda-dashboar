@@ -16,12 +16,28 @@ async function fetchAllMemories() {
   return data || [];
 }
 
+async function fetchAllSignals() {
+  const SELECT = 'symbol, direction, outcome, entry_gap, pl_zone, strategy, momentum, pips, session, box_h1_trend, box_h4_trend';
+  const PAGE = 1000;
+  let all = [];
+  let page = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from('signal_results').select(SELECT)
+      .not('outcome', 'is', null)
+      .order('created_at', { ascending: false })
+      .range(page * PAGE, (page + 1) * PAGE - 1);
+    if (error) return { data: all, error };
+    if (!data || data.length === 0) break;
+    all = all.concat(data);
+    if (data.length < PAGE) break;
+    page++;
+  }
+  return { data: all, error: null };
+}
+
 async function fetchRawCrossData() {
-  const { data: signals, error: sigErr } = await supabase
-    .from('signal_results')
-    .select('symbol, direction, outcome, entry_gap, pl_zone, strategy, momentum, pips, session, box_h1_trend, box_h4_trend')
-    .not('outcome', 'is', null)
-    .limit(5000);
+  const { data: signals, error: sigErr } = await fetchAllSignals();
 
   const { data: trades, error: tradeErr } = await supabase
     .from('manual_trades')

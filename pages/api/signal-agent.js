@@ -279,16 +279,28 @@ export default async function handler(req, res) {
   // POST — run full Signal Agent v2 analysis
   if (req.method === 'POST') {
     try {
-      // 1. Fetch all resolved signal_results (including newer columns)
-      const { data: rows, error: fetchErr } = await supabase
-        .from('signal_results')
-        .select('symbol, direction, strategy, entry_gap, peak_gap, outcome, pl_zone, momentum, confidence, duration_min, pips, session, box_h1_trend, box_h4_trend')
-        .not('outcome', 'is', null)
-        .order('created_at', { ascending: false })
-        .limit(5000);
+      // 1. Fetch ALL resolved signal_results (paginated — Supabase caps at 1000/request)
+      const SELECT = 'symbol, direction, strategy, entry_gap, peak_gap, outcome, pl_zone, momentum, confidence, duration_min, pips, session, box_h1_trend, box_h4_trend';
+      const PAGE = 1000;
+      let rows = [];
+      let page = 0;
+      let fetchErr = null;
+      while (true) {
+        const { data, error } = await supabase
+          .from('signal_results')
+          .select(SELECT)
+          .not('outcome', 'is', null)
+          .order('created_at', { ascending: false })
+          .range(page * PAGE, (page + 1) * PAGE - 1);
+        if (error) { fetchErr = error; break; }
+        if (!data || data.length === 0) break;
+        rows = rows.concat(data);
+        if (data.length < PAGE) break;
+        page++;
+      }
 
       if (fetchErr) return res.status(500).json({ error: fetchErr.message });
-      if (!rows || rows.length === 0) return res.status(200).json({ message: 'No resolved signals to analyze', memories_written: 0 });
+      if (rows.length === 0) return res.status(200).json({ message: 'No resolved signals to analyze', memories_written: 0 });
 
       // 2. Run all analysis functions
       const allMemories = [
