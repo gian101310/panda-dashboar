@@ -307,7 +307,7 @@ export default async function handler(req, res) {
         .in('factor', FACTORS);
       if (prevMem && prevMem.length > 0) {
         const avgS = Math.round(prevMem.reduce((s,m) => s + (m.sample_size || 0), 0) / prevMem.length);
-        await supabase.from('engine_logs').insert({ timestamp: new Date().toISOString(), component: 'signal_agent_summary', duration: 0, error: JSON.stringify({ memories: prevMem.length, avg_sample: avgS }) }).catch(() => {});
+        try { await supabase.from('engine_logs').insert({ timestamp: new Date().toISOString(), component: 'signal_agent_summary', duration: 0, error: JSON.stringify({ memories: prevMem.length, avg_sample: avgS }) }); } catch(_) {}
       }
 
       // 4. Clear previous signal agent memories (idempotent re-runs)
