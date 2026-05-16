@@ -2,6 +2,13 @@ import { supabase } from '../../lib/supabase';
 
 const MIN_SAMPLE = 20;
 
+// Factor names — MUST match what gets inserted and deleted
+const FACTORS = [
+  'overall_performance', 'pair_trading_performance', 'monthly_pnl',
+  'session_performance', 'hold_duration_performance', 'direction_performance',
+  'strategy_performance', 'gap_entry_performance'
+];
+
 function winRate(wins, losses) {
   const total = wins + losses;
   return total > 0 ? Math.round((wins / total) * 10000) / 100 : null;
@@ -23,6 +30,12 @@ function holdBucket(mins) {
   if (mins < 1440) return '12h_to_24h';
   if (mins < 4320) return '1d_to_3d';
   return 'over_3d';
+}
+
+function gapBucket(gap) {
+  if (gap == null) return null;
+  const g = Math.floor(Math.abs(gap));
+  return g >= 12 ? '12+' : String(g);
 }
 
 // --- ANALYSIS FUNCTIONS ---
@@ -71,7 +84,8 @@ function analyzeByPair(trades) {
 function analyzeByMonth(trades) {
   const buckets = {};
   for (const t of trades) {
-    const m = t.entry_time.slice(0, 7); // YYYY-MM
+    if (!t.entry_time) continue;
+    const m = typeof t.entry_time === 'string' ? t.entry_time.slice(0, 7) : new Date(t.entry_time).toISOString().slice(0, 7);
     if (!buckets[m]) buckets[m] = { wins: 0, losses: 0, pips: 0, n: 0 };
     const b = buckets[m];
     if (t.profit_loss_pips > 0) b.wins++; else if (t.profit_loss_pips < 0) b.losses++;
@@ -84,8 +98,7 @@ function analyzeByMonth(trades) {
     win_rate: winRate(b.wins, b.losses),
     total_pips: Math.round(b.pips * 100) / 100
   }));
-  // Store as single memory with all months in metadata
-  if (monthlyData.length >= 3) {
+  if (monthlyData.length >= 2) {
     const bestMonth = monthlyData.reduce((a, b) => b.total_pips > a.total_pips ? b : a);
     const worstMonth = monthlyData.reduce((a, b) => b.total_pips < a.total_pips ? b : a);
     memories.push({
@@ -103,6 +116,7 @@ function analyzeByMonth(trades) {
 function analyzeBySession(trades) {
   const buckets = {};
   for (const t of trades) {
+    if (!t.entry_time) continue;
     const h = new Date(t.entry_time).getUTCHours();
     const sess = sessionFromHour(h);
     if (!buckets[sess]) buckets[sess] = { wins: 0, losses: 0, pips: 0, n: 0 };
@@ -177,6 +191,58 @@ function analyzeByDirection(trades) {
   return memories;
 }
 
+function analyzeByStrategy(trades) {
+  const buckets = {};
+  for (const t of trades) {
+    const strat = t.strategy_name || 'UNKNOWN';
+    if (!buckets[strat]) buckets[strat] = { wins: 0, losses: 0, pips: 0, n: 0 };
+    const b = buckets[strat];
+    if (t.profit_loss_pips > 0) b.wins++; else if (t.profit_loss_pips < 0) b.losses++;
+    b.pips += t.profit_loss_pips || 0;
+    b.n++;
+  }
+  const memories = [];
+  for (const [strat, b] of Object.entries(buckets)) {
+    if (b.n < MIN_SAMPLE) continue;
+    memories.push({
+      type: 'behavior', factor: 'strategy_performance',
+      strategy: strat, win_rate: winRate(b.wins, b.losses), sample_size: b.n,
+      metadata: { wins: b.wins, losses: b.losses,
+        total_pips: Math.round(b.pips * 100) / 100,
+        avg_pips: Math.round((b.pips / b.n) * 100) / 100,
+        description: `${strat} strategy trading performance` }
+    });
+  }
+  return memories;
+}
+
+function analyzeByGapAtEntry(trades) {
+  const buckets = {};
+  for (const t of trades) {
+    const gb = gapBucket(t.gap_at_entry);
+    if (!gb) continue;
+    const key = gb;
+    if (!buckets[key]) buckets[key] = { gap: gb, wins: 0, losses: 0, pips: 0, n: 0 };
+    const b = buckets[key];
+    if (t.profit_loss_pips > 0) b.wins++; else if (t.profit_loss_pips < 0) b.losses++;
+    b.pips += t.profit_loss_pips || 0;
+    b.n++;
+  }
+  const memories = [];
+  for (const b of Object.values(buckets)) {
+    if (b.n < MIN_SAMPLE) continue;
+    memories.push({
+      type: 'behavior', factor: 'gap_entry_performance',
+      win_rate: winRate(b.wins, b.losses), sample_size: b.n,
+      metadata: { gap_level: b.gap, wins: b.wins, losses: b.losses,
+        total_pips: Math.round(b.pips * 100) / 100,
+        avg_pips: Math.round((b.pips / b.n) * 100) / 100,
+        description: `Trading performance when entry gap was ${b.gap}` }
+    });
+  }
+  return memories;
+}
+
 // --- MAIN HANDLER ---
 
 export default async function handler(req, res) {
@@ -207,19 +273,20 @@ export default async function handler(req, res) {
         ...analyzeBySession(trades),
         ...analyzeByHoldDuration(trades),
         ...analyzeByDirection(trades),
+        ...analyzeByStrategy(trades),
+        ...analyzeByGapAtEntry(trades),
       ];
 
       // Log previous run summary
       const { data: prevMem } = await supabase.from('ai_memory').select('sample_size')
-        .in('factor', ['overall_performance','pair_trading_performance','monthly_pnl','session_performance','hold_duration_performance','direction_performance']);
+        .in('factor', FACTORS);
       if (prevMem && prevMem.length > 0) {
-        const avgS = Math.round(prevMem.reduce((s,m) => s + m.sample_size, 0) / prevMem.length);
-        await supabase.from('engine_logs').insert({ timestamp: new Date().toISOString(), component: 'journal_agent_summary', duration: 0, error: JSON.stringify({ memories: prevMem.length, avg_sample: avgS }) });
+        const avgS = Math.round(prevMem.reduce((s,m) => s + (m.sample_size || 0), 0) / prevMem.length);
+        await supabase.from('engine_logs').insert({ timestamp: new Date().toISOString(), component: 'journal_agent_summary', duration: 0, error: JSON.stringify({ memories: prevMem.length, avg_sample: avgS }) }).catch(() => {});
       }
 
       // Clear previous journal agent memories
-      await supabase.from('ai_memory').delete()
-        .in('factor', ['overall_performance', 'pair_trading_performance', 'monthly_pnl', 'session_performance', 'hold_duration_performance', 'direction_performance']);
+      await supabase.from('ai_memory').delete().in('factor', FACTORS);
 
       // Batch insert
       const { data: inserted, error: writeErr } = await supabase.from('ai_memory').insert(allMemories).select('id');
@@ -236,7 +303,9 @@ export default async function handler(req, res) {
           'monthly_pnl — P&L by month with best/worst',
           'session_performance — ASIAN/LONDON/OVERLAP/NY',
           'hold_duration_performance — by hold time bucket',
-          'direction_performance — BUY vs SELL'
+          'direction_performance — BUY vs SELL',
+          'strategy_performance — by strategy name (BB/INTRA)',
+          'gap_entry_performance — by gap score at trade entry'
         ],
         ran_at: new Date().toISOString()
       });
