@@ -284,7 +284,8 @@ export default async function handler(req, res) {
         .from('signal_results')
         .select('symbol, direction, strategy, entry_gap, peak_gap, outcome, pl_zone, momentum, confidence, duration_min, pips, session, box_h1_trend, box_h4_trend')
         .not('outcome', 'is', null)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(5000);
 
       if (fetchErr) return res.status(500).json({ error: fetchErr.message });
       if (!rows || rows.length === 0) return res.status(200).json({ message: 'No resolved signals to analyze', memories_written: 0 });

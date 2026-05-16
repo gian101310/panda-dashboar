@@ -20,7 +20,8 @@ async function fetchRawCrossData() {
   const { data: signals, error: sigErr } = await supabase
     .from('signal_results')
     .select('symbol, direction, outcome, entry_gap, pl_zone, strategy, momentum, pips, session, box_h1_trend, box_h4_trend')
-    .not('outcome', 'is', null);
+    .not('outcome', 'is', null)
+    .limit(5000);
 
   const { data: trades, error: tradeErr } = await supabase
     .from('manual_trades')
