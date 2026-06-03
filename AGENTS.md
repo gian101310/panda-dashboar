@@ -18,30 +18,43 @@ Boss-G is the sole operator. His word is final.
 
 ---
 
-## 1. REPO MAP — NEVER CROSS-DEPLOY
+## 1. SINGLE REPO — ONE FOLDER, ONE REPO, ONE BRANCH
 
-| Repo | Vercel Project | Domain | Purpose |
-|------|---------------|--------|---------|
-| `gian101310/panda-dashboar` | `panda-dashboard` | `pandaengine.app` | Dashboard + API routes |
-| `gian101310/assistant-server` | — (its own, or none) | — | Separate project — NOT panda-dashboard |
+### Local folder
+```
+C:\Users\Admin\Documents\Claude\Projects\Panda Engine
+```
 
-### HARD RULE: REPO → VERCEL BINDING
+### GitHub repo
+```
+https://github.com/gian101310/panda-dashboar.git   (branch: main)
+```
 
+### Vercel binding
 ```
 panda-dashboar repo  →  panda-dashboard Vercel project  →  pandaengine.app
 ```
 
-**NEVER** push code from `assistant-server` (or any other repo) to the `panda-dashboard` Vercel project.
-**NEVER** link, deploy, or redirect any other repo to `pandaengine.app`.
+| Item | Value |
+|------|-------|
+| Local folder | `C:\Users\Admin\Documents\Claude\Projects\Panda Engine` |
+| GitHub repo | `gian101310/panda-dashboar` |
+| Branch | `main` |
+| Vercel project | `panda-dashboard` |
+| Domain | `pandaengine.app` / `www.pandaengine.app` |
 
-A `vercel.json` ignoreCommand guardrail is in place that auto-cancels builds from wrong repos.
-If you see a build get cancelled, that guardrail is working — do NOT remove or modify it.
+### HARD RULES
+
+- **`assistant-server` repo is DEAD.** Do not push to it, deploy from it, or reference it.
+- **Only push to `panda-dashboar`** — it auto-deploys to Vercel on every push.
+- **Only edit files in the local folder above.** Desktop copies (`ctrader_trend_scanner`, etc.) are old/archived.
+- A `vercel.json` ignoreCommand guardrail is in place that auto-cancels builds from wrong repos.
 
 ### WHY THIS RULE EXISTS
 
 On 2026-05-28, a Codex deploy from `assistant-server` overwrote the `panda-dashboard` production build.
-This silently erased the ALL AGENTS tab, PAGE VISIBILITY controls, and other features.
-Boss-G lost functionality with zero error messages. It took a full investigation to find the cause.
+On 2026-06-03, having two repos caused login alerts to silently stop working (code was pushed to the wrong repo).
+Both repos are now consolidated into `panda-dashboar` only.
 
 ---
 
