@@ -1,0 +1,23 @@
+# Auto-normalize line endings to LF on commit
+* text=auto
+
+# Force LF for source files
+*.py text eol=lf
+*.js text eol=lf
+*.jsx text eol=lf
+*.json text eol=lf
+*.css text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary files — never touch
+*.ex4 binary
+*.ex5 binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.zip binary
+*.pdf binary

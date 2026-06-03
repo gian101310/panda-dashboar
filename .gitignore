@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Next.js
+.next/
+out/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+
+# Environment & secrets
+.env
+.env.local
+.env.production
+service_account.json
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Vercel
+.vercel/
+
+# Archive (optional - uncomment to exclude from repo)
+# archive/
+
+# Snapshots
+snapshot.png
+snapshot_send.png

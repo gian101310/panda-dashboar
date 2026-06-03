@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panda Engine — Full Architecture Map</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700&family=Rajdhani:wght@400;600;700&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#0a0e14; color:#c8d6e5; font-family:'Rajdhani',sans-serif; font-size:15px; overflow-x:hidden; }
+  h1,h2,h3 { font-family:'Orbitron',sans-serif; }
+  code, .mono { font-family:'Share Tech Mono',monospace; font-size:13px; }
+
+  .header { text-align:center; padding:40px 20px 20px; border-bottom:1px solid #1a2030; }
+  .header h1 { font-size:28px; color:#00ff9f; letter-spacing:3px; }
+  .header .sub { color:#556; font-size:13px; margin-top:6px; font-family:'Share Tech Mono',monospace; }
+
+  /* Navigation */
+  .nav { display:flex; justify-content:center; gap:8px; padding:16px; flex-wrap:wrap; position:sticky; top:0; background:#0a0e14; z-index:100; border-bottom:1px solid #1a2030; }
+  .nav button { background:#111820; border:1px solid #1a2838; color:#8899aa; padding:8px 16px; border-radius:6px; cursor:pointer; font-family:'Rajdhani',sans-serif; font-size:14px; font-weight:600; transition:all .2s; }
+  .nav button:hover, .nav button.active { background:#00ff9f22; border-color:#00ff9f; color:#00ff9f; }
+
+  /* Sections */
+  .section { display:none; max-width:1400px; margin:0 auto; padding:30px 20px; }
+  .section.active { display:block; }
+  .section h2 { color:#00b4ff; font-size:20px; margin-bottom:20px; letter-spacing:2px; }
+  .section h3 { color:#ffd166; font-size:15px; margin:20px 0 10px; letter-spacing:1px; }
+
+  /* Cards */
+  .card { background:#111820; border:1px solid #1a2838; border-radius:10px; padding:20px; margin-bottom:16px; transition:border-color .2s; }
+  .card:hover { border-color:#00b4ff55; }
+  .card-title { font-family:'Orbitron',sans-serif; font-size:14px; color:#00ff9f; margin-bottom:8px; }
+  .card-sub { color:#556; font-size:12px; font-family:'Share Tech Mono',monospace; }
+
+  /* Grid layouts */
+  .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; }
+  .grid-4 { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+  @media(max-width:900px) { .grid-2,.grid-3,.grid-4 { grid-template-columns:1fr; } }
+
+  /* Flow diagram */
+  .flow { display:flex; flex-direction:column; gap:0; align-items:center; }
+  .flow-node { background:#111820; border:1px solid #1a2838; border-radius:10px; padding:16px 28px; text-align:center; min-width:340px; position:relative; }
+  .flow-node .label { font-family:'Orbitron',sans-serif; font-size:13px; color:#00ff9f; }
+  .flow-node .desc { color:#889; font-size:13px; margin-top:4px; }
+  .flow-arrow { color:#00b4ff; font-size:24px; line-height:1; padding:4px 0; }
+
+  /* Tables */
+  .tbl { width:100%; border-collapse:collapse; margin-top:10px; }
+  .tbl th { background:#0d1218; color:#00b4ff; font-family:'Orbitron',sans-serif; font-size:11px; letter-spacing:1px; text-align:left; padding:10px 12px; border-bottom:1px solid #1a2838; }
+  .tbl td { padding:8px 12px; border-bottom:1px solid #0d1218; font-size:13px; }
+  .tbl tr:hover td { background:#111820; }
+
+  /* Tags */
+  .tag { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-family:'Share Tech Mono',monospace; margin:2px; }
+  .tag-green { background:#00ff9f22; color:#00ff9f; border:1px solid #00ff9f44; }
+  .tag-blue { background:#00b4ff22; color:#00b4ff; border:1px solid #00b4ff44; }
+  .tag-red { background:#ff4d6d22; color:#ff4d6d; border:1px solid #ff4d6d44; }
+  .tag-yellow { background:#ffd16622; color:#ffd166; border:1px solid #ffd16644; }
+  .tag-orange { background:#ffaa4422; color:#ffaa44; border:1px solid #ffaa4444; }
+  .tag-purple { background:#a855f722; color:#a855f7; border:1px solid #a855f744; }
+
+  /* Stats row */
+  .stats { display:flex; gap:16px; flex-wrap:wrap; margin-bottom:24px; }
+  .stat { background:#111820; border:1px solid #1a2838; border-radius:8px; padding:14px 20px; flex:1; min-width:140px; text-align:center; }
+  .stat .num { font-family:'Orbitron',sans-serif; font-size:22px; color:#00ff9f; }
+  .stat .lbl { font-size:11px; color:#556; margin-top:4px; font-family:'Share Tech Mono',monospace; letter-spacing:1px; }
+
+  /* Collapsible */
+  .collapse-btn { background:none; border:none; color:#00b4ff; cursor:pointer; font-family:'Share Tech Mono',monospace; font-size:12px; float:right; }
+  .collapse-content { overflow:hidden; transition:max-height .3s; }
+
+  /* Search */
+  .search-box { width:100%; padding:10px 16px; background:#111820; border:1px solid #1a2838; border-radius:8px; color:#c8d6e5; font-family:'Share Tech Mono',monospace; font-size:14px; margin-bottom:20px; outline:none; }
+  .search-box:focus { border-color:#00b4ff; }
+  .search-box::placeholder { color:#334; }
+
+  .highlight { background:#ffd16644; border-radius:2px; }
+
+  /* Connection lines for the flow */
+  .layer-badge { display:inline-block; padding:4px 12px; border-radius:20px; font-size:11px; font-weight:700; letter-spacing:1px; font-family:'Orbitron',sans-serif; margin-bottom:8px; }
+  .layer-mt4 { background:#a855f733; color:#a855f7; border:1px solid #a855f755; }
+  .layer-engine { background:#ff4d6d33; color:#ff4d6d; border:1px solid #ff4d6d55; }
+  .layer-supa { background:#00ff9f33; color:#00ff9f; border:1px solid #00ff9f55; }
+  .layer-dash { background:#00b4ff33; color:#00b4ff; border:1px solid #00b4ff55; }
+  .layer-tg { background:#ffd16633; color:#ffd166; border:1px solid #ffd16655; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>PANDA ENGINE</h1>
+  <div class="sub">Full Architecture Map &bull; v3.0 &bull; Generated 2026-05-19</div>
+  <div class="sub" style="margin-top:4px;">pandaengine.app &bull; Supabase: jxkelchxitwuilpbrwxk &bull; 21 pairs &bull; 30 tables</div>
+</div>
+
+<div class="nav" id="nav">
+  <button class="active" onclick="showSection('overview')">OVERVIEW</button>
+  <button onclick="showSection('dataflow')">DATA FLOW</button>
+  <button onclick="showSection('engine')">ENGINE</button>
+  <button onclick="showSection('dashboard')">DASHBOARD</button>
+  <button onclick="showSection('api')">API ROUTES</button>
+  <button onclick="showSection('supabase')">SUPABASE</button>
+  <button onclick="showSection('mt4')">MT4 / EA</button>
+  <button onclick="showSection('auth')">AUTH</button>
+  <button onclick="showSection('strategies')">STRATEGIES</button>
+</div>
+
+<!-- ==================== OVERVIEW ==================== -->
+<div class="section active" id="sec-overview">
+  <h2>SYSTEM OVERVIEW</h2>
+  <div class="stats">
+    <div class="stat"><div class="num">21</div><div class="lbl">FOREX PAIRS</div></div>
+    <div class="stat"><div class="num">30</div><div class="lbl">DB TABLES</div></div>
+    <div class="stat"><div class="num">3,363</div><div class="lbl">DASHBOARD LINES</div></div>
+    <div class="stat"><div class="num">2,176</div><div class="lbl">ENGINE LINES</div></div>
+    <div class="stat"><div class="num">13</div><div class="lbl">TABS</div></div>
+    <div class="stat"><div class="num">28</div><div class="lbl">API ROUTES</div></div>
+    <div class="stat"><div class="num">6</div><div class="lbl">MQ4/MQ5 FILES</div></div>
+    <div class="stat"><div class="num">10</div><div class="lbl">MOMENTUM STATES</div></div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">ARCHITECTURE LAYERS</div>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:12px;">
+        <div><span class="layer-badge layer-mt4">LAYER 1</span> <strong>MT4 Indicators</strong> — Panda Exporter + Panda Lines write flat files every ~2 min</div>
+        <div><span class="layer-badge layer-engine">LAYER 2</span> <strong>Python Engine</strong> — FastAPI app.py (2,176 lines) parses, scores, pushes to Supabase every 5 min</div>
+        <div><span class="layer-badge layer-supa">LAYER 3</span> <strong>Supabase</strong> — 30 tables, PostgreSQL, RLS enabled on 28/30 tables</div>
+        <div><span class="layer-badge layer-dash">LAYER 4</span> <strong>Next.js Dashboard</strong> — dashboard.js (3,363 lines), 13 tabs, deployed on Vercel</div>
+        <div><span class="layer-badge layer-tg">LAYER 5</span> <strong>Telegram</strong> — Spike alerts, login notifications, per-pair subscriptions</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">TECH STACK</div>
+      <table class="tbl">
+        <tr><td class="mono">Engine</td><td>Python 3 + FastAPI + Uvicorn</td></tr>
+        <tr><td class="mono">Dashboard</td><td>Next.js 14 + React 18</td></tr>
+        <tr><td class="mono">Database</td><td>Supabase (PostgreSQL)</td></tr>
+        <tr><td class="mono">Hosting</td><td>Vercel (dashboard) + Local PC (engine)</td></tr>
+        <tr><td class="mono">Charts</td><td>Recharts + Canvas</td></tr>
+        <tr><td class="mono">Icons</td><td>Lucide React</td></tr>
+        <tr><td class="mono">AI</td><td>OpenAI GPT (ai-chat, agents)</td></tr>
+        <tr><td class="mono">Alerts</td><td>Telegram Bot API (2 bots)</td></tr>
+        <tr><td class="mono">Trading</td><td>MT4/MT5 Expert Advisors (MQ4/MQ5)</td></tr>
+        <tr><td class="mono">Auth</td><td>Cookie sessions + SHA-256 + device fingerprint</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== DATA FLOW ==================== -->
+<div class="section" id="sec-dataflow">
+  <h2>DATA FLOW</h2>
+  <div class="flow">
+    <div class="flow-node" style="border-color:#a855f7;">
+      <span class="layer-badge layer-mt4">MT4</span>
+      <div class="label">MetaTrader 4 Indicators</div>
+      <div class="desc">Panda Exporter + Panda Lines v3 write flat files every ~2 min</div>
+      <div class="desc mono" style="margin-top:6px;">mt4_SYMBOL.txt &bull; tbg_SYMBOL.txt</div>
+    </div>
+    <div class="flow-arrow">&#x25BC;</div>
+    <div class="flow-node" style="border-color:#ff4d6d;">
+      <span class="layer-badge layer-engine">ENGINE</span>
+      <div class="label">app.py — run_gap_once()</div>
+      <div class="desc">Parse MT4 files &rarr; Score all 21 pairs &rarr; Classify momentum</div>
+      <div class="desc mono" style="margin-top:6px;">Every 5 min via master_scheduler</div>
+    </div>
+    <div class="flow-arrow">&#x25BC;</div>
+    <div class="flow-node" style="border-color:#00ff9f;">
+      <span class="layer-badge layer-supa">SUPABASE</span>
+      <div class="label">Upsert to 'dashboard' (21 rows)</div>
+      <div class="desc">Also writes: signal_results, signal_tracker, spike_events, gap_history, strength_log</div>
+    </div>
+    <div class="flow-arrow">&#x25BC;</div>
+    <div style="display:flex;gap:16px;width:100%;max-width:740px;">
+      <div class="flow-node" style="border-color:#00b4ff;flex:1;">
+        <span class="layer-badge layer-dash">DASHBOARD</span>
+        <div class="label">Next.js Frontend</div>
+        <div class="desc">Polls /api/data every ~30s</div>
+        <div class="desc">13 tabs, real-time pair cards</div>
+      </div>
+      <div class="flow-node" style="border-color:#ffd166;flex:1;">
+        <span class="layer-badge layer-tg">TELEGRAM</span>
+        <div class="label">Alert Bots</div>
+        <div class="desc">Spike alerts, login alerts</div>
+        <div class="desc">Per-pair subscriptions</div>
+      </div>
+    </div>
+    <div class="flow-arrow">&#x25BC;</div>
+    <div class="flow-node" style="border-color:#a855f7;">
+      <span class="layer-badge layer-mt4">EA</span>
+      <div class="label">MT4/MT5 Expert Advisor</div>
+      <div class="desc">Reads engine scores &rarr; Executes trades &rarr; Posts results to /api/ea-result</div>
+    </div>
+  </div>
+
+  <h3 style="margin-top:30px;">AI AGENT FLOW</h3>
+  <div class="flow" style="margin-top:10px;">
+    <div class="flow-node" style="border-color:#a855f7;min-width:280px;">
+      <div class="label">Panda AI Chat</div>
+      <div class="desc">3 modes: insights, review, chat</div>
+    </div>
+    <div class="flow-arrow">&#x25BC;</div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;">
+      <div class="flow-node" style="min-width:180px;"><div class="label" style="font-size:11px;">signal-agent</div><div class="desc">Analyzes signal_results</div></div>
+      <div class="flow-node" style="min-width:180px;"><div class="label" style="font-size:11px;">journal-agent</div><div class="desc">Analyzes manual_trades</div></div>
+      <div class="flow-node" style="min-width:180px;"><div class="label" style="font-size:11px;">pattern-agent</div><div class="desc">Cross-references both</div></div>
+    </div>
+    <div class="flow-arrow">&#x25BC;</div>
+    <div class="flow-node" style="border-color:#00ff9f;min-width:280px;">
+      <div class="label">ai_memory + admin_brain</div>
+      <div class="desc">Persisted findings &amp; coaching rules</div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== ENGINE ==================== -->
+<div class="section" id="sec-engine">
+  <h2>ENGINE — app.py</h2>
+  <div class="card-sub" style="margin-bottom:16px;">C:\Users\Admin\Desktop\ctrader_trend_scanner\app.py &bull; 2,176 lines &bull; Python/FastAPI</div>
+
+  <div class="stats">
+    <div class="stat"><div class="num">2,176</div><div class="lbl">LINES</div></div>
+    <div class="stat"><div class="num">5 min</div><div class="lbl">GAP CYCLE</div></div>
+    <div class="stat"><div class="num">60 min</div><div class="lbl">SNAPSHOT CYCLE</div></div>
+    <div class="stat"><div class="num">21</div><div class="lbl">PAIRS</div></div>
+  </div>
+
+  <table class="tbl">
+    <thead><tr><th>LINES</th><th>FUNCTION / BLOCK</th><th>PURPOSE</th><th>STATUS</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">1-14</td><td>Header</td><td>Version info, docstring</td><td><span class="tag tag-blue">INFO</span></td></tr>
+      <tr><td class="mono">16-48</td><td>Imports + CORS</td><td>FastAPI, supabase, PIL, allowed origins</td><td><span class="tag tag-blue">INFO</span></td></tr>
+      <tr><td class="mono">49-80</td><td>Config block</td><td>MT4_PATH, tokens, PAIRS[], state vars</td><td><span class="tag tag-yellow">CONFIG</span></td></tr>
+      <tr><td class="mono">109-226</td><td>parse_tf_score / parse_mt4_file</td><td>MT4 file &rarr; D1/H4/H1/ADV/ATR/BOX</td><td><span class="tag tag-green">PARSER</span></td></tr>
+      <tr><td class="mono">229-272</td><td>parse_tbg_file</td><td>TBG &rarr; ST/FL/BIAS/ZONE/G1</td><td><span class="tag tag-green">PARSER</span></td></tr>
+      <tr><td class="mono">274-324</td><td>compute_box_trends</td><td>UPTREND / DOWNTREND / RANGING</td><td><span class="tag tag-green">COMPUTE</span></td></tr>
+      <tr><td class="mono">327-436</td><td>extract_panda_score / compute_scores_all_pairs</td><td>Gap scoring algorithm</td><td><span class="tag tag-red">LOCKED</span></td></tr>
+      <tr><td class="mono">454-495</td><td>classify_momentum</td><td>10-state momentum classification</td><td><span class="tag tag-green">COMPUTE</span></td></tr>
+      <tr><td class="mono">497-755</td><td>run_gap_once</td><td>MAIN LOOP: parse &rarr; score &rarr; momentum &rarr; upsert</td><td><span class="tag tag-orange">CORE</span></td></tr>
+      <tr><td class="mono">880-909</td><td>send_spike_alert</td><td>Spike detection + Telegram</td><td><span class="tag tag-yellow">ALERT</span></td></tr>
+      <tr><td class="mono">942-978</td><td>master_scheduler</td><td>5-min gap / 60-min snapshot scheduler</td><td><span class="tag tag-orange">CORE</span></td></tr>
+    </tbody>
+  </table>
+
+  <h3>SUPPORT FILES</h3>
+  <div class="grid-2">
+    <div class="card"><div class="card-title">check_dupes.py</div><div>Duplicate detection — <strong>RUN BEFORE EVERY PUSH</strong></div></div>
+    <div class="card"><div class="card-title">panda_run.bat</div><div>Engine launcher script</div></div>
+  </div>
+
+  <h3>ARCHIVE (8 backups)</h3>
+  <div style="display:flex;flex-wrap:wrap;gap:6px;">
+    <span class="tag tag-purple">App_v1_backup.py</span>
+    <span class="tag tag-purple">panda_engine_backup_safe.py</span>
+    <span class="tag tag-purple">qwapp.py</span>
+    <span class="tag tag-purple">dashboard_app.py</span>
+    <span class="tag tag-purple">vvapp.py</span>
+    <span class="tag tag-purple">app_backup_v2.1.py</span>
+    <span class="tag tag-purple">ctrader_journal.py</span>
+    <span class="tag tag-purple">app_backup_before_threshold_fix.py</span>
+  </div>
+</div>
+
+<!-- ==================== DASHBOARD ==================== -->
+<div class="section" id="sec-dashboard">
+  <h2>DASHBOARD — dashboard.js</h2>
+  <div class="card-sub" style="margin-bottom:16px;">C:\Users\Admin\panda-dashboard\pages\dashboard.js &bull; 3,363 lines &bull; Next.js 14 / React 18</div>
+
+  <div class="stats">
+    <div class="stat"><div class="num">3,363</div><div class="lbl">LINES</div></div>
+    <div class="stat"><div class="num">13</div><div class="lbl">TABS</div></div>
+    <div class="stat"><div class="num">12+</div><div class="lbl">COMPONENTS</div></div>
+    <div class="stat"><div class="num">1 file</div><div class="lbl">MONOLITH</div></div>
+  </div>
+
+  <h3>TAB STRUCTURE</h3>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;">
+    <span class="tag tag-green">PANELS</span>
+    <span class="tag tag-green">SIGNALS</span>
+    <span class="tag tag-blue">TABLE</span>
+    <span class="tag tag-blue">GAP CHART</span>
+    <span class="tag tag-blue">RESEARCH</span>
+    <span class="tag tag-yellow">CALCULATOR</span>
+    <span class="tag tag-green">SETUPS</span>
+    <span class="tag tag-green">VALID PAIRS</span>
+    <span class="tag tag-orange">SPIKE LOG</span>
+    <span class="tag tag-blue">CHART</span>
+    <span class="tag tag-purple">ANALYTICS</span>
+    <span class="tag tag-blue">SIGNAL LOG</span>
+    <span class="tag tag-purple">PANDA AI</span>
+  </div>
+
+  <h3>COMPONENTS</h3>
+  <table class="tbl">
+    <thead><tr><th>~LINE</th><th>COMPONENT</th><th>PURPOSE</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">8</td><td>ALL_PAIRS</td><td>21-pair constant array</td></tr>
+      <tr><td class="mono">10-22</td><td>MOMENTUM_GUIDE</td><td>Icon/action/color for 10 momentum states</td></tr>
+      <tr><td class="mono">25-91</td><td>Utility functions</td><td>stateColor, biasFromGap, boxTrend, tbgZoneBadge, atrFill</td></tr>
+      <tr><td class="mono">186-275</td><td>computeConfidence</td><td>Multi-factor confidence 0-100 (client-side only)</td></tr>
+      <tr><td class="mono">376-487</td><td>MomentumHeatmap</td><td>Heatmap grid component</td></tr>
+      <tr><td class="mono">613-711</td><td>GapChart</td><td>Gap history (canvas-based)</td></tr>
+      <tr><td class="mono">869-933</td><td>PairCard</td><td>Main pair card component</td></tr>
+      <tr><td class="mono">934-1092</td><td>PairCardModal</td><td>Expanded modal with full pair details</td></tr>
+      <tr><td class="mono">1093-1203</td><td>ValidSetupsTab</td><td>Box-confirmed setups</td></tr>
+      <tr><td class="mono">1204-1355</td><td>ValidPairsTab</td><td>Auto-filtered tradable pairs</td></tr>
+      <tr><td class="mono">1752-1830</td><td>PandaAIChat</td><td>Panda AI tab (3 modes)</td></tr>
+      <tr><td class="mono">~1782</td><td>SignalAnalytics</td><td>Signal performance V2</td></tr>
+      <tr><td class="mono">~2019</td><td>Dashboard()</td><td>Main export — state, effects, tab render</td></tr>
+    </tbody>
+  </table>
+
+  <h3>LIB FILES</h3>
+  <div class="grid-4">
+    <div class="card"><div class="card-title">supabase.js</div><div class="card-sub">Shared client</div></div>
+    <div class="card"><div class="card-title">auth.js</div><div class="card-sub">Session validation, hashing</div></div>
+    <div class="card"><div class="card-title">openai.js</div><div class="card-sub">API key export</div></div>
+    <div class="card" style="opacity:.5;"><div class="card-title">theme.js</div><div class="card-sub">DEPRECATED</div></div>
+  </div>
+
+  <h3>OTHER PAGES</h3>
+  <div class="grid-4">
+    <div class="card"><div class="card-title">index.js</div><div class="card-sub">Landing / redirect</div></div>
+    <div class="card"><div class="card-title">login.js</div><div class="card-sub">Login page</div></div>
+    <div class="card"><div class="card-title">pricing.js</div><div class="card-sub">Pricing page</div></div>
+    <div class="card"><div class="card-title">funnel.js</div><div class="card-sub">Signup funnel</div></div>
+    <div class="card"><div class="card-title">pending.js</div><div class="card-sub">Pending approval</div></div>
+    <div class="card"><div class="card-title">strength.js</div><div class="card-sub">Currency strength</div></div>
+    <div class="card"><div class="card-title">journal.js</div><div class="card-sub">Journal page</div></div>
+    <div class="card"><div class="card-title">portfolio.js</div><div class="card-sub">Portfolio page</div></div>
+    <div class="card"><div class="card-title">stream.js</div><div class="card-sub">Stream page</div></div>
+    <div class="card"><div class="card-title">admin/index.js</div><div class="card-sub">Admin panel</div></div>
+    <div class="card"><div class="card-title">admin/pf-approvals.js</div><div class="card-sub">Signup approvals</div></div>
+    <div class="card"><div class="card-title">_app.js</div><div class="card-sub">Next.js wrapper</div></div>
+  </div>
+
+  <h3>DESIGN SYSTEM</h3>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">FONTS</div>
+      <div><span class="tag tag-green">Share Tech Mono</span> Data/numbers</div>
+      <div><span class="tag tag-blue">Orbitron</span> Headings</div>
+      <div><span class="tag tag-yellow">Rajdhani</span> Body text</div>
+    </div>
+    <div class="card">
+      <div class="card-title">COLORS</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;">
+        <span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:16px;height:16px;border-radius:50%;background:#00ff9f;display:inline-block;"></span><span class="mono">#00ff9f BUY</span></span>
+        <span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:16px;height:16px;border-radius:50%;background:#ff4d6d;display:inline-block;"></span><span class="mono">#ff4d6d SELL</span></span>
+        <span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:16px;height:16px;border-radius:50%;background:#00b4ff;display:inline-block;"></span><span class="mono">#00b4ff ACCENT</span></span>
+        <span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:16px;height:16px;border-radius:50%;background:#ffd166;display:inline-block;"></span><span class="mono">#ffd166 WARN</span></span>
+        <span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:16px;height:16px;border-radius:50%;background:#ffaa44;display:inline-block;"></span><span class="mono">#ffaa44 COOL</span></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== API ROUTES ==================== -->
+<div class="section" id="sec-api">
+  <h2>API ROUTES</h2>
+  <div class="card-sub" style="margin-bottom:16px;">All under /pages/api/ &bull; 28 route files</div>
+
+  <input class="search-box" placeholder="Search routes..." oninput="filterTable(this,'api-table')">
+
+  <table class="tbl" id="api-table">
+    <thead><tr><th>ROUTE</th><th>METHOD</th><th>PURPOSE</th><th>TABLES</th><th>GROUP</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">/api/login</td><td>POST</td><td>Authenticate, create session</td><td class="mono">panda_users, panda_sessions, panda_access_logs</td><td><span class="tag tag-red">AUTH</span></td></tr>
+      <tr><td class="mono">/api/logout</td><td>POST</td><td>Revoke session</td><td class="mono">panda_sessions</td><td><span class="tag tag-red">AUTH</span></td></tr>
+      <tr><td class="mono">/api/me</td><td>GET</td><td>Current user from token</td><td class="mono">panda_sessions, panda_users</td><td><span class="tag tag-red">AUTH</span></td></tr>
+      <tr><td class="mono">/api/data</td><td>GET</td><td>Dashboard rows (21 pairs)</td><td class="mono">dashboard</td><td><span class="tag tag-green">DATA</span></td></tr>
+      <tr><td class="mono">/api/gap-chart</td><td>GET</td><td>Gap history</td><td class="mono">gap_history</td><td><span class="tag tag-green">DATA</span></td></tr>
+      <tr><td class="mono">/api/heatmap</td><td>GET</td><td>Momentum heatmap</td><td class="mono">dashboard</td><td><span class="tag tag-green">DATA</span></td></tr>
+      <tr><td class="mono">/api/pdr</td><td>GET</td><td>PDR strength</td><td class="mono">pdr_cache</td><td><span class="tag tag-green">DATA</span></td></tr>
+      <tr><td class="mono">/api/spikes</td><td>GET</td><td>Spike event log</td><td class="mono">spike_events</td><td><span class="tag tag-green">DATA</span></td></tr>
+      <tr><td class="mono">/api/currency-strength</td><td>GET</td><td>Currency strength</td><td class="mono">strength_log</td><td><span class="tag tag-green">DATA</span></td></tr>
+      <tr><td class="mono">/api/strength-history</td><td>GET</td><td>Strength time series</td><td class="mono">strength_log</td><td><span class="tag tag-green">DATA</span></td></tr>
+      <tr><td class="mono">/api/engine-health</td><td>GET</td><td>Engine status</td><td class="mono">engine_heartbeat</td><td><span class="tag tag-green">DATA</span></td></tr>
+      <tr><td class="mono">/api/signal-log</td><td>GET</td><td>Signal snapshots</td><td class="mono">signal_snapshots</td><td><span class="tag tag-blue">SIGNAL</span></td></tr>
+      <tr><td class="mono">/api/signal-tracker</td><td>GET/POST</td><td>Signal lifecycle CRUD</td><td class="mono">signal_tracker</td><td><span class="tag tag-blue">SIGNAL</span></td></tr>
+      <tr><td class="mono">/api/signal-analytics</td><td>GET</td><td>Signal performance</td><td class="mono">signal_results</td><td><span class="tag tag-blue">SIGNAL</span></td></tr>
+      <tr><td class="mono">/api/public-signals</td><td>GET</td><td>Public signal data</td><td class="mono">signal_results</td><td><span class="tag tag-blue">SIGNAL</span></td></tr>
+      <tr><td class="mono">/api/ai-chat</td><td>POST</td><td>Panda AI (3 modes)</td><td class="mono">dashboard, signal_results, signal_tracker, manual_trades, ai_memory, admin_brain</td><td><span class="tag tag-purple">AI</span></td></tr>
+      <tr><td class="mono">/api/ai-memory</td><td>GET/POST/DEL</td><td>AI memory CRUD</td><td class="mono">ai_memory</td><td><span class="tag tag-purple">AI</span></td></tr>
+      <tr><td class="mono">/api/admin-brain</td><td>GET/POST/DEL</td><td>Boss-G brain CRUD</td><td class="mono">admin_brain</td><td><span class="tag tag-purple">AI</span></td></tr>
+      <tr><td class="mono">/api/signal-agent</td><td>POST</td><td>Signal analysis agent</td><td class="mono">signal_results, ai_memory</td><td><span class="tag tag-purple">AI</span></td></tr>
+      <tr><td class="mono">/api/journal-agent</td><td>POST</td><td>Journal analysis agent</td><td class="mono">manual_trades, ai_memory</td><td><span class="tag tag-purple">AI</span></td></tr>
+      <tr><td class="mono">/api/pattern-agent</td><td>POST</td><td>Pattern cross-reference</td><td class="mono">signal_results, manual_trades, ai_memory</td><td><span class="tag tag-purple">AI</span></td></tr>
+      <tr><td class="mono">/api/journal</td><td>CRUD</td><td>Trade journal</td><td class="mono">manual_trades, trade_journal</td><td><span class="tag tag-yellow">JOURNAL</span></td></tr>
+      <tr><td class="mono">/api/journal-upload</td><td>POST</td><td>CSV trade import</td><td class="mono">manual_trades, csv_uploads</td><td><span class="tag tag-yellow">JOURNAL</span></td></tr>
+      <tr><td class="mono">/api/alert-prefs</td><td>GET/POST</td><td>Alert preferences</td><td class="mono">user_alert_prefs</td><td><span class="tag tag-orange">PREFS</span></td></tr>
+      <tr><td class="mono">/api/strategies</td><td>CRUD</td><td>User strategies</td><td class="mono">user_strategies</td><td><span class="tag tag-orange">PREFS</span></td></tr>
+      <tr><td class="mono">/api/notify-telegram</td><td>POST</td><td>Telegram notification</td><td class="mono">telegram_subscriptions</td><td><span class="tag tag-orange">PREFS</span></td></tr>
+      <tr><td class="mono">/api/upcoming-news</td><td>GET</td><td>ForexFactory news</td><td class="mono">-</td><td><span class="tag tag-blue">MISC</span></td></tr>
+      <tr><td class="mono">/api/calendar</td><td>GET</td><td>Trading calendar</td><td class="mono">-</td><td><span class="tag tag-blue">MISC</span></td></tr>
+      <tr><td class="mono">/api/cot</td><td>GET</td><td>COT data</td><td class="mono">-</td><td><span class="tag tag-blue">MISC</span></td></tr>
+      <tr><td class="mono">/api/ea-data</td><td>GET</td><td>EA data endpoint</td><td class="mono">dashboard</td><td><span class="tag tag-orange">EA</span></td></tr>
+      <tr><td class="mono">/api/ea-result</td><td>POST</td><td>EA execution results</td><td class="mono">ea_executions</td><td><span class="tag tag-orange">EA</span></td></tr>
+      <tr><td class="mono">/api/maintenance</td><td>GET/POST</td><td>Maintenance mode</td><td class="mono">site_config</td><td><span class="tag tag-red">ADMIN</span></td></tr>
+      <tr><td class="mono">/api/pf-signup</td><td>POST</td><td>Signup request</td><td class="mono">pf_signup_requests</td><td><span class="tag tag-red">AUTH</span></td></tr>
+      <tr><td class="mono">/api/admin/*</td><td>CRUD</td><td>Users, sessions, logs, approvals</td><td class="mono">panda_users, panda_sessions, panda_access_logs, pf_signup_requests</td><td><span class="tag tag-red">ADMIN</span></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ==================== SUPABASE ==================== -->
+<div class="section" id="sec-supabase">
+  <h2>SUPABASE TABLES</h2>
+  <div class="card-sub" style="margin-bottom:16px;">Project: jxkelchxitwuilpbrwxk &bull; 30 tables &bull; RLS on 28/30</div>
+
+  <input class="search-box" placeholder="Search tables..." oninput="filterTable(this,'supa-table')">
+
+  <table class="tbl" id="supa-table">
+    <thead><tr><th>TABLE</th><th>ROWS</th><th>PK</th><th>PURPOSE</th><th>GROUP</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">dashboard</td><td>21</td><td>symbol</td><td>Live pair data (upserted every 5 min)</td><td><span class="tag tag-green">CORE</span></td></tr>
+      <tr><td class="mono">signal_results</td><td>2,022</td><td>id (bigint)</td><td>BB + INTRA strategy performance</td><td><span class="tag tag-blue">SIGNAL</span></td></tr>
+      <tr><td class="mono">signal_tracker</td><td>4,729</td><td>id (uuid)</td><td>Signal lifecycle with hourly snapshots</td><td><span class="tag tag-blue">SIGNAL</span></td></tr>
+      <tr><td class="mono">signal_snapshots</td><td>0</td><td>id (uuid)</td><td>Full pair snapshots every cycle</td><td><span class="tag tag-blue">SIGNAL</span></td></tr>
+      <tr><td class="mono">signal_accuracy</td><td>0</td><td>id (uuid)</td><td>Signal follow-through tracking</td><td><span class="tag tag-blue">SIGNAL</span></td></tr>
+      <tr><td class="mono">gap_history</td><td>36,600</td><td>-</td><td>Historical gap scores</td><td><span class="tag tag-green">CORE</span></td></tr>
+      <tr><td class="mono">strength_log</td><td>23,193</td><td>-</td><td>Currency strength time series</td><td><span class="tag tag-green">CORE</span></td></tr>
+      <tr><td class="mono">spike_events</td><td>1,058</td><td>id (bigint)</td><td>Gap spike alerts</td><td><span class="tag tag-orange">ALERT</span></td></tr>
+      <tr><td class="mono">pdr_cache</td><td>21</td><td>symbol</td><td>PDR strength (15-min TTL)</td><td><span class="tag tag-green">CORE</span></td></tr>
+      <tr><td class="mono">trade_matrix</td><td>13,768</td><td>-</td><td>Trade state matrix history</td><td><span class="tag tag-green">CORE</span></td></tr>
+      <tr><td class="mono">trade_events</td><td>1,088</td><td>-</td><td>Trade event log</td><td><span class="tag tag-green">CORE</span></td></tr>
+      <tr><td class="mono">ai_memory</td><td>65</td><td>id (uuid)</td><td>AI agent findings</td><td><span class="tag tag-purple">AI</span></td></tr>
+      <tr><td class="mono">admin_brain</td><td>18</td><td>id (uuid)</td><td>Boss-G brain (pref/coaching/pattern/rule)</td><td><span class="tag tag-purple">AI</span></td></tr>
+      <tr><td class="mono">manual_trades</td><td>0</td><td>id (uuid)</td><td>Real trades (CSV import)</td><td><span class="tag tag-yellow">JOURNAL</span></td></tr>
+      <tr><td class="mono">trade_journal</td><td>0</td><td>id (uuid)</td><td>Detailed trade journal</td><td><span class="tag tag-yellow">JOURNAL</span></td></tr>
+      <tr><td class="mono">csv_uploads</td><td>38</td><td>id (uuid)</td><td>Upload history/audit</td><td><span class="tag tag-yellow">JOURNAL</span></td></tr>
+      <tr><td class="mono">panda_users</td><td>4</td><td>id (uuid)</td><td>Users + roles + feature_access</td><td><span class="tag tag-red">AUTH</span></td></tr>
+      <tr><td class="mono">panda_sessions</td><td>294</td><td>id (uuid)</td><td>Login sessions + fingerprinting</td><td><span class="tag tag-red">AUTH</span></td></tr>
+      <tr><td class="mono">panda_access_logs</td><td>550</td><td>id (uuid)</td><td>Login/access audit trail</td><td><span class="tag tag-red">AUTH</span></td></tr>
+      <tr><td class="mono">user_alert_prefs</td><td>1</td><td>id (uuid)</td><td>Per-user notification prefs</td><td><span class="tag tag-orange">PREFS</span></td></tr>
+      <tr><td class="mono">user_strategies</td><td>5</td><td>id (uuid)</td><td>User-defined strategies</td><td><span class="tag tag-orange">PREFS</span></td></tr>
+      <tr><td class="mono">telegram_subscriptions</td><td>21</td><td>id (uuid)</td><td>Per-pair Telegram subscriptions</td><td><span class="tag tag-orange">PREFS</span></td></tr>
+      <tr><td class="mono">engine_logs</td><td>1,772</td><td>-</td><td>Engine perf/error logs</td><td><span class="tag tag-yellow">OPS</span></td></tr>
+      <tr><td class="mono">engine_heartbeat</td><td>0</td><td>id (int)</td><td>Heartbeat (alert if stale 10 min)</td><td><span class="tag tag-red">RLS OFF</span></td></tr>
+      <tr><td class="mono">ea_executions</td><td>0</td><td>id (uuid)</td><td>EA trade records</td><td><span class="tag tag-red">RLS OFF</span></td></tr>
+      <tr><td class="mono">structural_log</td><td>0</td><td>-</td><td>Delta/acceleration log</td><td><span class="tag tag-green">CORE</span></td></tr>
+      <tr><td class="mono">site_config</td><td>1</td><td>key</td><td>Maintenance mode, site settings</td><td><span class="tag tag-yellow">OPS</span></td></tr>
+      <tr><td class="mono">panda_project_docs</td><td>10</td><td>id (int)</td><td>Project documentation</td><td><span class="tag tag-yellow">OPS</span></td></tr>
+      <tr><td class="mono">pf_signup_requests</td><td>12</td><td>id (uuid)</td><td>Signup/waitlist requests</td><td><span class="tag tag-red">AUTH</span></td></tr>
+      <tr><td class="mono">pf_security_events</td><td>228</td><td>id (uuid)</td><td>Security event log</td><td><span class="tag tag-red">AUTH</span></td></tr>
+      <tr><td class="mono">pf_known_devices</td><td>29</td><td>id (uuid)</td><td>Known device fingerprints</td><td><span class="tag tag-red">AUTH</span></td></tr>
+      <tr><td class="mono">pf_known_ips</td><td>29</td><td>id (uuid)</td><td>Known IP addresses</td><td><span class="tag tag-red">AUTH</span></td></tr>
+      <tr><td class="mono">pf_telegram_chats</td><td>0</td><td>id (uuid)</td><td>Telegram chat ID mapping</td><td><span class="tag tag-orange">PREFS</span></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ==================== MT4 / EA ==================== -->
+<div class="section" id="sec-mt4">
+  <h2>MT4 / MT5 — INDICATORS & EAs</h2>
+
+  <h3>INDICATOR FILES (write data for engine)</h3>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Panda_Exporter.mq4</div>
+      <div>Writes <span class="mono">mt4_SYMBOL.txt</span> with D1/H4/H1 TF scores, ADV scores, ATR, SPREAD, BOX levels</div>
+      <div class="card-sub" style="margin-top:6px;">Compiled: Panda_Exporter.ex4</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Panda Lines v3.mq4</div>
+      <div>Writes <span class="mono">tbg_SYMBOL.txt</span> with ST/FL/BIAS/ZONE/G1 (TBG indicator)</div>
+      <div class="card-sub" style="margin-top:6px;">MT5 version: Panda Lines v3 MT5.mq5</div>
+    </div>
+  </div>
+
+  <h3>EXPERT ADVISORS (execute trades)</h3>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">PandaEngine_EA.mq4</div>
+      <div>MT4 EA — reads engine score files, executes trades based on gap/bias/TBG</div>
+    </div>
+    <div class="card">
+      <div class="card-title">PandaEngine_EA_MT5.mq5</div>
+      <div>MT5 version of EA</div>
+      <div class="card-sub" style="margin-top:6px;">Compiled: PandaEngine_EA_MT5.ex5</div>
+    </div>
+    <div class="card">
+      <div class="card-title">PandaEngine_EA_MT5_WRITEBACK.mq5</div>
+      <div>MT5 EA with writeback capability</div>
+      <div class="card-sub" style="margin-top:6px;">Compiled: PandaEngine_EA_MT5_WRITEBACK.ex5</div>
+    </div>
+    <div class="card">
+      <div class="card-title">PandaEngine_EA_MT5_v2.10_writeback.mq5</div>
+      <div>Latest MT5 EA v2.10 with writeback</div>
+      <div class="card-sub" style="margin-top:6px;">Compiled: PandaEngine_EA_MT5_v2.10_writeback.ex5</div>
+    </div>
+  </div>
+
+  <h3>DATA FILE FORMAT</h3>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">mt4_SYMBOL.txt</div>
+      <div class="mono" style="color:#889;line-height:1.8;">
+        D1=score, H4=score, H1=score<br>
+        ADV_D1=score, ADV_H4=score, ADV_H1=score<br>
+        ATR=value, SPREAD=value<br>
+        BOX_H1=high,low, BOX_H4=high,low<br>
+        PDH=val, PDL=val, PWH=val, PWL=val...<br>
+        WRITE_TIME=timestamp
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">tbg_SYMBOL.txt</div>
+      <div class="mono" style="color:#889;line-height:1.8;">
+        ST=value (short-term level)<br>
+        FL=value (flip level)<br>
+        BIAS=ABOVE|BELOW|BETWEEN<br>
+        ZONE=ABOVE|BELOW|BETWEEN<br>
+        G1=RED|GREEN|YELLOW|WHITE
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== AUTH ==================== -->
+<div class="section" id="sec-auth">
+  <h2>AUTHENTICATION SYSTEM</h2>
+
+  <div class="flow">
+    <div class="flow-node"><div class="label">User submits username + password</div></div>
+    <div class="flow-arrow">&#x25BC;</div>
+    <div class="flow-node"><div class="label">/api/login</div><div class="desc">SHA-256 hash (static salt) &rarr; compare with panda_users.password_hash</div></div>
+    <div class="flow-arrow">&#x25BC;</div>
+    <div class="flow-node"><div class="label">Create session</div><div class="desc">Generate 48-byte token &rarr; insert into panda_sessions with device_fingerprint + IP</div></div>
+    <div class="flow-arrow">&#x25BC;</div>
+    <div class="flow-node"><div class="label">Set cookie: panda_session</div><div class="desc">HttpOnly cookie for all subsequent requests</div></div>
+    <div class="flow-arrow">&#x25BC;</div>
+    <div class="flow-node"><div class="label">validateSession()</div><div class="desc">Every API call: check token valid + user active + not expired + device limit</div></div>
+  </div>
+
+  <h3 style="margin-top:24px;">SECURITY FEATURES</h3>
+  <div class="grid-3">
+    <div class="card"><div class="card-title">Device Fingerprinting</div><div>Max devices enforced per user (default: 1)</div><div class="card-sub">pf_known_devices (29 records)</div></div>
+    <div class="card"><div class="card-title">IP Tracking</div><div>Known IPs tracked, anomalies flagged</div><div class="card-sub">pf_known_ips (29 records)</div></div>
+    <div class="card"><div class="card-title">Access Logging</div><div>Every login/action logged</div><div class="card-sub">panda_access_logs (550 records)</div></div>
+    <div class="card"><div class="card-title">Account Expiry</div><div>expires_at enforced on every request</div><div class="card-sub">Auto-deactivates + revokes sessions</div></div>
+    <div class="card"><div class="card-title">Session Revocation</div><div>Admin can revoke any session</div><div class="card-sub">panda_sessions.is_revoked</div></div>
+    <div class="card"><div class="card-title">Security Events</div><div>Login anomalies, suspicious activity</div><div class="card-sub">pf_security_events (228 records)</div></div>
+  </div>
+
+  <h3>ROLES</h3>
+  <div style="display:flex;gap:12px;">
+    <div class="card" style="flex:1;text-align:center;"><div class="card-title">admin</div><div>Full access + user management</div></div>
+    <div class="card" style="flex:1;text-align:center;"><div class="card-title">vip</div><div>Extended features</div></div>
+    <div class="card" style="flex:1;text-align:center;"><div class="card-title">user</div><div>Basic dashboard access</div></div>
+  </div>
+</div>
+
+<!-- ==================== STRATEGIES ==================== -->
+<div class="section" id="sec-strategies">
+  <h2>TRADING STRATEGIES</h2>
+
+  <div class="grid-2">
+    <div class="card" style="border-color:#00ff9f44;">
+      <div class="card-title" style="font-size:18px;">BB — BREAKOUT BIAS</div>
+      <table class="tbl" style="margin-top:12px;">
+        <tr><td style="color:#00b4ff;width:100px;">Entry</td><td>Gap &ge; 5 (valid bias), any time, any day. TBG NOT required.</td></tr>
+        <tr><td style="color:#00b4ff;">Concurrency</td><td>No new entry if same pair has open BB trade. Re-entry allowed once closed.</td></tr>
+        <tr><td style="color:#00b4ff;">Exit</td><td>Gap drops &gt;2 points from peak gap value.</td></tr>
+      </table>
+    </div>
+    <div class="card" style="border-color:#ffd16644;">
+      <div class="card-title" style="font-size:18px;">INTRA — INTRADAY</div>
+      <table class="tbl" style="margin-top:12px;">
+        <tr><td style="color:#00b4ff;width:100px;">Entry</td><td>Gap &ge; 9 + TBG confirmed (ABOVE=BUY, BELOW=SELL). Window: 2AM-4AM UAE only.</td></tr>
+        <tr><td style="color:#00b4ff;">Concurrency</td><td>Same as BB — no duplicate per pair.</td></tr>
+        <tr><td style="color:#00b4ff;">Exit</td><td>10AM UAE hard close — no exceptions.</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <h3>GAP SCORING</h3>
+  <div class="card">
+    <div class="card-title">GAP = BASE score - QUOTE score (D1 + H4 + H1)</div>
+    <div style="margin-top:12px;">
+      <div><span class="tag tag-green">BUY</span> Gap &ge; 5 &nbsp;&nbsp; <span class="tag tag-red">SELL</span> Gap &le; -5 &nbsp;&nbsp; <span class="tag tag-yellow">WAIT</span> Between</div>
+      <div style="margin-top:8px;"><span class="tag tag-green">MARKET</span> |gap| &ge; 9 &nbsp;&nbsp; <span class="tag tag-yellow">PULLBACK</span> |gap| &ge; 5</div>
+      <div style="margin-top:8px;">Range: <span class="mono">-18 to +18</span></div>
+    </div>
+  </div>
+
+  <h3>TBG ZONES</h3>
+  <div class="grid-3">
+    <div class="card" style="text-align:center;border-color:#00ff9f44;"><div class="card-title">ABOVE</div><div>BUY valid</div></div>
+    <div class="card" style="text-align:center;border-color:#ff4d6d44;"><div class="card-title">BELOW</div><div>SELL valid</div></div>
+    <div class="card" style="text-align:center;border-color:#55555544;"><div class="card-title">BETWEEN</div><div>Always invalid</div></div>
+  </div>
+
+  <h3>CONFIDENCE SCORING (Frontend, 0-100)</h3>
+  <div class="card">
+    <div style="display:flex;gap:20px;flex-wrap:wrap;">
+      <div><span class="tag tag-green">Gap Magnitude</span> ~25-30 pts</div>
+      <div><span class="tag tag-blue">TBG Valid</span> +20 pts</div>
+      <div><span class="tag tag-blue">Box Aligned</span> +20 pts</div>
+      <div><span class="tag tag-yellow">COT</span> +10 pts</div>
+      <div><span class="tag tag-yellow">Momentum</span> +10 pts</div>
+    </div>
+  </div>
+
+  <h3>MOMENTUM STATES</h3>
+  <div class="grid-2">
+    <div class="card"><span style="font-size:18px;">&#x1F525;</span> <strong style="color:#00ff9f;">STRONG</strong> — RIDE IT. All 3 TF aligned.</div>
+    <div class="card"><span style="font-size:18px;">&#x1F680;</span> <strong style="color:#66ffcc;">BUILDING</strong> — ENTER NOW. Short + mid rising.</div>
+    <div class="card"><span style="font-size:18px;">&#x26A1;</span> <strong style="color:#ffd166;">SPARK</strong> — WATCH. Early signal, not confirmed.</div>
+    <div class="card"><span style="font-size:18px;">&#x1F535;</span> <strong style="color:#00b4ff;">CONSOLIDATING</strong> — HOLD. Strong trend resting.</div>
+    <div class="card"><span style="font-size:18px;">&#x1F321;&#xFE0F;</span> <strong style="color:#ffaa44;">COOLING</strong> — TIGHTEN SL. Slowing but intact.</div>
+    <div class="card"><span style="font-size:18px;">&#x1F4C9;</span> <strong style="color:#ff7744;">FADING</strong> — CONSIDER CLOSING. Gap shrinking.</div>
+    <div class="card"><span style="font-size:18px;">&#x26A0;&#xFE0F;</span> <strong style="color:#ff4d6d;">REVERSING</strong> — CLOSE POSITION. Trend breaking.</div>
+    <div class="card"><span style="font-size:18px;">&#x25AC;</span> <strong style="color:#889;">STABLE</strong> — MONITOR. No strong momentum.</div>
+    <div class="card"><span style="font-size:18px;">&#x25CB;</span> <strong style="color:#556;">NEUTRAL</strong> — WAIT. Gap below &plusmn;5.</div>
+    <div class="card"><span style="font-size:18px;">&#x1F4C8;</span> <strong style="color:#66ffcc;">EMERGING</strong> — PREPARE ENTRY. Signal emerging.</div>
+  </div>
+</div>
+
+<script>
+function showSection(id) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('sec-'+id).classList.add('active');
+  event.target.classList.add('active');
+}
+
+function filterTable(input, tableId) {
+  const filter = input.value.toLowerCase();
+  const rows = document.getElementById(tableId).querySelectorAll('tbody tr');
+  rows.forEach(row => {
+    const text = row.textContent.toLowerCase();
+    row.style.display = text.includes(filter) ? '' : 'none';
+  });
+}
+</script>
+</body>
+</html>

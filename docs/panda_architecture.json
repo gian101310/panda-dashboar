@@ -1,0 +1,362 @@
+{
+  "project": "Panda Engine",
+  "version": "3.0",
+  "description": "Forex intelligence platform — MT4 data → Python engine → Supabase → Next.js dashboard",
+  "generated": "2026-05-19",
+  "domains": {
+    "production_url": "https://pandaengine.app",
+    "vercel_url": "https://panda-dashboard.vercel.app",
+    "supabase_project": "jxkelchxitwuilpbrwxk",
+    "supabase_url": "https://jxkelchxitwuilpbrwxk.supabase.co",
+    "github_repo": "github.com/gian101310/panda-dashboar"
+  },
+  "pairs": [
+    "AUDJPY","AUDCAD","AUDNZD","AUDUSD","CADJPY",
+    "EURAUD","EURCAD","EURGBP","EURJPY","EURNZD","EURUSD",
+    "GBPAUD","GBPCAD","GBPJPY","GBPNZD","GBPUSD",
+    "NZDCAD","NZDJPY","NZDUSD","USDCAD","USDJPY"
+  ],
+
+  "layers": {
+    "MT4_data_source": {
+      "description": "MetaTrader 4 writes indicator data to flat files every ~2 min",
+      "path": "C:\\Users\\Admin\\AppData\\Roaming\\MetaQuotes\\Terminal\\Common\\Files",
+      "file_patterns": {
+        "mt4_SYMBOL.txt": "D1/H4/H1 TF scores, ADV scores, ATR, SPREAD, BOX levels for BASE and QUOTE currencies",
+        "tbg_SYMBOL.txt": "TBG indicator — ST/FL/BIAS/ZONE/G1 (Panda Lines)"
+      },
+      "mq4_files": [
+        {"file": "Panda_Exporter.mq4", "purpose": "MT4 indicator that writes mt4_SYMBOL.txt files"},
+        {"file": "Panda Lines v3.mq4", "purpose": "TBG indicator that writes tbg_SYMBOL.txt files"},
+        {"file": "PandaEngine_EA.mq4", "purpose": "Expert Advisor — reads engine scores, executes trades"},
+        {"file": "PandaEngine_EA_MT5.mq5", "purpose": "MT5 version of the EA"},
+        {"file": "PandaEngine_EA_MT5_WRITEBACK.mq5", "purpose": "MT5 EA with writeback capability"},
+        {"file": "PandaEngine_EA_MT5_v2.10_writeback.mq5", "purpose": "Latest MT5 EA v2.10 with writeback"}
+      ],
+      "max_file_age": "300 seconds (5 min)"
+    },
+
+    "engine": {
+      "description": "Python/FastAPI engine running on local PC (future VPS)",
+      "runtime": "uvicorn app:app --host 0.0.0.0 --port 8000",
+      "launcher": "panda_run.bat",
+      "path": "C:\\Users\\Admin\\Desktop\\ctrader_trend_scanner",
+      "files": {
+        "app.py": {
+          "lines": 2176,
+          "purpose": "Core engine — MT4 parser, scoring, Supabase push, signals, Telegram, scheduler",
+          "sections": [
+            {"lines": "1-14", "name": "Header/docstring", "purpose": "Version info"},
+            {"lines": "16-33", "name": "Imports", "purpose": "FastAPI, asyncio, supabase, PIL, etc."},
+            {"lines": "34-48", "name": "CORS middleware", "purpose": "Allow dashboard origins"},
+            {"lines": "49-80", "name": "Config block", "purpose": "MT4_PATH, tokens, creds, PAIRS list, state vars"},
+            {"lines": "109-226", "name": "parse_tf_score / parse_mt4_file", "purpose": "MT4 file → D1/H4/H1/ADV/ATR/BOX"},
+            {"lines": "229-272", "name": "parse_tbg_file", "purpose": "TBG → ST/FL/BIAS/ZONE/G1"},
+            {"lines": "274-324", "name": "compute_box_trends", "purpose": "UPTREND/DOWNTREND/RANGING from box levels"},
+            {"lines": "327-436", "name": "extract_panda_score / compute_scores_all_pairs", "purpose": "LOCKED — gap scoring algorithm. NEVER TOUCH."},
+            {"lines": "454-495", "name": "classify_momentum", "purpose": "10-state momentum engine (STRONG→NEUTRAL)"},
+            {"lines": "497-755", "name": "run_gap_once", "purpose": "MAIN LOOP — parse → score → momentum → upsert to Supabase"},
+            {"lines": "880-909", "name": "send_spike_alert", "purpose": "Spike detection + Telegram notification"},
+            {"lines": "942-978", "name": "master_scheduler", "purpose": "5-min gap cycle / 60-min snapshot cycle"}
+          ]
+        },
+        "check_dupes.py": {
+          "lines": null,
+          "purpose": "Duplicate detection — RUN BEFORE EVERY PUSH"
+        }
+      },
+      "archive": [
+        "App_v1_backup.py",
+        "panda_engine_backup_safe.py",
+        "qwapp.py",
+        "dashboard_app.py",
+        "vvapp.py",
+        "app_backup_v2.1.py",
+        "ctrader_journal.py",
+        "app_backup_before_threshold_fix.py"
+      ],
+      "scheduler": {
+        "gap_cycle": "Every 5 minutes",
+        "snapshot_cycle": "Every 60 minutes"
+      },
+      "integrations": {
+        "telegram": {
+          "bot_token": "****",
+          "chat_id": "-1003857801976",
+          "login_alert_bot": "separate bot for login alerts"
+        },
+        "openai": "GPT for AI insights generation"
+      }
+    },
+
+    "dashboard": {
+      "description": "Next.js 14 frontend deployed on Vercel",
+      "framework": "Next.js 14",
+      "path": "C:\\Users\\Admin\\panda-dashboard",
+      "dependencies": {
+        "@supabase/supabase-js": "^2.45.4",
+        "bcryptjs": "^3.0.3",
+        "cookie": "^0.6.0",
+        "lucide-react": "^1.14.0",
+        "next": "^14.2.35",
+        "react": "^18",
+        "react-dom": "^18",
+        "recharts": "^3.8.1"
+      },
+      "config_files": {
+        "next.config.js": "reactStrictMode: true",
+        "vercel.json": "framework: nextjs, buildCommand: next build"
+      },
+
+      "lib": {
+        "supabase.js": "Shared Supabase client (project ID: jxkelchxitwuilpbrwxk)",
+        "auth.js": "hashPassword, generateToken, logAccess, validateSession, requireAdmin",
+        "openai.js": "OpenAI API key export",
+        "theme.js": "DEPRECATED — dark-only design, safe to delete"
+      },
+
+      "pages": {
+        "index.js": "Landing / redirect",
+        "login.js": "Login page",
+        "pending.js": "Pending approval page",
+        "pricing.js": "Pricing page",
+        "funnel.js": "Signup funnel",
+        "strength.js": "Currency strength page",
+        "stream.js": "Stream page",
+        "journal.js": "Journal page",
+        "portfolio.js": "Portfolio page",
+        "_app.js": "Next.js app wrapper",
+        "dashboard.js": {
+          "lines": 3363,
+          "purpose": "Main dashboard — ALL tabs and components in one file",
+          "style": "All inline styles, no CSS modules",
+          "fonts": {
+            "data": "Share Tech Mono",
+            "headings": "Orbitron",
+            "body": "Rajdhani"
+          },
+          "colors": {
+            "BUY": "#00ff9f",
+            "SELL": "#ff4d6d",
+            "accent": "#00b4ff",
+            "warn": "#ffd166",
+            "cool": "#ffaa44"
+          },
+          "tabs": [
+            "PANELS", "SIGNALS", "TABLE", "GAP CHART", "RESEARCH",
+            "CALCULATOR", "SETUPS", "VALID PAIRS", "SPIKE LOG",
+            "CHART", "ANALYTICS", "SIGNAL LOG", "PANDA AI"
+          ],
+          "components": [
+            {"name": "ALL_PAIRS", "line": "~8", "purpose": "21-pair constant array"},
+            {"name": "MOMENTUM_GUIDE", "line": "~10-22", "purpose": "Icon/action/color for 10 momentum states"},
+            {"name": "Utility functions", "line": "~25-91", "purpose": "stateColor, biasFromGap, boxTrend, tbgZoneBadge, atrFill"},
+            {"name": "computeConfidence", "line": "~186-275", "purpose": "Multi-factor confidence 0-100 (client-side only)"},
+            {"name": "MomentumHeatmap", "line": "~376-487", "purpose": "Heatmap grid component"},
+            {"name": "GapChart", "line": "~613-711", "purpose": "Gap history canvas chart"},
+            {"name": "PairCard", "line": "~869-933", "purpose": "Main pair card component"},
+            {"name": "PairCardModal", "line": "~934-1092", "purpose": "Expanded modal for pair details"},
+            {"name": "ValidSetupsTab", "line": "~1093-1203", "purpose": "Box-confirmed setups"},
+            {"name": "ValidPairsTab", "line": "~1204-1355", "purpose": "Auto-filtered tradable pairs"},
+            {"name": "PandaAIChat", "line": "~1752-1830", "purpose": "Panda AI chat tab"},
+            {"name": "SignalAnalytics", "line": "~1782", "purpose": "Signal performance V2"},
+            {"name": "Dashboard()", "line": "~2019", "purpose": "Main export component"}
+          ]
+        },
+        "admin/index.js": "Admin panel",
+        "admin/pf-approvals.js": "Signup approval management"
+      },
+
+      "api_routes": {
+        "data": {
+          "auth": {
+            "login.js": {"method": "POST", "purpose": "Authenticate user, create session, set cookie", "tables": ["panda_users", "panda_sessions", "panda_access_logs"]},
+            "logout.js": {"method": "POST", "purpose": "Revoke session", "tables": ["panda_sessions"]},
+            "me.js": {"method": "GET", "purpose": "Get current user from session token", "tables": ["panda_sessions", "panda_users"]},
+            "pf-me.js": {"method": "GET", "purpose": "Portfolio/funnel user info"},
+            "pf-log-event.js": {"method": "POST", "purpose": "Log portfolio funnel events", "tables": ["pf_security_events"]},
+            "pf-signup.js": {"method": "POST", "purpose": "Handle signup requests", "tables": ["pf_signup_requests"]}
+          },
+          "engine_data": {
+            "data.js": {"method": "GET", "purpose": "Dashboard rows (all 21 pairs)", "tables": ["dashboard"]},
+            "gap-chart.js": {"method": "GET", "purpose": "Gap history data", "tables": ["gap_history"]},
+            "heatmap.js": {"method": "GET", "purpose": "Momentum heatmap data", "tables": ["dashboard"]},
+            "pdr.js": {"method": "GET", "purpose": "PDR strength data", "tables": ["pdr_cache"]},
+            "spikes.js": {"method": "GET", "purpose": "Spike event log", "tables": ["spike_events"]},
+            "currency-strength.js": {"method": "GET", "purpose": "Currency strength data", "tables": ["strength_log"]},
+            "strength-history.js": {"method": "GET", "purpose": "Strength time series", "tables": ["strength_log"]},
+            "engine-health.js": {"method": "GET", "purpose": "Engine status check", "tables": ["engine_heartbeat"]}
+          },
+          "signals": {
+            "signal-log.js": {"method": "GET", "purpose": "Signal snapshot history", "tables": ["signal_snapshots"]},
+            "signal-tracker.js": {"method": "GET/POST", "purpose": "Signal lifecycle CRUD", "tables": ["signal_tracker"]},
+            "signal-analytics.js": {"method": "GET", "purpose": "Signal performance stats", "tables": ["signal_results"]},
+            "public-signals.js": {"method": "GET", "purpose": "Public-facing signal data", "tables": ["signal_results"]}
+          },
+          "ai": {
+            "ai-chat.js": {"method": "POST", "purpose": "Panda AI — 3 modes (insights, review, chat)", "tables": ["dashboard", "signal_results", "signal_tracker", "manual_trades", "ai_memory", "admin_brain"]},
+            "ai-memory.js": {"method": "GET/POST/DELETE", "purpose": "AI memory CRUD", "tables": ["ai_memory"]},
+            "admin-brain.js": {"method": "GET/POST/DELETE", "purpose": "Boss-G brain CRUD", "tables": ["admin_brain"]},
+            "signal-agent.js": {"method": "POST", "purpose": "Analyzes signal_results", "tables": ["signal_results", "ai_memory"]},
+            "journal-agent.js": {"method": "POST", "purpose": "Analyzes manual_trades", "tables": ["manual_trades", "ai_memory"]},
+            "pattern-agent.js": {"method": "POST", "purpose": "Cross-references signal + journal", "tables": ["signal_results", "manual_trades", "ai_memory"]}
+          },
+          "journal": {
+            "journal.js": {"method": "GET/POST/PUT/DELETE", "purpose": "Trade journal CRUD", "tables": ["manual_trades", "trade_journal"]},
+            "journal-upload.js": {"method": "POST", "purpose": "CSV upload for trade import", "tables": ["manual_trades", "csv_uploads"]},
+            "bakupjournal.js": {"method": "GET", "purpose": "Journal backup route"}
+          },
+          "user_prefs": {
+            "alert-prefs.js": {"method": "GET/POST", "purpose": "User alert preferences", "tables": ["user_alert_prefs"]},
+            "strategies.js": {"method": "GET/POST/DELETE", "purpose": "User strategy CRUD", "tables": ["user_strategies"]},
+            "notify-telegram.js": {"method": "POST", "purpose": "Telegram notification trigger", "tables": ["telegram_subscriptions"]},
+            "telegram-webhook.js": {"method": "POST", "purpose": "Incoming Telegram webhook"}
+          },
+          "misc": {
+            "calendar.js": {"method": "GET", "purpose": "Trading calendar"},
+            "cot.js": {"method": "GET", "purpose": "COT data"},
+            "upcoming-news.js": {"method": "GET", "purpose": "ForexFactory news alerts"},
+            "open-trades.js": {"method": "GET", "purpose": "Open trade positions"},
+            "maintenance.js": {"method": "GET/POST", "purpose": "Maintenance mode toggle", "tables": ["site_config"]},
+            "ea-data.js": {"method": "GET", "purpose": "EA data endpoint for MT4/MT5 EA"},
+            "ea-result.js": {"method": "POST", "purpose": "EA execution results", "tables": ["ea_executions"]}
+          },
+          "admin": {
+            "admin/index.js": {"method": "GET", "purpose": "Admin dashboard data"},
+            "admin/users.js": {"method": "GET/POST/PUT", "purpose": "User management", "tables": ["panda_users"]},
+            "admin/sessions.js": {"method": "GET/DELETE", "purpose": "Session management", "tables": ["panda_sessions"]},
+            "admin/logs.js": {"method": "GET", "purpose": "Access logs", "tables": ["panda_access_logs"]},
+            "admin/pf-approve.js": {"method": "POST", "purpose": "Approve signup requests", "tables": ["pf_signup_requests", "panda_users"]}
+          }
+        }
+      }
+    },
+
+    "supabase": {
+      "project_id": "jxkelchxitwuilpbrwxk",
+      "tables": {
+        "dashboard": {"rows": 21, "pk": "symbol", "purpose": "Live pair data — upserted every 5 min by engine", "columns": 45, "key_columns": ["symbol","gap","bias","momentum","execution","confidence","hard_invalid","base_d1","base_h4","base_h1","quote_d1","quote_h4","quote_h1","atr","spread","box_h1_trend","box_h4_trend","pl_zone","pl_bias","pl_g1_valid","pdh","pdl","pwh","pwl","pmh","pml","pyh","pyl"]},
+        "signal_snapshots": {"rows": 0, "pk": "id (uuid)", "purpose": "All 21 pairs every cycle — full snapshot archive", "note": "Was 121K+, may have been purged"},
+        "signal_results": {"rows": 2022, "pk": "id (bigint)", "purpose": "BB + INTRA strategy performance tracking", "key_columns": ["symbol","direction","strategy","entry_gap","peak_gap","exit_gap","pips","status","outcome","confidence","session"]},
+        "signal_tracker": {"rows": 4729, "pk": "id (uuid)", "purpose": "Signal lifecycle — session/box/pdr/prices/hourly snapshots", "key_columns": ["symbol","direction","strategy","gap_at_open","confidence_at_open","momentum_at_open","entry_price","exit_price","peak_price","net_pips","status","hourly_gaps","hourly_prices"]},
+        "manual_trades": {"rows": 0, "pk": "id (uuid)", "purpose": "Real trades from CSV import", "fk": "user_id → panda_users"},
+        "trade_journal": {"rows": 0, "pk": "id (uuid)", "purpose": "Detailed trade journal entries"},
+        "ai_memory": {"rows": 65, "pk": "id (uuid)", "purpose": "AI agent findings — patterns, behaviors, edges", "types": ["signal_pattern","behavior","edge_analysis","market_theme","confluence_validation"]},
+        "admin_brain": {"rows": 18, "pk": "id (uuid)", "purpose": "Boss-G brain — preferences/coaching/patterns/rules", "categories": ["preference","coaching","pattern","rule","question"]},
+        "panda_users": {"rows": 4, "pk": "id (uuid)", "purpose": "Users + roles + feature_access + tiers", "roles": ["user","vip","admin"], "fk_children": ["user_alert_prefs","telegram_subscriptions","manual_trades","csv_uploads","user_strategies","panda_sessions"]},
+        "panda_sessions": {"rows": 294, "pk": "id (uuid)", "purpose": "Active login sessions with device fingerprinting", "fk": "user_id → panda_users"},
+        "panda_access_logs": {"rows": 550, "pk": "id (uuid)", "purpose": "Login/access audit trail"},
+        "spike_events": {"rows": 1058, "pk": "id (bigint)", "purpose": "Gap spike alerts + Telegram notifications"},
+        "gap_history": {"rows": 36600, "pk": "none", "purpose": "Historical gap scores per symbol"},
+        "strength_log": {"rows": 23193, "pk": "none", "purpose": "Currency strength time series"},
+        "pdr_cache": {"rows": 21, "pk": "symbol", "purpose": "PDR strength with 15-min TTL"},
+        "trade_matrix": {"rows": 13768, "pk": "none", "purpose": "Trade state matrix history"},
+        "trade_events": {"rows": 1088, "pk": "none", "purpose": "Trade event log"},
+        "engine_logs": {"rows": 1772, "pk": "none", "purpose": "Engine performance/error logs"},
+        "engine_heartbeat": {"rows": 0, "pk": "id (int)", "purpose": "Engine cycle heartbeat — alert if no row in 10 min", "rls": false},
+        "user_alert_prefs": {"rows": 1, "pk": "id (uuid)", "purpose": "Per-user alert/notification settings", "fk": "user_id → panda_users"},
+        "telegram_subscriptions": {"rows": 21, "pk": "id (uuid)", "purpose": "Per-pair Telegram alert subscriptions", "fk": "user_id → panda_users"},
+        "user_strategies": {"rows": 5, "pk": "id (uuid)", "purpose": "User-defined trading strategies", "fk": "user_id → panda_users"},
+        "csv_uploads": {"rows": 38, "pk": "id (uuid)", "purpose": "CSV upload history/audit", "fk": "user_id → panda_users"},
+        "signal_accuracy": {"rows": 0, "pk": "id (uuid)", "purpose": "Signal accuracy tracking (gap follow-through)"},
+        "structural_log": {"rows": 0, "pk": "none", "purpose": "Structural delta/acceleration log"},
+        "panda_project_docs": {"rows": 10, "pk": "id (int)", "purpose": "Project documentation storage"},
+        "site_config": {"rows": 1, "pk": "key", "purpose": "Site-wide config (maintenance mode, etc.)"},
+        "ea_executions": {"rows": 0, "pk": "id (uuid)", "purpose": "EA trade execution records", "rls": false},
+        "pf_signup_requests": {"rows": 12, "pk": "id (uuid)", "purpose": "Signup/waitlist requests"},
+        "pf_security_events": {"rows": 228, "pk": "id (uuid)", "purpose": "Security event log (login anomalies, etc.)"},
+        "pf_known_devices": {"rows": 29, "pk": "id (uuid)", "purpose": "Known device fingerprints per user"},
+        "pf_known_ips": {"rows": 29, "pk": "id (uuid)", "purpose": "Known IP addresses per user"},
+        "pf_telegram_chats": {"rows": 0, "pk": "id (uuid)", "purpose": "Telegram chat ID mapping"}
+      },
+      "rls_warnings": ["ea_executions (RLS disabled)", "engine_heartbeat (RLS disabled)"]
+    }
+  },
+
+  "strategies": {
+    "BB": {
+      "name": "Breakout Bias",
+      "entry": "gap >= 5 (valid bias), any time, any day. TBG NOT required.",
+      "concurrency": "No new entry if same pair has open BB trade. Re-entry allowed once closed.",
+      "exit": "Gap drops >2 points from peak gap value."
+    },
+    "INTRA": {
+      "name": "Intraday",
+      "entry": "gap >= 9 + TBG confirmed (ABOVE=BUY, BELOW=SELL). Window: 2AM-4AM UAE only.",
+      "concurrency": "Same as BB.",
+      "exit": "10AM UAE hard close — no exceptions."
+    }
+  },
+
+  "scoring": {
+    "gap_score": {
+      "formula": "BASE_score - QUOTE_score across D1/H4/H1",
+      "range": "+/-18",
+      "bias": {"BUY": "gap >= 5", "SELL": "gap <= -5", "WAIT": "between"},
+      "execution": {"MARKET": "|gap| >= 9", "PULLBACK": "|gap| >= 5"}
+    },
+    "tbg_zones": {
+      "ABOVE": "BUY valid",
+      "BELOW": "SELL valid",
+      "BETWEEN": "Always invalid"
+    },
+    "confidence": {
+      "range": "0-100",
+      "location": "Frontend only (computeConfidence in dashboard.js)",
+      "factors": {
+        "gap_magnitude": "~25-30 pts",
+        "tbg_valid": "+20 pts",
+        "box_aligned": "+20 pts",
+        "cot": "+10 pts",
+        "momentum": "+10 pts"
+      }
+    },
+    "momentum_states": [
+      "STRONG", "BUILDING", "SPARK", "CONSOLIDATING", "COOLING",
+      "FADING", "REVERSING", "STABLE", "NEUTRAL", "EMERGING"
+    ]
+  },
+
+  "data_flow": {
+    "cycle": [
+      "1. MT4 indicators write mt4_SYMBOL.txt + tbg_SYMBOL.txt every ~2 min",
+      "2. app.py master_scheduler triggers run_gap_once every 5 min",
+      "3. parse_mt4_file reads D1/H4/H1/ADV/ATR/BOX from mt4_SYMBOL.txt",
+      "4. parse_tbg_file reads ST/FL/BIAS/ZONE/G1 from tbg_SYMBOL.txt",
+      "5. compute_scores_all_pairs calculates GAP, BIAS, EXECUTION for all 21 pairs",
+      "6. classify_momentum assigns one of 10 momentum states",
+      "7. Upsert to Supabase 'dashboard' table (21 rows)",
+      "8. Signal engine opens/closes BB and INTRA signals → signal_results",
+      "9. Spike detection fires Telegram alerts if conditions met → spike_events",
+      "10. Every 60 min: full snapshot → signal_snapshots"
+    ],
+    "dashboard_refresh": "Frontend polls /api/data every ~30 seconds",
+    "ea_flow": [
+      "1. EA reads score files written by app.py",
+      "2. EA executes trades based on gap/bias/TBG",
+      "3. EA posts results to /api/ea-result → ea_executions table"
+    ]
+  },
+
+  "auth_system": {
+    "method": "Cookie-based sessions (panda_session token)",
+    "hash": "SHA-256 with static salt",
+    "session_validation": "validateSession() in lib/auth.js — checks token, user active, expiry",
+    "roles": ["admin", "vip", "user"],
+    "device_limit": "max_devices per user (default 1)",
+    "security_features": ["device fingerprinting", "IP tracking", "access logging", "account expiry", "session revocation"]
+  },
+
+  "deployment": {
+    "dashboard": {
+      "platform": "Vercel",
+      "auto_deploy": "Push to main branch",
+      "build": "next build"
+    },
+    "engine": {
+      "platform": "Local PC (future VPS)",
+      "command": "uvicorn app:app --host 0.0.0.0 --port 8000",
+      "launcher": "panda_run.bat"
+    }
+  }
+}

@@ -1,0 +1,453 @@
+{
+  "project": {
+    "name": "Panda Engine",
+    "version": "3.0",
+    "description": "Proprietary forex intelligence platform — MT4 data parsing, multi-timeframe gap scoring, momentum classification, automated signals, and real-time dashboard",
+    "author": "Boss-G",
+    "domain": "pandaengine.app",
+    "git_repo": "github.com/gian101310/panda-dashboar",
+    "supabase_project_id": "jxkelchxitwuilpbrwxk"
+  },
+
+  "pairs": [
+    "AUDJPY", "AUDCAD", "AUDNZD", "AUDUSD", "CADJPY",
+    "EURAUD", "EURCAD", "EURGBP", "EURJPY", "EURNZD", "EURUSD",
+    "GBPAUD", "GBPCAD", "GBPJPY", "GBPNZD", "GBPUSD",
+    "NZDCAD", "NZDJPY", "NZDUSD", "USDCAD", "USDJPY"
+  ],
+
+  "currencies": ["AUD", "CAD", "EUR", "GBP", "JPY", "NZD", "USD"],
+
+  "architecture": {
+    "engine": {
+      "runtime": "Python / FastAPI",
+      "file": "app.py",
+      "path": "C:\\Users\\Admin\\Desktop\\ctrader_trend_scanner\\app.py",
+      "lines": 2180,
+      "host": "local PC (future VPS)",
+      "command": "uvicorn app:app --host 0.0.0.0 --port 8000",
+      "data_source": "MT4 indicator files (mt4_SYMBOL.txt, tbg_SYMBOL.txt)",
+      "mt4_data_dir": "C:\\Users\\Admin\\AppData\\Roaming\\MetaQuotes\\Terminal\\Common\\Files"
+    },
+    "dashboard": {
+      "runtime": "Next.js 14",
+      "file": "dashboard.js",
+      "path": "C:\\Users\\Admin\\panda-dashboard\\pages\\dashboard.js",
+      "lines": 3251,
+      "host": "Vercel",
+      "urls": ["https://pandaengine.app", "https://panda-dashboard.vercel.app"],
+      "api_route_count": 44
+    },
+    "database": {
+      "provider": "Supabase (PostgreSQL)",
+      "project_id": "jxkelchxitwuilpbrwxk",
+      "table_count": "30+"
+    },
+    "ea_layer": {
+      "platforms": ["MT4", "MT5"],
+      "strategy": "Panda Lines v4.1 SuperTrend flip, gated by engine bias",
+      "data_file": "panda_score_SYMBOL.txt"
+    },
+    "notifications": {
+      "provider": "Telegram Bot API",
+      "alert_types": ["spike", "gap_zone", "news", "ai_narration", "snapshot_png", "login"]
+    }
+  },
+
+  "engine_functions": {
+    "parsers": [
+      {
+        "name": "parse_tf_score",
+        "lines": "168-178",
+        "input": "Score string like '+3/-1'",
+        "output": "Integer (summed parts)"
+      },
+      {
+        "name": "parse_mt4_file",
+        "lines": "180-301",
+        "input": "mt4_SYMBOL.txt",
+        "output": "Dict: base/quote D1/H4/H1, ADV scores, ATR, spread, boxes",
+        "stale_threshold_sec": 300,
+        "weekend_stale_threshold_sec": 259200
+      },
+      {
+        "name": "parse_pl_file",
+        "lines": "305-383",
+        "input": "tbg_SYMBOL.txt",
+        "output": "Dict: pl_st, pl_fl, pl_bias, pl_zone, pl_g1_valid, PDR levels",
+        "stale_threshold_sec": 345600
+      }
+    ],
+
+    "scoring": {
+      "locked": true,
+      "never_touch": true,
+      "functions": [
+        {
+          "name": "extract_panda_score",
+          "lines": "440-477",
+          "description": "Exact replica of C# PandaEngineMaster ExtractPandaScore()",
+          "extreme_threshold": 4,
+          "hard_invalid_rule": "Both pos_sig AND neg_sig present"
+        },
+        {
+          "name": "compute_scores_all_pairs",
+          "lines": "491-550",
+          "description": "Two-phase cross-pair scoring with global currency conflict propagation",
+          "phases": [
+            "Score each line, collect globally invalid currencies",
+            "Apply scores + propagate global currency conflict"
+          ]
+        }
+      ],
+      "gap_formula": "BASE_SCORE - QUOTE_SCORE",
+      "gap_range": [-18, 18],
+      "bias_rules": {
+        "BUY": "gap >= 5",
+        "SELL": "gap <= -5",
+        "INVALID": "-5 < gap < 5"
+      },
+      "execution_rules": {
+        "MARKET": "abs(gap) >= 9",
+        "PULLBACK": "abs(gap) >= 5",
+        "NONE": "abs(gap) < 5"
+      },
+      "hard_invalid_causes": [
+        "Both positive AND negative extreme values on same currency line",
+        "Global currency conflict (any pair with that currency is invalid)",
+        "Neutral vs Neutral (both base and quote abs < 4)"
+      ]
+    },
+
+    "box_trends": {
+      "name": "compute_box_trends",
+      "lines": "387-436",
+      "boxes": {
+        "shortest_span": "~2 days (H1 context)",
+        "medium_span": "~14 days (H4 context)",
+        "longest_span": "~62 days (D1 context)"
+      },
+      "outputs": ["UPTREND", "DOWNTREND", "RANGING", "UNKNOWN"],
+      "method": "50% midpoint rule — latter midpoint vs former high/low"
+    },
+
+    "momentum": {
+      "name": "classify_momentum",
+      "lines": "573-590",
+      "inputs": ["gap", "delta_short", "delta_mid", "delta_long"],
+      "delta_definitions": {
+        "delta_short": "gap[0] - gap[2] (last 2 cycles, ~10 min)",
+        "delta_mid": "gap[0] - gap[8] (last 8 cycles, ~40 min)",
+        "delta_long": "gap[0] - gap[24] (last 24 cycles, ~2 hours)"
+      },
+      "states": [
+        {"name": "STRONG", "condition": "s>=3, m>=6, l>=4, abs_gap>=7", "state_group": "EXPAND", "action": "RIDE IT"},
+        {"name": "BUILDING", "condition": "s>=2, m>=3", "state_group": "EXPAND", "action": "ENTER NOW"},
+        {"name": "SPARK", "condition": "s>=1.5, m<2", "state_group": "STABLE", "action": "WATCH"},
+        {"name": "CONSOLIDATING", "condition": "abs_gap>=7, -5<=s<0, m>=-2", "state_group": "STABLE", "action": "HOLD"},
+        {"name": "COOLING", "condition": "abs_gap>=5, s<0, m<0, l>=1", "state_group": "PULLBACK", "action": "TIGHTEN SL"},
+        {"name": "FADING", "condition": "abs_gap<=7, s<-1, m<-1, l<1", "state_group": "PULLBACK", "action": "CONSIDER CLOSING"},
+        {"name": "REVERSING", "condition": "abs_gap<=6, s<-2, m<-2, l<0", "state_group": "NEUTRAL", "action": "CLOSE POSITION"},
+        {"name": "STABLE", "condition": "default fallback", "state_group": "STABLE", "action": "MONITOR"},
+        {"name": "NEUTRAL", "condition": "abs(gap) < 5", "state_group": "NEUTRAL", "action": "WAIT"}
+      ]
+    },
+
+    "structural_states": {
+      "name": "classify_structural_state",
+      "lines": "602-613",
+      "threshold": 12,
+      "states": ["EXPAND_BULL", "STABLE_BULL", "PULLBACK_BULL", "DEEP_PULLBACK_BULL",
+                 "EXPAND_BEAR", "STABLE_BEAR", "PULLBACK_BEAR", "DEEP_PULLBACK_BEAR", "NEUTRAL"]
+    },
+
+    "strength_score": {
+      "formula": "(abs(delta_mid)*0.45) + (abs(accel)*0.20) + (abs(gap)*0.15) + (abs(delta_short)*0.15) + (abs(delta_long)*0.05)",
+      "signal_tiers": {
+        "STRONG": "strength >= 2",
+        "MODERATE": "strength >= 1",
+        "NONE": "strength < 1"
+      }
+    },
+
+    "signals": {
+      "strategies": [
+        {
+          "name": "BB",
+          "full_name": "Bias Based",
+          "entry": "Gap crosses from <5 to >=5, not neutral matchup, no pending BB for this pair",
+          "exit_rules": ["abs(gap) < 5 (BIAS_FLIP)", "Peak gap drop >= 2 (MOMENTUM_LOSS)", "Friday 19:00 UTC (WEEKEND_CLOSE)"],
+          "pl_required": false,
+          "time_window": "any"
+        },
+        {
+          "name": "INTRA",
+          "full_name": "Intraday",
+          "entry": "abs(gap) >= 9, PL zone confirms (ABOVE=BUY, BELOW=SELL), window 22:00-00:00 UTC",
+          "exit_rules": ["06:00 UTC hard close (INTRA_10AM_CLOSE)", "Friday 19:00 UTC (WEEKEND_CLOSE)"],
+          "pl_required": true,
+          "time_window": "22:00-00:00 UTC (2AM-4AM UAE)"
+        }
+      ],
+      "outcome_rules": {
+        "WIN": "pips > 5",
+        "LOSS": "pips < -5",
+        "FLAT": "-5 <= pips <= 5"
+      }
+    }
+  },
+
+  "confidence_score": {
+    "range": [0, 100],
+    "factors": [
+      {"name": "gap_magnitude", "points": 25, "condition": "abs(gap) >= 8"},
+      {"name": "gap_magnitude", "points": 15, "condition": "abs(gap) >= 5"},
+      {"name": "matchup_spread", "points": 20, "condition": "TF diff >= 8"},
+      {"name": "matchup_spread", "points": 10, "condition": "TF diff >= 5"},
+      {"name": "pl_zone_valid", "points": 15, "condition": "Zone confirms bias"},
+      {"name": "box_both_aligned", "points": 10, "condition": "H1 + H4 aligned"},
+      {"name": "box_h1_only", "points": 5, "condition": "Only H1 aligned"},
+      {"name": "momentum_strong", "points": 10, "condition": "STRONG"},
+      {"name": "momentum_building", "points": 5, "condition": "BUILDING"},
+      {"name": "strength_high", "points": 10, "condition": "abs(strength) >= 3"},
+      {"name": "strength_mod", "points": 5, "condition": "abs(strength) >= 1"}
+    ],
+    "penalties": [
+      {"name": "h4_box_opposing", "points": -10, "condition": "H4 trend opposes bias"},
+      {"name": "pl_zone_invalid", "points": -15, "condition": "Zone does not confirm"},
+      {"name": "weak_momentum", "points": -10, "condition": "FADING/REVERSING/COOLING/NEUTRAL"}
+    ],
+    "tiers": {
+      "ELITE": {"min": 90, "max": 100},
+      "HIGH": {"min": 75, "max": 89},
+      "MOD": {"min": 60, "max": 74},
+      "LOW": {"min": 40, "max": 59},
+      "WEAK": {"min": 0, "max": 39}
+    }
+  },
+
+  "scheduler": {
+    "cycles": [
+      {
+        "name": "5-minute",
+        "trigger": "minute % 5 == 0",
+        "actions": ["run_gap_once", "check_news_alerts"]
+      },
+      {
+        "name": "hourly",
+        "trigger": "minute == 1",
+        "actions": ["run_gap_once", "send_snapshot", "send_ai_snapshot", "daily_cleanup"]
+      }
+    ],
+    "market_hours": {
+      "open": "Sunday 22:00 UTC",
+      "close": "Friday 22:00 UTC",
+      "skip_when_closed": true
+    }
+  },
+
+  "telegram_alerts": [
+    {
+      "type": "snapshot",
+      "trigger": "hourly",
+      "format": "PNG table (21 pairs, color-coded)",
+      "colors": {"BUY": "green", "SELL": "red", "watch": "yellow", "idle": "white"}
+    },
+    {
+      "type": "spike",
+      "trigger": "momentum transition to SPARK/BUILDING/STRONG + abs(gap) >= 7",
+      "cooldown_sec": 14400,
+      "format": "HTML message with action guide"
+    },
+    {
+      "type": "gap_zone",
+      "trigger": "9 <= abs(gap) <= 12 + valid PL zone",
+      "cooldown_sec": 14400,
+      "format": "HTML 'Pairs Good to Ride' alert"
+    },
+    {
+      "type": "news",
+      "trigger": "HIGH impact ForexFactory event 10-60 min away",
+      "source": "nfs.faireconomy.media/ff_calendar_thisweek.json",
+      "cache_ttl_sec": 1800
+    },
+    {
+      "type": "ai_narration",
+      "trigger": "hourly",
+      "model": "gpt-4o-mini",
+      "mode": "narrator only — no trade recommendations"
+    },
+    {
+      "type": "login",
+      "trigger": "user login to dashboard",
+      "bot": "separate LOGIN_ALERT_BOT_TOKEN"
+    }
+  ],
+
+  "resilience": {
+    "supabase_retry": {
+      "max_retries": 3,
+      "backoff": "exponential (2s base)",
+      "transient_errors": ["522", "timeout", "ConnectionError", "ConnectionReset"]
+    },
+    "telegram_circuit_breaker": {
+      "failure_threshold": 5,
+      "lockout_sec": 120
+    },
+    "file_read_retry": {
+      "max_retries": 6,
+      "backoff": "exponential (0.3s base)",
+      "trigger": "PermissionError"
+    },
+    "auto_heal": {
+      "trigger": "stale_count > 5 for 3 consecutive cycles",
+      "action": "sys.exit(1) for auto-restart"
+    },
+    "prev_gap_preload": {
+      "trigger": "engine restart",
+      "purpose": "prevent phantom BB signals by loading last known gap from Supabase"
+    },
+    "daily_cleanup": {
+      "tables": ["signal_snapshots", "gap_history", "strength_log", "engine_logs"],
+      "retention_days": 7
+    }
+  },
+
+  "supabase_tables": {
+    "live_data": {
+      "dashboard": {"records": 21, "purpose": "Live pair data, upserted every 5 min"},
+      "gap_history": {"records": "rolling", "purpose": "Historical gap scores per pair"},
+      "strength_log": {"records": "rolling", "purpose": "Currency strength time series"},
+      "pdr_cache": {"records": 21, "purpose": "PDR strength with 15-min TTL"}
+    },
+    "signal_system": {
+      "signal_snapshots": {"records": "121K+", "purpose": "All 21 pairs every cycle"},
+      "signal_results": {"records": "1419+", "purpose": "BB + INTRA strategy performance"},
+      "signal_tracker": {"records": "2851+", "purpose": "Signal lifecycle (session/box/pdr/prices)"},
+      "spike_events": {"records": "852+", "purpose": "Momentum spike alerts"}
+    },
+    "ai_layer": {
+      "ai_memory": {"records": "28+", "purpose": "AI agent findings"},
+      "admin_brain": {"records": "18+", "purpose": "Boss-G coaching/patterns/rules"}
+    },
+    "trade_journal": {
+      "manual_trades": {"records": "439+", "purpose": "Real trades from CSV import"}
+    },
+    "users_auth": {
+      "panda_users": {"records": "4+", "purpose": "Users + roles + feature_access"},
+      "pf_telegram_chats": {"purpose": "Telegram chat IDs for notifications"}
+    },
+    "system": {
+      "engine_logs": {"purpose": "Cycle completion logs"},
+      "engine_heartbeat": {"purpose": "Heartbeat with pairs_processed count"}
+    }
+  },
+
+  "dashboard_api_routes": {
+    "core_data": [
+      {"path": "/api/data", "purpose": "Dashboard rows"},
+      {"path": "/api/gap-chart", "purpose": "Gap history time series"},
+      {"path": "/api/heatmap", "purpose": "Momentum heatmap data"},
+      {"path": "/api/spikes", "purpose": "Spike event log"},
+      {"path": "/api/pdr", "purpose": "PDR strength"},
+      {"path": "/api/currency-strength", "purpose": "Currency strength data"},
+      {"path": "/api/strength-history", "purpose": "Strength time series"},
+      {"path": "/api/cot", "purpose": "COT data"},
+      {"path": "/api/upcoming-news", "purpose": "ForexFactory calendar"},
+      {"path": "/api/calendar", "purpose": "Calendar events"},
+      {"path": "/api/engine-health", "purpose": "Engine status check"}
+    ],
+    "signal_system": [
+      {"path": "/api/signal-analytics", "purpose": "Signal performance stats"},
+      {"path": "/api/signal-log", "purpose": "Signal snapshot history"},
+      {"path": "/api/signal-tracker", "purpose": "Signal lifecycle CRUD"},
+      {"path": "/api/public-signals", "purpose": "Public-facing signal feed"},
+      {"path": "/api/strategies", "purpose": "Strategy configuration"}
+    ],
+    "ai_layer": [
+      {"path": "/api/ai-chat", "purpose": "Panda AI (insights/review/chat)"},
+      {"path": "/api/ai-memory", "purpose": "AI memory CRUD"},
+      {"path": "/api/admin-brain", "purpose": "Boss-G brain entries CRUD"},
+      {"path": "/api/signal-agent", "purpose": "Analyzes signal_results"},
+      {"path": "/api/journal-agent", "purpose": "Analyzes manual_trades"},
+      {"path": "/api/pattern-agent", "purpose": "Cross-references signal + journal"}
+    ],
+    "trade_journal": [
+      {"path": "/api/journal", "purpose": "Manual trade CRUD"},
+      {"path": "/api/journal-upload", "purpose": "CSV import"},
+      {"path": "/api/open-trades", "purpose": "Currently open positions"}
+    ],
+    "ea_integration": [
+      {"path": "/api/ea-data", "purpose": "EA pair data feed"},
+      {"path": "/api/ea-result", "purpose": "EA trade results"}
+    ],
+    "auth_users": [
+      {"path": "/api/login", "purpose": "Authentication"},
+      {"path": "/api/logout", "purpose": "Session end"},
+      {"path": "/api/me", "purpose": "Current user info"},
+      {"path": "/api/pf-me", "purpose": "Public-facing user profile"},
+      {"path": "/api/pf-signup", "purpose": "Public user signup"},
+      {"path": "/api/pf-log-event", "purpose": "Event logging"},
+      {"path": "/api/notify-telegram", "purpose": "Telegram notification trigger"},
+      {"path": "/api/telegram-webhook", "purpose": "Bot webhook handler"},
+      {"path": "/api/alert-prefs", "purpose": "Alert preference settings"}
+    ],
+    "admin": [
+      {"path": "/api/admin", "purpose": "Admin dashboard"},
+      {"path": "/api/admin/users", "purpose": "User management"},
+      {"path": "/api/admin/logs", "purpose": "System logs"},
+      {"path": "/api/admin/sessions", "purpose": "Active sessions"},
+      {"path": "/api/admin/pf-approve", "purpose": "Approve public users"},
+      {"path": "/api/maintenance", "purpose": "Maintenance mode toggle"}
+    ]
+  },
+
+  "dashboard_components": [
+    {"name": "ALL_PAIRS", "line": 8, "purpose": "21-pair constant array"},
+    {"name": "MOMENTUM_GUIDE", "lines": "10-22", "purpose": "Icon + action + color for 10 states"},
+    {"name": "Utility functions", "lines": "25-91", "purpose": "stateColor, biasFromGap, boxTrend, tbgZoneBadge, atrFill"},
+    {"name": "computeConfidence", "lines": "186-275", "purpose": "Multi-factor confidence 0-100 (client-side, includes COT)"},
+    {"name": "MomentumHeatmap", "lines": "376-487", "purpose": "Grid of all pairs x momentum"},
+    {"name": "GapChart", "lines": "613-711", "purpose": "Canvas-based gap history chart"},
+    {"name": "PairCard", "lines": "869-933", "purpose": "Main card per pair"},
+    {"name": "PairCardModal", "lines": "934-1092", "purpose": "Expanded detail modal"},
+    {"name": "ValidSetupsTab", "lines": "1093-1203", "purpose": "Box-confirmed setups"},
+    {"name": "ValidPairsTab", "lines": "1204-1355", "purpose": "Auto-filtered tradable pairs"},
+    {"name": "PandaAIChat", "lines": "~1752-1830", "purpose": "AI chat (3 modes)"},
+    {"name": "SignalAnalytics", "lines": "~1782", "purpose": "Signal performance V2"},
+    {"name": "Dashboard", "lines": "~2019", "purpose": "Main export"}
+  ],
+
+  "dashboard_tabs": [
+    "PANELS", "SIGNALS", "TABLE", "GAP CHART", "RESEARCH",
+    "CALCULATOR", "SETUPS", "VALID PAIRS", "SPIKE LOG",
+    "CHART", "ANALYTICS", "SIGNAL LOG", "PANDA AI"
+  ],
+
+  "design_system": {
+    "fonts": {
+      "data": "Share Tech Mono",
+      "headings": "Orbitron",
+      "body": "Rajdhani"
+    },
+    "colors": {
+      "BUY": "#00ff9f",
+      "SELL": "#ff4d6d",
+      "accent": "#00b4ff",
+      "warning": "#ffd166",
+      "cool": "#ffaa44"
+    },
+    "styling": "All inline (no CSS modules)",
+    "mobile_breakpoint": 768
+  },
+
+  "score_file_format": {
+    "filename": "panda_score_SYMBOL.txt",
+    "fields": [
+      "GAP", "BIAS", "CONFIDENCE", "EXECUTION", "MOMENTUM",
+      "STRENGTH", "HARD_INVALID", "PL_ZONE", "PL_G1",
+      "BOX_H1", "BOX_H4", "CONFLUENCE", "WRITE_TIME"
+    ],
+    "purpose": "Written by engine, read by MT4 EA for trade gating"
+  }
+}

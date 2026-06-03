@@ -1,0 +1,37 @@
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;700;900&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-base: #050810;
+  --bg-panel: #0a0e1a;
+  --bg-card: #0e1525;
+  --bg-hover: #141c30;
+  --border: #1a2540;
+  --border-bright: #1e3060;
+  --accent-green: #00ff9f;
+  --accent-yellow: #ffd166;
+  --accent-red: #ff4d6d;
+  --accent-blue: #00b4ff;
+  --accent-dim: #334;
+  --text-primary: #e8eaf0;
+  --text-secondary: #8892aa;
+  --text-dim: #445566;
+  --glow-green: 0 0 12px rgba(0,255,159,0.4);
+  --glow-red: 0 0 12px rgba(255,77,109,0.4);
+  --glow-yellow: 0 0 12px rgba(255,209,102,0.3);
+  --glow-blue: 0 0 12px rgba(0,180,255,0.3);
+}
+
+html, body {
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: 'Rajdhani', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--bg-base); }
+::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 3px; }

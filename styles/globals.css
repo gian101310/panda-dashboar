@@ -1,0 +1,60 @@
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;700;900&display=swap');
+
+/* ===== DARK THEME (default) ===== */
+:root,
+[data-theme="dark"] {
+  --bg-primary:    #0d1117;
+  --bg-secondary:  #141b27;
+  --bg-card:       #1a2235;
+  --bg-hover:      #1e2840;
+  --border:        #253050;
+  --border-bright: #2e3d70;
+
+  --text-primary:  #e8eaf0;
+  --text-secondary:#a0aabe;
+  --text-muted:    #8494a7;
+
+  --accent:        #00ff9f;
+  --accent-dim:    rgba(0,255,159,0.15);
+  --accent-glow:   rgba(0,255,159,0.4);
+
+  --buy:           #00ff9f;
+  --sell:          #ff4d6d;
+  --warn:          #ffd166;
+  --invalid:       #ff7744;
+  --hard-invalid:  #ff9944;
+
+  --scrollbar-track: #0d1117;
+  --scrollbar-thumb: #2e3d70;
+
+  --shadow:        0 4px 24px rgba(0,0,0,0.5);
+  --shadow-card:   0 2px 12px rgba(0,0,0,0.3);
+  --grid-line:     rgba(0,180,255,0.05);
+  --glow-green:    radial-gradient(circle, rgba(0,255,159,0.06) 0%, transparent 70%);
+}
+
+/* ===== BASE RESET ===== */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  background:  var(--bg-primary);
+  color:       var(--text-primary);
+  font-family: 'Rajdhani', sans-serif;
+  min-height:  100vh;
+  overflow-x:  hidden;
+  transition:  background 0.3s ease, color 0.3s ease;
+}
+
+/* ===== SCROLLBAR ===== */
+::-webkit-scrollbar       { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+
+/* ===== GLOBAL TRANSITIONS ===== */
+div, section, nav, header, main, aside, table, tr, td, th, input, button, a {
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+}
