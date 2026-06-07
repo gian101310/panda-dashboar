@@ -1004,7 +1004,7 @@ function PairCard({ row, trend, cotBias, confidence, memoryIndex, pdr, newsAlert
         ].map(p=>(
           <button key={p.short}
             title={`Open ${p.label} (${row.symbol})`}
-            onClick={e=>{e.stopPropagation();window.open(p.url,'_self');}}
+            onClick={e=>{e.stopPropagation();const a=document.createElement('a');a.href=p.url;a.click();}}
             onMouseEnter={e=>{e.currentTarget.style.background=p.color+'28';e.currentTarget.style.borderColor=p.color+'99';}}
             onMouseLeave={e=>{e.currentTarget.style.background=p.color+'14';e.currentTarget.style.borderColor=p.color+'44';}}
             style={{fontFamily:mono,fontSize:8,color:p.color,background:p.color+'14',border:`1px solid ${p.color}44`,borderRadius:4,padding:'2px 8px',cursor:'pointer',letterSpacing:0.5,fontWeight:700,transition:'background 0.15s, border-color 0.15s'}}>
