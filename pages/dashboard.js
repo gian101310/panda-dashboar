@@ -998,18 +998,19 @@ function PairCard({ row, trend, cotBias, confidence, memoryIndex, pdr, newsAlert
       <div style={{display:'flex',alignItems:'center',gap:4,paddingTop:2}}>
         <span style={{fontFamily:mono,fontSize:7,color:'var(--text-muted)',letterSpacing:1,flexShrink:0}}>OPEN IN</span>
         {[
-          {label:'cTrader',short:'CT',color:'#00b4ff',url:`ctrader://`},
-          {label:'MetaTrader 4',short:'MT4',color:'#f48024',url:`metatrader4://`},
-          {label:'MetaTrader 5',short:'MT5',color:'#8b5cf6',url:`metatrader5://`},
+          {label:'cTrader',short:'CT',color:'#00b4ff',url:'ctrader://'},
+          {label:'MetaTrader 4',short:'MT4',color:'#f48024',url:'metatrader4://'},
+          {label:'MetaTrader 5',short:'MT5',color:'#8b5cf6',url:'metatrader5://'},
         ].map(p=>(
-          <button key={p.short}
+          <a key={p.short}
+            href={p.url}
             title={`Open ${p.label} (${row.symbol})`}
-            onClick={e=>{e.stopPropagation();const a=document.createElement('a');a.href=p.url;a.click();}}
+            onClick={e=>e.stopPropagation()}
             onMouseEnter={e=>{e.currentTarget.style.background=p.color+'28';e.currentTarget.style.borderColor=p.color+'99';}}
             onMouseLeave={e=>{e.currentTarget.style.background=p.color+'14';e.currentTarget.style.borderColor=p.color+'44';}}
-            style={{fontFamily:mono,fontSize:8,color:p.color,background:p.color+'14',border:`1px solid ${p.color}44`,borderRadius:4,padding:'2px 8px',cursor:'pointer',letterSpacing:0.5,fontWeight:700,transition:'background 0.15s, border-color 0.15s'}}>
+            style={{fontFamily:mono,fontSize:8,color:p.color,background:p.color+'14',border:`1px solid ${p.color}44`,borderRadius:4,padding:'2px 8px',cursor:'pointer',letterSpacing:0.5,fontWeight:700,transition:'background 0.15s, border-color 0.15s',textDecoration:'none',display:'inline-block'}}>
             {p.short}
-          </button>
+          </a>
         ))}
       </div>
     </div>
