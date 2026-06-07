@@ -932,16 +932,18 @@ function StatCard({ label, value, color, sub }) {
 }
 
 // ===== PLATFORM BUTTONS =====
+const CTRADER_BASE='https://ct.icmarkets.com/copy/ctrader-open/?cmd=chart&symbol=';
 const PLATFORMS=[
-  {label:'cTrader',short:'CT',color:'#00b4ff'},
-  {label:'MetaTrader 4',short:'MT4',color:'#f48024'},
-  {label:'MetaTrader 5',short:'MT5',color:'#8b5cf6'},
+  {label:'cTrader',short:'CT',color:'#00b4ff',getUrl:sym=>CTRADER_BASE+encodeURIComponent(sym)},
+  {label:'MetaTrader 4',short:'MT4',color:'#f48024',getUrl:null},
+  {label:'MetaTrader 5',short:'MT5',color:'#8b5cf6',getUrl:null},
 ];
 function PlatformButtons({symbol}){
   const [copied,setCopied]=useState(null);
   const handleClick=(e,p)=>{
     e.stopPropagation();e.preventDefault();
     const sym=symbol||'';
+    if(p.getUrl){window.open(p.getUrl(sym),'_blank');return;}
     navigator.clipboard.writeText(sym).then(()=>{setCopied(p.short);setTimeout(()=>setCopied(null),1800);}).catch(()=>{});
   };
   return(
@@ -949,7 +951,7 @@ function PlatformButtons({symbol}){
       <span style={{fontFamily:mono,fontSize:7,color:copied?'#00ff9f':'var(--text-muted)',letterSpacing:1,flexShrink:0,transition:'color 0.2s'}}>{copied?'✓ COPIED':'OPEN IN'}</span>
       {PLATFORMS.map(p=>(
         <button key={p.short}
-          title={`Copy ${symbol} for ${p.label}`}
+          title={p.getUrl?`Open ${symbol} in ${p.label}`:`Copy ${symbol} for ${p.label}`}
           onClick={e=>handleClick(e,p)}
           onMouseEnter={e=>{e.currentTarget.style.background=p.color+'28';e.currentTarget.style.borderColor=p.color+'99';}}
           onMouseLeave={e=>{e.currentTarget.style.background=copied===p.short?p.color+'38':p.color+'14';e.currentTarget.style.borderColor=copied===p.short?p.color+'99':p.color+'44';}}
