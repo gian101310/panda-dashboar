@@ -995,6 +995,23 @@ function PairCard({ row, trend, cotBias, confidence, memoryIndex, pdr, newsAlert
       <div style={{display:'flex',alignItems:'center',gap:5}}><div style={{width:5,height:5,borderRadius:'50%',background:sc,flexShrink:0}}/><span style={{fontFamily:mono,fontSize:9,color:sc}}>{row.state||'NEUTRAL'}</span></div>
       <div style={{background:'var(--bg-card)',borderRadius:6,padding:'7px 10px',display:'flex',flexDirection:'column',gap:5}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}><span style={{fontFamily:mono,fontSize:9,color:'var(--text-secondary)',letterSpacing:2,fontWeight:600}}>STRENGTH</span><span style={{fontFamily:orb,fontSize:15,fontWeight:700,color:strColor(strVal),textShadow:`0 0 8px ${strColor(strVal)}66`}}>{Number(strVal).toFixed(2)}</span></div><div style={{height:4,background:'var(--border)',borderRadius:2,overflow:'hidden'}}><div style={{width:`${Math.min(100,(Math.abs(strVal)/30)*100)}%`,height:'100%',background:strColor(strVal),borderRadius:2}}/></div></div>
       <div style={{display:'flex',justifyContent:'space-between',borderTop:'1px solid var(--border)',paddingTop:5}}><span style={{fontFamily:mono,fontSize:9,color:sig.color}}>{sig.icon} {sig.text}</span><span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>{formatTime(row.updated_at)}</span></div>
+      <div style={{display:'flex',alignItems:'center',gap:4,paddingTop:2}}>
+        <span style={{fontFamily:mono,fontSize:7,color:'var(--text-muted)',letterSpacing:1,flexShrink:0}}>OPEN IN</span>
+        {[
+          {label:'cTrader',short:'CT',color:'#00b4ff',url:`ctrader://`},
+          {label:'MetaTrader 4',short:'MT4',color:'#f48024',url:`metatrader4://`},
+          {label:'MetaTrader 5',short:'MT5',color:'#8b5cf6',url:`metatrader5://`},
+        ].map(p=>(
+          <button key={p.short}
+            title={`Open ${p.label} (${row.symbol})`}
+            onClick={e=>{e.stopPropagation();window.open(p.url,'_self');}}
+            onMouseEnter={e=>{e.currentTarget.style.background=p.color+'28';e.currentTarget.style.borderColor=p.color+'99';}}
+            onMouseLeave={e=>{e.currentTarget.style.background=p.color+'14';e.currentTarget.style.borderColor=p.color+'44';}}
+            style={{fontFamily:mono,fontSize:8,color:p.color,background:p.color+'14',border:`1px solid ${p.color}44`,borderRadius:4,padding:'2px 8px',cursor:'pointer',letterSpacing:0.5,fontWeight:700,transition:'background 0.15s, border-color 0.15s'}}>
+            {p.short}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1130,31 +1147,63 @@ function PairCardModal({ row, trend, cotBias, onClose, isMobile, confidence, mem
           <PdrBadge pdr={pdr}/>
         </div>}
 
-        {/* Pullback Entry Levels */}
-        {(()=>{const isBuy=bias.label==='BUY',isSell=bias.label==='SELL';if(!isBuy&&!isSell)return null;if(!row.pdh&&!row.pdl&&!row.pwh&&!row.pwl)return null;const isJpy=row.symbol?.includes('JPY');const dec=isJpy?3:5;const fmt=v=>v!=null?Number(v).toFixed(dec):'—';const entryColor=isBuy?'#00ff9f':'#ff4d6d';const primaryD=isBuy?row.pdl:row.pdh;const primaryW=isBuy?row.pwl:row.pwh;const secondaryD=isBuy?row.pdh:row.pdl;const secondaryW=isBuy?row.pwh:row.pwl;return(
+        {/* Pullback Entry Zones — Nearest S/R + SL */}
+        {(()=>{const isBuy=bias.label==='BUY',isSell=bias.label==='SELL';if(!isBuy&&!isSell)return null;const price=row.pl_price;if(!price)return null;const isJpy=row.symbol?.includes('JPY');const dec=isJpy?3:5;const pip=isJpy?0.01:0.0001;const fmt=v=>v!=null?Number(v).toFixed(dec):'—';const toPips=v=>Math.round(Math.abs(v)/pip);const entryColor=isBuy?'#00ff9f':'#ff4d6d';
+          const allLevels=[{l:'PDL',v:row.pdl},{l:'PDH',v:row.pdh},{l:'PWL',v:row.pwl},{l:'PWH',v:row.pwh},{l:'PML',v:row.pml},{l:'PMH',v:row.pmh},{l:'PYL',v:row.pyl},{l:'PYH',v:row.pyh}].filter(x=>x.v!=null);
+          let entry=null,tp=null;
+          if(isBuy){
+            const entryLevels=allLevels.filter(x=>x.v<price).sort((a,b)=>b.v-a.v);
+            const tpLevels=allLevels.filter(x=>x.v>price).sort((a,b)=>a.v-b.v);
+            for(const e of entryLevels){for(const t of tpLevels){if(toPips(t.v-e.v)>=50){entry=e;tp=t;break;}}if(entry)break;}
+            if(!entry&&tpLevels.length){for(const t of tpLevels){if(toPips(t.v-price)>=50){tp=t;break;}}if(!tp)tp=tpLevels[tpLevels.length-1];}
+          }else{
+            const entryLevels=allLevels.filter(x=>x.v>price).sort((a,b)=>a.v-b.v);
+            const tpLevels=allLevels.filter(x=>x.v<price).sort((a,b)=>b.v-a.v);
+            for(const e of entryLevels){for(const t of tpLevels){if(toPips(e.v-t.v)>=50){entry=e;tp=t;break;}}if(entry)break;}
+            if(!entry&&tpLevels.length){for(const t of tpLevels){if(toPips(price-t.v)>=50){tp=t;break;}}if(!tp)tp=tpLevels[tpLevels.length-1];}
+          }
+          if(!entry&&!tp)return null;
+          const entryDist=entry?toPips(isBuy?(price-entry.v):(entry.v-price)):null;
+          const tpDist=entry&&tp?toPips(isBuy?(tp.v-entry.v):(entry.v-tp.v)):null;
+          const slRatio=tpDist>=300?5:tpDist>=200?4:tpDist>=100?3:2;
+          const slPips=tpDist?Math.round(tpDist/slRatio):null;
+          const slPrice=entry&&slPips?(isBuy?entry.v-slPips*pip:entry.v+slPips*pip):null;
+          const labelMap={PDL:'PREV DAY LOW',PDH:'PREV DAY HIGH',PWL:'PREV WEEK LOW',PWH:'PREV WEEK HIGH',PML:'PREV MONTH LOW',PMH:'PREV MONTH HIGH',PYL:'PREV YEAR LOW',PYH:'PREV YEAR HIGH'};
+          return(
           <div style={{padding:'10px 14px',background:'rgba(0,0,0,0.15)',borderRadius:8,display:'flex',flexDirection:'column',gap:8}}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-              <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2}}>PULLBACK ENTRY ZONES</span>
+              <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2}}>PULLBACK ENTRY</span>
               <span style={{fontFamily:mono,fontSize:8,color:entryColor,letterSpacing:1}}>{isBuy?'BUY THE DIP':'SELL THE RALLY'}</span>
             </div>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+            <div style={{display:'flex',alignItems:'center',gap:6,padding:'4px 8px',background:'rgba(255,255,255,0.03)',borderRadius:6}}>
+              <span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)'}}>PRICE</span>
+              <span style={{fontFamily:orb,fontSize:13,fontWeight:700,color:'var(--text-secondary)'}}>{fmt(price)}</span>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6}}>
               <div style={{background:entryColor+'0a',border:`1px solid ${entryColor}25`,borderRadius:6,padding:'8px 10px'}}>
-                <div style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1,marginBottom:4}}>{isBuy?'PDL — DAILY SUPPORT':'PDH — DAILY RESIST'}</div>
-                <div style={{fontFamily:orb,fontSize:16,fontWeight:700,color:entryColor}}>{fmt(primaryD)}</div>
+                <div style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1,marginBottom:2}}>{isBuy?'▼ ENTRY':'▲ ENTRY'}</div>
+                <div style={{fontFamily:mono,fontSize:7,color:entryColor+'99',marginBottom:4}}>{entry?labelMap[entry.l]||entry.l:'—'}</div>
+                <div style={{fontFamily:orb,fontSize:15,fontWeight:700,color:entryColor}}>{entry?fmt(entry.v):'—'}</div>
+                {entryDist!=null&&<div style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',marginTop:2}}>{entryDist}p away</div>}
               </div>
               <div style={{background:'rgba(0,180,255,0.06)',border:'1px solid rgba(0,180,255,0.2)',borderRadius:6,padding:'8px 10px'}}>
-                <div style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1,marginBottom:4}}>{isBuy?'PWL — WEEKLY SUPPORT':'PWH — WEEKLY RESIST'}</div>
-                <div style={{fontFamily:orb,fontSize:16,fontWeight:700,color:'#00b4ff'}}>{fmt(primaryW)}</div>
+                <div style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1,marginBottom:2}}>{isBuy?'▲ TP':'▼ TP'}</div>
+                <div style={{fontFamily:mono,fontSize:7,color:'#00b4ff99',marginBottom:4}}>{tp?labelMap[tp.l]||tp.l:'—'}</div>
+                <div style={{fontFamily:orb,fontSize:15,fontWeight:700,color:'#00b4ff'}}>{tp?fmt(tp.v):'—'}</div>
+                {tpDist!=null&&<div style={{fontFamily:mono,fontSize:8,color:'#00b4ff',marginTop:2}}>{tpDist}p ✓</div>}
               </div>
-              <div style={{background:'rgba(255,255,255,0.02)',border:'1px solid var(--border)',borderRadius:6,padding:'8px 10px',opacity:0.6}}>
-                <div style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1,marginBottom:4}}>{isBuy?'PDH — DAILY HIGH':'PDL — DAILY LOW'}</div>
-                <div style={{fontFamily:mono,fontSize:13,fontWeight:600,color:'var(--text-muted)'}}>{fmt(secondaryD)}</div>
-              </div>
-              <div style={{background:'rgba(255,255,255,0.02)',border:'1px solid var(--border)',borderRadius:6,padding:'8px 10px',opacity:0.6}}>
-                <div style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1,marginBottom:4}}>{isBuy?'PWH — WEEKLY HIGH':'PWL — WEEKLY LOW'}</div>
-                <div style={{fontFamily:mono,fontSize:13,fontWeight:600,color:'var(--text-muted)'}}>{fmt(secondaryW)}</div>
+              <div style={{background:'rgba(255,77,109,0.06)',border:'1px solid rgba(255,77,109,0.2)',borderRadius:6,padding:'8px 10px'}}>
+                <div style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1,marginBottom:2}}>✕ SL</div>
+                <div style={{fontFamily:mono,fontSize:7,color:'#ff4d6d99',marginBottom:4}}>TP÷{slRatio}</div>
+                <div style={{fontFamily:orb,fontSize:15,fontWeight:700,color:'#ff4d6d'}}>{slPrice?fmt(slPrice):'—'}</div>
+                {slPips!=null&&<div style={{fontFamily:mono,fontSize:8,color:'#ff4d6d',marginTop:2}}>{slPips}p risk</div>}
               </div>
             </div>
+            {tpDist!=null&&slPips!=null&&<div style={{display:'flex',alignItems:'center',gap:8,padding:'4px 8px',background:'rgba(255,255,255,0.02)',borderRadius:6}}>
+              <span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)'}}>R:R</span>
+              <span style={{fontFamily:mono,fontSize:10,fontWeight:700,color:tpDist/slPips>=2?'#00ff9f':'#ffd166'}}>{(tpDist/slPips).toFixed(1)}:1</span>
+              <span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)'}}>TP {tpDist}p · SL {slPips}p</span>
+            </div>}
           </div>
         );})()}
 
@@ -1898,11 +1947,15 @@ function ResearchTab({ pairs, cotData, cotLoading, fetchCot }) {
 }
 
 // ===== PANDA AI CHAT =====
-function PandaAIChat({ userId }) {
+function PandaAIChat({ userId, isAdmin }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [activeMode, setActiveMode] = useState(null);
+  const [aiSubTab, setAiSubTab] = useState('chat');
+  const [agentResults, setAgentResults] = useState(null);
+  const [agentRunning, setAgentRunning] = useState(false);
+  const [agentProgress, setAgentProgress] = useState([]);
   const chatEndRef = useRef(null);
   const mono = "'Share Tech Mono',monospace", orb = "'Orbitron',sans-serif";
 
@@ -1932,10 +1985,63 @@ function PandaAIChat({ userId }) {
   const handleSend = useCallback(() => { if (!input.trim()) return; const msg = input.trim(); setInput(''); sendRequest('chat', msg); }, [input, sendRequest]);
   const handleKeyDown = useCallback((e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }, [handleSend]);
 
+  // ---- ALL AGENTS ----
+  const runAllAgents = useCallback(async () => {
+    if (agentRunning) return;
+    setAgentRunning(true);
+    setAgentResults(null);
+    setAgentProgress([
+      { name: 'Signal Agent', status: 'running' },
+      { name: 'Journal Agent', status: 'running' },
+      { name: 'Pattern Agent', status: 'running' },
+    ]);
+    try {
+      const r = await fetch('/api/run-all-agents', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+      const data = await r.json();
+      if (r.ok && data.agents) {
+        setAgentResults(data);
+        setAgentProgress(data.agents.map(a => ({
+          name: a.agent,
+          status: a.status === 'success' ? 'done' : 'error',
+          duration: a.duration_ms,
+          detail: a.status === 'success'
+            ? `${a.memories_written ?? a.themes_written ?? '?'} memories · ${a.total_signals_analyzed || a.total_trades_analyzed || a.signals_analyzed || '—'} analyzed`
+            : a.error || 'Failed',
+        })));
+      } else {
+        setAgentProgress(prev => prev.map(p => ({ ...p, status: 'error', detail: data.error || 'API error' })));
+      }
+    } catch (err) {
+      setAgentProgress(prev => prev.map(p => ({ ...p, status: 'error', detail: err.message })));
+    }
+    setAgentRunning(false);
+  }, [agentRunning]);
+
+  const AI_SUB_TABS = [
+    { key: 'chat', label: '💬 CHAT', color: '#00b4ff' },
+    { key: 'agents', label: '🤖 ALL AGENTS', color: '#cc77ff' },
+  ];
+
   return (
     <div style={{display:'flex',flexDirection:'column',gap:12,height:'100%'}}>
+      {/* Sub-tab selector */}
       <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
         <span style={{fontFamily:orb,fontSize:11,color:'#00b4ff',letterSpacing:4,fontWeight:700}}>🐼 PANDA AI</span>
+        <div style={{display:'flex',gap:4,background:'var(--bg-secondary)',borderRadius:6,border:'1px solid var(--border)',overflow:'hidden'}}>
+          {AI_SUB_TABS.map(st=>(
+            <button key={st.key} onClick={()=>setAiSubTab(st.key)} style={{
+              fontFamily:mono,fontSize:9,padding:'5px 14px',border:'none',cursor:'pointer',letterSpacing:2,
+              background:aiSubTab===st.key?st.color+'22':'transparent',
+              color:aiSubTab===st.key?st.color:'var(--text-muted)',fontWeight:aiSubTab===st.key?700:400,
+              borderBottom:aiSubTab===st.key?`2px solid ${st.color}`:'2px solid transparent',
+            }}>{st.label}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* ===== CHAT SUB-TAB ===== */}
+      {aiSubTab==='chat'&&(<>
+      <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
         <button onClick={()=>sendRequest('insights')} disabled={loading} style={{fontFamily:mono,fontSize:9,padding:'5px 14px',borderRadius:4,border:'1px solid #00ff9f44',background:activeMode==='insights'?'rgba(0,255,159,0.15)':'var(--bg-card)',color:'#00ff9f',cursor:loading?'not-allowed':'pointer',letterSpacing:2}}>📊 ANALYZE MARKET</button>
         <button onClick={()=>sendRequest('review')} disabled={loading} style={{fontFamily:mono,fontSize:9,padding:'5px 14px',borderRadius:4,border:'1px solid #ffd16644',background:activeMode==='review'?'rgba(255,209,102,0.15)':'var(--bg-card)',color:'#ffd166',cursor:loading?'not-allowed':'pointer',letterSpacing:2}}>📋 REVIEW TRADES</button>
         {messages.length>0&&<button onClick={()=>setMessages([])} style={{fontFamily:mono,fontSize:8,padding:'4px 8px',borderRadius:4,border:'1px solid #ff4d6d33',background:'rgba(255,77,109,0.1)',color:'#ff4d6d',cursor:'pointer',letterSpacing:1}}>✕ CLEAR</button>}
@@ -1988,6 +2094,85 @@ function PandaAIChat({ userId }) {
         <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={handleKeyDown} placeholder="Ask Panda AI about any pair or setup..." disabled={loading} style={{flex:1,fontFamily:mono,fontSize:10,padding:'8px 12px',borderRadius:6,border:'1px solid var(--border)',background:'var(--bg-card)',color:'var(--text-primary)',outline:'none'}}/>
         <button onClick={handleSend} disabled={loading||!input.trim()} style={{fontFamily:mono,fontSize:9,padding:'8px 16px',borderRadius:6,border:'1px solid #00b4ff44',background:input.trim()?'rgba(0,180,255,0.15)':'var(--bg-card)',color:input.trim()?'#00b4ff':'var(--text-muted)',cursor:input.trim()&&!loading?'pointer':'not-allowed',letterSpacing:2}}>SEND</button>
       </div>
+      </>)}
+
+      {/* ===== ALL AGENTS SUB-TAB ===== */}
+      {aiSubTab==='agents'&&(
+        <div style={{display:'flex',flexDirection:'column',gap:16}}>
+          <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+            <div style={{fontFamily:orb,fontSize:13,color:'#cc77ff',letterSpacing:3,fontWeight:700}}>ALL AGENTS</div>
+            <button onClick={runAllAgents} disabled={agentRunning} style={{
+              fontFamily:mono,fontSize:10,padding:'8px 20px',borderRadius:6,cursor:agentRunning?'not-allowed':'pointer',
+              border:'1px solid #cc77ff55',background:agentRunning?'rgba(204,119,255,0.08)':'rgba(204,119,255,0.15)',
+              color:'#cc77ff',letterSpacing:2,fontWeight:700,
+              animation:agentRunning?'blink 1s infinite':'none',
+            }}>{agentRunning?'⟳ RUNNING ALL AGENTS...':'🚀 RUN ALL AGENTS'}</button>
+            {agentResults&&<span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>{(agentResults.total_duration_ms/1000).toFixed(1)}s total</span>}
+          </div>
+
+          <div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:1,lineHeight:1.6}}>
+            Runs Signal Agent + Journal Agent + Pattern Agent in parallel. Updates all AI memories at once.
+          </div>
+
+          {/* Agent status cards */}
+          <div style={{display:'flex',gap:12,flexWrap:'wrap'}}>
+            {(agentProgress.length>0?agentProgress:[
+              {name:'Signal Agent',status:'idle'},
+              {name:'Journal Agent',status:'idle'},
+              {name:'Pattern Agent',status:'idle'},
+            ]).map(a=>{
+              const icon = a.status==='done'?'✅':a.status==='running'?'⟳':a.status==='error'?'❌':'⏸️';
+              const borderC = a.status==='done'?'#00ff9f':a.status==='running'?'#cc77ff':a.status==='error'?'#ff4d6d':'var(--border)';
+              const bgC = a.status==='done'?'rgba(0,255,159,0.06)':a.status==='running'?'rgba(204,119,255,0.08)':a.status==='error'?'rgba(255,77,109,0.06)':'var(--bg-card)';
+              return(
+                <div key={a.name} style={{flex:'1 1 200px',minWidth:200,background:bgC,border:`1px solid ${borderC}`,borderRadius:10,padding:'14px 18px',display:'flex',flexDirection:'column',gap:6}}>
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                    <span style={{fontFamily:orb,fontSize:11,fontWeight:700,color:'var(--text-primary)',letterSpacing:1}}>{a.name}</span>
+                    <span style={{fontSize:14,animation:a.status==='running'?'spin 1s linear infinite':'none',display:'inline-block'}}>{icon}</span>
+                  </div>
+                  {a.status==='running'&&<div style={{fontFamily:mono,fontSize:9,color:'#cc77ff',letterSpacing:1}}>Processing...</div>}
+                  {a.detail&&<div style={{fontFamily:mono,fontSize:9,color:a.status==='error'?'#ff4d6d':'#00ff9f',lineHeight:1.5}}>{a.detail}</div>}
+                  {a.duration!=null&&<div style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)'}}>{(a.duration/1000).toFixed(1)}s</div>}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Detailed results */}
+          {agentResults&&agentResults.agents&&(
+            <div style={{display:'flex',flexDirection:'column',gap:10,marginTop:4}}>
+              <div style={{fontFamily:orb,fontSize:11,color:'#00b4ff',letterSpacing:2}}>RESULTS</div>
+              {agentResults.agents.map((a,i)=>(
+                <div key={i} style={{background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:8,padding:'12px 16px',fontFamily:mono,fontSize:9,color:'var(--text-primary)',lineHeight:1.8}}>
+                  <div style={{fontWeight:700,color:a.status==='success'?'#00ff9f':'#ff4d6d',marginBottom:4,letterSpacing:1}}>{a.agent} — {a.status==='success'?'SUCCESS':'FAILED'}</div>
+                  {a.status==='success'&&(<>
+                    {a.total_signals_analyzed!=null&&<div>Signals analyzed: <span style={{color:'#00b4ff'}}>{a.total_signals_analyzed}</span></div>}
+                    {a.total_trades_analyzed!=null&&<div>Trades analyzed: <span style={{color:'#00b4ff'}}>{a.total_trades_analyzed}</span></div>}
+                    {a.signals_analyzed!=null&&<div>Signals cross-referenced: <span style={{color:'#00b4ff'}}>{a.signals_analyzed}</span></div>}
+                    {a.memories_written!=null&&<div>Memories written: <span style={{color:'#00ff9f'}}>{a.memories_written}</span></div>}
+                    {a.themes_written!=null&&<div>Themes written: <span style={{color:'#00ff9f'}}>{a.themes_written}</span></div>}
+                    {a.bb_count!=null&&<div>BB: {a.bb_count} · INTRA: {a.intra_count}</div>}
+                    {a.analysis_types&&<div style={{marginTop:4,color:'var(--text-muted)',fontSize:8}}>{a.analysis_types.length} analysis types</div>}
+                  </>)}
+                  {a.status!=='success'&&<div style={{color:'#ff4d6d'}}>{a.error}</div>}
+                </div>
+              ))}
+              <div style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>Ran at {new Date(agentResults.ran_at).toLocaleString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit',day:'2-digit',month:'short'})}</div>
+            </div>
+          )}
+
+          {!agentResults&&!agentRunning&&(
+            <div style={{textAlign:'center',padding:30,fontFamily:mono,fontSize:10,color:'var(--text-muted)'}}>
+              <div style={{fontSize:36,marginBottom:12}}>🤖</div>
+              <div style={{fontFamily:orb,fontSize:12,color:'#cc77ff',letterSpacing:3,marginBottom:8}}>AGENT COMMAND CENTER</div>
+              <div style={{maxWidth:400,margin:'0 auto',lineHeight:1.7}}>
+                Hit RUN ALL AGENTS to fire all 3 AI agents at once.
+                They analyze your signal history, trade journal, and cross-reference patterns — all in parallel.
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -2884,6 +3069,8 @@ export default function Dashboard() {
   const [showAlertSettings, setShowAlertSettings] = useState(false);
   const [popup,      setPopup]      = useState(null);
   const [maintenance, setMaintenance] = useState(false);
+  const [pageVis, setPageVis] = useState(null);
+  const [showPageVis, setShowPageVis] = useState(false);
 
   // Mobile detection
   const [isMobile, setIsMobile] = useState(false);
@@ -2973,6 +3160,7 @@ export default function Dashboard() {
   useEffect(()=>{if(tab==='RESEARCH'&&cotData.length===0) fetchCot();},[tab,cotData.length,fetchCot]);
   useEffect(()=>{fetchCot();},[fetchCot]);
   useEffect(()=>{fetch('/api/me').then(r=>r.json()).then(d=>{setUser(d);if(d.role==='admin') setIsAdmin(true);}).catch(()=>{});},[]);
+  useEffect(()=>{fetch('/api/page-visibility').then(r=>r.json()).then(d=>setPageVis(d)).catch(()=>{});},[]);
 
   // Maintenance mode check
   useEffect(()=>{
@@ -3079,10 +3267,64 @@ export default function Dashboard() {
             {(isAdmin||user?.role==='vip'||user?.feature_access?.includes('journal'))&&<button onClick={()=>window.location.href='/journal'} style={{background:'rgba(255,209,102,0.06)',border:'1px solid #ffd16633',borderRadius:5,color:'#ffd166',fontFamily:mono,fontSize:9,padding:'5px 10px',cursor:'pointer'}}>📓 JOURNAL</button>}
             <button onClick={()=>window.location.href='/strength'} style={{background:'rgba(78,154,241,0.06)',border:'1px solid #4e9af133',borderRadius:5,color:'#4e9af1',fontFamily:mono,fontSize:9,padding:'5px 10px',cursor:'pointer'}}>STRENGTH</button>
             {isAdmin&&<button onClick={()=>window.location.href='/admin'} style={{background:'rgba(255,209,102,0.08)',border:'1px solid #ffd16644',borderRadius:5,color:'#ffd166',fontFamily:mono,fontSize:9,padding:'5px 10px',cursor:'pointer'}}>🛡️ ADMIN</button>}
+            {isAdmin&&<button onClick={()=>setShowPageVis(!showPageVis)} style={{background:showPageVis?'rgba(204,119,255,0.15)':'rgba(204,119,255,0.06)',border:'1px solid #cc77ff44',borderRadius:5,color:'#cc77ff',fontFamily:mono,fontSize:9,padding:'5px 10px',cursor:'pointer'}}>👁️ PAGES</button>}
             {isAdmin&&<button onClick={toggleMaintenance} style={{background:maintenance?'rgba(255,77,109,0.12)':'rgba(0,255,159,0.06)',border:`1px solid ${maintenance?'#ff4d6d33':'#00ff9f33'}`,borderRadius:5,color:maintenance?'#ff4d6d':'#00ff9f',fontFamily:mono,fontSize:9,padding:'5px 10px',cursor:'pointer'}}>{maintenance?'🔴 SITE OFF':'🟢 SITE ON'}</button>}
             <button onClick={handleLogout} style={{background:'transparent',border:'1px solid #2a1525',borderRadius:5,color:'#ff4d6d',fontFamily:mono,fontSize:9,padding:'5px 10px',cursor:'pointer'}}>LOGOUT</button>
           </div>
         </header>
+
+        {/* PAGE VISIBILITY TOGGLE — ADMIN ONLY */}
+        {isAdmin&&showPageVis&&pageVis&&(()=>{
+          const PAGES = [
+            { key:'landing',   label:'🏠 LANDING',   route:'/' },
+            { key:'funnel',    label:'🔄 FUNNEL',    route:'/funnel' },
+            { key:'pricing',   label:'💰 PRICING',   route:'/pricing' },
+            { key:'portfolio', label:'📁 PORTFOLIO', route:'/portfolio' },
+            { key:'login',     label:'🔐 LOGIN',     route:'/login' },
+          ];
+          const togglePage = async (pgKey) => {
+            const next = { ...pageVis, [pgKey]: !pageVis[pgKey] };
+            setPageVis(next);
+            await fetch('/api/page-visibility',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(next)});
+          };
+          const toggleBypass = async () => {
+            const next = { ...pageVis, bypass_enabled: !pageVis.bypass_enabled };
+            setPageVis(next);
+            await fetch('/api/page-visibility',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(next)});
+          };
+          return(
+          <div style={{background:'rgba(204,119,255,0.06)',borderBottom:'1px solid rgba(204,119,255,0.25)',padding:'12px 20px',zIndex:99}}>
+            <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:10,flexWrap:'wrap'}}>
+              <span style={{fontFamily:orb,fontSize:11,color:'#cc77ff',letterSpacing:3,fontWeight:700}}>👁️ PAGE VISIBILITY</span>
+              <span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>Toggle site pages on/off for visitors</span>
+              {/* BYPASS TOGGLE */}
+              <div style={{display:'flex',alignItems:'center',gap:6,marginLeft:'auto',background:pageVis.bypass_enabled?'rgba(0,255,159,0.08)':'rgba(255,77,109,0.1)',border:`1px solid ${pageVis.bypass_enabled?'#00ff9f33':'#ff4d6d33'}`,borderRadius:6,padding:'4px 12px',cursor:'pointer'}} onClick={toggleBypass}>
+                <div style={{width:32,height:16,borderRadius:8,background:pageVis.bypass_enabled?'#00ff9f':'#ff4d6d',position:'relative',transition:'background 0.2s'}}>
+                  <div style={{width:12,height:12,borderRadius:6,background:'white',position:'absolute',top:2,transition:'left 0.2s',left:pageVis.bypass_enabled?18:2}}/>
+                </div>
+                <span style={{fontFamily:mono,fontSize:9,color:pageVis.bypass_enabled?'#00ff9f':'#ff4d6d',letterSpacing:1,fontWeight:700}}>BYPASS {pageVis.bypass_enabled?'ON':'OFF'}</span>
+              </div>
+            </div>
+            {pageVis.bypass_enabled&&<div style={{fontFamily:mono,fontSize:9,color:'#00ff9f',marginBottom:8,letterSpacing:1}}>✅ BYPASS ON — All pages open to visitors. Toggle individual pages below to override even with bypass.</div>}
+            {!pageVis.bypass_enabled&&<div style={{fontFamily:mono,fontSize:9,color:'#ff4d6d',marginBottom:8,letterSpacing:1}}>🔒 BYPASS OFF — Only toggled-ON pages are visible. Disabled pages show "Coming Soon".</div>}
+            <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+              {PAGES.map(pg=>{
+                const isOn = pageVis[pg.key]!==false;
+                return(
+                  <div key={pg.key} style={{display:'flex',alignItems:'center',gap:8,background:isOn?'rgba(0,255,159,0.06)':'rgba(255,77,109,0.06)',border:`1px solid ${isOn?'#00ff9f44':'#ff4d6d44'}`,borderRadius:8,padding:'8px 16px',cursor:'pointer',minWidth:140,transition:'all 0.2s'}} onClick={()=>togglePage(pg.key)}>
+                    <div style={{width:34,height:18,borderRadius:9,background:isOn?'#00ff9f':'#ff4d6d55',position:'relative',transition:'background 0.2s',flexShrink:0}}>
+                      <div style={{width:14,height:14,borderRadius:7,background:isOn?'white':'#ff4d6d',position:'absolute',top:2,transition:'left 0.2s',left:isOn?18:2,boxShadow:'0 1px 3px rgba(0,0,0,0.3)'}}/>
+                    </div>
+                    <div style={{display:'flex',flexDirection:'column',gap:1}}>
+                      <span style={{fontFamily:mono,fontSize:10,color:isOn?'#00ff9f':'#ff4d6d',letterSpacing:1,fontWeight:700}}>{pg.label}</span>
+                      <span style={{fontFamily:mono,fontSize:7,color:'var(--text-muted)',letterSpacing:0.5}}>{pg.route}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>);
+        })()}
 
         {/* NEWS ALERT BANNER */}
         {upcomingNews.events && upcomingNews.events.length > 0 && (
@@ -3281,7 +3523,7 @@ export default function Dashboard() {
 <SignalAnalytics/>
 </div>
 ):tab==='PANDA AI'?(
-<PandaAIChat userId={user?.id}/>
+<PandaAIChat userId={user?.id} isAdmin={isAdmin}/>
 ):tab==='TABLE'?(
 
             <div style={{overflowX:'auto'}}>
