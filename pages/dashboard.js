@@ -931,6 +931,36 @@ function StatCard({ label, value, color, sub }) {
   );
 }
 
+// ===== PLATFORM BUTTONS =====
+const PLATFORMS=[
+  {label:'cTrader',short:'CT',color:'#00b4ff'},
+  {label:'MetaTrader 4',short:'MT4',color:'#f48024'},
+  {label:'MetaTrader 5',short:'MT5',color:'#8b5cf6'},
+];
+function PlatformButtons({symbol}){
+  const [copied,setCopied]=useState(null);
+  const handleClick=(e,p)=>{
+    e.stopPropagation();e.preventDefault();
+    const sym=symbol||'';
+    navigator.clipboard.writeText(sym).then(()=>{setCopied(p.short);setTimeout(()=>setCopied(null),1800);}).catch(()=>{});
+  };
+  return(
+    <div style={{display:'flex',alignItems:'center',gap:4,paddingTop:2}}>
+      <span style={{fontFamily:mono,fontSize:7,color:copied?'#00ff9f':'var(--text-muted)',letterSpacing:1,flexShrink:0,transition:'color 0.2s'}}>{copied?'✓ COPIED':'OPEN IN'}</span>
+      {PLATFORMS.map(p=>(
+        <button key={p.short}
+          title={`Copy ${symbol} for ${p.label}`}
+          onClick={e=>handleClick(e,p)}
+          onMouseEnter={e=>{e.currentTarget.style.background=p.color+'28';e.currentTarget.style.borderColor=p.color+'99';}}
+          onMouseLeave={e=>{e.currentTarget.style.background=copied===p.short?p.color+'38':p.color+'14';e.currentTarget.style.borderColor=copied===p.short?p.color+'99':p.color+'44';}}
+          style={{fontFamily:mono,fontSize:8,color:p.color,background:copied===p.short?p.color+'38':p.color+'14',border:`1px solid ${copied===p.short?p.color+'99':p.color+'44'}`,borderRadius:4,padding:'2px 8px',cursor:'pointer',letterSpacing:0.5,fontWeight:700,transition:'background 0.15s, border-color 0.15s'}}>
+          {copied===p.short?'✓':p.short}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // ===== PAIR CARD =====
 function PairCard({ row, trend, cotBias, confidence, memoryIndex, pdr, newsAlert }) {
   const gap=row.gap??0,valid=isValid(gap)&&!row.hard_invalid&&!isNeutralMatchup(row),bias=biasFromGap(gap),sig=signalLabel(row.signal,row.strength),strVal=row.strength??0,sc=stateColor(row.state),t=trend||{};
@@ -995,24 +1025,7 @@ function PairCard({ row, trend, cotBias, confidence, memoryIndex, pdr, newsAlert
       <div style={{display:'flex',alignItems:'center',gap:5}}><div style={{width:5,height:5,borderRadius:'50%',background:sc,flexShrink:0}}/><span style={{fontFamily:mono,fontSize:9,color:sc}}>{row.state||'NEUTRAL'}</span></div>
       <div style={{background:'var(--bg-card)',borderRadius:6,padding:'7px 10px',display:'flex',flexDirection:'column',gap:5}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}><span style={{fontFamily:mono,fontSize:9,color:'var(--text-secondary)',letterSpacing:2,fontWeight:600}}>STRENGTH</span><span style={{fontFamily:orb,fontSize:15,fontWeight:700,color:strColor(strVal),textShadow:`0 0 8px ${strColor(strVal)}66`}}>{Number(strVal).toFixed(2)}</span></div><div style={{height:4,background:'var(--border)',borderRadius:2,overflow:'hidden'}}><div style={{width:`${Math.min(100,(Math.abs(strVal)/30)*100)}%`,height:'100%',background:strColor(strVal),borderRadius:2}}/></div></div>
       <div style={{display:'flex',justifyContent:'space-between',borderTop:'1px solid var(--border)',paddingTop:5}}><span style={{fontFamily:mono,fontSize:9,color:sig.color}}>{sig.icon} {sig.text}</span><span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>{formatTime(row.updated_at)}</span></div>
-      <div style={{display:'flex',alignItems:'center',gap:4,paddingTop:2}}>
-        <span style={{fontFamily:mono,fontSize:7,color:'var(--text-muted)',letterSpacing:1,flexShrink:0}}>OPEN IN</span>
-        {[
-          {label:'cTrader',short:'CT',color:'#00b4ff',url:'ctrader://'},
-          {label:'MetaTrader 4',short:'MT4',color:'#f48024',url:'metatrader4://'},
-          {label:'MetaTrader 5',short:'MT5',color:'#8b5cf6',url:'metatrader5://'},
-        ].map(p=>(
-          <a key={p.short}
-            href={p.url}
-            title={`Open ${p.label} (${row.symbol})`}
-            onClick={e=>e.stopPropagation()}
-            onMouseEnter={e=>{e.currentTarget.style.background=p.color+'28';e.currentTarget.style.borderColor=p.color+'99';}}
-            onMouseLeave={e=>{e.currentTarget.style.background=p.color+'14';e.currentTarget.style.borderColor=p.color+'44';}}
-            style={{fontFamily:mono,fontSize:8,color:p.color,background:p.color+'14',border:`1px solid ${p.color}44`,borderRadius:4,padding:'2px 8px',cursor:'pointer',letterSpacing:0.5,fontWeight:700,transition:'background 0.15s, border-color 0.15s',textDecoration:'none',display:'inline-block'}}>
-            {p.short}
-          </a>
-        ))}
-      </div>
+      <PlatformButtons symbol={row.symbol}/>
     </div>
   );
 }
@@ -1255,6 +1268,9 @@ function PairCardModal({ row, trend, cotBias, onClose, isMobile, confidence, mem
           ) : <span/>}
           <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>Updated: {formatDt(row.updated_at)}</span>
         </div>
+
+        {/* Platform buttons */}
+        <PlatformButtons symbol={row.symbol}/>
 
       </div>
     </div>
