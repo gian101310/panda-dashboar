@@ -15,21 +15,33 @@ class PositionDrawerSourceTest(unittest.TestCase):
         source = read_source()
 
         self.assertIn("input bool              InpEnabled", source)
-        self.assertIn("enum PandaPositionMode", source)
-        self.assertIn("PANDA_MODE_MANUAL_LONG", source)
-        self.assertIn("PANDA_MODE_MANUAL_SHORT", source)
-        self.assertIn("PANDA_MODE_ENGINE_BIAS", source)
+        self.assertIn("input bool              InpShowButtons", source)
+        self.assertIn("enum PandaPositionSide", source)
+        self.assertIn("PANDA_LONG", source)
+        self.assertIn("PANDA_SHORT", source)
         self.assertIn("RemovePositionObjects();", source)
 
-    def test_position_drawer_supports_drag_resize_and_optional_bias_file(self):
+    def test_position_drawer_supports_drag_resize_without_engine_bias(self):
         source = read_source()
 
         self.assertIn("input bool              InpAllowBoxResize", source)
         self.assertIn("OBJPROP_SELECTABLE, InpAllowBoxResize", source)
         self.assertIn("CHARTEVENT_OBJECT_DRAG", source)
         self.assertIn("SyncBoxPrices", source)
-        self.assertIn("LoadEngineBiasSide", source)
-        self.assertIn("InpBiasFileName", source)
+        self.assertNotIn("LoadEngineBiasSide", source)
+        self.assertNotIn("InpBiasFileName", source)
+        self.assertNotIn("TBG_BIAS", source)
+
+    def test_position_drawer_has_chart_buttons_for_fast_side_switching(self):
+        source = read_source()
+
+        self.assertIn("input bool              InpShowButtons", source)
+        self.assertIn("DrawControlButtons", source)
+        self.assertIn("CHARTEVENT_OBJECT_CLICK", source)
+        self.assertIn("g_longButtonName", source)
+        self.assertIn("g_shortButtonName", source)
+        self.assertIn("g_offButtonName", source)
+        self.assertIn("ApplyButtonMode", source)
 
 
 if __name__ == "__main__":

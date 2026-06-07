@@ -4,16 +4,9 @@
 //|   Drag Entry, Stop, Target, or resize boxes to update RR display.|
 //+------------------------------------------------------------------+
 #property copyright "Panda Engine"
-#property version   "1.10"
+#property version   "1.20"
 #property strict
 #property indicator_chart_window
-
-enum PandaPositionMode
-{
-   PANDA_MODE_MANUAL_LONG  = 0,
-   PANDA_MODE_MANUAL_SHORT = 1,
-   PANDA_MODE_ENGINE_BIAS  = 2
-};
 
 enum PandaPositionSide
 {
@@ -22,9 +15,9 @@ enum PandaPositionSide
 };
 
 input bool              InpEnabled           = true;                // Show position drawing
-input PandaPositionMode InpMode              = PANDA_MODE_MANUAL_LONG; // Long, short, or TBG bias
+input PandaPositionSide InpDefaultSide       = PANDA_LONG;          // Initial side
+input bool              InpShowButtons       = true;                // Show LONG/SHORT/OFF buttons
 input bool              InpAllowBoxResize    = true;                // Allow resizing TP/SL boxes
-input string            InpBiasFileName      = "";                  // Bias file (blank=tbg_SYMBOL.txt)
 input string            InpObjectPrefix      = "PandaPosition";     // Object prefix
 input double            InpEntryPrice        = 0.0;                 // Entry price (0 = market)
 input double            InpStopLossPrice     = 0.0;                 // Stop price (0 = pips)
@@ -45,27 +38,29 @@ string g_targetName;
 string g_riskName;
 string g_rewardName;
 string g_labelName;
+string g_longButtonName;
+string g_shortButtonName;
+string g_offButtonName;
 
 double g_entry;
 double g_stop;
 double g_target;
 PandaPositionSide g_side = PANDA_LONG;
+bool g_runtimeEnabled = true;
 bool g_hasPrices = false;
 
 //+------------------------------------------------------------------+
 int OnInit()
 {
+   g_side = InpDefaultSide;
+   g_runtimeEnabled = InpEnabled;
    SetObjectNames();
 
-   if(!InpEnabled)
+   if(InpShowButtons) DrawControlButtons();
+
+   if(!g_runtimeEnabled)
    {
       RemovePositionObjects();
-      return(INIT_SUCCEEDED);
-   }
-
-   if(!ResolveSide())
-   {
-      DrawWaitingLabel();
       return(INIT_SUCCEEDED);
    }
 
@@ -78,6 +73,7 @@ int OnInit()
 void OnDeinit(const int reason)
 {
    RemovePositionObjects();
+   RemoveControlButtons();
 }
 
 //+------------------------------------------------------------------+
@@ -94,21 +90,15 @@ int OnCalculate(const int rates_total,
 {
    SetObjectNames();
 
-   if(!InpEnabled)
+   if(InpShowButtons) DrawControlButtons();
+
+   if(!g_runtimeEnabled)
    {
       RemovePositionObjects();
       return(rates_total);
    }
 
-   PandaPositionSide previousSide = g_side;
-   if(!ResolveSide())
-   {
-      RemovePositionObjects();
-      DrawWaitingLabel();
-      return(rates_total);
-   }
-
-   if(!g_hasPrices || previousSide != g_side)
+   if(!g_hasPrices)
       InitPrices();
 
    SyncLinePrices();
@@ -123,7 +113,10 @@ void OnChartEvent(const int id,
                   const double &dparam,
                   const string &sparam)
 {
-   if(!InpEnabled) return;
+   if(id == CHARTEVENT_OBJECT_CLICK && ApplyButtonMode(sparam))
+      return;
+
+   if(!g_runtimeEnabled) return;
 
    if(id != CHARTEVENT_OBJECT_DRAG && id != CHARTEVENT_OBJECT_CHANGE) return;
 
@@ -144,6 +137,11 @@ void OnChartEvent(const int id,
 //+------------------------------------------------------------------+
 void SetObjectNames()
 {
+   string controlPrefix = InpObjectPrefix + "_" + _Symbol + "_" + IntegerToString(_Period) + "_Controls";
+   g_longButtonName  = controlPrefix + "_Long";
+   g_shortButtonName = controlPrefix + "_Short";
+   g_offButtonName   = controlPrefix + "_Off";
+
    string modeSuffix = ModeSuffix();
    g_prefix     = InpObjectPrefix + "_" + _Symbol + "_" + IntegerToString(_Period) + "_" + modeSuffix;
    g_entryName  = g_prefix + "_Entry";
@@ -157,63 +155,8 @@ void SetObjectNames()
 //+------------------------------------------------------------------+
 string ModeSuffix()
 {
-   if(InpMode == PANDA_MODE_MANUAL_LONG) return("LONG");
-   if(InpMode == PANDA_MODE_MANUAL_SHORT) return("SHORT");
-   return("BIAS");
-}
-
-//+------------------------------------------------------------------+
-bool ResolveSide()
-{
-   if(InpMode == PANDA_MODE_MANUAL_LONG)
-   {
-      g_side = PANDA_LONG;
-      return(true);
-   }
-
-   if(InpMode == PANDA_MODE_MANUAL_SHORT)
-   {
-      g_side = PANDA_SHORT;
-      return(true);
-   }
-
-   return(LoadEngineBiasSide(g_side));
-}
-
-//+------------------------------------------------------------------+
-bool LoadEngineBiasSide(PandaPositionSide &side)
-{
-   string fileName = InpBiasFileName;
-   if(fileName == "") fileName = "tbg_" + _Symbol + ".txt";
-
-   int handle = FileOpen(fileName, FILE_READ | FILE_TXT | FILE_COMMON);
-   if(handle == INVALID_HANDLE) return(false);
-
-   bool found = false;
-   while(!FileIsEnding(handle))
-   {
-      string upper = FileReadString(handle);
-      StringToUpper(upper);
-
-      if(StringFind(upper, "TBG_BIAS") >= 0)
-      {
-         if(StringFind(upper, "BUY") >= 0)
-         {
-            side = PANDA_LONG;
-            found = true;
-            break;
-         }
-         if(StringFind(upper, "SELL") >= 0)
-         {
-            side = PANDA_SHORT;
-            found = true;
-            break;
-         }
-      }
-   }
-
-   FileClose(handle);
-   return(found);
+   if(g_side == PANDA_LONG) return("LONG");
+   return("SHORT");
 }
 
 //+------------------------------------------------------------------+
@@ -311,6 +254,8 @@ void PickEntryAndSidePrice(const double price1, const double price2, double &sid
 //+------------------------------------------------------------------+
 void DrawPosition()
 {
+   if(InpShowButtons) DrawControlButtons();
+
    datetime startTime = iTime(_Symbol, _Period, 0);
    if(startTime <= 0) startTime = TimeCurrent();
 
@@ -396,8 +341,7 @@ void DrawInfoLabel()
    if(riskPips > 0.0) rr = rewardPips / riskPips;
 
    string side = (g_side == PANDA_LONG ? "LONG" : "SHORT");
-   string mode = (InpMode == PANDA_MODE_ENGINE_BIAS ? "BIAS AUTO" : "MANUAL");
-   string text = side + " " + mode +
+   string text = side +
       " | Entry " + DoubleToString(g_entry, _Digits) +
       " | SL " + DoubleToString(g_stop, _Digits) +
       " | TP " + DoubleToString(g_target, _Digits) +
@@ -406,12 +350,6 @@ void DrawInfoLabel()
       " | RR 1:" + DoubleToString(rr, 2);
 
    DrawLabel(text);
-}
-
-//+------------------------------------------------------------------+
-void DrawWaitingLabel()
-{
-   DrawLabel("Panda Position Drawer | waiting for TBG_BIAS BUY/SELL");
 }
 
 //+------------------------------------------------------------------+
@@ -441,5 +379,75 @@ void RemovePositionObjects()
    ObjectDelete(0, g_rewardName);
    ObjectDelete(0, g_labelName);
    g_hasPrices = false;
+}
+
+//+------------------------------------------------------------------+
+bool ApplyButtonMode(const string objectName)
+{
+   if(!InpShowButtons) return(false);
+   if(objectName != g_longButtonName && objectName != g_shortButtonName && objectName != g_offButtonName)
+      return(false);
+
+   ObjectSetInteger(0, objectName, OBJPROP_SELECTED, false);
+   RemovePositionObjects();
+
+   if(objectName == g_offButtonName)
+   {
+      g_runtimeEnabled = false;
+      DrawControlButtons();
+      ChartRedraw(0);
+      return(true);
+   }
+
+   g_runtimeEnabled = true;
+   g_side = (objectName == g_longButtonName ? PANDA_LONG : PANDA_SHORT);
+   SetObjectNames();
+   InitPrices();
+   DrawPosition();
+   return(true);
+}
+
+//+------------------------------------------------------------------+
+void DrawControlButtons()
+{
+   DrawButton(g_longButtonName, "LONG", 12, 48, 58, (g_runtimeEnabled && g_side == PANDA_LONG), InpTargetColor);
+   DrawButton(g_shortButtonName, "SHORT", 74, 48, 62, (g_runtimeEnabled && g_side == PANDA_SHORT), InpStopColor);
+   DrawButton(g_offButtonName, "OFF", 140, 48, 50, !g_runtimeEnabled, clrDimGray);
+}
+
+//+------------------------------------------------------------------+
+void DrawButton(const string name,
+                const string text,
+                const int x,
+                const int y,
+                const int width,
+                const bool active,
+                const color activeColor)
+{
+   if(ObjectFind(0, name) < 0)
+   {
+      ObjectCreate(0, name, OBJ_BUTTON, 0, 0, 0);
+      ObjectSetInteger(0, name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+      ObjectSetInteger(0, name, OBJPROP_YSIZE, 22);
+      ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+   }
+
+   ObjectSetInteger(0, name, OBJPROP_XDISTANCE, x);
+   ObjectSetInteger(0, name, OBJPROP_YDISTANCE, y);
+   ObjectSetInteger(0, name, OBJPROP_XSIZE, width);
+   ObjectSetString(0, name, OBJPROP_TEXT, text);
+   ObjectSetString(0, name, OBJPROP_FONT, "Arial");
+   ObjectSetInteger(0, name, OBJPROP_FONTSIZE, 8);
+   ObjectSetInteger(0, name, OBJPROP_COLOR, clrWhite);
+   ObjectSetInteger(0, name, OBJPROP_BGCOLOR, active ? activeColor : clrBlack);
+   ObjectSetInteger(0, name, OBJPROP_BORDER_COLOR, active ? activeColor : clrDimGray);
+}
+
+//+------------------------------------------------------------------+
+void RemoveControlButtons()
+{
+   ObjectDelete(0, g_longButtonName);
+   ObjectDelete(0, g_shortButtonName);
+   ObjectDelete(0, g_offButtonName);
 }
 //+------------------------------------------------------------------+
