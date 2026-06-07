@@ -36,12 +36,21 @@ class PositionDrawerSourceTest(unittest.TestCase):
         source = read_source()
 
         self.assertIn("input bool              InpShowButtons", source)
-        self.assertIn("DrawControlButtons", source)
+        self.assertIn("DrawFloatingPanel", source)
         self.assertIn("CHARTEVENT_OBJECT_CLICK", source)
         self.assertIn("g_longButtonName", source)
         self.assertIn("g_shortButtonName", source)
         self.assertIn("g_offButtonName", source)
         self.assertIn("ApplyButtonMode", source)
+
+    def test_position_drawer_has_visible_draggable_lines_and_tags(self):
+        source = read_source()
+
+        self.assertIn("g_panelName", source)
+        self.assertIn("g_entryTagName", source)
+        self.assertIn("DrawPriceTag", source)
+        self.assertIn("OBJPROP_SELECTED, true", source)
+        self.assertIn("DrawLine(g_entryName, g_entry, InpEntryColor, STYLE_SOLID, 3", source)
 
 
 if __name__ == "__main__":

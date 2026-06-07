@@ -4,7 +4,7 @@
 //|   Drag Entry, Stop, Target, or resize boxes to update RR display.|
 //+------------------------------------------------------------------+
 #property copyright "Panda Engine"
-#property version   "1.20"
+#property version   "1.30"
 #property strict
 #property indicator_chart_window
 
@@ -26,6 +26,8 @@ input double            InpStopLossPips      = 50.0;                // Default s
 input double            InpRiskReward        = 2.0;                 // Target RR when TP price is 0
 input int               InpExtendBars        = 80;                  // Box width in bars
 input bool              InpShowInfoLabel     = true;                // Show RR/pips label
+input int               InpPanelX            = 12;                  // Panel X position
+input int               InpPanelY            = 80;                  // Panel Y position
 input color             InpEntryColor        = clrDodgerBlue;       // Entry line color
 input color             InpStopColor         = clrTomato;           // Stop/risk color
 input color             InpTargetColor       = clrLimeGreen;        // Target/reward color
@@ -41,6 +43,11 @@ string g_labelName;
 string g_longButtonName;
 string g_shortButtonName;
 string g_offButtonName;
+string g_panelName;
+string g_panelTitleName;
+string g_entryTagName;
+string g_stopTagName;
+string g_targetTagName;
 
 double g_entry;
 double g_stop;
@@ -56,7 +63,7 @@ int OnInit()
    g_runtimeEnabled = InpEnabled;
    SetObjectNames();
 
-   if(InpShowButtons) DrawControlButtons();
+   if(InpShowButtons) DrawFloatingPanel();
 
    if(!g_runtimeEnabled)
    {
@@ -90,7 +97,7 @@ int OnCalculate(const int rates_total,
 {
    SetObjectNames();
 
-   if(InpShowButtons) DrawControlButtons();
+   if(InpShowButtons) DrawFloatingPanel();
 
    if(!g_runtimeEnabled)
    {
@@ -141,6 +148,8 @@ void SetObjectNames()
    g_longButtonName  = controlPrefix + "_Long";
    g_shortButtonName = controlPrefix + "_Short";
    g_offButtonName   = controlPrefix + "_Off";
+   g_panelName       = controlPrefix + "_Panel";
+   g_panelTitleName  = controlPrefix + "_Title";
 
    string modeSuffix = ModeSuffix();
    g_prefix     = InpObjectPrefix + "_" + _Symbol + "_" + IntegerToString(_Period) + "_" + modeSuffix;
@@ -150,6 +159,9 @@ void SetObjectNames()
    g_riskName   = g_prefix + "_RiskBox";
    g_rewardName = g_prefix + "_RewardBox";
    g_labelName  = g_prefix + "_Info";
+   g_entryTagName  = g_prefix + "_EntryTag";
+   g_stopTagName   = g_prefix + "_StopTag";
+   g_targetTagName = g_prefix + "_TargetTag";
 }
 
 //+------------------------------------------------------------------+
@@ -254,19 +266,22 @@ void PickEntryAndSidePrice(const double price1, const double price2, double &sid
 //+------------------------------------------------------------------+
 void DrawPosition()
 {
-   if(InpShowButtons) DrawControlButtons();
+   if(InpShowButtons) DrawFloatingPanel();
 
    datetime startTime = iTime(_Symbol, _Period, 0);
    if(startTime <= 0) startTime = TimeCurrent();
 
    datetime endTime = startTime + PeriodSecondsSafe() * MathMax(InpExtendBars, 5);
 
-   DrawLine(g_entryName, g_entry, InpEntryColor, STYLE_SOLID, 2, "ENTRY");
-   DrawLine(g_stopName, g_stop, InpStopColor, STYLE_SOLID, 2, "STOP");
-   DrawLine(g_targetName, g_target, InpTargetColor, STYLE_SOLID, 2, "TARGET");
-
    DrawBox(g_riskName, startTime, g_entry, endTime, g_stop, InpStopColor);
    DrawBox(g_rewardName, startTime, g_entry, endTime, g_target, InpTargetColor);
+
+   DrawLine(g_entryName, g_entry, InpEntryColor, STYLE_SOLID, 3, "ENTRY");
+   DrawLine(g_stopName, g_stop, InpStopColor, STYLE_SOLID, 3, "SL");
+   DrawLine(g_targetName, g_target, InpTargetColor, STYLE_SOLID, 3, "TP");
+   DrawPriceTag(g_entryTagName, "ENTRY", g_entry, InpEntryColor);
+   DrawPriceTag(g_stopTagName, "SL", g_stop, InpStopColor);
+   DrawPriceTag(g_targetTagName, "TP", g_target, InpTargetColor);
 
    if(InpShowInfoLabel)
       DrawInfoLabel();
@@ -296,14 +311,37 @@ void DrawLine(const string name,
    {
       ObjectCreate(0, name, OBJ_HLINE, 0, 0, price);
       ObjectSetInteger(0, name, OBJPROP_SELECTABLE, true);
-      ObjectSetInteger(0, name, OBJPROP_SELECTED, false);
+      ObjectSetInteger(0, name, OBJPROP_SELECTED, true);
    }
 
    ObjectSetDouble(0, name, OBJPROP_PRICE1, price);
    ObjectSetInteger(0, name, OBJPROP_COLOR, lineColor);
    ObjectSetInteger(0, name, OBJPROP_STYLE, lineStyle);
    ObjectSetInteger(0, name, OBJPROP_WIDTH, lineWidth);
+   ObjectSetInteger(0, name, OBJPROP_BACK, false);
+   ObjectSetInteger(0, name, OBJPROP_SELECTABLE, true);
    ObjectSetString(0, name, OBJPROP_TEXT, description + " " + DoubleToString(price, _Digits));
+}
+
+//+------------------------------------------------------------------+
+void DrawPriceTag(const string name,
+                  const string label,
+                  const double price,
+                  const color tagColor)
+{
+   datetime tagTime = iTime(_Symbol, _Period, 0) + PeriodSecondsSafe() * 4;
+   if(ObjectFind(0, name) < 0)
+   {
+      ObjectCreate(0, name, OBJ_TEXT, 0, tagTime, price);
+      ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+   }
+
+   ObjectSetInteger(0, name, OBJPROP_TIME1, tagTime);
+   ObjectSetDouble(0, name, OBJPROP_PRICE1, price);
+   ObjectSetString(0, name, OBJPROP_TEXT, label + "  " + DoubleToString(price, _Digits));
+   ObjectSetString(0, name, OBJPROP_FONT, "Arial Bold");
+   ObjectSetInteger(0, name, OBJPROP_FONTSIZE, 9);
+   ObjectSetInteger(0, name, OBJPROP_COLOR, tagColor);
 }
 
 //+------------------------------------------------------------------+
@@ -378,6 +416,9 @@ void RemovePositionObjects()
    ObjectDelete(0, g_riskName);
    ObjectDelete(0, g_rewardName);
    ObjectDelete(0, g_labelName);
+   ObjectDelete(0, g_entryTagName);
+   ObjectDelete(0, g_stopTagName);
+   ObjectDelete(0, g_targetTagName);
    g_hasPrices = false;
 }
 
@@ -394,7 +435,7 @@ bool ApplyButtonMode(const string objectName)
    if(objectName == g_offButtonName)
    {
       g_runtimeEnabled = false;
-      DrawControlButtons();
+      DrawFloatingPanel();
       ChartRedraw(0);
       return(true);
    }
@@ -408,11 +449,49 @@ bool ApplyButtonMode(const string objectName)
 }
 
 //+------------------------------------------------------------------+
-void DrawControlButtons()
+void DrawFloatingPanel()
 {
-   DrawButton(g_longButtonName, "LONG", 12, 48, 58, (g_runtimeEnabled && g_side == PANDA_LONG), InpTargetColor);
-   DrawButton(g_shortButtonName, "SHORT", 74, 48, 62, (g_runtimeEnabled && g_side == PANDA_SHORT), InpStopColor);
-   DrawButton(g_offButtonName, "OFF", 140, 48, 50, !g_runtimeEnabled, clrDimGray);
+   DrawPanelBox();
+   DrawPanelTitle();
+   DrawButton(g_longButtonName, "LONG", InpPanelX + 10, InpPanelY + 30, 64, (g_runtimeEnabled && g_side == PANDA_LONG), InpTargetColor);
+   DrawButton(g_shortButtonName, "SHORT", InpPanelX + 80, InpPanelY + 30, 66, (g_runtimeEnabled && g_side == PANDA_SHORT), InpStopColor);
+   DrawButton(g_offButtonName, "OFF", InpPanelX + 152, InpPanelY + 30, 48, !g_runtimeEnabled, clrDimGray);
+}
+
+//+------------------------------------------------------------------+
+void DrawPanelBox()
+{
+   if(ObjectFind(0, g_panelName) < 0)
+   {
+      ObjectCreate(0, g_panelName, OBJ_RECTANGLE_LABEL, 0, 0, 0);
+      ObjectSetInteger(0, g_panelName, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+      ObjectSetInteger(0, g_panelName, OBJPROP_SELECTABLE, false);
+   }
+
+   ObjectSetInteger(0, g_panelName, OBJPROP_XDISTANCE, InpPanelX);
+   ObjectSetInteger(0, g_panelName, OBJPROP_YDISTANCE, InpPanelY);
+   ObjectSetInteger(0, g_panelName, OBJPROP_XSIZE, 212);
+   ObjectSetInteger(0, g_panelName, OBJPROP_YSIZE, 68);
+   ObjectSetInteger(0, g_panelName, OBJPROP_BGCOLOR, clrBlack);
+   ObjectSetInteger(0, g_panelName, OBJPROP_BORDER_COLOR, clrDimGray);
+}
+
+//+------------------------------------------------------------------+
+void DrawPanelTitle()
+{
+   if(ObjectFind(0, g_panelTitleName) < 0)
+   {
+      ObjectCreate(0, g_panelTitleName, OBJ_LABEL, 0, 0, 0);
+      ObjectSetInteger(0, g_panelTitleName, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+      ObjectSetInteger(0, g_panelTitleName, OBJPROP_SELECTABLE, false);
+   }
+
+   ObjectSetInteger(0, g_panelTitleName, OBJPROP_XDISTANCE, InpPanelX + 10);
+   ObjectSetInteger(0, g_panelTitleName, OBJPROP_YDISTANCE, InpPanelY + 8);
+   ObjectSetString(0, g_panelTitleName, OBJPROP_TEXT, "PANDA POSITION");
+   ObjectSetString(0, g_panelTitleName, OBJPROP_FONT, "Arial Bold");
+   ObjectSetInteger(0, g_panelTitleName, OBJPROP_FONTSIZE, 9);
+   ObjectSetInteger(0, g_panelTitleName, OBJPROP_COLOR, clrWhite);
 }
 
 //+------------------------------------------------------------------+
@@ -449,5 +528,7 @@ void RemoveControlButtons()
    ObjectDelete(0, g_longButtonName);
    ObjectDelete(0, g_shortButtonName);
    ObjectDelete(0, g_offButtonName);
+   ObjectDelete(0, g_panelName);
+   ObjectDelete(0, g_panelTitleName);
 }
 //+------------------------------------------------------------------+
