@@ -54,6 +54,8 @@ def _install_import_fakes():
     image = types.ModuleType("PIL.Image")
     image_draw = types.ModuleType("PIL.ImageDraw")
     image_font = types.ModuleType("PIL.ImageFont")
+    image_font.truetype = lambda font_path, size: ("truetype", font_path, size)
+    image_font.load_default = lambda: ("default",)
     pil.Image = image
     pil.ImageDraw = image_draw
     pil.ImageFont = image_font
@@ -118,6 +120,16 @@ class SnapshotLayoutTests(unittest.TestCase):
             "Watch: 3 | Idle: 10",
         )
         self.assertTrue(caption.isascii())
+
+    def test_snapshot_font_loader_uses_existing_scalable_font_file(self):
+        app = _load_app()
+
+        font = app._load_snapshot_font("arialbd.ttf", 72)
+
+        self.assertEqual(font[0], "truetype")
+        self.assertTrue(Path(font[1]).is_absolute())
+        self.assertTrue(Path(font[1]).exists())
+        self.assertEqual(font[2], 72)
 
 
 class MarketHoursTests(unittest.TestCase):

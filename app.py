@@ -1511,6 +1511,19 @@ def _compute_confidence(r):
     else: tier = "WEAK"
     return score, tier
 
+def _load_snapshot_font(font_name, size):
+    candidates = [
+        font_name,
+        os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts", font_name),
+    ]
+    for candidate in candidates:
+        if os.path.isabs(candidate) and os.path.exists(candidate):
+            return ImageFont.truetype(candidate, size)
+    try:
+        return ImageFont.truetype(font_name, size)
+    except Exception:
+        return ImageFont.load_default()
+
 def build_snapshot_layout(pair_count):
     """
     Telegram previews tall portrait images as narrow thumbnails. Keep 21 pairs in
@@ -1589,17 +1602,13 @@ def generate_snapshot(pair_data):
     draw = ImageDraw.Draw(img)
 
     # ---- Fonts sized for improved readability on small previews ----
-    try:
-        font_title = ImageFont.truetype("arialbd.ttf", 72)
-        font_pair  = ImageFont.truetype("arialbd.ttf", 72)
-        font_bias  = ImageFont.truetype("arialbd.ttf", 96)
-        font_data  = ImageFont.truetype("arial.ttf",   56)
-        font_bold  = ImageFont.truetype("arialbd.ttf", 72)
-        font_hdr   = ImageFont.truetype("arialbd.ttf", 52)
-        font_sm    = ImageFont.truetype("arial.ttf",   44)
-    except Exception:
-        # Fallback to default font if truetype not available — default is small but at least functional
-        font_title = font_pair = font_bias = font_data = font_bold = font_hdr = font_sm = ImageFont.load_default()
+    font_title = _load_snapshot_font("arialbd.ttf", 72)
+    font_pair  = _load_snapshot_font("arialbd.ttf", 72)
+    font_bias  = _load_snapshot_font("arialbd.ttf", 96)
+    font_data  = _load_snapshot_font("arial.ttf",   56)
+    font_bold  = _load_snapshot_font("arialbd.ttf", 72)
+    font_hdr   = _load_snapshot_font("arialbd.ttf", 52)
+    font_sm    = _load_snapshot_font("arial.ttf",   44)
 
     # ---- Header ----
     draw.rectangle([0, 0, width, HEADER_H], fill=BG_CARD)
