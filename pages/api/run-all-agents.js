@@ -1,51 +1,54 @@
-// Run All Agents — orchestrates Signal, Journal, and Pattern agents in parallel
+// Run All Agents — calls Signal, Journal, and Pattern agent handlers directly (no HTTP round-trip)
+import signalHandler from './signal-agent';
+import journalHandler from './journal-agent';
+import patternHandler from './pattern-agent';
+
+// Vercel Pro: allow up to 60s for all 3 agents
+export const config = { maxDuration: 60 };
+
+function mockReqRes(method) {
+  const req = { method, headers: {}, body: {} };
+  let _status = 200;
+  let _body = null;
+  const res = {
+    status(code) { _status = code; return res; },
+    json(data) { _body = data; return res; },
+    getResult() { return { status: _status, body: _body }; },
+  };
+  return { req, res };
+}
+
+async function runAgent(name, handlerFn) {
+  const start = Date.now();
+  try {
+    const { req, res } = mockReqRes('POST');
+    await handlerFn(req, res);
+    const { status, body } = res.getResult();
+    const duration_ms = Date.now() - start;
+    if (status >= 400) {
+      return { agent: name, status: 'error', error: body?.error || `Status ${status}`, duration_ms };
+    }
+    return { agent: name, status: 'success', duration_ms, ...body };
+  } catch (err) {
+    return { agent: name, status: 'error', error: err.message, duration_ms: Date.now() - start };
+  }
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const baseUrl = process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : process.env.NEXTAUTH_URL || `http://localhost:${process.env.PORT || 3000}`;
-
-  const agents = [
-    { name: 'Signal Agent', endpoint: '/api/signal-agent' },
-    { name: 'Journal Agent', endpoint: '/api/journal-agent' },
-    { name: 'Pattern Agent', endpoint: '/api/pattern-agent' },
-  ];
-
   const totalStart = Date.now();
 
-  const results = await Promise.allSettled(
-    agents.map(async (agent) => {
-      const start = Date.now();
-      try {
-        const r = await fetch(`${baseUrl}${agent.endpoint}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(req.headers.cookie ? { cookie: req.headers.cookie } : {}),
-          },
-        });
-        const data = await r.json();
-        const duration_ms = Date.now() - start;
-        if (!r.ok) {
-          return { agent: agent.name, status: 'error', error: data.error || `HTTP ${r.status}`, duration_ms };
-        }
-        return { agent: agent.name, status: 'success', duration_ms, ...data };
-      } catch (err) {
-        return { agent: agent.name, status: 'error', error: err.message, duration_ms: Date.now() - start };
-      }
-    })
-  );
-
-  const agentResults = results.map((r) =>
-    r.status === 'fulfilled' ? r.value : { agent: 'Unknown', status: 'error', error: r.reason?.message || 'Promise rejected', duration_ms: 0 }
-  );
+  const agents = await Promise.all([
+    runAgent('Signal Agent', signalHandler),
+    runAgent('Journal Agent', journalHandler),
+    runAgent('Pattern Agent', patternHandler),
+  ]);
 
   return res.status(200).json({
-    agents: agentResults,
+    agents,
     total_duration_ms: Date.now() - totalStart,
     ran_at: new Date().toISOString(),
   });
