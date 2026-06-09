@@ -248,7 +248,8 @@ def parse_mt4_file(symbol):
                 print(f"[LOCK] {symbol}: attempt {attempt+1}/{max_retries}, retry in {wait:.1f}s")
                 time.sleep(wait)
             else:
-                print(f"[READ ERROR] {symbol}: file locked after {max_retries} retries ({9.3:.1f}s total)")
+                total_wait = sum(0.3 * (2 ** i) for i in range(max_retries - 1))
+                print(f"[READ ERROR] {symbol}: file locked after {max_retries} retries ({total_wait:.1f}s total)")
                 return None
         except Exception as e:
             print(f"[READ ERROR] {symbol}: {e}")
@@ -934,6 +935,7 @@ def evaluate_pending_signals(all_scores, all_pl_map):
 # ================= CORE ENGINE =================
 def run_gap_once():
     global PREV_MOMENTUM, PREV_GAP, PREV_GAP_INITIALIZED
+    _cycle_start = time.time()
 
     # Market hours check - skip when forex market is closed.
     _now = datetime.now(timezone.utc)
@@ -1348,7 +1350,9 @@ def run_gap_once():
                 snap["timestamp"] = snap_ts
                 snap["is_valid"] = is_valid
                 snap["gap_delta"] = gap_deltas.get(row.get("symbol", ""), 0)
-                snap.pop("updated_at", None)
+                # Remove fields that don't exist in signal_snapshots table
+                for _drop in ("updated_at", "pdh", "pdl", "pwh", "pwl", "pmh", "pml", "pyh", "pyl"):
+                    snap.pop(_drop, None)
                 snapshot_rows.append(snap)
             supabase_retry(
                 lambda: supabase.table("signal_snapshots").insert(snapshot_rows).execute(),
@@ -1445,7 +1449,7 @@ def run_gap_once():
                 "pairs_processed": len(dashboard_payload),
                 "signals_pushed": len([r for r in dashboard_payload if abs(r.get("gap", 0)) >= 5]),
                 "errors": None,
-                "duration_sec": 0,
+                "duration_sec": round(time.time() - _cycle_start, 2),
             }).execute(),
             label="Heartbeat"
         )
@@ -2018,6 +2022,11 @@ def hourly_snapshot_due(now, last_hour_mark):
         return False, last_hour_mark
     return True, hour_mark
 
+async def run_scheduler_step(label, *steps):
+    """Run blocking engine work outside FastAPI's event loop."""
+    for step in steps:
+        await asyncio.to_thread(step)
+
 # ---- NEWS ALERT ----
 def fetch_news_feed():
     """Fetch ForexFactory JSON feed with 30-min in-memory cache."""
@@ -2266,8 +2275,7 @@ async def master_scheduler():
                     async with ENGINE_LOCK:
                         try:
                             print(f"\n{'='*50}\n[5MIN] Firing at {now.strftime('%H:%M:%S')}")
-                            run_gap_once()
-                            check_news_alerts()
+                            await run_scheduler_step("5min", run_gap_once, check_news_alerts)
                         except Exception as e:
                             print("[ENGINE ERROR - 15min]:", e)
                     LAST_QUARTER_MARK = quarter_mark
@@ -2277,16 +2285,14 @@ async def master_scheduler():
                 async with ENGINE_LOCK:
                     try:
                         print(f"\n{'='*50}\n[HOURLY] Firing at {now.strftime('%H:%M:%S')}")
-                        run_gap_once()
+                        await run_scheduler_step("hourly-gap", run_gap_once)
                         # Auto-reset circuit breaker before hourly snapshot
                         # — ensures snapshot always attempts, even after transient failures
                         if not telegram_circuit.allow():
                             print("[HOURLY] Circuit breaker was locked — auto-resetting for snapshot")
                             telegram_circuit.failures = 0
                             telegram_circuit.locked_until = 0
-                        send_snapshot()
-                        send_ai_snapshot()
-                        daily_cleanup()
+                        await run_scheduler_step("hourly-alerts", send_snapshot, send_ai_snapshot, daily_cleanup)
                     except Exception as e:
                         print("[ENGINE ERROR - hourly]:", e)
                 LAST_HOUR_MARK = hour_mark
@@ -2422,8 +2428,13 @@ def force_gap_only():
 @app.get("/status")
 def get_status():
     try:
-        res         = supabase.table("engine_logs").select("*").order("timestamp", desc=True).limit(1).execute()
-        last_run    = res.data[0]["timestamp"] if res.data else "Never"
+        hb          = supabase.table("engine_heartbeat").select("created_at").order("created_at", desc=True).limit(1).execute()
+        res         = supabase.table("engine_logs").select("timestamp").order("timestamp", desc=True).limit(1).execute()
+        last_run    = (
+            hb.data[0]["created_at"] if hb.data
+            else res.data[0]["timestamp"] if res.data
+            else "Never"
+        )
         dash        = supabase.table("dashboard").select("symbol,gap,momentum,hard_invalid,execution,updated_at").execute()
         all_pairs   = dash.data or []
         valid       = [r for r in all_pairs if abs(r.get("gap") or 0) >= 5 and not r.get("hard_invalid")]

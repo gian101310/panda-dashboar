@@ -1,4 +1,5 @@
 import importlib.util
+import asyncio
 import os
 import sys
 import types
@@ -173,6 +174,29 @@ class SchedulerTimingTests(unittest.TestCase):
         self.assertTrue(due)
         self.assertFalse(duplicate_due)
         self.assertEqual(duplicate_mark, mark)
+
+    def test_scheduler_steps_run_in_worker_thread(self):
+        app = _load_app()
+        calls = []
+
+        async def fake_to_thread(fn):
+            calls.append(fn.__name__)
+            return fn()
+
+        def first_step():
+            calls.append("first_ran")
+
+        def second_step():
+            calls.append("second_ran")
+
+        original_to_thread = app.asyncio.to_thread
+        app.asyncio.to_thread = fake_to_thread
+        try:
+            asyncio.run(app.run_scheduler_step("test", first_step, second_step))
+        finally:
+            app.asyncio.to_thread = original_to_thread
+
+        self.assertEqual(calls, ["first_step", "first_ran", "second_step", "second_ran"])
 
 
 if __name__ == "__main__":
