@@ -152,5 +152,28 @@ class MarketHoursTests(unittest.TestCase):
         self.assertFalse(app.is_market_closed(monday_dubai_open))
 
 
+class SchedulerTimingTests(unittest.TestCase):
+    def test_hourly_snapshot_still_runs_when_scheduler_wakes_after_first_10_seconds(self):
+        app = _load_app()
+        delayed_tick = datetime(2026, 6, 9, 2, 1, 12)
+
+        due, mark = app.hourly_snapshot_due(delayed_tick, last_hour_mark=None)
+
+        self.assertTrue(due)
+        self.assertEqual(mark, datetime(2026, 6, 9, 2, 0, 0))
+
+    def test_hourly_snapshot_runs_once_per_hour_after_delayed_tick(self):
+        app = _load_app()
+        first_tick = datetime(2026, 6, 9, 2, 3, 45)
+        duplicate_tick = datetime(2026, 6, 9, 2, 59, 5)
+
+        due, mark = app.hourly_snapshot_due(first_tick, last_hour_mark=None)
+        duplicate_due, duplicate_mark = app.hourly_snapshot_due(duplicate_tick, mark)
+
+        self.assertTrue(due)
+        self.assertFalse(duplicate_due)
+        self.assertEqual(duplicate_mark, mark)
+
+
 if __name__ == "__main__":
     unittest.main()

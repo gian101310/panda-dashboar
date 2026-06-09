@@ -2005,6 +2005,19 @@ async def login_alert(data: dict):
 # ================= SCHEDULER =================
 ENGINE_LOCK = asyncio.Lock()
 
+def hourly_snapshot_due(now, last_hour_mark):
+    """
+    Return whether the hourly Telegram snapshot should run.
+    The scheduler can be busy during the first seconds after :01, especially
+    in the 2-4 AM Dubai INTRA window, so allow any late tick in the hour.
+    """
+    if now.minute < 1:
+        return False, last_hour_mark
+    hour_mark = now.replace(minute=0, second=0, microsecond=0)
+    if last_hour_mark == hour_mark:
+        return False, last_hour_mark
+    return True, hour_mark
+
 # ---- NEWS ALERT ----
 def fetch_news_feed():
     """Fetch ForexFactory JSON feed with 30-min in-memory cache."""
@@ -2259,25 +2272,24 @@ async def master_scheduler():
                             print("[ENGINE ERROR - 15min]:", e)
                     LAST_QUARTER_MARK = quarter_mark
 
-            if now.minute == 1 and now.second < 10:
-                hour_mark = now.replace(second=0, microsecond=0)
-                if LAST_HOUR_MARK != hour_mark:
-                    async with ENGINE_LOCK:
-                        try:
-                            print(f"\n{'='*50}\n[HOURLY] Firing at {now.strftime('%H:%M:%S')}")
-                            run_gap_once()
-                            # Auto-reset circuit breaker before hourly snapshot
-                            # — ensures snapshot always attempts, even after transient failures
-                            if not telegram_circuit.allow():
-                                print("[HOURLY] Circuit breaker was locked — auto-resetting for snapshot")
-                                telegram_circuit.failures = 0
-                                telegram_circuit.locked_until = 0
-                            send_snapshot()
-                            send_ai_snapshot()
-                            daily_cleanup()
-                        except Exception as e:
-                            print("[ENGINE ERROR - hourly]:", e)
-                    LAST_HOUR_MARK = hour_mark
+            hourly_due, hour_mark = hourly_snapshot_due(now, LAST_HOUR_MARK)
+            if hourly_due:
+                async with ENGINE_LOCK:
+                    try:
+                        print(f"\n{'='*50}\n[HOURLY] Firing at {now.strftime('%H:%M:%S')}")
+                        run_gap_once()
+                        # Auto-reset circuit breaker before hourly snapshot
+                        # — ensures snapshot always attempts, even after transient failures
+                        if not telegram_circuit.allow():
+                            print("[HOURLY] Circuit breaker was locked — auto-resetting for snapshot")
+                            telegram_circuit.failures = 0
+                            telegram_circuit.locked_until = 0
+                        send_snapshot()
+                        send_ai_snapshot()
+                        daily_cleanup()
+                    except Exception as e:
+                        print("[ENGINE ERROR - hourly]:", e)
+                LAST_HOUR_MARK = hour_mark
 
         except Exception as e:
             print("[SCHEDULER ERROR]:", e)
