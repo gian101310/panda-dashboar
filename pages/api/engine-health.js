@@ -1,5 +1,6 @@
 import { supabase } from '../../lib/supabase';
 import { requireAdmin } from '../../lib/auth';
+import { computeRunHealth } from '../../lib/engineHealth.mjs';
 
 export default async function handler(req, res) {
   // Admin only
@@ -14,13 +15,8 @@ export default async function handler(req, res) {
       .order('timestamp', { ascending: false })
       .limit(5);
 
-    const lastRun = logs?.[0]?.timestamp || null;
-
-    // Check freshness
+    const logLastRun = logs?.[0]?.timestamp || null;
     const now = new Date();
-    const lastRunDate = lastRun ? new Date(lastRun) : null;
-    const minutesAgo = lastRunDate ? Math.max(0, Math.floor((now - lastRunDate) / 60000)) : 999;
-    const isAlive = minutesAgo <= 20;
 
     // Get dashboard stats
     const { data: dashboard } = await supabase
@@ -39,7 +35,7 @@ export default async function handler(req, res) {
     const errors = (logs || []).filter(l => l.error).map(l => l.error);
 
     // Heartbeat from engine_heartbeat table (new — more reliable than engine_logs)
-    let heartbeat = null;
+    let heartbeatRow = null;
     try {
       const { data: hb } = await supabase
         .from('engine_heartbeat')
@@ -47,18 +43,15 @@ export default async function handler(req, res) {
         .order('created_at', { ascending: false })
         .limit(1);
       if (hb && hb.length > 0) {
-        const last = hb[0];
-        const hbAge = Math.max(0, Math.floor((now - new Date(last.created_at)) / 60000));
-        heartbeat = {
-          last_beat: last.created_at,
-          age_minutes: hbAge,
-          pairs_processed: last.pairs_processed,
-          signals_pushed: last.signals_pushed,
-          cycle_errors: last.errors,
-          status: hbAge <= 10 ? 'HEALTHY' : hbAge <= 20 ? 'WARNING' : 'CRITICAL',
-        };
+        heartbeatRow = hb[0];
       }
     } catch (_) { /* heartbeat table may not exist yet */ }
+
+    const { lastRun, minutesAgo, isAlive, heartbeat } = computeRunHealth({
+      now,
+      logLastRun,
+      heartbeatRow,
+    });
 
     return res.status(200).json({
       isAlive,
