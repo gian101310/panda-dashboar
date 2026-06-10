@@ -2519,6 +2519,58 @@ function OvAIPanel() {
   </div>;
 }
 
+function ovNewsCountdown(eventAtUtc, fallbackMins) {
+  const target = eventAtUtc ? new Date(eventAtUtc).getTime() : NaN;
+  const mins = Number.isFinite(target) ? Math.round((target - Date.now()) / 60000) : Number(fallbackMins || 0);
+  if (mins <= 0) return { mins, label: 'NOW' };
+  if (mins < 60) return { mins, label: `${mins}m` };
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return { mins, label: m ? `${h}h ${m}m` : `${h}h` };
+}
+
+function OvNewsBanner({ upcomingNews, isMobile }) {
+  const events = upcomingNews?.events || [];
+  if (!events.length) return null;
+  const next = events[0];
+  const nextCount = ovNewsCountdown(next.event_at_utc, next.mins_away);
+  const watchPairs = next.affected_pairs || upcomingNews?.affected_pairs || [];
+  const urgent = nextCount.mins <= 15;
+  const soon = nextCount.mins <= 60;
+  const color = urgent ? OV_COLORS.sell : soon ? OV_COLORS.warn : OV_COLORS.accent;
+
+  return <div style={{...ovGlass,padding:isMobile?'14px 14px':'16px 18px',border:`1px solid ${color}55`,background:urgent?'rgba(255,77,109,0.08)':soon?'rgba(255,209,102,0.07)':'rgba(0,180,255,0.06)',animation:'fadeSlideUp 0.4s ease 80ms both'}}>
+    <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'minmax(0,1fr) auto',gap:14,alignItems:'center'}}>
+      <div style={{display:'flex',flexDirection:'column',gap:8,minWidth:0}}>
+        <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+          <AlertTriangle size={15} color={color}/>
+          <span style={{fontFamily:mono,fontSize:9,color,letterSpacing:2,fontWeight:900}}>HIGH IMPACT NEWS</span>
+          <span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted,letterSpacing:1}}>NEXT: {next.event_at_dubai || next.time || 'TIME TBA'} DUBAI</span>
+        </div>
+        <div style={{fontFamily:orb,fontSize:isMobile?15:18,fontWeight:900,color:OV_COLORS.textPrimary,letterSpacing:1,whiteSpace:'normal',overflowWrap:'anywhere'}}>
+          {next.currency} - {next.title || 'High impact event'}
+        </div>
+        <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+          {watchPairs.slice(0,8).map(pair=><span key={pair} style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textSecondary,background:'rgba(255,255,255,0.04)',border:`1px solid ${color}35`,borderRadius:4,padding:'3px 7px'}}>{pair}</span>)}
+          {watchPairs.length>8&&<span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted}}>+{watchPairs.length-8} more</span>}
+        </div>
+      </div>
+      <div style={{display:'flex',flexDirection:isMobile?'row':'column',alignItems:isMobile?'center':'flex-end',justifyContent:'space-between',gap:8}}>
+        <div style={{fontFamily:orb,fontSize:isMobile?24:30,fontWeight:900,color,textShadow:`0 0 18px ${color}55`,lineHeight:1}}>{nextCount.label}</div>
+        <div style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted,letterSpacing:1,textAlign:isMobile?'left':'right'}}>WATCH PAIRS TODAY</div>
+      </div>
+    </div>
+    {events.length>1&&<div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:12,paddingTop:10,borderTop:`1px solid ${OV_COLORS.border}`}}>
+      {events.slice(1,4).map((ev,i)=>{
+        const c=ovNewsCountdown(ev.event_at_utc, ev.mins_away);
+        return <span key={`${ev.currency}-${ev.title}-${i}`} style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted,background:'rgba(255,255,255,0.025)',border:`1px solid ${OV_COLORS.border}`,borderRadius:4,padding:'4px 7px'}}>
+          {ev.currency} {c.label} - {ev.title}
+        </span>;
+      })}
+    </div>}
+  </div>;
+}
+
 function OvNewsPanel({ upcomingNews }) {
   const events = upcomingNews?.events || [];
   if(events.length===0) return null;
@@ -2529,7 +2581,7 @@ function OvNewsPanel({ upcomingNews }) {
       <span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted}}>({events.length})</span>
     </div>
     {events.slice(0,4).map((ev,i)=>{
-      const mins=ev.minutes_until||0;const urgent=mins<30;const critical=mins<10;
+      const count=ovNewsCountdown(ev.event_at_utc, ev.mins_away);const mins=count.mins;const urgent=mins<30;const critical=mins<10;
       const c=critical?OV_COLORS.sell:urgent?OV_COLORS.warn:OV_COLORS.textSecondary;
       return <div key={i} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 10px',borderRadius:6,marginBottom:4,
         background:critical?'rgba(255,77,109,0.08)':urgent?'rgba(255,209,102,0.06)':'rgba(255,255,255,0.02)',
@@ -2539,7 +2591,7 @@ function OvNewsPanel({ upcomingNews }) {
           {ev.affected_pairs&&<span style={{fontFamily:mono,fontSize:7,color:OV_COLORS.textMuted}}>Affects: {ev.affected_pairs.join(', ')}</span>}
         </div>
         <div style={{fontFamily:orb,fontSize:13,fontWeight:700,color:c,padding:'4px 10px',borderRadius:4,background:`${c}15`,
-          animation:critical?'pulse 1s ease-in-out infinite':'none'}}>{mins}m</div>
+          animation:critical?'pulse 1s ease-in-out infinite':'none'}}>{count.label}</div>
       </div>;
     })}
   </div>;
@@ -2659,6 +2711,8 @@ function OverviewTab({ data, trends, pdrData, upcomingNews, spikes, confidenceMa
       </div>
 
       {/* ROW 2 — STAT CARDS */}
+      <OvNewsBanner upcomingNews={upcomingNews} isMobile={isMobile}/>
+
       <div style={{display:'flex',gap:12,flexWrap:'wrap'}}>
         <OvStatCard label="VALID SIGNALS" value={valid.length} icon={Activity} color={OV_COLORS.accent} delay={100} subtitle={`${buyC} BUY · ${sellC} SELL`}/>
         <OvStatCard label="STRONGEST" icon={TrendingUp} color={(strongest?.gap??0)>=0?OV_COLORS.buy:OV_COLORS.sell} delay={200} displayValue={`${(strongest?.gap??0)>0?'+':''}${Number(strongest?.gap??0).toFixed(1)}`} subtitle={`${strongest?.symbol||'—'} · ${strongest?.bias||'—'}`}/>
@@ -3346,7 +3400,7 @@ export default function Dashboard() {
         })()}
 
         {/* NEWS ALERT BANNER */}
-        {upcomingNews.events && upcomingNews.events.length > 0 && (
+        {false && upcomingNews.events && upcomingNews.events.length > 0 && (
           <div style={{background:'rgba(255,61,94,0.08)',borderBottom:'1px solid rgba(255,61,94,0.3)',padding:'6px 20px',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',zIndex:99}}>
             <span style={{fontFamily:mono,fontSize:9,color:'#ff4d6d',fontWeight:700,letterSpacing:1,flexShrink:0}}>📰 HIGH IMPACT NEWS</span>
             {upcomingNews.events.slice(0,3).map((ev,i)=>(

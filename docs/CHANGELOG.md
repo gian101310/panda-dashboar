@@ -4,6 +4,20 @@
 
 ---
 
+## Jun 10, 2026 - High-Impact News Banner + Signal Telegram Warnings
+
+**Overview news banner**
+- Added same-day Dubai high-impact news normalization for `/api/upcoming-news`
+- Overview tab now shows the next high-impact event with Dubai time, live countdown, and affected pairs to watch
+- Existing pair news badges now use the same normalized affected-pair list
+
+**Signal Telegram news warnings**
+- Engine news alerts now target the signal Telegram channel
+- Added per-event warning buckets for 3h, 1h, 15m, and 2m before high-impact events
+- News checks run every minute while gap scoring stays on the existing 5-minute cycle
+
+---
+
 ## May 28, 2026 — Cross-Deploy Fix, Deploy Guardrail, Multi-Agent Hardening, Hermes DB Integration
 
 **Cross-repo deploy incident & fix**

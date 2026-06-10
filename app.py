@@ -80,6 +80,7 @@ PAIRS = [
 
 LAST_QUARTER_MARK = None
 LAST_HOUR_MARK    = None
+LAST_NEWS_MARK    = None
 PREV_MOMENTUM     = {}
 PREV_GAP          = {}
 PREV_BIAS         = {}
@@ -89,6 +90,12 @@ PREV_GAP_INITIALIZED = False
 NEWS_ALERTED      = set()   # event keys already alerted this week — prevents duplicates
 NEWS_CACHE        = {"data": [], "fetched_at": None}   # 30-min in-memory cache
 NEWS_CACHE_TTL    = 1800    # seconds
+NEWS_ALERT_THRESHOLDS = (
+    (2, "2M", "2 MIN"),
+    (15, "15M", "15 MIN"),
+    (60, "1H", "1 HOUR"),
+    (180, "3H", "3 HOURS"),
+)
 
 # ---- Currency → pairs mapping for news alert ----
 CURRENCY_TO_PAIRS = {
@@ -2071,6 +2078,26 @@ def parse_news_time(date_str, time_str):
     except:
         return None
 
+def select_news_alert_threshold(mins_away):
+    """Return the current news warning bucket for a future event."""
+    if mins_away < 0:
+        return None
+    for minutes, label, _ in NEWS_ALERT_THRESHOLDS:
+        if mins_away <= minutes:
+            return minutes, label
+    return None
+
+def news_alert_label(threshold_label):
+    for _, label, display in NEWS_ALERT_THRESHOLDS:
+        if label == threshold_label:
+            return display
+    return threshold_label
+
+def build_news_alert_key(ev, threshold_label):
+    currency = (ev.get("country") or "").upper()
+    title = (ev.get("title") or "").strip()[:40]
+    return f"{currency}_{ev.get('date','')}_{ev.get('time','')}_{title}_{threshold_label}"
+
 def check_news_alerts():
     """
     Check ForexFactory for HIGH impact events in the next 15-60 minutes.
@@ -2096,24 +2123,32 @@ def check_news_alerts():
             title = ev.get("title","").strip()
             date_str = ev.get("date","")
             time_str = ev.get("time","")
-            event_key = f"{currency}_{date_str}_{time_str}_{title[:20]}"
-            if event_key in NEWS_ALERTED:
-                continue
             event_dt = parse_news_time(date_str, time_str)
             if not event_dt:
                 continue
             mins_away = (event_dt - now_utc).total_seconds() / 60
-            if not (10 <= mins_away <= 60):
+            threshold = select_news_alert_threshold(mins_away)
+            if not threshold:
+                continue
+            _, threshold_label = threshold
+            event_key = build_news_alert_key(ev, threshold_label)
+            if event_key in NEWS_ALERTED:
                 continue
             # Determine affected pairs from our 21
             affected = [p for p in CURRENCY_TO_PAIRS.get(currency,[]) if p in PAIRS]
             if not affected:
                 continue
             NEWS_ALERTED.add(event_key)
-            alerted_this_run.append((title, currency, mins_away, affected))
+            alerted_this_run.append((title, currency, mins_away, affected, event_dt, threshold_label, ev))
 
-        for title, currency, mins_away, affected in alerted_this_run:
+        for title, currency, mins_away, affected, event_dt, threshold_label, ev in alerted_this_run:
             pairs_str = ", ".join(affected[:6])
+            dubai_time = event_dt.astimezone(timezone(timedelta(hours=4))).strftime("%Y-%m-%d %H:%M")
+            forecast = (ev.get("forecast") or "").strip()
+            previous = (ev.get("previous") or "").strip()
+            data_line = ""
+            if forecast or previous:
+                data_line = f"\nForecast: <b>{forecast or '-'}</b> | Previous: <b>{previous or '-'}</b>\n"
             msg = (
                 f"📰 <b>HIGH IMPACT NEWS ALERT</b>\n"
                 f"━━━━━━━━━━━━━━━━━━━━━\n"
@@ -2124,14 +2159,29 @@ def check_news_alerts():
                 f"<i>⚠️ High volatility expected. Currency bias data only — not financial advice.</i>\n"
                 f"🐼 PANDA ENGINE"
             )
+            msg = (
+                f"<b>HIGH IMPACT NEWS IN {news_alert_label(threshold_label)}</b>\n"
+                f"---------------------\n"
+                f"<b>{title}</b>\n"
+                f"Currency: <b>{currency}</b>\n"
+                f"Countdown: <b>{max(0, int(mins_away))} minutes</b>\n"
+                f"Dubai time: <b>{dubai_time}</b>\n"
+                f"{data_line}\n"
+                f"Affected pairs:\n<b>{pairs_str}</b>\n\n"
+                f"<i>High volatility expected. Currency bias data only - not financial advice.</i>\n"
+                f"PANDA ENGINE"
+            )
             r = requests.post(
-                f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
-                data={"chat_id": TELEGRAM_CHAT_ID, "text": msg, "parse_mode": "HTML"},
+                f"https://api.telegram.org/bot{SIGNAL_BOT_TOKEN}/sendMessage",
+                data={"chat_id": SIGNAL_CHAT_ID, "text": msg, "parse_mode": "HTML"},
                 timeout=10
             )
             status = "✓" if r.status_code == 200 else "✗"
             print(f"[NEWS ALERT] {status} {currency} — {title} in {int(mins_away)}min → {pairs_str}")
-            telegram_circuit.success()
+            if r.status_code == 200:
+                telegram_circuit.success()
+            else:
+                telegram_circuit.failure()
     except Exception as e:
         print(f"[NEWS ALERT ERROR]: {e}")
 
@@ -2261,7 +2311,7 @@ def daily_cleanup():
     print(f"[CLEANUP] Daily cleanup complete — {total_deleted}/{len(cleanup_targets)} tables cleaned")
 
 async def master_scheduler():
-    global LAST_QUARTER_MARK, LAST_HOUR_MARK
+    global LAST_QUARTER_MARK, LAST_HOUR_MARK, LAST_NEWS_MARK
     await asyncio.sleep(5)
     print("[SCHEDULER] Started — waiting for next 15-min mark...")
 
@@ -2269,13 +2319,22 @@ async def master_scheduler():
         try:
             now = datetime.now()
 
+            if now.second < 10:
+                news_mark = now.replace(second=0, microsecond=0)
+                if LAST_NEWS_MARK != news_mark:
+                    try:
+                        await run_scheduler_step("news", check_news_alerts)
+                    except Exception as e:
+                        print("[NEWS ERROR - 1min]:", e)
+                    LAST_NEWS_MARK = news_mark
+
             if now.minute % 5 == 0 and now.second < 10:
                 quarter_mark = now.replace(second=0, microsecond=0)
                 if LAST_QUARTER_MARK != quarter_mark:
                     async with ENGINE_LOCK:
                         try:
                             print(f"\n{'='*50}\n[5MIN] Firing at {now.strftime('%H:%M:%S')}")
-                            await run_scheduler_step("5min", run_gap_once, check_news_alerts)
+                            await run_scheduler_step("5min", run_gap_once)
                         except Exception as e:
                             print("[ENGINE ERROR - 15min]:", e)
                     LAST_QUARTER_MARK = quarter_mark

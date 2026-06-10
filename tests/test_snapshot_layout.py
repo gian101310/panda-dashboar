@@ -199,5 +199,30 @@ class SchedulerTimingTests(unittest.TestCase):
         self.assertEqual(calls, ["first_step", "first_ran", "second_step", "second_ran"])
 
 
+class NewsAlertTimingTests(unittest.TestCase):
+    def test_news_alert_threshold_selects_current_warning_bucket(self):
+        app = _load_app()
+
+        self.assertEqual(app.select_news_alert_threshold(181), None)
+        self.assertEqual(app.select_news_alert_threshold(180), (180, "3H"))
+        self.assertEqual(app.select_news_alert_threshold(59), (60, "1H"))
+        self.assertEqual(app.select_news_alert_threshold(14), (15, "15M"))
+        self.assertEqual(app.select_news_alert_threshold(2), (2, "2M"))
+        self.assertEqual(app.select_news_alert_threshold(-1), None)
+
+    def test_news_alert_key_includes_threshold_label(self):
+        app = _load_app()
+        event = {"country": "USD", "date": "2026-06-10", "time": "8:30am", "title": "CPI m/m"}
+
+        self.assertEqual(
+            app.build_news_alert_key(event, "1H"),
+            "USD_2026-06-10_8:30am_CPI m/m_1H",
+        )
+        self.assertNotEqual(
+            app.build_news_alert_key(event, "1H"),
+            app.build_news_alert_key(event, "15M"),
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
