@@ -71,7 +71,17 @@ function analyzeGapLevels(rows) {
   const memories = [];
   for (const b of Object.values(buckets)) {
     const wr = winRates(b.wins, b.losses, b.flats);
-    if (wr.total < MIN_SAMPLE) continue;
+    if (wr.total < MIN_SAMPLE) {
+      // Low-sample gap buckets (e.g. gap 11, 12+): still log so Panda AI can
+      // report the raw numbers instead of "not logged" — flagged as NOT validated.
+      memories.push({
+        type: 'signal_pattern', factor: 'gap_level',
+        strategy: b.strategy, win_rate: wr.win_rate_resolved, sample_size: wr.total,
+        metadata: { gap_level: b.gap, ...wr, low_sample: true,
+          description: `${b.strategy} at gap ${b.gap} — LOW SAMPLE (n=${wr.total} < ${MIN_SAMPLE}), not statistically validated` }
+      });
+      continue;
+    }
     memories.push({
       type: 'signal_pattern', factor: 'gap_level',
       strategy: b.strategy, win_rate: wr.win_rate_resolved, sample_size: wr.total,
@@ -343,7 +353,7 @@ export default async function handler(req, res) {
         errors: errors.length > 0 ? errors : undefined,
         analysis_types: [
           'strategy_overall — BB and INTRA overall win rates',
-          'gap_level — win rate at each gap level (5,6,7,8,9,10+)',
+          'gap_level — win rate at each gap level (5-11, 12+); buckets under n=20 logged with low_sample flag',
           'pl_confirmation — Panda Lines confirmed vs unconfirmed edge',
           'gap_plus_pl — combined gap level + Panda Lines confirmation',
           'per_pair — per-pair stats (sample >= 20 only)',

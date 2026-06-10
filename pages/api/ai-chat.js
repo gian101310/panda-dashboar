@@ -319,7 +319,7 @@ async function fetchMemoryContext() {
     sections[key].push(`${desc} (n=${m.sample_size}${wr}${pips}${avg}${flat}${sess}${hold})`);
   }
   const latest = data.reduce((b, m) => m.computed_at > b ? m.computed_at : b, '');
-  let ctx = `HISTORICAL ANALYSIS (validated, n>=20):\nComputed: ${latest?.slice(0,10)} | ${data.length} memories\n`;
+  let ctx = `HISTORICAL ANALYSIS (n>=20 validated; entries marked LOW SAMPLE are logged but NOT statistically validated — always state the caveat):\nComputed: ${latest?.slice(0,10)} | ${data.length} memories\n`;
   if (sections.signal_pattern.length) ctx += '\nSIGNAL PATTERNS:\n' + sections.signal_pattern.join('\n');
   if (sections.edge_analysis.length) ctx += '\nEDGE ANALYSIS:\n' + sections.edge_analysis.join('\n');
   if (sections.confluence_validation.length) ctx += '\nCONFLUENCE:\n' + sections.confluence_validation.join('\n');
