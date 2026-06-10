@@ -4,6 +4,16 @@
 
 ---
 
+## Jun 10, 2026 - Engine Launcher Watchdog Hardening
+
+**Engine restart reliability**
+- `START_PANDA.bat` now auto-restarts the engine after unexpected uvicorn exits
+- Added `WATCH_PANDA.bat` health check wrapper that starts only through `START_PANDA.bat`
+- Registered local Windows watchdog task every 5 minutes and added a user Startup-folder logon check
+- Removed wrong local `run_engine.bat` launcher that bypassed the canonical `py -3.11 -m uvicorn` command
+
+---
+
 ## Jun 10, 2026 - High-Impact News Banner + Signal Telegram Warnings
 
 **Overview news banner**
