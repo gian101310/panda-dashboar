@@ -6,7 +6,7 @@
         "dev": "next dev",
         "build": "next build",
         "start": "next start",
-        "plot:aplus-ob": "node tools/plot-aplus-ob.mjs"
+        "plot:engine-pb": "node tools/plot-engine-pb.mjs"
     },
     "dependencies": {
         "@supabase/supabase-js": "^2.45.4",
