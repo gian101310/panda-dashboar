@@ -21,3 +21,5 @@ create table if not exists account_guardian_snapshots (
 
 create index if not exists account_guardian_snapshots_created_idx
 on account_guardian_snapshots (created_at desc);
+
+alter table account_guardian_snapshots enable row level security;
