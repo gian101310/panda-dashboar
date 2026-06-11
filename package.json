@@ -7,7 +7,8 @@
         "build": "next build",
         "start": "next start",
         "plot:engine-pb": "node tools/plot-engine-pb.mjs",
-        "account:guardian": "node tools/account-guardian-agent.mjs"
+        "account:guardian": "node tools/account-guardian-agent.mjs",
+        "execute:engine-pb": "node tools/execute-engine-pb.mjs"
     },
     "dependencies": {
         "@supabase/supabase-js": "^2.45.4",
