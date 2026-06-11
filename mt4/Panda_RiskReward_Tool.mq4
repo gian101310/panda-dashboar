@@ -1,10 +1,10 @@
 //+------------------------------------------------------------------+
-//|                                      Panda_Position_Drawer.mq4   |
+//|                                      Panda_RiskReward_Tool.mq4   |
 //|   MT4 long/short position drawing tool for visual trade planning.|
 //|   Drag Entry, Stop, Target, or resize boxes to update RR display.|
 //+------------------------------------------------------------------+
 #property copyright "Panda Engine"
-#property version   "1.30"
+#property version   "1.33"
 #property strict
 #property indicator_chart_window
 
@@ -43,6 +43,7 @@ string g_labelName;
 string g_longButtonName;
 string g_shortButtonName;
 string g_offButtonName;
+string g_deleteButtonName;
 string g_panelName;
 string g_panelTitleName;
 string g_entryTagName;
@@ -62,6 +63,7 @@ int OnInit()
    g_side = InpDefaultSide;
    g_runtimeEnabled = InpEnabled;
    SetObjectNames();
+   LoadSavedState();
 
    if(InpShowButtons) DrawFloatingPanel();
 
@@ -79,6 +81,7 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
 {
+   SaveState();
    RemovePositionObjects();
    RemoveControlButtons();
 }
@@ -127,9 +130,18 @@ void OnChartEvent(const int id,
 
    if(id != CHARTEVENT_OBJECT_DRAG && id != CHARTEVENT_OBJECT_CHANGE) return;
 
-   if(sparam == g_entryName || sparam == g_stopName || sparam == g_targetName)
+   if(sparam == g_entryName)
+   {
+      MoveWholePositionFromEntry();
+      SaveState();
+      DrawPosition();
+      return;
+   }
+
+   if(sparam == g_stopName || sparam == g_targetName)
    {
       SyncLinePrices();
+      SaveState();
       DrawPosition();
       return;
    }
@@ -137,6 +149,7 @@ void OnChartEvent(const int id,
    if(InpAllowBoxResize && (sparam == g_riskName || sparam == g_rewardName))
    {
       SyncBoxPrices();
+      SaveState();
       DrawPosition();
    }
 }
@@ -148,6 +161,7 @@ void SetObjectNames()
    g_longButtonName  = controlPrefix + "_Long";
    g_shortButtonName = controlPrefix + "_Short";
    g_offButtonName   = controlPrefix + "_Off";
+   g_deleteButtonName = controlPrefix + "_Delete";
    g_panelName       = controlPrefix + "_Panel";
    g_panelTitleName  = controlPrefix + "_Title";
 
@@ -174,6 +188,12 @@ string ModeSuffix()
 //+------------------------------------------------------------------+
 void InitPrices()
 {
+   if(LoadSavedState())
+   {
+      g_hasPrices = true;
+      return;
+   }
+
    RefreshRates();
 
    double pip = PipSize();
@@ -202,6 +222,56 @@ void InitPrices()
    }
 
    g_hasPrices = true;
+}
+
+//+------------------------------------------------------------------+
+string StateKey(const string name)
+{
+   return(InpObjectPrefix + "_" + _Symbol + "_State_" + name);
+}
+
+//+------------------------------------------------------------------+
+bool LoadSavedState()
+{
+   if(!GlobalVariableCheck(StateKey("entry")) ||
+      !GlobalVariableCheck(StateKey("stop")) ||
+      !GlobalVariableCheck(StateKey("target")))
+      return(false);
+
+   g_entry = NormalizeDouble(GlobalVariableGet(StateKey("entry")), _Digits);
+   g_stop = NormalizeDouble(GlobalVariableGet(StateKey("stop")), _Digits);
+   g_target = NormalizeDouble(GlobalVariableGet(StateKey("target")), _Digits);
+
+   if(GlobalVariableCheck(StateKey("side")))
+      g_side = (GlobalVariableGet(StateKey("side")) >= 0.5 ? PANDA_SHORT : PANDA_LONG);
+
+   if(GlobalVariableCheck(StateKey("enabled")))
+      g_runtimeEnabled = (GlobalVariableGet(StateKey("enabled")) >= 0.5);
+
+   g_hasPrices = true;
+   return(true);
+}
+
+//+------------------------------------------------------------------+
+void SaveState()
+{
+   if(!g_hasPrices) return;
+
+   GlobalVariableSet(StateKey("entry"), g_entry);
+   GlobalVariableSet(StateKey("stop"), g_stop);
+   GlobalVariableSet(StateKey("target"), g_target);
+   GlobalVariableSet(StateKey("side"), (g_side == PANDA_SHORT ? 1.0 : 0.0));
+   GlobalVariableSet(StateKey("enabled"), (g_runtimeEnabled ? 1.0 : 0.0));
+}
+
+//+------------------------------------------------------------------+
+void ClearSavedState()
+{
+   GlobalVariableDel(StateKey("entry"));
+   GlobalVariableDel(StateKey("stop"));
+   GlobalVariableDel(StateKey("target"));
+   GlobalVariableDel(StateKey("side"));
+   GlobalVariableDel(StateKey("enabled"));
 }
 
 //+------------------------------------------------------------------+
@@ -234,6 +304,19 @@ void SyncLinePrices()
 
    if(ObjectFind(0, g_targetName) >= 0)
       g_target = NormalizeDouble(ObjectGetDouble(0, g_targetName, OBJPROP_PRICE1), _Digits);
+}
+
+//+------------------------------------------------------------------+
+void MoveWholePositionFromEntry()
+{
+   if(ObjectFind(0, g_entryName) < 0) return;
+
+   double newEntry = NormalizeDouble(ObjectGetDouble(0, g_entryName, OBJPROP_PRICE1), _Digits);
+   double delta = newEntry - g_entry;
+
+   g_entry = newEntry;
+   g_stop = NormalizeDouble(g_stop + delta, _Digits);
+   g_target = NormalizeDouble(g_target + delta, _Digits);
 }
 
 //+------------------------------------------------------------------+
@@ -423,18 +506,48 @@ void RemovePositionObjects()
 }
 
 //+------------------------------------------------------------------+
+void DeleteAllDrawings()
+{
+   string matchPrefix = InpObjectPrefix + "_" + _Symbol + "_";
+
+   for(int i = ObjectsTotal(0, -1, -1) - 1; i >= 0; i--)
+   {
+      string name = ObjectName(0, i, -1, -1);
+      if(StringFind(name, matchPrefix) == 0)
+         ObjectDelete(0, name);
+   }
+
+   ClearSavedState();
+   g_hasPrices = false;
+   g_runtimeEnabled = false;
+}
+
+//+------------------------------------------------------------------+
 bool ApplyButtonMode(const string objectName)
 {
    if(!InpShowButtons) return(false);
-   if(objectName != g_longButtonName && objectName != g_shortButtonName && objectName != g_offButtonName)
+   if(objectName != g_longButtonName &&
+      objectName != g_shortButtonName &&
+      objectName != g_offButtonName &&
+      objectName != g_deleteButtonName)
       return(false);
 
    ObjectSetInteger(0, objectName, OBJPROP_SELECTED, false);
+
+   if(objectName == g_deleteButtonName)
+   {
+      DeleteAllDrawings();
+      DrawFloatingPanel();
+      ChartRedraw(0);
+      return(true);
+   }
+
    RemovePositionObjects();
 
    if(objectName == g_offButtonName)
    {
       g_runtimeEnabled = false;
+      SaveState();
       DrawFloatingPanel();
       ChartRedraw(0);
       return(true);
@@ -444,6 +557,7 @@ bool ApplyButtonMode(const string objectName)
    g_side = (objectName == g_longButtonName ? PANDA_LONG : PANDA_SHORT);
    SetObjectNames();
    InitPrices();
+   SaveState();
    DrawPosition();
    return(true);
 }
@@ -456,6 +570,7 @@ void DrawFloatingPanel()
    DrawButton(g_longButtonName, "LONG", InpPanelX + 10, InpPanelY + 30, 64, (g_runtimeEnabled && g_side == PANDA_LONG), InpTargetColor);
    DrawButton(g_shortButtonName, "SHORT", InpPanelX + 80, InpPanelY + 30, 66, (g_runtimeEnabled && g_side == PANDA_SHORT), InpStopColor);
    DrawButton(g_offButtonName, "OFF", InpPanelX + 152, InpPanelY + 30, 48, !g_runtimeEnabled, clrDimGray);
+   DrawButton(g_deleteButtonName, "DELETE", InpPanelX + 10, InpPanelY + 56, 200, false, clrFireBrick);
 }
 
 //+------------------------------------------------------------------+
@@ -471,7 +586,7 @@ void DrawPanelBox()
    ObjectSetInteger(0, g_panelName, OBJPROP_XDISTANCE, InpPanelX);
    ObjectSetInteger(0, g_panelName, OBJPROP_YDISTANCE, InpPanelY);
    ObjectSetInteger(0, g_panelName, OBJPROP_XSIZE, 212);
-   ObjectSetInteger(0, g_panelName, OBJPROP_YSIZE, 68);
+   ObjectSetInteger(0, g_panelName, OBJPROP_YSIZE, 96);
    ObjectSetInteger(0, g_panelName, OBJPROP_BGCOLOR, clrBlack);
    ObjectSetInteger(0, g_panelName, OBJPROP_BORDER_COLOR, clrDimGray);
 }
@@ -528,6 +643,7 @@ void RemoveControlButtons()
    ObjectDelete(0, g_longButtonName);
    ObjectDelete(0, g_shortButtonName);
    ObjectDelete(0, g_offButtonName);
+   ObjectDelete(0, g_deleteButtonName);
    ObjectDelete(0, g_panelName);
    ObjectDelete(0, g_panelTitleName);
 }
