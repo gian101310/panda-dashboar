@@ -84,6 +84,55 @@ test('buildPullbackPlan mirrors engine dashboard PB levels for SELL', () => {
   assert.equal(plan.riskReward, 4);
 });
 
+test('buildPullbackPlan keeps the nearest PB entry even when a farther entry has bigger target', () => {
+  const plan = buildPullbackPlan({
+    symbol: 'EURUSD',
+    gap: 7,
+    bias: 'BUY',
+    pdh: 1.107,
+    pdl: 1.104,
+    pwh: 1.13,
+    pwl: 1.09,
+  }, 1.105);
+
+  assert.equal(plan.entry.label, 'PDL');
+  assert.equal(plan.entry.price, 1.104);
+  assert.equal(plan.takeProfit.label, 'PWH');
+  assert.equal(plan.takeProfit.pips, 260);
+});
+
+test('buildPullbackPlan requires at least 50 pips of clear target from PB entry', () => {
+  const plan = buildPullbackPlan({
+    symbol: 'EURUSD',
+    gap: 7,
+    bias: 'BUY',
+    pdh: 1.107,
+    pdl: 1.104,
+    pwh: 1.1089,
+  }, 1.105);
+
+  assert.equal(plan, null);
+});
+
+test('buildPullbackPlan expands INTRA take profit to farthest valid engine line', () => {
+  const plan = buildPullbackPlan({
+    symbol: 'EURUSD',
+    gap: 10,
+    bias: 'BUY',
+    pl_zone: 'ABOVE',
+    pl_g1_valid: true,
+    pdh: 1.112,
+    pdl: 1.104,
+    pwh: 1.13,
+    pmh: 1.155,
+  }, 1.105, new Date('2026-06-11T22:30:00Z'));
+
+  assert.equal(plan.strategy, 'INTRA');
+  assert.equal(plan.entry.label, 'PDL');
+  assert.equal(plan.takeProfit.label, 'PMH');
+  assert.equal(plan.takeProfit.pips, 510);
+});
+
 test('buildEngineChartObjects plots PB entry with SL and TP only', () => {
   const setup = { symbol: 'EURUSD', strategy: 'BB', direction: 'BUY', gap: 7 };
   const plan = {

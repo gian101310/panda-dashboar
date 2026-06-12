@@ -3,8 +3,11 @@ import assert from 'node:assert/strict';
 
 import {
   buildPendingOrderRequest,
+  computeRiskSizedVolume,
   evaluatePendingOrderExecution,
   normalizeVolumeUnits,
+  planOpenPositionActions,
+  planPendingOrderActions,
 } from '../lib/tradeExecutor.mjs';
 
 const greenGuardian = { state: 'GREEN', mode: 'NORMAL' };
@@ -78,6 +81,29 @@ test('normalizeVolumeUnits converts lots to broker units and snaps to volume ste
   assert.equal(normalizeVolumeUnits({ lots: 0.026, symbolDetails }), 3000);
 });
 
+test('computeRiskSizedVolume rounds down so stop loss risk stays inside account budget', () => {
+  const sized = computeRiskSizedVolume({
+    plan: { stopLoss: { pips: 25 } },
+    risk: { equity: 48000, dailyRemaining: 1900, maxLossRemaining: 2500 },
+    symbolDetails: { ...symbolDetails, pipValuePerLot: 10 },
+    riskPct: 0.5,
+    maxRiskUsd: 300,
+    safetyBufferUsd: 100,
+  });
+
+  assert.equal(sized.volume, 96000);
+  assert.equal(sized.riskBudgetUsd, 240);
+  assert.equal(sized.estimatedLossUsd, 240);
+});
+
+test('computeRiskSizedVolume refuses to guess when pip value is unavailable', () => {
+  assert.throws(() => computeRiskSizedVolume({
+    plan: { stopLoss: { pips: 25 } },
+    risk: { equity: 48000, dailyRemaining: 1900, maxLossRemaining: 2500 },
+    symbolDetails,
+  }), /PIP_VALUE_UNAVAILABLE/);
+});
+
 test('buildPendingOrderRequest creates a buy limit request with SL and TP pips', () => {
   const expiresAt = new Date('2026-06-11T10:30:00.000Z');
   const request = buildPendingOrderRequest({
@@ -98,4 +124,31 @@ test('buildPendingOrderRequest creates a buy limit request with SL and TP pips',
     label: 'PANDA-INTRA-PB',
     comment: 'Panda Engine INTRA PB PDL RR 3:1',
   });
+});
+
+test('planOpenPositionActions closes Panda position when engine signal disappears', () => {
+  const actions = planOpenPositionActions({
+    positions: [{ id: 101, symbolName: 'EURUSD', label: 'PANDA-INTRA-PB', netProfit: 50 }],
+    activeSetups: [],
+  });
+
+  assert.deepEqual(actions, [{ tool: 'close_position', args: { positionId: 101 }, reason: 'SIGNAL_DISAPPEARED' }]);
+});
+
+test('planOpenPositionActions leaves Panda position alone while signal remains same direction', () => {
+  const actions = planOpenPositionActions({
+    positions: [{ id: 101, symbolName: 'EURUSD', tradeSide: 'BUY', label: 'PANDA-INTRA-PB', netProfit: 50 }],
+    activeSetups: [{ symbol: 'EURUSD', direction: 'BUY', strategy: 'INTRA' }],
+  });
+
+  assert.deepEqual(actions, []);
+});
+
+test('planPendingOrderActions cancels Panda pending order when engine signal disappears', () => {
+  const actions = planPendingOrderActions({
+    pendingOrders: [{ id: 202, symbolName: 'EURUSD', label: 'PANDA-INTRA-PB' }],
+    activeSetups: [],
+  });
+
+  assert.deepEqual(actions, [{ tool: 'cancel_order', args: { orderId: 202 }, reason: 'SIGNAL_DISAPPEARED' }]);
 });

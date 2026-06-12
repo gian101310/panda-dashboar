@@ -11,8 +11,10 @@ import {
 } from '../lib/accountGuardian.mjs';
 import {
   buildPendingOrderRequest,
+  computeRiskSizedVolume,
   evaluatePendingOrderExecution,
-  normalizeVolumeUnits,
+  planOpenPositionActions,
+  planPendingOrderActions,
 } from '../lib/tradeExecutor.mjs';
 
 function loadDotEnv(path = '.env') {
@@ -35,6 +37,7 @@ const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_AN
 const MCP_URL = process.env.CTRADER_MCP_URL || 'http://127.0.0.1:9876/mcp/';
 const args = new Set(process.argv.slice(2));
 const approval = args.has('--approve');
+const manageOpen = args.has('--manage-open');
 
 function argValue(name, fallback = '') {
   const raw = process.argv.find(arg => arg.startsWith(`--${name}=`));
@@ -54,9 +57,11 @@ const challenge = {
   maxLossUsed: numberArg('max-loss-used', 2427.87),
   profitTarget: numberArg('profit-target', 4000),
 };
-const lots = numberArg('lots', 0.01);
 const symbolFilter = String(argValue('symbol', '')).toUpperCase();
 const holdHours = Math.max(4, Math.min(12, numberArg('hold-hours', 12)));
+const riskPct = numberArg('risk-pct', 0.25);
+const maxRiskUsd = numberArg('max-risk', 250);
+const safetyBufferUsd = numberArg('safety-buffer', 100);
 
 function parseMcpText(result) {
   const text = result?.content?.find(part => part.type === 'text')?.text;
@@ -116,6 +121,8 @@ function sanitizePosition(position) {
     netProfit: position.netProfit,
     stopLoss: position.stopLoss,
     takeProfit: position.takeProfit,
+    label: position.label,
+    comment: position.comment,
   };
 }
 
@@ -130,6 +137,7 @@ function sanitizeOrder(order) {
     stopLoss: order.stopLoss,
     takeProfit: order.takeProfit,
     label: order.label,
+    comment: order.comment,
   };
 }
 
@@ -141,9 +149,13 @@ async function loadRows() {
   return data || [];
 }
 
-async function buildBestIntraPlan(client) {
-  const now = new Date();
-  const rows = await loadRows();
+function activeEngineSetups(rows, now) {
+  return rows
+    .map(row => classifyEngineSetup(row, now))
+    .filter(setup => setup?.strategy === 'INTRA');
+}
+
+async function buildBestIntraPlan(client, rows, now) {
   const plans = [];
   for (const row of rows) {
     if (symbolFilter && String(row.symbol || '').toUpperCase() !== symbolFilter) continue;
@@ -151,7 +163,7 @@ async function buildBestIntraPlan(client) {
     if (!setup || setup.strategy !== 'INTRA') continue;
     const quote = await client.call('get_spot_prices', { symbolName: setup.symbol });
     const currentPrice = currentPriceFromQuote(quote, setup.direction);
-    const plan = buildPullbackPlan(row, currentPrice);
+    const plan = buildPullbackPlan(row, currentPrice, now);
     if (plan?.strategy === 'INTRA') plans.push({ setup, plan, quote });
   }
 
@@ -168,13 +180,25 @@ async function main() {
 
   const positions = (positionsResult?.positions || []).map(sanitizePosition);
   const pendingOrders = (ordersResult?.orders || []).map(sanitizeOrder);
+  const rows = await loadRows();
+  const now = new Date();
+  const activeSetups = activeEngineSetups(rows, now);
+  const staleActions = [
+    ...planOpenPositionActions({ positions, activeSetups }),
+    ...planPendingOrderActions({ pendingOrders, activeSetups }),
+  ];
   const risk = computeChallengeRisk({
     ...challenge,
     balance: balance?.balance,
     equity: balance?.equity,
   });
   const guardian = classifyGuardianStatus({ risk, positions, pendingOrders });
-  const candidate = await buildBestIntraPlan(client);
+  for (const action of staleActions) {
+    console.log(`STALE_${approval && manageOpen ? 'EXEC' : 'DRY'} | ${action.tool} | ${JSON.stringify(action.args)} | reason=${action.reason}`);
+    if (approval && manageOpen) await client.call(action.tool, action.args);
+  }
+
+  const candidate = await buildBestIntraPlan(client, rows, now);
   if (!candidate) {
     console.log(`NO_VALID_INTRA_PB | guardian=${guardian.state} | symbol=${symbolFilter || 'ALL'}`);
     return;
@@ -182,9 +206,9 @@ async function main() {
 
   const { setup, plan } = candidate;
   const symbolDetails = await client.call('get_symbol_details', { symbolName: setup.symbol });
-  const volume = normalizeVolumeUnits({ lots, symbolDetails });
+  const sizing = computeRiskSizedVolume({ plan, risk, symbolDetails, riskPct, maxRiskUsd, safetyBufferUsd });
   const expiresAt = new Date(Date.now() + holdHours * 60 * 60 * 1000);
-  const request = buildPendingOrderRequest({ setup, plan, volume, expiresAt });
+  const request = buildPendingOrderRequest({ setup, plan, volume: sizing.volume, expiresAt });
   const decision = evaluatePendingOrderExecution({
     guardian,
     setup,
@@ -206,6 +230,8 @@ async function main() {
     `SLp=${request.stopLossPips}`,
     `TPp=${request.takeProfitPips}`,
     `volume=${request.volume}`,
+    `lots=${sizing.lots}`,
+    `risk_usd=${sizing.estimatedLossUsd}/${sizing.riskBudgetUsd}`,
     `expires=${request.expiresAt}`,
     `reasons=${decision.reasons.join(',') || 'none'}`,
   ].join(' | '));
