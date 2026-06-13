@@ -114,7 +114,31 @@ test('buildPullbackPlan requires at least 50 pips of clear target from PB entry'
   assert.equal(plan, null);
 });
 
-test('buildPullbackPlan expands INTRA take profit to farthest valid engine line', () => {
+test('buildPullbackPlan uses Supertrend stop and 2R take profit for INTRA BUY', () => {
+  const plan = buildPullbackPlan({
+    symbol: 'EURUSD',
+    gap: 10,
+    bias: 'BUY',
+    pl_zone: 'ABOVE',
+    pl_g1_valid: true,
+    supertrend_line: 1.1,
+    pdh: 1.112,
+    pdl: 1.104,
+    pwh: 1.13,
+    pmh: 1.155,
+  }, 1.105, new Date('2026-06-11T22:30:00Z'));
+
+  assert.equal(plan.strategy, 'INTRA');
+  assert.equal(plan.entry.label, 'PDL');
+  assert.equal(plan.takeProfit.label, '2R');
+  assert.equal(plan.stopLoss.price, 1.099);
+  assert.equal(plan.stopLoss.pips, 50);
+  assert.equal(plan.takeProfit.price, 1.114);
+  assert.equal(plan.takeProfit.pips, 100);
+  assert.equal(plan.riskReward, 2);
+});
+
+test('buildPullbackPlan blocks INTRA when Supertrend line is missing', () => {
   const plan = buildPullbackPlan({
     symbol: 'EURUSD',
     gap: 10,
@@ -124,13 +148,31 @@ test('buildPullbackPlan expands INTRA take profit to farthest valid engine line'
     pdh: 1.112,
     pdl: 1.104,
     pwh: 1.13,
-    pmh: 1.155,
   }, 1.105, new Date('2026-06-11T22:30:00Z'));
 
-  assert.equal(plan.strategy, 'INTRA');
-  assert.equal(plan.entry.label, 'PDL');
-  assert.equal(plan.takeProfit.label, 'PMH');
-  assert.equal(plan.takeProfit.pips, 510);
+  assert.equal(plan, null);
+});
+
+test('buildPullbackPlan uses Supertrend plus 10 pips above entry for INTRA SELL stop', () => {
+  const plan = buildPullbackPlan({
+    symbol: 'GBPUSD',
+    gap: -10,
+    bias: 'SELL',
+    pl_zone: 'BELOW',
+    pl_g1_valid: true,
+    supertrend_line: 1.286,
+    pdh: 1.281,
+    pdl: 1.255,
+    pwh: 1.295,
+    pwl: 1.24,
+  }, 1.27, new Date('2026-06-11T22:30:00Z'));
+
+  assert.equal(plan.entry.label, 'PDH');
+  assert.equal(plan.stopLoss.price, 1.287);
+  assert.equal(plan.stopLoss.pips, 60);
+  assert.equal(plan.takeProfit.price, 1.269);
+  assert.equal(plan.takeProfit.pips, 120);
+  assert.equal(plan.riskReward, 2);
 });
 
 test('buildEngineChartObjects plots PB entry with SL and TP only', () => {
