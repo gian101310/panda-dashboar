@@ -5,6 +5,7 @@ import {
   buildEngineChartObjects,
   buildPullbackPlan,
   classifyEngineSetup,
+  classifyPandaLinesPbSetup,
 } from '../lib/engineSetups.mjs';
 
 test('classifyEngineSetup marks INTRA only inside engine window with PL confirmation', () => {
@@ -40,6 +41,32 @@ test('classifyEngineSetup falls back to BB outside the INTRA window', () => {
 test('classifyEngineSetup rejects hard invalid and below-threshold rows', () => {
   assert.equal(classifyEngineSetup({ symbol: 'EURGBP', gap: 11, hard_invalid: true }), null);
   assert.equal(classifyEngineSetup({ symbol: 'EURGBP', gap: 4, hard_invalid: false }), null);
+});
+
+test('classifyPandaLinesPbSetup allows valid Panda Lines bias any time', () => {
+  const setup = classifyPandaLinesPbSetup({
+    symbol: 'EURUSD',
+    gap: 7,
+    bias: 'BUY',
+    hard_invalid: false,
+    pl_zone: 'ABOVE',
+    pl_g1_valid: true,
+  });
+
+  assert.equal(setup.strategy, 'PLPB');
+  assert.equal(setup.direction, 'BUY');
+  assert.equal(setup.reason, 'gap >= 5 + Panda Lines confirmed');
+});
+
+test('classifyPandaLinesPbSetup rejects unconfirmed Panda Lines bias', () => {
+  assert.equal(classifyPandaLinesPbSetup({
+    symbol: 'EURUSD',
+    gap: 7,
+    bias: 'BUY',
+    hard_invalid: false,
+    pl_zone: 'BELOW',
+    pl_g1_valid: true,
+  }), null);
 });
 
 test('buildPullbackPlan mirrors engine dashboard PB levels for BUY', () => {
@@ -173,6 +200,28 @@ test('buildPullbackPlan uses Supertrend plus 10 pips above entry for INTRA SELL 
   assert.equal(plan.takeProfit.price, 1.269);
   assert.equal(plan.takeProfit.pips, 120);
   assert.equal(plan.riskReward, 2);
+});
+
+test('buildPullbackPlan uses Panda Lines stop and 2R take profit for always-on PLPB', () => {
+  const plan = buildPullbackPlan({
+    symbol: 'EURUSD',
+    gap: 7,
+    bias: 'BUY',
+    pl_zone: 'ABOVE',
+    pl_g1_valid: true,
+    pl_st: 1.1,
+    pdh: 1.112,
+    pdl: 1.104,
+    pwh: 1.13,
+  }, 1.105, new Date('2026-06-11T18:30:00Z'), { mode: 'PLPB' });
+
+  assert.equal(plan.strategy, 'PLPB');
+  assert.equal(plan.entry.label, 'PDL');
+  assert.equal(plan.stopLoss.price, 1.099);
+  assert.equal(plan.stopLoss.pips, 50);
+  assert.equal(plan.takeProfit.label, '2R');
+  assert.equal(plan.takeProfit.price, 1.114);
+  assert.equal(plan.takeProfit.pips, 100);
 });
 
 test('buildEngineChartObjects plots PB entry with SL and TP only', () => {

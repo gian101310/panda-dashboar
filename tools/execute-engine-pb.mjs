@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import {
   buildPullbackPlan,
   classifyEngineSetup,
+  classifyPandaLinesPbSetup,
 } from '../lib/engineSetups.mjs';
 import {
   classifyGuardianStatus,
@@ -58,6 +59,10 @@ const challenge = {
   profitTarget: numberArg('profit-target', 4000),
 };
 const symbolFilter = String(argValue('symbol', '')).toUpperCase();
+const executionMode = String(argValue('mode', 'plpb')).toUpperCase();
+if (!['INTRA', 'PLPB'].includes(executionMode)) {
+  throw new Error('mode must be INTRA or PLPB');
+}
 const holdHours = Math.max(4, Math.min(12, numberArg('hold-hours', 12)));
 const riskPct = numberArg('risk-pct', 0.25);
 const maxRiskUsd = numberArg('max-risk', 250);
@@ -151,20 +156,24 @@ async function loadRows() {
 
 function activeEngineSetups(rows, now) {
   return rows
-    .map(row => classifyEngineSetup(row, now))
-    .filter(setup => setup?.strategy === 'INTRA');
+    .flatMap(row => [classifyEngineSetup(row, now), classifyPandaLinesPbSetup(row)].filter(Boolean))
+    .filter(setup => setup.strategy === 'INTRA' || setup.strategy === 'PLPB');
 }
 
-async function buildBestIntraPlan(client, rows, now) {
+function classifyForExecutionMode(row, now) {
+  return executionMode === 'INTRA' ? classifyEngineSetup(row, now) : classifyPandaLinesPbSetup(row);
+}
+
+async function buildBestPlan(client, rows, now) {
   const plans = [];
   for (const row of rows) {
     if (symbolFilter && String(row.symbol || '').toUpperCase() !== symbolFilter) continue;
-    const setup = classifyEngineSetup(row, now);
-    if (!setup || setup.strategy !== 'INTRA') continue;
+    const setup = classifyForExecutionMode(row, now);
+    if (!setup) continue;
     const quote = await client.call('get_spot_prices', { symbolName: setup.symbol });
     const currentPrice = currentPriceFromQuote(quote, setup.direction);
-    const plan = buildPullbackPlan(row, currentPrice, now);
-    if (plan?.strategy === 'INTRA') plans.push({ setup, plan, quote });
+    const plan = buildPullbackPlan(row, currentPrice, now, { mode: setup.strategy });
+    if (plan?.strategy === setup.strategy) plans.push({ setup, plan, quote });
   }
 
   return plans.sort((a, b) => Math.abs(b.setup.gap) - Math.abs(a.setup.gap))[0] || null;
@@ -198,9 +207,9 @@ async function main() {
     if (approval && manageOpen) await client.call(action.tool, action.args);
   }
 
-  const candidate = await buildBestIntraPlan(client, rows, now);
+  const candidate = await buildBestPlan(client, rows, now);
   if (!candidate) {
-    console.log(`NO_VALID_INTRA_PB | guardian=${guardian.state} | symbol=${symbolFilter || 'ALL'}`);
+    console.log(`NO_VALID_${executionMode}_PB | guardian=${guardian.state} | symbol=${symbolFilter || 'ALL'}`);
     return;
   }
 
@@ -214,6 +223,7 @@ async function main() {
     setup,
     plan,
     approval,
+    allowedStrategies: [setup.strategy],
     pendingOrders,
     now: new Date(),
   });

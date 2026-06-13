@@ -62,6 +62,20 @@ test('evaluatePendingOrderExecution only allows INTRA PB plans', () => {
   assert.ok(decision.reasons.includes('INTRA_ONLY'));
 });
 
+test('evaluatePendingOrderExecution allows PLPB when strategy is enabled', () => {
+  const decision = evaluatePendingOrderExecution({
+    guardian: greenGuardian,
+    setup: { ...intraSetup, strategy: 'PLPB', gap: 7 },
+    plan: { ...pbPlan, strategy: 'PLPB' },
+    allowedStrategies: ['PLPB'],
+    approval: true,
+    now: new Date('2026-06-10T18:30:00.000Z'),
+  });
+
+  assert.equal(decision.allowed, true);
+  assert.deepEqual(decision.reasons, []);
+});
+
 test('evaluatePendingOrderExecution blocks duplicate Panda PB pending orders on the same symbol', () => {
   const decision = evaluatePendingOrderExecution({
     guardian: greenGuardian,
@@ -70,6 +84,21 @@ test('evaluatePendingOrderExecution blocks duplicate Panda PB pending orders on 
     approval: true,
     pendingOrders: [{ symbolName: 'EURUSD', label: 'PANDA-INTRA-PB' }],
     now: new Date('2026-06-10T22:30:00.000Z'),
+  });
+
+  assert.equal(decision.allowed, false);
+  assert.ok(decision.reasons.includes('DUPLICATE_PANDA_PB_ORDER'));
+});
+
+test('evaluatePendingOrderExecution blocks duplicate PLPB pending orders on the same symbol', () => {
+  const decision = evaluatePendingOrderExecution({
+    guardian: greenGuardian,
+    setup: { ...intraSetup, strategy: 'PLPB', gap: 7 },
+    plan: { ...pbPlan, strategy: 'PLPB' },
+    allowedStrategies: ['PLPB'],
+    approval: true,
+    pendingOrders: [{ symbolName: 'EURUSD', label: 'PANDA-PLPB' }],
+    now: new Date('2026-06-10T18:30:00.000Z'),
   });
 
   assert.equal(decision.allowed, false);
@@ -124,6 +153,18 @@ test('buildPendingOrderRequest creates a buy limit request with SL and TP pips',
     label: 'PANDA-INTRA-PB',
     comment: 'Panda Engine INTRA PB PDL RR 3:1',
   });
+});
+
+test('buildPendingOrderRequest labels PLPB orders separately from INTRA', () => {
+  const request = buildPendingOrderRequest({
+    setup: { ...intraSetup, strategy: 'PLPB' },
+    plan: { ...pbPlan, strategy: 'PLPB' },
+    volume: 1000,
+    expiresAt: new Date('2026-06-11T10:30:00.000Z'),
+  });
+
+  assert.equal(request.label, 'PANDA-PLPB');
+  assert.equal(request.comment, 'Panda Engine PLPB PB PDL RR 3:1');
 });
 
 test('planOpenPositionActions closes Panda position when engine signal disappears', () => {
