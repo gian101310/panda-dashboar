@@ -114,38 +114,65 @@ function NotificationCard({ notif }) {
   );
 }
 
-function CommandButton({ label, command, description }) {
+function CommandButton({ label, command, description, onResult }) {
   const [running, setRunning] = useState(false);
 
   const run = async () => {
     setRunning(true);
+    onResult?.({ command, status: 'running' });
     try {
-      // This would hit a local endpoint or Desktop Commander
-      // For now, just show the command to copy
-      await navigator.clipboard.writeText(command);
-      alert(`Copied to clipboard:\n${command}`);
-    } catch {
-      alert(`Run manually:\n${command}`);
+      const res = await fetch('/api/run-command', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ command }),
+      });
+      const data = await res.json();
+      onResult?.({ command, status: data.success ? 'success' : 'error', output: data.output, error: data.error || data.error });
+    } catch (e) {
+      onResult?.({ command, status: 'error', error: e.message });
     }
     setRunning(false);
   };
 
   return (
     <button onClick={run} disabled={running} style={{
-      background: 'rgba(8,14,28,0.92)',
-      border: '1px solid rgba(80,110,160,0.3)',
+      background: running ? 'rgba(0,255,159,0.08)' : 'rgba(8,14,28,0.92)',
+      border: `1px solid ${running ? '#00ff9f' : 'rgba(80,110,160,0.3)'}`,
       borderRadius: 6,
       padding: '8px 12px',
-      color: '#c8ddf0',
+      color: running ? '#00ff9f' : '#c8ddf0',
       fontFamily: mono,
       fontSize: 10,
-      cursor: 'pointer',
+      cursor: running ? 'wait' : 'pointer',
       textAlign: 'left',
       width: '100%',
+      transition: 'all 0.2s',
     }}>
-      <div style={{ fontWeight: 700, marginBottom: 2 }}>{label}</div>
+      <div style={{ fontWeight: 700, marginBottom: 2 }}>{running ? '⏳ RUNNING...' : label}</div>
       <div style={{ color: 'rgba(200,221,240,0.5)', fontSize: 9 }}>{description}</div>
     </button>
+  );
+}
+
+function OutputPanel({ result }) {
+  if (!result) return null;
+  const color = result.status === 'success' ? '#00ff9f' : result.status === 'error' ? '#ff4d6d' : '#ffd166';
+  return (
+    <div style={{ background: 'rgba(8,14,28,0.95)', border: `1px solid ${color}33`, borderRadius: 8, padding: 12, marginBottom: 16 }}>
+      <div style={{ fontFamily: mono, fontSize: 10, color, marginBottom: 6 }}>
+        {result.status === 'running' ? '⏳' : result.status === 'success' ? '✅' : '❌'} npm run {result.command}
+      </div>
+      {result.output && (
+        <pre style={{ fontFamily: mono, fontSize: 9, color: 'rgba(200,221,240,0.7)', margin: 0, whiteSpace: 'pre-wrap', maxHeight: 200, overflow: 'auto' }}>
+          {result.output}
+        </pre>
+      )}
+      {result.error && (
+        <pre style={{ fontFamily: mono, fontSize: 9, color: '#ff4d6d', margin: '4px 0 0', whiteSpace: 'pre-wrap' }}>
+          {result.error}
+        </pre>
+      )}
+    </div>
   );
 }
 
@@ -154,6 +181,7 @@ export default function GuardianPage() {
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState(false);
   const [executing, setExecuting] = useState(null);
+  const [cmdResult, setCmdResult] = useState(null);
 
   const fetchState = useCallback(async () => {
     try {
@@ -292,22 +320,26 @@ export default function GuardianPage() {
               </div>
             </div>
 
+            {/* COMMAND OUTPUT */}
+            <OutputPanel result={cmdResult} />
+
             {/* COMMAND PALETTE */}
             <div style={{ marginBottom: 20 }}>
               <h3 style={{ fontFamily: orb, fontSize: 12, letterSpacing: 2, color: '#c8ddf0', marginBottom: 10 }}>COMMANDS</h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8 }}>
-                <CommandButton label="▶ RUN AUTO LOOP" command="npm run auto:loop" description="Single pass: scan → guardian → execute/notify" />
-                <CommandButton label="▶ DAEMON MODE" command="npm run auto:loop -- --daemon" description="Continuous loop every 5 min" />
-                <CommandButton label="📊 GUARDIAN SNAPSHOT" command="npm run account:guardian -- --write" description="Refresh guardian state to Supabase" />
-                <CommandButton label="📈 CHART ANNOTATE" command="npm run chart:annotate -- --draw" description="Draw entry/SL/TP on valid setups" />
-                <CommandButton label="🎯 EXECUTE PB" command="npm run execute:engine-pb -- --approve" description="Execute best PB setup now" />
-                <CommandButton label="⚡ MARKET ORDER" command="npm run market:order -- --approve" description="Instant market entry" />
-                <CommandButton label="🔴 KILL SWITCH" command="npm run killswitch -- --confirm" description="Emergency close ALL positions" />
-                <CommandButton label="🔄 BREAKEVEN" command="npm run breakeven -- --approve" description="Move winning SLs to breakeven" />
-                <CommandButton label="📋 JOURNAL SYNC" command="npm run journal:sync -- --write" description="Sync closed trades to Supabase" />
-                <CommandButton label="🔔 ALERTS" command="npm run alerts -- --apply" description="Create guardian + entry zone alerts" />
-                <CommandButton label="📊 ACCOUNT REPORT" command="npm run account:report" description="Full account dump" />
-                <CommandButton label="🔍 SYMBOL SCAN" command="npm run scan:symbols -- --quotes" description="Live quotes for 28 pairs" />
+                <CommandButton label="▶ RUN AUTO LOOP" command="auto:loop" description="Single pass: scan → guardian → execute/notify" onResult={setCmdResult} />
+                <CommandButton label="▶ DAEMON MODE" command="auto:loop -- --daemon" description="Continuous loop every 5 min" onResult={setCmdResult} />
+                <CommandButton label="🔄 REFRESH GUARDIAN" command="account:guardian -- --write" description="Refresh guardian state to Supabase" onResult={setCmdResult} />
+                <CommandButton label="📈 SCORE ENGINE" command="plot:engine-pb" description="Score all 28 pairs → dashboard table" onResult={setCmdResult} />
+                <CommandButton label="📈 CHART ANNOTATE" command="chart:annotate -- --draw" description="Draw entry/SL/TP on valid setups" onResult={setCmdResult} />
+                <CommandButton label="🎯 EXECUTE PB" command="execute:engine-pb -- --approve" description="Execute best PB setup now" onResult={setCmdResult} />
+                <CommandButton label="⚡ MARKET ORDER" command="market:order -- --approve" description="Instant market entry" onResult={setCmdResult} />
+                <CommandButton label="🔴 KILL SWITCH" command="killswitch -- --confirm" description="Emergency close ALL positions" onResult={setCmdResult} />
+                <CommandButton label="🔄 BREAKEVEN" command="breakeven -- --approve" description="Move winning SLs to breakeven" onResult={setCmdResult} />
+                <CommandButton label="📋 JOURNAL SYNC" command="journal:sync -- --write" description="Sync closed trades to Supabase" onResult={setCmdResult} />
+                <CommandButton label="🔔 ALERTS" command="alerts -- --apply" description="Create guardian + entry zone alerts" onResult={setCmdResult} />
+                <CommandButton label="📊 ACCOUNT REPORT" command="account:report" description="Full account dump" onResult={setCmdResult} />
+                <CommandButton label="🔍 SYMBOL SCAN" command="scan:symbols -- --quotes" description="Live quotes for 28 pairs" onResult={setCmdResult} />
               </div>
             </div>
 
