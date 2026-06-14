@@ -43,10 +43,10 @@ app.add_middleware(
 
 # ================= CONFIG =================
 PANDA_PATH       = r"C:\Users\Admin\AppData\Roaming\MetaQuotes\Terminal\Common\Files"
-TELEGRAM_TOKEN   = "8556482762:AAGd6I7M6fFZ84f-8r2O8fyVktRCF3rUosA"
-TELEGRAM_CHAT_ID = "-1003857801976"
+TELEGRAM_TOKEN   = "REDACTED"  # rotate via BotFather
+TELEGRAM_CHAT_ID = "REDACTED"
 SUPABASE_URL     = "https://jxkelchxitwuilpbrwxk.supabase.co"
-SUPABASE_KEY     = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4a2VsY2h4aXR3dWlscGJyd3hrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3Mzg1MTI2NSwiZXhwIjoyMDg5NDI3MjY1fQ.OgNCKlZPy010de01wW02qH--Lb6zVYqPBxTEFpGrD5M"
+SUPABASE_KEY     = "REDACTED"  # service role key — rotate in Supabase dashboard
 MAX_FILE_AGE_SECONDS = 180
 
 LAST_QUARTER_MARK = None
@@ -573,8 +573,8 @@ def send_spike_alert(spikes):
         telegram_circuit.failure()
 
 # ================= LOGIN ALERT =================
-LOGIN_ALERT_BOT_TOKEN = "8605294552:AAG2o7bF30qkZx0Zv_FgmwA0RgS7g56OH7Y"
-LOGIN_ALERT_CHAT_ID   = "5379148910"
+LOGIN_ALERT_BOT_TOKEN = "REDACTED"
+LOGIN_ALERT_CHAT_ID   = "REDACTED"
 
 @app.post("/api/login-alert")
 async def login_alert(data: dict):
@@ -707,4 +707,4 @@ def get_status():
             "sell_pairs":    len([r for r in valid if (r.get("gap") or 0) <= -5]),
         }
     except Exception as e:
-        return {"status": "ERROR", "message": str(e)}
+        return {"status": "ERROR", "message": str(e)}                                                                                                                                                                                  

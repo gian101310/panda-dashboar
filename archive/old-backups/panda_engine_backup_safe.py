@@ -41,7 +41,7 @@ STRENGTH_LOG_SHEET = "STRENGTH_LOG"
 CREDS_FILE = r"C:\Users\Admin\Desktop\ctrader_trend_scanner\service_account.json"
 PANDA_PATH = r"C:\Users\Admin\AppData\Roaming\MetaQuotes\Terminal\Common\Files"
 
-TELEGRAM_TOKEN = "8556482762:AAGd6I7M6fFZ84f-8r2O8fyVktRCF3rUosA"
+TELEGRAM_TOKEN = "REDACTED"
 TELEGRAM_CHAT_ID = "-1003857801976"
 
 THRESHOLD = 2

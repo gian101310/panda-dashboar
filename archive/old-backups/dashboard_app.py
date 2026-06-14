@@ -8,7 +8,7 @@ app = FastAPI()
 
 # ================= CONFIG =================
 SUPABASE_URL = "https://jxkelchxitwuilpbrwxk.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4a2VsY2h4aXR3dWlscGJyd3hrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3Mzg1MTI2NSwiZXhwIjoyMDg5NDI3MjY1fQ.OgNCKlZPy010de01wW02qH--Lb6zVYqPBxTEFpGrD5M"  # USE YOUR FULL REAL KEY
+SUPABASE_KEY = "REDACTED"  # USE YOUR FULL REAL KEY
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 

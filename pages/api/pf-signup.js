@@ -2,8 +2,8 @@ import { supabase } from '../../lib/supabase';
 import { hashPassword } from '../../lib/auth';
 import crypto from 'crypto';
 
-const PF_BOT_TOKEN  = '8605294552:AAG2o7bF30qkZx0Zv_FgmwA0RgS7g56OH7Y';
-const PF_ADMIN_CHAT = '5379148910';
+const PF_BOT_TOKEN  = process.env.PF_BOT_TOKEN || '';
+const PF_ADMIN_CHAT = process.env.PF_ADMIN_CHAT || '';
 const PF_STARTER_FEATURES = ['signals','calendar','calculator','cot'];
 
 function pfGetIp(req) {

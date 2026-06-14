@@ -1,7 +1,8 @@
 import { supabase } from '../../../lib/supabase';
 import { validateSession, hashPassword } from '../../../lib/auth';
 
-const PF_BOT_TOKEN = '8605294552:AAG2o7bF30qkZx0Zv_FgmwA0RgS7g56OH7Y';
+const PF_BOT_TOKEN = process.env.PF_BOT_TOKEN || '';
+const PF_ADMIN_CHAT = process.env.PF_ADMIN_CHAT || '';
 
 function pfGenPassword() { return 'Panda#' + Math.floor(1000 + Math.random() * 9000); }
 
@@ -113,7 +114,7 @@ export default async function handler(req, res) {
       }
 
       // Notify admin
-      await pfSendTelegram('5379148910', `🐼 <b>USER APPROVED</b>\n<b>User:</b> ${username}\n<b>Tier:</b> ${safeTier.toUpperCase()}\n<b>Email:</b> ${req_row.email}`);
+      await pfSendTelegram(PF_ADMIN_CHAT, `🐼 <b>USER APPROVED</b>\n<b>User:</b> ${username}\n<b>Tier:</b> ${safeTier.toUpperCase()}\n<b>Email:</b> ${req_row.email}`);
       return res.status(200).json({ ok: true });
     }
 
@@ -128,7 +129,7 @@ export default async function handler(req, res) {
       const { data: u } = await supabase.from('panda_users').select('pf_approved, username').eq('id', id).single();
       const next = !u.pf_approved;
       await supabase.from('panda_users').update({ pf_approved: next }).eq('id', id);
-      await pfSendTelegram('5379148910', `🐼 <b>APPROVAL ${next ? 'GRANTED' : 'REVOKED'}</b>\n<b>User:</b> ${u.username}`);
+      await pfSendTelegram(PF_ADMIN_CHAT, `🐼 <b>APPROVAL ${next ? 'GRANTED' : 'REVOKED'}</b>\n<b>User:</b> ${u.username}`);
       return res.status(200).json({ ok: true, pf_approved: next });
     }
 

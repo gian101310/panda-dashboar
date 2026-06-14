@@ -4,6 +4,25 @@
 
 ---
 
+## Jun 14, 2026 — Full Repository Audit
+
+**Audit performed by Claude (Cowork). Zero application code modified.**
+
+**Documentation updates (authorized, completed):**
+- `PANDA_ENGINE_OVERVIEW.md` — corrected app.py line count (~2234+), dashboard.js line count (~3356), table count (31), signal_results and signal_tracker record counts
+- `AGENTS.md` — added audit warning note about package-lock.json gitignore contradiction and missing ignoreCommand in vercel.json
+- `PROJECT_AUDIT_REPORT.md` — created (full 15-section audit report)
+
+**Security findings requiring Boss-G approval:**
+- CRITICAL: Telegram Bot Token hardcoded in 5 source files (lib/loginAlert.mjs, telegram-webhook.js, pf-signup.js, pf-log-event.js, admin/pf-approve.js) — token must be rotated and moved to env vars
+- HIGH: `ignoreCommand` is absent from `vercel.json` despite CHANGELOG claiming it was added May 28 — cross-deploy risk is fully restored
+- HIGH: 4 API routes lack authentication (signal-agent.js, journal-agent.js, pattern-agent.js, run-all-agents.js)
+- HIGH: package-lock.json is in .gitignore — contradicts AGENTS.md rule, prevents npm audit
+
+**All fixes documented in PROJECT_AUDIT_REPORT.md, Section 13 (Prioritized Action Plan). No fixes applied yet.**
+
+---
+
 ## Jun 10, 2026 - Engine Launcher Watchdog Hardening
 
 **Engine restart reliability**

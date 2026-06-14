@@ -1,8 +1,8 @@
 import { supabase } from '../../lib/supabase';
 import crypto from 'crypto';
 
-const PF_BOT_TOKEN = '8605294552:AAG2o7bF30qkZx0Zv_FgmwA0RgS7g56OH7Y';
-const ADMIN_CHAT_ID = '5379148910';
+const PF_BOT_TOKEN = process.env.PF_BOT_TOKEN || '';
+const ADMIN_CHAT_ID = process.env.PF_ADMIN_CHAT || '';
 const FREE_TABS = ['signals','gap_chart','calendar','calculator'];
 // Set TG_WEBHOOK_SECRET in Vercel env vars, then re-register webhook with:
 // https://api.telegram.org/bot<TOKEN>/setWebhook?url=<URL>&secret_token=<SECRET>

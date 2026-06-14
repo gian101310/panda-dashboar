@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase';
+import { requireAdmin } from '../../lib/auth';
 
 const MIN_SAMPLE = 20;
 
@@ -274,6 +275,9 @@ function analyzeBoxTrend(rows) {
 // --- MAIN HANDLER ---
 
 export default async function handler(req, res) {
+  const admin = await requireAdmin(req);
+  if (!admin) return res.status(403).json({ error: 'Admin only' });
+
   // GET — return existing signal_pattern memories
   if (req.method === 'GET') {
     const { data, error } = await supabase

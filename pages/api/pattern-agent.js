@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase';
+import { requireAdmin } from '../../lib/auth';
 
 // Pattern Agent v2 — cross-references Signal Agent vs Journal Agent findings
 // Finds: alpha pairs, leak pairs, missed edge, behavioral blind spots,
@@ -357,6 +358,9 @@ function findBehavioralInsights(memories) {
 // --- MAIN HANDLER ---
 
 export default async function handler(req, res) {
+  const admin = await requireAdmin(req);
+  if (!admin) return res.status(403).json({ error: 'Admin only' });
+
   if (req.method === 'GET') {
     const { data, error } = await supabase
       .from('ai_memory').select('*')

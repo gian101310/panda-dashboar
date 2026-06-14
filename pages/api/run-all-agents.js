@@ -2,12 +2,13 @@
 import signalHandler from './signal-agent';
 import journalHandler from './journal-agent';
 import patternHandler from './pattern-agent';
+import { requireAdmin } from '../../lib/auth';
 
 // Vercel Pro: allow up to 60s for all 3 agents
 export const config = { maxDuration: 60 };
 
-function mockReqRes(method) {
-  const req = { method, headers: {}, body: {} };
+function mockReqRes(method, cookies) {
+  const req = { method, headers: {}, body: {}, cookies: cookies || {} };
   let _status = 200;
   let _body = null;
   const res = {
@@ -18,10 +19,10 @@ function mockReqRes(method) {
   return { req, res };
 }
 
-async function runAgent(name, handlerFn) {
+async function runAgent(name, handlerFn, cookies) {
   const start = Date.now();
   try {
-    const { req, res } = mockReqRes('POST');
+    const { req, res } = mockReqRes('POST', cookies);
     await handlerFn(req, res);
     const { status, body } = res.getResult();
     const duration_ms = Date.now() - start;
@@ -35,16 +36,20 @@ async function runAgent(name, handlerFn) {
 }
 
 export default async function handler(req, res) {
+  const admin = await requireAdmin(req);
+  if (!admin) return res.status(403).json({ error: 'Admin only' });
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  const cookies = req.cookies || {};
   const totalStart = Date.now();
 
   const agents = await Promise.all([
-    runAgent('Signal Agent', signalHandler),
-    runAgent('Journal Agent', journalHandler),
-    runAgent('Pattern Agent', patternHandler),
+    runAgent('Signal Agent', signalHandler, cookies),
+    runAgent('Journal Agent', journalHandler, cookies),
+    runAgent('Pattern Agent', patternHandler, cookies),
   ]);
 
   return res.status(200).json({

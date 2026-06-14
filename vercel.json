@@ -1,1 +1,7 @@
-{"framework":"nextjs","buildCommand":"next build","outputDirectory":".next","installCommand":"npm install"}
+{
+  "framework": "nextjs",
+  "buildCommand": "next build",
+  "outputDirectory": ".next",
+  "installCommand": "npm install",
+  "ignoreCommand": "[ \"$(git remote get-url origin 2>/dev/null)\" != \"https://github.com/gian101310/panda-dashboar.git\" ] && echo 1 || echo 0"
+}

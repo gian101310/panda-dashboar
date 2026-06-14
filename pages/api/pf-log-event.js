@@ -1,8 +1,8 @@
 import { supabase } from '../../lib/supabase';
 import crypto from 'crypto';
 
-const ADMIN_BOT = '8605294552:AAG2o7bF30qkZx0Zv_FgmwA0RgS7g56OH7Y';
-const ADMIN_CHAT = '5379148910';
+const ADMIN_BOT = process.env.PF_BOT_TOKEN || '';
+const ADMIN_CHAT = process.env.PF_ADMIN_CHAT || '';
 
 const FLAGS = {
   LOGIN_SUCCESS:        ['🆕 First Login'],

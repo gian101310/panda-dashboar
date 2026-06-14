@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase';
+import { requireAdmin } from '../../lib/auth';
 
 const MIN_SAMPLE = 20;
 
@@ -246,6 +247,9 @@ function analyzeByGapAtEntry(trades) {
 // --- MAIN HANDLER ---
 
 export default async function handler(req, res) {
+  const admin = await requireAdmin(req);
+  if (!admin) return res.status(403).json({ error: 'Admin only' });
+
   if (req.method === 'GET') {
     const { data, error } = await supabase
       .from('ai_memory').select('*')

@@ -17,7 +17,7 @@ TOKEN_URL     = "https://openapi.ctrader.com/apps/token"
 FROM_TS       = 1735689600000  # Jan 1 2026
 
 SUPABASE_URL = "https://jxkelchxitwuilpbrwxk.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4a2VsY2h4aXR3dWlscGJyd3hrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3Mzg1MTI2NSwiZXhwIjoyMDg5NDI3MjY1fQ.OgNCKlZPy010de01wW02qH--Lb6zVYqPBxTEFpGrD5M"
+SUPABASE_KEY = "REDACTED"
 
 ACCOUNT_LABELS = {
     36456179: "Live Account",

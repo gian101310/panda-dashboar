@@ -1,6 +1,6 @@
 # PANDA ENGINE v3.0 — Structured Overview
 
-> Last updated: 2026-05-25
+> Last updated: 2026-06-14
 > Author: Boss-G (gianronaldang@gmail.com)
 
 ---
@@ -19,7 +19,7 @@ MT4 Indicators (Panda Lines v4.1 + TBG)
         | writes mt4_SYMBOL.txt + tbg_SYMBOL.txt
         v
 +---------------------------+
-|   app.py (FastAPI/Python) |  <-- Core Engine (~2180 lines)
+|   app.py (FastAPI/Python) |  <-- Core Engine (~2234+ lines)
 |   Running on local PC     |
 |   Scheduler: 5-min + 60-min cycles
 +---------------------------+
@@ -29,14 +29,14 @@ MT4 Indicators (Panda Lines v4.1 + TBG)
         | panda_score_*.txt -> MT4 EA panel
         v
 +---------------------------+
-|   Supabase (PostgreSQL)   |  <-- 30+ tables
+|   Supabase (PostgreSQL)   |  <-- 31 tables
 |   Project: jxkelchxitwuilpbrwxk
 +---------------------------+
         |
         v
 +---------------------------+
 |   Next.js 14 Dashboard    |  <-- Vercel (pandaengine.app)
-|   dashboard.js (~3251 lines, single-file)
+|   dashboard.js (~3356 lines, single-file)
 |   44 API routes in pages/api/
 |   3 AI Agents (signal, journal, pattern)
 |   Panda AI Chat (3 modes)
@@ -225,7 +225,7 @@ PDL : 1.97100
 
 ## 5. Dashboard (Next.js 14) — Component Map
 
-### 5.1 Main File: dashboard.js (~3251 lines)
+### 5.1 Main File: dashboard.js (~3356 lines)
 
 | Line Range | Component | Purpose |
 |------------|-----------|---------|
@@ -338,7 +338,7 @@ PANELS, SIGNALS, TABLE, GAP CHART, RESEARCH, CALCULATOR, SETUPS, VALID PAIRS, SP
 
 ---
 
-## 7. Supabase Tables (30+)
+## 7. Supabase Tables (31)
 
 ### Live Data
 | Table | Records | Purpose |
@@ -352,8 +352,8 @@ PANELS, SIGNALS, TABLE, GAP CHART, RESEARCH, CALCULATOR, SETUPS, VALID PAIRS, SP
 | Table | Records | Purpose |
 |-------|---------|---------|
 | `signal_snapshots` | 121K+ | All 21 pairs every cycle |
-| `signal_results` | 1,419+ | BB + INTRA strategy performance |
-| `signal_tracker` | 2,851+ | Signal lifecycle (session/box/pdr/prices) |
+| `signal_results` | 1,822+ | BB + INTRA strategy performance |
+| `signal_tracker` | 3,989+ | Signal lifecycle (session/box/pdr/prices) |
 | `spike_events` | 852+ | Momentum spike alerts |
 
 ### AI Layer

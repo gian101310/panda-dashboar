@@ -27,10 +27,10 @@ app = FastAPI()
 
 # ================= CONFIG =================
 PANDA_PATH       = r"C:\Users\Admin\AppData\Roaming\MetaQuotes\Terminal\Common\Files"
-TELEGRAM_TOKEN   = "8556482762:AAGd6I7M6fFZ84f-8r2O8fyVktRCF3rUosA"
+TELEGRAM_TOKEN   = "REDACTED"
 TELEGRAM_CHAT_ID = "-1003857801976"
 SUPABASE_URL     = "https://jxkelchxitwuilpbrwxk.supabase.co"
-SUPABASE_KEY     = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4a2VsY2h4aXR3dWlscGJyd3hrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3Mzg1MTI2NSwiZXhwIjoyMDg5NDI3MjY1fQ.OgNCKlZPy010de01wW02qH--Lb6zVYqPBxTEFpGrD5M"
+SUPABASE_KEY     = "REDACTED"
 MAX_FILE_AGE_SECONDS = 180
 
 LAST_QUARTER_MARK = None

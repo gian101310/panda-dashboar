@@ -48,7 +48,8 @@ panda-dashboar repo  →  panda-dashboard Vercel project  →  pandaengine.app
 - **`assistant-server` repo is DEAD.** Do not push to it, deploy from it, or reference it.
 - **Only push to `panda-dashboar`** — it auto-deploys to Vercel on every push.
 - **Only edit files in the local folder above.** Desktop copies (`ctrader_trend_scanner`, etc.) are old/archived.
-- A `vercel.json` ignoreCommand guardrail is in place that auto-cancels builds from wrong repos.
+- A `vercel.json` ignoreCommand guardrail MUST be in place that auto-cancels builds from wrong repos.
+  > ⚠️ AUDIT FINDING (2026-06-14): The `ignoreCommand` is currently ABSENT from `vercel.json`. Restoration is pending Boss-G approval. Do NOT remove it once restored.
 
 ### WHY THIS RULE EXISTS
 
@@ -64,10 +65,14 @@ These files are load-bearing for Vercel builds. Deleting ANY of them = full site
 
 ```
 package.json        — NEVER DELETE
-package-lock.json   — NEVER DELETE
+package-lock.json   — NEVER DELETE (also: do NOT add to .gitignore — it must be committed)
 vercel.json         — NEVER DELETE (contains deploy guardrail)
 next.config.js      — NEVER DELETE
 ```
+
+> ⚠️ KNOWN ISSUE (2026-06-14 audit): `package-lock.json` is currently listed in `.gitignore`.
+> This contradicts the NEVER DELETE rule and prevents `npm audit` from running.
+> Fix: remove `package-lock.json` from `.gitignore` and commit it (pending Boss-G approval).
 
 ### WHY THIS RULE EXISTS
 
