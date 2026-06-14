@@ -267,7 +267,26 @@ export default function GuardianPage() {
               Last updated: {data?.lastUpdated ? new Date(data.lastUpdated).toLocaleString() : '—'}
             </div>
           </div>
-          <ModeToggle mode={data?.mode || 'MANUAL'} onToggle={toggleMode} loading={toggling} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <ModeToggle mode={data?.mode || 'MANUAL'} onToggle={toggleMode} loading={toggling} />
+            <button
+              onClick={() => window.location.href = '/dashboard'}
+              style={{
+                background: 'rgba(0,180,255,0.08)',
+                border: '1px solid rgba(0,180,255,0.35)',
+                borderRadius: 6,
+                padding: '10px 18px',
+                color: '#00b4ff',
+                fontFamily: mono,
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: 2,
+                cursor: 'pointer',
+              }}
+            >
+              ← DASHBOARD
+            </button>
+          </div>
         </div>
 
         {loading && <div style={{ fontFamily: mono, color: 'rgba(200,221,240,0.5)' }}>Loading...</div>}
