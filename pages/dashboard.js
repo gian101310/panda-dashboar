@@ -3137,8 +3137,8 @@ export default function Dashboard() {
   }, [aiMemories]);
   const [tab,        setTab]        = useState('OVERVIEW');
   const [logSub,     setLogSub]     = useState('Signal Log');
-  const [isAdmin,    setIsAdmin]    = useState(false);
   const [user,       setUser]       = useState(null);
+  const isAdmin = user?.role === 'admin';
   const [showAlertSettings, setShowAlertSettings] = useState(false);
   const [popup,      setPopup]      = useState(null);
   const [maintenance, setMaintenance] = useState(false);
@@ -3232,7 +3232,12 @@ export default function Dashboard() {
   useEffect(()=>{const t=setInterval(fetchSpikes,15000);fetchSpikes();return()=>clearInterval(t);},[fetchSpikes]);
   useEffect(()=>{if(tab==='RESEARCH'&&cotData.length===0) fetchCot();},[tab,cotData.length,fetchCot]);
   useEffect(()=>{fetchCot();},[fetchCot]);
-  useEffect(()=>{fetch('/api/me').then(r=>r.json()).then(d=>{setUser(d);if(d.role==='admin') setIsAdmin(true);}).catch(()=>{});},[]);
+  useEffect(()=>{
+    fetch('/api/me')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setUser(d && d.role ? d : null))
+      .catch(() => setUser(null));
+  },[]);
   useEffect(()=>{fetch('/api/page-visibility').then(r=>r.json()).then(d=>setPageVis(d)).catch(()=>{});},[]);
 
   // Maintenance mode check

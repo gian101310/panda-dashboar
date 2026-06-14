@@ -1,5 +1,6 @@
 import Head from 'next/head';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { requireAdmin } from '../lib/auth';
 
 const mono = "'Share Tech Mono',monospace";
 const orb = "'Orbitron',sans-serif";
@@ -211,6 +212,20 @@ export default function AccountGuardianPage() {
       </div>
     </>
   );
+}
+
+export async function getServerSideProps({ req }) {
+  const session = await requireAdmin(req);
+  if (!session) {
+    return {
+      redirect: {
+        destination: '/dashboard',
+        permanent: false,
+      },
+    };
+  }
+
+  return { props: {} };
 }
 
 const button = { background: 'rgba(0,180,255,0.08)', border: '1px solid rgba(0,180,255,0.35)', borderRadius: 5, color: '#00b4ff', fontFamily: mono, fontSize: 9, letterSpacing: 2, padding: '7px 12px', cursor: 'pointer' };
