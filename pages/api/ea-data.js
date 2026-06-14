@@ -30,7 +30,7 @@ export default async function handler(req, res) {
         base_d1, base_h4, base_h1,
         quote_d1, quote_h4, quote_h1,
         box_h1_trend, box_h4_trend,
-        pl_zone, pl_bias, pl_g1_valid,
+        pl_zone, pl_bias, pl_g1_valid, pl_st, pl_fl, pl_price,
         atr, spread, updated_at
       `);
 

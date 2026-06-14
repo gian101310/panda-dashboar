@@ -3137,8 +3137,8 @@ export default function Dashboard() {
   }, [aiMemories]);
   const [tab,        setTab]        = useState('OVERVIEW');
   const [logSub,     setLogSub]     = useState('Signal Log');
-  const [isAdmin,    setIsAdmin]    = useState(false);
   const [user,       setUser]       = useState(null);
+  const isAdmin = user?.role === 'admin';
   const [showAlertSettings, setShowAlertSettings] = useState(false);
   const [popup,      setPopup]      = useState(null);
   const [maintenance, setMaintenance] = useState(false);
@@ -3232,7 +3232,12 @@ export default function Dashboard() {
   useEffect(()=>{const t=setInterval(fetchSpikes,15000);fetchSpikes();return()=>clearInterval(t);},[fetchSpikes]);
   useEffect(()=>{if(tab==='RESEARCH'&&cotData.length===0) fetchCot();},[tab,cotData.length,fetchCot]);
   useEffect(()=>{fetchCot();},[fetchCot]);
-  useEffect(()=>{fetch('/api/me').then(r=>r.json()).then(d=>{setUser(d);if(d.role==='admin') setIsAdmin(true);}).catch(()=>{});},[]);
+  useEffect(()=>{
+    fetch('/api/me')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setUser(d && d.role ? d : null))
+      .catch(() => setUser(null));
+  },[]);
   useEffect(()=>{fetch('/api/page-visibility').then(r=>r.json()).then(d=>setPageVis(d)).catch(()=>{});},[]);
 
   // Maintenance mode check
@@ -3340,6 +3345,7 @@ export default function Dashboard() {
             {(isAdmin||user?.role==='vip'||user?.feature_access?.includes('journal'))&&<button onClick={()=>window.location.href='/journal'} style={{background:'rgba(255,209,102,0.06)',border:'1px solid #ffd16633',borderRadius:5,color:'#ffd166',fontFamily:mono,fontSize:9,padding:'5px 10px',cursor:'pointer'}}>📓 JOURNAL</button>}
             <button onClick={()=>window.location.href='/strength'} style={{background:'rgba(78,154,241,0.06)',border:'1px solid #4e9af133',borderRadius:5,color:'#4e9af1',fontFamily:mono,fontSize:9,padding:'5px 10px',cursor:'pointer'}}>STRENGTH</button>
             {isAdmin&&<button onClick={()=>window.location.href='/admin'} style={{background:'rgba(255,209,102,0.08)',border:'1px solid #ffd16644',borderRadius:5,color:'#ffd166',fontFamily:mono,fontSize:9,padding:'5px 10px',cursor:'pointer'}}>🛡️ ADMIN</button>}
+            {isAdmin&&<button onClick={()=>window.location.href='/account-guardian'} style={{background:'rgba(255,77,109,0.08)',border:'1px solid #ff4d6d44',borderRadius:5,color:'#ff4d6d',fontFamily:mono,fontSize:9,padding:'5px 10px',cursor:'pointer'}}>GUARDIAN</button>}
             {isAdmin&&<button onClick={()=>setShowPageVis(!showPageVis)} style={{background:showPageVis?'rgba(204,119,255,0.15)':'rgba(204,119,255,0.06)',border:'1px solid #cc77ff44',borderRadius:5,color:'#cc77ff',fontFamily:mono,fontSize:9,padding:'5px 10px',cursor:'pointer'}}>👁️ PAGES</button>}
             {isAdmin&&<button onClick={toggleMaintenance} style={{background:maintenance?'rgba(255,77,109,0.12)':'rgba(0,255,159,0.06)',border:`1px solid ${maintenance?'#ff4d6d33':'#00ff9f33'}`,borderRadius:5,color:maintenance?'#ff4d6d':'#00ff9f',fontFamily:mono,fontSize:9,padding:'5px 10px',cursor:'pointer'}}>{maintenance?'🔴 SITE OFF':'🟢 SITE ON'}</button>}
             <button onClick={handleLogout} style={{background:'transparent',border:'1px solid #2a1525',borderRadius:5,color:'#ff4d6d',fontFamily:mono,fontSize:9,padding:'5px 10px',cursor:'pointer'}}>LOGOUT</button>
