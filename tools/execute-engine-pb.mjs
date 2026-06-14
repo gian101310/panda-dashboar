@@ -288,6 +288,20 @@ async function main() {
 
   if (!decision.allowed) return;
 
+  // --- MARGIN PRE-FLIGHT CHECK ---
+  const { preflightMarginCheck } = await import('../lib/marginCheck.mjs');
+  const marginCheck = await preflightMarginCheck(client, {
+    symbol: setup.symbol,
+    tradeSide: setup.direction,
+    volume: request.volume,
+  });
+
+  if (!marginCheck.allowed) {
+    console.log(`MARGIN_BLOCKED | ${setup.symbol} | reason=${marginCheck.reason} | required=${marginCheck.requiredMargin} | available=${marginCheck.availableMargin} | usage=${marginCheck.usagePercent}%`);
+    return;
+  }
+  console.log(`MARGIN_OK | required=${marginCheck.requiredMargin} | available=${marginCheck.availableMargin} | usage=${marginCheck.usagePercent}%`);
+
   const result = await client.call('place_limit_order', request);
   console.log(`PLACED | ${setup.symbol} | order=${JSON.stringify(result)}`);
 }

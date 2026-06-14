@@ -5,6 +5,7 @@ import {
   classifyGuardianStatus,
   computeChallengeRisk,
 } from '../lib/accountGuardian.mjs';
+import { evaluatePerformance, mergeStatsIntoGuardian } from '../lib/accountStats.mjs';
 
 function loadDotEnv(path = '.env') {
   if (!existsSync(path)) return;
@@ -138,7 +139,17 @@ async function main() {
     balance: balance?.balance,
     equity: balance?.equity,
   });
-  const guardian = classifyGuardianStatus({ risk, positions, pendingOrders });
+  let guardian = classifyGuardianStatus({ risk, positions, pendingOrders });
+
+  // --- STATS GATE: feed win rate + profit factor into Guardian ---
+  let statsGate = null;
+  try {
+    const accountStats = await client.call('get_account_statistics');
+    statsGate = evaluatePerformance(accountStats);
+    guardian = mergeStatsIntoGuardian(guardian, statsGate);
+  } catch (e) {
+    console.log(`STATS_GATE_SKIP | ${e.message}`);
+  }
 
   const snapshot = {
     balance: risk.balance,
@@ -157,6 +168,9 @@ async function main() {
     blockers: guardian.blockers,
     warnings: guardian.warnings,
     mode: guardian.mode,
+    stats_gate: guardian.statsGate || null,
+    risk_multiplier: guardian.riskMultiplier ?? 1.0,
+    stats_detail: guardian.statsDetail || null,
   };
 
   if (shouldWrite) await writeSnapshot(snapshot);
@@ -172,6 +186,8 @@ async function main() {
     `positions=${positions.length}`,
     `missing_sl=${guardian.positionsWithoutSl}`,
     `pending=${pendingOrders.length}`,
+    `stats_gate=${guardian.statsGate || 'N/A'}`,
+    `risk_mult=${guardian.riskMultiplier ?? 1.0}`,
     `blockers=${guardian.blockers.join(',') || 'none'}`,
   ].join(' | '));
 }
