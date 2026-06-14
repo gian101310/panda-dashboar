@@ -236,10 +236,10 @@ test('buildEngineChartObjects plots PB entry with SL and TP only', () => {
 
   const objects = buildEngineChartObjects(setup, plan, '2026-06-11T18:30:00Z');
 
-  assert.deepEqual(objects.map(o => o.object_type), ['risk_reward', 'horizontal_line', 'text']);
+  assert.deepEqual(objects.map(o => o.object_type), ['risk_reward', 'horizontal_line', 'horizontal_line', 'horizontal_line', 'text']);
   assert.equal(objects[0].side, 'buy');
   assert.equal(objects[0].price1, 1.101);
   assert.equal(objects[0].price2, 1.09533);
   assert.equal(objects[0].price3, 1.118);
-  assert.match(objects[2].text, /BB EURUSD BUY PB PDL/);
+  assert.match(objects[4].text, /BB EURUSD BUY PB PDL/);
 });

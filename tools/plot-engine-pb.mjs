@@ -105,6 +105,26 @@ async function loadRows() {
   return data || [];
 }
 
+async function focusPlotChart(client, setup) {
+  const timeframe = setup.strategy === 'INTRA' ? 'm15' : 'h1';
+  const chartsResult = await client.call('list_charts');
+  const existing = (chartsResult?.charts || []).find(chart =>
+    chart.symbolName === setup.symbol && String(chart.timeframe || '').toLowerCase() === timeframe
+  );
+  if (existing?.chartId) {
+    await client.call('focus_chart', { chartId: existing.chartId });
+    return existing.chartId;
+  }
+
+  const opened = await client.call('open_chart', { symbolName: setup.symbol, timeframe });
+  if (opened?.chartId) {
+    await client.call('focus_chart', { chartId: opened.chartId });
+    return opened.chartId;
+  }
+
+  return null;
+}
+
 async function buildPlans(client) {
   const rows = await loadRows();
   const plans = [];
@@ -143,8 +163,11 @@ async function main() {
   for (const { setup, plan } of plans) {
     const objects = buildEngineChartObjects(setup, plan, nowIso);
     if (!dryRun) {
-      await client.call('open_chart', { symbolName: setup.symbol, timeframe: setup.strategy === 'INTRA' ? 'm15' : 'h1' });
-      for (const object of objects) await client.call('add_chart_object', object);
+      const chartId = await focusPlotChart(client, setup);
+      const added = [];
+      for (const object of objects) added.push(await client.call('add_chart_object', object));
+      const chartObjects = await client.call('get_chart_objects');
+      console.log(`CHART | ${setup.symbol} | chart=${chartId || 'active'} | added=${added.length} | objects=${chartObjects?.objects?.length ?? 'unknown'}`);
     }
     console.log([
       dryRun ? 'DRY' : 'PLOTTED',
