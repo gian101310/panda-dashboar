@@ -33,7 +33,6 @@ import {
   computeRiskSizedVolume,
   deriveUsdPipValuePerUnit,
   evaluatePendingOrderExecution,
-  pipValuePerUnit,
 } from '../lib/tradeExecutor.mjs';
 import {
   computeChallengeBudget,
@@ -334,7 +333,7 @@ async function runPass() {
 
   // Get symbol details for lot calculation
   const symbolDetails = await client.call('get_symbol_details', { symbolName: setup.symbol });
-  const pipUnit = pipValuePerUnit(symbolDetails);
+  const pipUnit = deriveUsdPipValuePerUnit({ symbolDetails });
   const sizing = computeLotSize({
     maxRiskUsd: budget.maxRiskUsd,
     slPips: plan.stopLoss.pips,
