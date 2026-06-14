@@ -34,7 +34,12 @@ const limit = Math.max(1, Math.min(10, Number(limitArg?.split('=')[1] || 5)));
 
 function parseMcpText(result) {
   const text = result?.content?.find(part => part.type === 'text')?.text;
-  return text ? JSON.parse(text) : null;
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { text };
+  }
 }
 
 async function mcpRequest(body, sessionId = null) {
@@ -80,6 +85,18 @@ function currentPriceFromQuote(quote, direction) {
   return Number.isFinite(bid) ? bid : ask;
 }
 
+async function currentPriceForSetup(client, setup) {
+  const quote = await client.call('get_spot_prices', { symbolName: setup.symbol });
+  let currentPrice = currentPriceFromQuote(quote, setup.direction);
+  if (Number.isFinite(currentPrice)) return { quote, currentPrice };
+
+  const details = await client.call('get_symbol_details', { symbolName: setup.symbol });
+  currentPrice = currentPriceFromQuote(details, setup.direction);
+  if (Number.isFinite(currentPrice)) return { quote: details, currentPrice };
+
+  return { quote, currentPrice: null };
+}
+
 async function loadRows() {
   if (!SUPABASE_KEY) throw new Error('SUPABASE_SERVICE_KEY or SUPABASE_ANON_KEY is required');
   const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -96,8 +113,11 @@ async function buildPlans(client) {
     if (!setup) continue;
     if (strategyFilter !== 'ALL' && strategyFilter !== setup.strategy) continue;
 
-    const quote = await client.call('get_spot_prices', { symbolName: setup.symbol });
-    const currentPrice = currentPriceFromQuote(quote, setup.direction);
+    const { quote, currentPrice } = await currentPriceForSetup(client, setup);
+    if (!Number.isFinite(currentPrice)) {
+      console.log(`SKIP | ${setup.strategy} | ${setup.symbol} | no live quote`);
+      continue;
+    }
     const plan = buildPullbackPlan(row, currentPrice);
     if (!plan) continue;
     plans.push({ setup, plan, quote });
