@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   buildPendingOrderRequest,
   computeRiskSizedVolume,
+  deriveUsdPipValuePerUnit,
   evaluatePendingOrderExecution,
   normalizeVolumeUnits,
   planOpenPositionActions,
@@ -131,6 +132,31 @@ test('computeRiskSizedVolume refuses to guess when pip value is unavailable', ()
     risk: { equity: 48000, dailyRemaining: 1900, maxLossRemaining: 2500 },
     symbolDetails,
   }), /PIP_VALUE_UNAVAILABLE/);
+});
+
+test('deriveUsdPipValuePerUnit handles USD quote pairs directly', () => {
+  assert.equal(deriveUsdPipValuePerUnit({
+    symbolDetails: { name: 'EURUSD', pipSize: 0.0001, lotSize: 100000 },
+  }), 0.0001);
+});
+
+test('deriveUsdPipValuePerUnit handles USD base pairs by inverting current price', () => {
+  assert.equal(deriveUsdPipValuePerUnit({
+    symbolDetails: { name: 'USDJPY', pipSize: 0.01, lotSize: 100000 },
+    conversionDetails: { name: 'USDJPY', bid: 160, ask: 160 },
+  }), 0.0000625);
+});
+
+test('deriveUsdPipValuePerUnit handles cross pairs through conversion quotes', () => {
+  assert.equal(deriveUsdPipValuePerUnit({
+    symbolDetails: { name: 'EURCAD', pipSize: 0.0001, lotSize: 100000 },
+    conversionDetails: { name: 'USDCAD', bid: 1.25, ask: 1.25 },
+  }), 0.00008);
+
+  assert.equal(deriveUsdPipValuePerUnit({
+    symbolDetails: { name: 'EURGBP', pipSize: 0.0001, lotSize: 100000 },
+    conversionDetails: { name: 'GBPUSD', bid: 1.5, ask: 1.5 },
+  }), 0.00015000000000000001);
 });
 
 test('buildPendingOrderRequest creates a buy limit request with SL and TP pips', () => {

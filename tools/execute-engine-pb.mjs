@@ -13,6 +13,7 @@ import {
 import {
   buildPendingOrderRequest,
   computeRiskSizedVolume,
+  deriveUsdPipValuePerUnit,
   evaluatePendingOrderExecution,
   planOpenPositionActions,
   planPendingOrderActions,
@@ -161,7 +162,45 @@ function activeEngineSetups(rows, now) {
 }
 
 function classifyForExecutionMode(row, now) {
-  return executionMode === 'INTRA' ? classifyEngineSetup(row, now) : classifyPandaLinesPbSetup(row);
+  if (executionMode === 'PLPB') return classifyPandaLinesPbSetup(row);
+  const setup = classifyEngineSetup(row, now);
+  return setup?.strategy === 'INTRA' ? setup : null;
+}
+
+function forexQuoteCurrency(symbolName) {
+  const name = String(symbolName || '').toUpperCase();
+  return name.length >= 6 ? name.slice(3, 6) : '';
+}
+
+function hasBrokerPipValue(symbolDetails) {
+  return Number(symbolDetails?.pipValuePerUnit) > 0
+    || Number(symbolDetails?.pipValuePerLot) > 0
+    || Number(symbolDetails?.pipValue) > 0;
+}
+
+async function enrichUsdPipValue(client, symbolDetails, depositAsset = 'USD') {
+  const deposit = String(depositAsset || 'USD').toUpperCase();
+  const quote = forexQuoteCurrency(symbolDetails?.name || symbolDetails?.symbolName || symbolDetails?.symbol);
+  if (hasBrokerPipValue(symbolDetails) || quote === deposit) {
+    const pipValuePerUnit = deriveUsdPipValuePerUnit({ symbolDetails, depositAsset: deposit });
+    return pipValuePerUnit > 0 ? { ...symbolDetails, pipValuePerUnit } : symbolDetails;
+  }
+
+  for (const conversionSymbol of [`${quote}${deposit}`, `${deposit}${quote}`]) {
+    try {
+      const conversionDetails = await client.call('get_symbol_details', { symbolName: conversionSymbol });
+      const pipValuePerUnit = deriveUsdPipValuePerUnit({
+        symbolDetails,
+        conversionDetails,
+        depositAsset: deposit,
+      });
+      if (pipValuePerUnit > 0) return { ...symbolDetails, pipValuePerUnit };
+    } catch {
+      // Try the inverse conversion symbol next.
+    }
+  }
+
+  return symbolDetails;
 }
 
 async function buildBestPlan(client, rows, now) {
@@ -214,7 +253,8 @@ async function main() {
   }
 
   const { setup, plan } = candidate;
-  const symbolDetails = await client.call('get_symbol_details', { symbolName: setup.symbol });
+  const rawSymbolDetails = await client.call('get_symbol_details', { symbolName: setup.symbol });
+  const symbolDetails = await enrichUsdPipValue(client, rawSymbolDetails, balance?.depositAsset || 'USD');
   const sizing = computeRiskSizedVolume({ plan, risk, symbolDetails, riskPct, maxRiskUsd, safetyBufferUsd });
   const expiresAt = new Date(Date.now() + holdHours * 60 * 60 * 1000);
   const request = buildPendingOrderRequest({ setup, plan, volume: sizing.volume, expiresAt });
