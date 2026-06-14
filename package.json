@@ -18,7 +18,9 @@
         "scan:symbols": "node tools/symbol-scanner-agent.mjs",
         "chart:manage": "node tools/chart-manager-agent.mjs",
         "account:report": "node tools/account-report-agent.mjs",
-        "alerts": "node tools/price-alert-agent.mjs"
+        "alerts": "node tools/price-alert-agent.mjs",
+        "chart:annotate": "node tools/chart-annotator-agent.mjs",
+        "auto:loop": "node tools/autonomous-loop.mjs"
     },
     "dependencies": {
         "@supabase/supabase-js": "^2.45.4",
