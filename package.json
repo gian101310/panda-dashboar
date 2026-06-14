@@ -8,7 +8,10 @@
         "start": "next start",
         "plot:engine-pb": "node tools/plot-engine-pb.mjs",
         "account:guardian": "node tools/account-guardian-agent.mjs",
-        "execute:engine-pb": "node tools/execute-engine-pb.mjs"
+        "execute:engine-pb": "node tools/execute-engine-pb.mjs",
+        "breakeven": "node tools/breakeven-agent.mjs",
+        "journal:sync": "node tools/journal-sync-agent.mjs",
+        "backtest": "node tools/backtest-engine-setups.mjs"
     },
     "dependencies": {
         "@supabase/supabase-js": "^2.45.4",
