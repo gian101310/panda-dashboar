@@ -33,7 +33,13 @@ import {
   computeRiskSizedVolume,
   deriveUsdPipValuePerUnit,
   evaluatePendingOrderExecution,
+  pipValuePerUnit,
 } from '../lib/tradeExecutor.mjs';
+import {
+  computeChallengeBudget,
+  computeLotSize,
+  formatTradeNotification,
+} from '../lib/challengeRisk.mjs';
 
 function loadDotEnv(path = '.env') {
   if (!existsSync(path)) return;
@@ -295,14 +301,58 @@ async function runPass() {
     console.log(`CHART_SKIP | ${e.message}`);
   }
 
+  // --- CHALLENGE-AWARE RISK BUDGET ---
+  // Count PANDA positions and risk
+  const pandaPositions = positions.filter(p =>
+    String(p.label || '').startsWith('PANDA') || String(p.comment || '').includes('Panda')
+  );
+  const sameDirectionCount = pandaPositions.filter(p =>
+    String(p.tradeSide || '').toUpperCase() === setup.direction
+  ).length;
+  const openRiskUsd = pandaPositions.reduce((sum, p) => {
+    const sl = Number(p.stopLoss);
+    const entry = Number(p.entryPrice || p.currentPrice);
+    if (!sl || !entry) return sum + 100; // assume $100 risk if no SL
+    return sum + Math.abs(entry - sl) * Number(p.volume || 0) * 0.0001; // rough estimate
+  }, 0);
+
+  const budget = computeChallengeBudget({
+    dailyRemaining: risk.dailyRemaining,
+    maxLossRemaining: risk.maxLossRemaining,
+    openPositionCount: pandaPositions.length,
+    openDirectionCount: sameDirectionCount,
+    openRiskUsd,
+  });
+
+  if (!budget.allowed) {
+    console.log(`CHALLENGE_BLOCKED | ${budget.reason} | positions=${pandaPositions.length}`);
+    await sendTelegramNotification(
+      `🚫 *CHALLENGE BLOCK*\n${setup.symbol} ${setup.direction}\nReason: ${budget.reason}\nPositions: ${pandaPositions.length}/3`
+    );
+    return;
+  }
+
+  // Get symbol details for lot calculation
+  const symbolDetails = await client.call('get_symbol_details', { symbolName: setup.symbol });
+  const pipUnit = pipValuePerUnit(symbolDetails);
+  const sizing = computeLotSize({
+    maxRiskUsd: budget.maxRiskUsd,
+    slPips: plan.stopLoss.pips,
+    pipValuePerUnit: pipUnit,
+    lotSize: Number(symbolDetails?.lotSize || 100000),
+    volumeStep: Number(symbolDetails?.volumeStep || 100000),
+    minVolume: Number(symbolDetails?.minVolume || 100000),
+  });
+
+  if (!sizing.volume) {
+    console.log(`SIZING_FAILED | ${sizing.reason} | budget=$${budget.maxRiskUsd} | SL=${plan.stopLoss.pips}p`);
+    return;
+  }
+
+  console.log(`SIZING | lots=${sizing.lots} | risk=$${sizing.estimatedRiskUsd}/$${budget.maxRiskUsd} | slots=${budget.slotsAvailable}/3`);
+
   if (mode === 'AUTO') {
     // --- AUTO EXECUTION ---
-    // Get symbol details for sizing
-    const symbolDetails = await client.call('get_symbol_details', { symbolName: setup.symbol });
-    const riskPct = 0.25;
-    const maxRiskUsd = 250;
-    const safetyBufferUsd = 100;
-    const sizing = computeRiskSizedVolume({ plan, risk, symbolDetails, riskPct, maxRiskUsd, safetyBufferUsd });
     const expiresAt = new Date(Date.now() + 12 * 60 * 60 * 1000);
     const request = buildPendingOrderRequest({ setup, plan, volume: sizing.volume, expiresAt });
 
@@ -323,33 +373,27 @@ async function runPass() {
 
     // Execute
     const result = await client.call('place_limit_order', request);
-    console.log(`AUTO_EXECUTED | ${setup.symbol} ${setup.direction} | volume=${request.volume} | order=${JSON.stringify(result)}`);
+    console.log(`AUTO_EXECUTED | ${setup.symbol} ${setup.direction} | lots=${sizing.lots} | order=${JSON.stringify(result)}`);
 
-    // Notify about auto execution
+    // Notify with full details
     await sendTelegramNotification(
-      `✅ *AUTO EXECUTED*\n` +
-      `${setup.strategy} | ${setup.symbol} ${setup.direction}\n` +
-      `Entry: ${plan.entry.price}\n` +
-      `SL: ${plan.stopLoss.price} (${plan.stopLoss.pips}p)\n` +
-      `TP: ${plan.takeProfit.price} (${plan.takeProfit.pips}p)\n` +
-      `R:R ${plan.riskReward}:1 | Volume: ${sizing.lots} lots`
+      `✅ *AUTO EXECUTED*\n\n` +
+      `*${setup.strategy}* | ${setup.symbol} *${setup.direction}*\n` +
+      `Entry: \`${plan.entry.price}\`\n` +
+      `SL: \`${plan.stopLoss.price}\` (${plan.stopLoss.pips}p)\n` +
+      `TP: \`${plan.takeProfit.price}\` (${plan.takeProfit.pips}p)\n` +
+      `R:R: *${plan.riskReward}:1*\n\n` +
+      `📊 *Lots: ${sizing.lots}* | Risk: $${sizing.estimatedRiskUsd}\n` +
+      `🛡 Daily room: $${Math.round(risk.dailyRemaining)} | Max room: $${Math.round(risk.maxLossRemaining)}\n` +
+      `Open: ${pandaPositions.length + 1}/3 positions`
     );
 
   } else {
-    // --- MANUAL MODE: Notify and wait ---
-    const msg =
-      `🎯 *VALID SETUP FOUND*\n` +
-      `${setup.strategy} | ${setup.symbol} ${setup.direction}\n` +
-      `Entry: ${plan.entry.price}\n` +
-      `SL: ${plan.stopLoss.price} (${plan.stopLoss.pips}p)\n` +
-      `TP: ${plan.takeProfit.price} (${plan.takeProfit.pips}p)\n` +
-      `R:R ${plan.riskReward}:1 | Gap: ${setup.gap}\n` +
-      `Guardian: ${guardian.state}\n\n` +
-      `👉 Open Guardian page to execute, or reply /execute ${setup.symbol}`;
-
+    // --- MANUAL MODE: Full notification ---
+    const msg = formatTradeNotification({ setup, plan, sizing, budget, guardian });
     await sendTelegramNotification(msg);
     await logSetupNotification(supabase, setup, plan, guardian);
-    console.log(`NOTIFIED | ${setup.symbol} ${setup.direction} | awaiting manual approval`);
+    console.log(`NOTIFIED | ${setup.symbol} ${setup.direction} | lots=${sizing.lots} | risk=$${sizing.estimatedRiskUsd} | awaiting approval`);
   }
 }
 
