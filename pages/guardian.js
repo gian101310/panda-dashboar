@@ -360,6 +360,15 @@ export default function GuardianPage() {
   );
 }
 
-export async function getServerSideProps(ctx) {
-  return requireAdmin(ctx);
+export async function getServerSideProps({ req }) {
+  const session = await requireAdmin(req);
+  if (!session) {
+    return {
+      redirect: {
+        destination: '/dashboard',
+        permanent: false,
+      },
+    };
+  }
+  return { props: {} };
 }

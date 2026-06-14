@@ -3360,6 +3360,8 @@ export default function Dashboard() {
             { key:'pricing',   label:'💰 PRICING',   route:'/pricing' },
             { key:'portfolio', label:'📁 PORTFOLIO', route:'/portfolio' },
             { key:'login',     label:'🔐 LOGIN',     route:'/login' },
+            { key:'guardian',  label:'🛡️ GUARDIAN',  route:'/guardian' },
+            { key:'stream',    label:'📡 STREAM',    route:'/stream' },
           ];
           const togglePage = async (pgKey) => {
             const next = { ...pageVis, [pgKey]: !pageVis[pgKey] };
