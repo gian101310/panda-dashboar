@@ -11,7 +11,13 @@
         "execute:engine-pb": "node tools/execute-engine-pb.mjs",
         "breakeven": "node tools/breakeven-agent.mjs",
         "journal:sync": "node tools/journal-sync-agent.mjs",
-        "backtest": "node tools/backtest-engine-setups.mjs"
+        "backtest": "node tools/backtest-engine-setups.mjs",
+        "market:order": "node tools/market-order-agent.mjs",
+        "killswitch": "node tools/kill-switch-agent.mjs",
+        "modify:order": "node tools/modify-order-agent.mjs",
+        "scan:symbols": "node tools/symbol-scanner-agent.mjs",
+        "chart:manage": "node tools/chart-manager-agent.mjs",
+        "account:report": "node tools/account-report-agent.mjs"
     },
     "dependencies": {
         "@supabase/supabase-js": "^2.45.4",
