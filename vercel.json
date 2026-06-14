@@ -3,5 +3,5 @@
   "buildCommand": "next build",
   "outputDirectory": ".next",
   "installCommand": "npm install",
-  "ignoreCommand": "[ ! -f \"lib/accountGuardian.mjs\" ] && echo 1 || echo 0"
+  "ignoreCommand": "[ ! -f lib/accountGuardian.mjs ]"
 }
