@@ -375,6 +375,69 @@ async function fetchReviewContext() {
   return ctx || 'No signal data available for review.';
 }
 
+async function fetchTradeContext() {
+  // Pull closed trades from both sources
+  const COLS = 'symbol, direction, profit_loss_pips, entry_time, exit_time, duration_minutes, strategy_name';
+  const [ctRes, manRes, openRes] = await Promise.all([
+    supabase.from('trade_journal').select(COLS).not('exit_time', 'is', null).order('entry_time', { ascending: false }).limit(2000),
+    supabase.from('manual_trades').select(COLS).not('exit_time', 'is', null).order('entry_time', { ascending: false }).limit(500),
+    supabase.from('manual_trades').select('symbol, direction, entry_time, profit_loss_pips').is('exit_time', null).order('entry_time', { ascending: false })
+  ]);
+  const closed = [...(ctRes.data || []), ...(manRes.data || [])];
+  const open = openRes.data || [];
+  if (closed.length === 0 && open.length === 0) return '';
+
+  // Aggregate per-pair stats
+  const byPair = {};
+  for (const t of closed) {
+    if (!byPair[t.symbol]) byPair[t.symbol] = { wins: 0, losses: 0, flat: 0, total_pips: 0, count: 0, buys: 0, sells: 0 };
+    const p = byPair[t.symbol];
+    p.count++;
+    const pips = parseFloat(t.profit_loss_pips) || 0;
+    p.total_pips += pips;
+    if (pips > 0) p.wins++;
+    else if (pips < 0) p.losses++;
+    else p.flat++;
+    if (t.direction === 'BUY') p.buys++;
+    else if (t.direction === 'SELL') p.sells++;
+  }
+
+  let ctx = `\n\nTRADE JOURNAL DATA (${closed.length} closed trades):\n`;
+  // Overall stats
+  const totalW = closed.filter(t => (parseFloat(t.profit_loss_pips)||0) > 0).length;
+  const totalL = closed.filter(t => (parseFloat(t.profit_loss_pips)||0) < 0).length;
+  const totalPips = closed.reduce((s, t) => s + (parseFloat(t.profit_loss_pips)||0), 0);
+  ctx += `Overall: ${closed.length} trades | ${totalW}W / ${totalL}L | win%: ${(totalW/closed.length*100).toFixed(1)}% | total pips: ${totalPips.toFixed(1)}\n`;
+
+  // Per-pair breakdown (sorted by trade count)
+  ctx += '\nPER-PAIR STATS:\n';
+  const sorted = Object.entries(byPair).sort((a,b) => b[1].count - a[1].count);
+  for (const [pair, s] of sorted) {
+    const wr = s.count > 0 ? (s.wins/s.count*100).toFixed(1) : '0';
+    ctx += `${pair}: ${s.count} trades | ${s.wins}W/${s.losses}L/${s.flat}F | win:${wr}% | pips:${s.total_pips.toFixed(1)} | B:${s.buys}/S:${s.sells}\n`;
+  }
+
+  // Recent 15 closed trades
+  ctx += '\nRECENT TRADES:\n';
+  const recent = closed.slice(0, 15);
+  for (const t of recent) {
+    const pips = parseFloat(t.profit_loss_pips) || 0;
+    const dur = t.duration_minutes ? `${t.duration_minutes}m` : '-';
+    const strat = t.strategy_name || '-';
+    ctx += `${t.entry_time?.slice(0,16)} ${t.symbol} ${t.direction} ${pips > 0 ? '+' : ''}${pips.toFixed(1)}pip ${dur} ${strat}\n`;
+  }
+
+  // Open positions
+  if (open.length > 0) {
+    ctx += `\nOPEN POSITIONS (${open.length}):\n`;
+    for (const t of open) {
+      ctx += `${t.symbol} ${t.direction} opened:${t.entry_time?.slice(0,16)}\n`;
+    }
+  }
+
+  return ctx;
+}
+
 // ─── MAIN HANDLER ─────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
@@ -409,8 +472,8 @@ export default async function handler(req, res) {
     if (mode === 'insights') {
       userContent = `MARKET DATA:\n${marketData}\n\n${memoryContext}\n\nAnalyze all 21 pairs. Describe the current bias landscape. Identify currency themes. Show which pairs have strong gap scores and whether Panda Lines are confirming. Include historical pattern data where relevant with sample sizes. Remember: describe data only — no trade recommendations.`;
     } else if (mode === 'review') {
-      const reviewData = await fetchReviewContext();
-      userContent = `MARKET DATA:\n${marketData}\n\n${reviewData}\n\n${memoryContext}\n\nDescribe the signal performance data. Analyze outcomes by gap level, Panda Lines confirmation, session, and hold duration. Show which pairs and conditions produced wins vs losses vs flats. Identify behavioral patterns. Present data factually — no trade recommendations.`;
+      const [reviewData, tradeData] = await Promise.all([fetchReviewContext(), fetchTradeContext()]);
+      userContent = `MARKET DATA:\n${marketData}\n\n${reviewData}\n${tradeData}\n\n${memoryContext}\n\nDescribe the signal performance data. Analyze outcomes by gap level, Panda Lines confirmation, session, and hold duration. Show which pairs and conditions produced wins vs losses vs flats. Include per-pair win rates and P/L from trade journal data. Identify behavioral patterns. Present data factually — no trade recommendations.`;
     } else if (mode === 'chat') {
       if (!message) return res.status(400).json({ error: 'message required' });
       userContent = `MARKET DATA:\n${marketData}\n\n${memoryContext}\n\nUser question: ${message}`;
@@ -437,7 +500,6 @@ export default async function handler(req, res) {
     messages.push({ role: 'user', content: userContent });
 
     // ── Call OpenAI ─────────────────────────────────────────────────────────
-    console.log('[AI-CHAT] OPENAI_API_KEY present:', !!OPENAI_API_KEY, 'length:', (OPENAI_API_KEY||'').length, 'prefix:', (OPENAI_API_KEY||'').slice(0,8));
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_API_KEY}` },
