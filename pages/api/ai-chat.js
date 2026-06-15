@@ -304,7 +304,7 @@ function classifyBrainEntry(text) {
 async function fetchMemoryContext() {
   const { data } = await supabase.from('ai_memory')
     .select('type, factor, pair, strategy, win_rate, sample_size, metadata, computed_at')
-    .order('computed_at', { ascending: false }).limit(100);
+    .order('computed_at', { ascending: false }).limit(50);
   if (!data || data.length === 0) return '';
   const sections = { signal_pattern: [], edge_analysis: [], confluence_validation: [], behavior: [] };
   for (const m of data) {
@@ -450,7 +450,11 @@ export default async function handler(req, res) {
 
     if (!response.ok) {
       const err = await response.text();
-      return res.status(500).json({ error: 'OpenAI error', detail: err });
+      console.error('[AI-CHAT] OpenAI error:', response.status, err);
+      // Parse to get a readable message
+      let msg = 'OpenAI error';
+      try { const parsed = JSON.parse(err); msg = parsed?.error?.message || msg; } catch(_) {}
+      return res.status(500).json({ error: msg, detail: err });
     }
 
     const data = await response.json();
