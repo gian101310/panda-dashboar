@@ -2166,7 +2166,7 @@ function PandaAIChat({ userId, isAdmin }) {
                   <div style={{fontWeight:700,color:a.status==='success'?'#00ff9f':'#ff4d6d',marginBottom:4,letterSpacing:1}}>{a.agent} — {a.status==='success'?'SUCCESS':'FAILED'}</div>
                   {a.status==='success'&&(<>
                     {a.total_signals_analyzed!=null&&<div>Signals analyzed: <span style={{color:'#00b4ff'}}>{a.total_signals_analyzed}</span></div>}
-                    {a.total_trades_analyzed!=null&&<div>Trades analyzed: <span style={{color:'#00b4ff'}}>{a.total_trades_analyzed}</span>{a.open_trades!=null&&<span style={{color:'var(--text-muted)'}}> (open: {a.open_trades} · closed: {a.closed_trades||0})</span>}</div>}
+                    {a.total_trades_analyzed!=null&&<div>Trades analyzed: <span style={{color:'#00b4ff'}}>{a.total_trades_analyzed}</span>{a.open_trades!=null&&<span style={{color:'var(--text-muted)'}}> (open: {a.open_trades} · closed: {a.closed_trades||0}{a.journal_trades?` · journal: ${a.journal_trades}`:''})</span>}</div>}
                     {a.signals_analyzed!=null&&<div>Signals cross-referenced: <span style={{color:'#00b4ff'}}>{a.signals_analyzed}</span></div>}
                     {a.memories_written!=null&&<div>Memories written: <span style={{color:'#00ff9f'}}>{a.memories_written}</span></div>}
                     {a.themes_written!=null&&<div>Themes written: <span style={{color:'#00ff9f'}}>{a.themes_written}</span></div>}

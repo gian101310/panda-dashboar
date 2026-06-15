@@ -287,26 +287,22 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     try {
-      // Fetch closed trades
-      const { data: closedTrades, error: closedErr } = await supabase
-        .from('manual_trades')
-        .select('symbol, direction, profit_loss_pips, entry_time, exit_time, duration_minutes, strategy_name, gap_at_entry, momentum_at_entry')
-        .not('exit_time', 'is', null)
-        .order('entry_time', { ascending: false });
+      const COLS = 'symbol, direction, profit_loss_pips, entry_time, exit_time, duration_minutes, strategy_name, gap_at_entry, momentum_at_entry';
 
-      if (closedErr) return res.status(500).json({ error: closedErr.message });
+      // Fetch closed trades from BOTH tables
+      const [ctClosedRes, manClosedRes, manOpenRes] = await Promise.all([
+        supabase.from('trade_journal').select(COLS).not('exit_time', 'is', null).order('entry_time', { ascending: false }),
+        supabase.from('manual_trades').select(COLS).not('exit_time', 'is', null).order('entry_time', { ascending: false }),
+        supabase.from('manual_trades').select('symbol, direction, entry_time, gap_at_entry, momentum_at_entry').is('exit_time', null).order('entry_time', { ascending: false }),
+      ]);
 
-      // Fetch open trades
-      const { data: openTrades, error: openErr } = await supabase
-        .from('manual_trades')
-        .select('symbol, direction, entry_time, gap_at_entry, momentum_at_entry')
-        .is('exit_time', null)
-        .order('entry_time', { ascending: false });
+      if (ctClosedRes.error) return res.status(500).json({ error: ctClosedRes.error.message });
+      if (manClosedRes.error) return res.status(500).json({ error: manClosedRes.error.message });
+      if (manOpenRes.error) return res.status(500).json({ error: manOpenRes.error.message });
 
-      if (openErr) return res.status(500).json({ error: openErr.message });
-
-      const trades = closedTrades || [];
-      const open = openTrades || [];
+      // Merge closed trades from both sources
+      const trades = [...(ctClosedRes.data || []), ...(manClosedRes.data || [])];
+      const open = manOpenRes.data || [];
       const totalTrades = trades.length + open.length;
 
       if (totalTrades === 0) return res.status(200).json({ message: 'No trades to analyze', memories_written: 0, total_trades_analyzed: 0 });
@@ -344,6 +340,8 @@ export default async function handler(req, res) {
         total_trades_analyzed: totalTrades,
         closed_trades: trades.length,
         open_trades: open.length,
+        journal_trades: (ctClosedRes.data || []).length,
+        manual_trades: (manClosedRes.data || []).length,
         memories_written: written,
         memories_attempted: allMemories.length,
         errors: writeErr ? [{ error: writeErr.message }] : undefined,
