@@ -437,6 +437,7 @@ export default async function handler(req, res) {
     messages.push({ role: 'user', content: userContent });
 
     // ── Call OpenAI ─────────────────────────────────────────────────────────
+    console.log('[AI-CHAT] OPENAI_API_KEY present:', !!OPENAI_API_KEY, 'length:', (OPENAI_API_KEY||'').length, 'prefix:', (OPENAI_API_KEY||'').slice(0,8));
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_API_KEY}` },
