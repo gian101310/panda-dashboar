@@ -1,13 +1,13 @@
 import { supabase } from '../../lib/supabase';
 import { requireAdmin } from '../../lib/auth';
 
-const MIN_SAMPLE = 20;
+const MIN_SAMPLE = 3;
 
 // Factor names — MUST match what gets inserted and deleted
 const FACTORS = [
   'overall_performance', 'pair_trading_performance', 'monthly_pnl',
   'session_performance', 'hold_duration_performance', 'direction_performance',
-  'strategy_performance', 'gap_entry_performance'
+  'strategy_performance', 'gap_entry_performance', 'open_positions_summary'
 ];
 
 function winRate(wins, losses) {
@@ -244,6 +244,32 @@ function analyzeByGapAtEntry(trades) {
   return memories;
 }
 
+function analyzeOpenPositions(trades) {
+  if (!trades || trades.length === 0) return [];
+  const byPair = {};
+  const byDir = { BUY: 0, SELL: 0 };
+  for (const t of trades) {
+    byPair[t.symbol] = (byPair[t.symbol] || 0) + 1;
+    if (t.direction === 'BUY' || t.direction === 'SELL') byDir[t.direction]++;
+  }
+  const oldestEntry = trades.reduce((a, b) => (a.entry_time < b.entry_time ? a : b));
+  const newestEntry = trades.reduce((a, b) => (a.entry_time > b.entry_time ? a : b));
+  const pairList = Object.entries(byPair).sort((a, b) => b[1] - a[1]);
+  return [{
+    type: 'behavior', factor: 'open_positions_summary',
+    win_rate: null, sample_size: trades.length,
+    metadata: {
+      open_count: trades.length,
+      pairs: Object.fromEntries(pairList),
+      unique_pairs: pairList.length,
+      direction_split: byDir,
+      oldest_entry: oldestEntry.entry_time,
+      newest_entry: newestEntry.entry_time,
+      description: `${trades.length} open positions across ${pairList.length} pairs`
+    }
+  }];
+}
+
 // --- MAIN HANDLER ---
 
 export default async function handler(req, res) {
@@ -261,24 +287,42 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     try {
-      const { data: trades, error: fetchErr } = await supabase
+      // Fetch closed trades
+      const { data: closedTrades, error: closedErr } = await supabase
         .from('manual_trades')
         .select('symbol, direction, profit_loss_pips, entry_time, exit_time, duration_minutes, strategy_name, gap_at_entry, momentum_at_entry')
         .not('exit_time', 'is', null)
         .order('entry_time', { ascending: false });
 
-      if (fetchErr) return res.status(500).json({ error: fetchErr.message });
-      if (!trades || trades.length === 0) return res.status(200).json({ message: 'No closed trades to analyze', memories_written: 0 });
+      if (closedErr) return res.status(500).json({ error: closedErr.message });
+
+      // Fetch open trades
+      const { data: openTrades, error: openErr } = await supabase
+        .from('manual_trades')
+        .select('symbol, direction, entry_time, gap_at_entry, momentum_at_entry')
+        .is('exit_time', null)
+        .order('entry_time', { ascending: false });
+
+      if (openErr) return res.status(500).json({ error: openErr.message });
+
+      const trades = closedTrades || [];
+      const open = openTrades || [];
+      const totalTrades = trades.length + open.length;
+
+      if (totalTrades === 0) return res.status(200).json({ message: 'No trades to analyze', memories_written: 0, total_trades_analyzed: 0 });
 
       const allMemories = [
-        ...analyzeOverall(trades),
-        ...analyzeByPair(trades),
-        ...analyzeByMonth(trades),
-        ...analyzeBySession(trades),
-        ...analyzeByHoldDuration(trades),
-        ...analyzeByDirection(trades),
-        ...analyzeByStrategy(trades),
-        ...analyzeByGapAtEntry(trades),
+        // Open position analysis (always runs if open trades exist)
+        ...analyzeOpenPositions(open),
+        // Closed trade analysis (only if closed trades exist)
+        ...(trades.length > 0 ? analyzeOverall(trades) : []),
+        ...(trades.length > 0 ? analyzeByPair(trades) : []),
+        ...(trades.length > 0 ? analyzeByMonth(trades) : []),
+        ...(trades.length > 0 ? analyzeBySession(trades) : []),
+        ...(trades.length > 0 ? analyzeByHoldDuration(trades) : []),
+        ...(trades.length > 0 ? analyzeByDirection(trades) : []),
+        ...(trades.length > 0 ? analyzeByStrategy(trades) : []),
+        ...(trades.length > 0 ? analyzeByGapAtEntry(trades) : []),
       ];
 
       // Log previous run summary
@@ -297,13 +341,16 @@ export default async function handler(req, res) {
       const written = writeErr ? 0 : (inserted || []).length;
 
       return res.status(200).json({
-        total_trades_analyzed: trades.length,
+        total_trades_analyzed: totalTrades,
+        closed_trades: trades.length,
+        open_trades: open.length,
         memories_written: written,
         memories_attempted: allMemories.length,
         errors: writeErr ? [{ error: writeErr.message }] : undefined,
         analysis_types: [
+          'open_positions_summary — current exposure & pair distribution',
           'overall_performance — win rate, avg pips, avg hold',
-          'pair_trading_performance — per-pair stats (sample >= 20)',
+          'pair_trading_performance — per-pair stats',
           'monthly_pnl — P&L by month with best/worst',
           'session_performance — ASIAN/LONDON/OVERLAP/NY',
           'hold_duration_performance — by hold time bucket',
