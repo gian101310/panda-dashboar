@@ -93,7 +93,7 @@ export default function LandingPage() {
   const [liveSignals, setLiveSignals] = useState([]);
   const [pairCount, setPairCount] = useState(21);
   const [licenseModal, setLicenseModal] = useState(null);
-  const [licenseForm, setLicenseForm] = useState({ customer_name: '', contact: '', mt4_account_id: '' });
+  const [licenseForm, setLicenseForm] = useState({ customer_name: '', contact: '', mt4_account_id: '', telegram_username: '' });
   const [licenseBusy, setLicenseBusy] = useState(false);
   const [licenseOk, setLicenseOk] = useState(false);
   const [licenseErr, setLicenseErr] = useState('');
@@ -122,7 +122,7 @@ export default function LandingPage() {
 
   function openLicenseRequest(product) {
     setLicenseModal(product);
-    setLicenseForm({ customer_name: '', contact: '', mt4_account_id: '' });
+    setLicenseForm({ customer_name: '', contact: '', mt4_account_id: '', telegram_username: '' });
     setLicenseOk(false);
     setLicenseErr('');
   }
@@ -409,7 +409,7 @@ export default function LandingPage() {
                   <div style={{ fontFamily: mono, fontSize: 10, letterSpacing: 4, color: '#00ff9f', marginBottom: 10 }}>REQUEST SENT</div>
                   <h3 style={{ fontFamily: orb, fontSize: 20, margin: '0 0 12px' }}>{licenseModal.name}</h3>
                   <p style={{ fontFamily: raj, fontSize: 14, color: '#8899bb', lineHeight: 1.55, marginBottom: 20 }}>
-                    Your account ID is now pending. Access will activate after manual payment confirmation.
+                    Your request is pending. Panda will send you the payment link and indicator file via Telegram or email.
                   </p>
                   <button onClick={() => setLicenseModal(null)} style={{ width: '100%', background: '#00ff9f', border: 'none', borderRadius: 8, color: '#050810', fontFamily: orb, fontSize: 11, fontWeight: 800, letterSpacing: 2, padding: 12, cursor: 'pointer' }}>CLOSE</button>
                 </div>
@@ -418,11 +418,12 @@ export default function LandingPage() {
                   <div style={{ fontFamily: mono, fontSize: 10, letterSpacing: 4, color: '#00b4ff', marginBottom: 8 }}>ACTIVATE INDICATOR</div>
                   <h3 style={{ fontFamily: orb, fontSize: 21, margin: '0 0 8px' }}>{licenseModal.name}</h3>
                   <p style={{ fontFamily: raj, fontSize: 13, color: '#6b7fa8', lineHeight: 1.5, marginBottom: 18 }}>
-                    Enter the MT4 account ID where this indicator will run. Panda will approve it after payment.
+                    Enter your MT4 account ID. Add your Telegram username to receive the payment link and indicator file directly via Telegram.
                   </p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     <input value={licenseForm.customer_name} onChange={(e) => setLicenseForm((f) => ({ ...f, customer_name: e.target.value }))} placeholder="Your name" style={{ background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '12px 14px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, outline: 'none' }} />
-                    <input value={licenseForm.contact} onChange={(e) => setLicenseForm((f) => ({ ...f, contact: e.target.value }))} placeholder="Email, Telegram, or WhatsApp" style={{ background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '12px 14px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, outline: 'none' }} />
+                    <input value={licenseForm.contact} onChange={(e) => setLicenseForm((f) => ({ ...f, contact: e.target.value }))} placeholder="Email address" style={{ background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '12px 14px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, outline: 'none' }} />
+                    <input value={licenseForm.telegram_username} onChange={(e) => setLicenseForm((f) => ({ ...f, telegram_username: e.target.value }))} placeholder="Telegram username (optional — for faster delivery)" style={{ background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '12px 14px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, outline: 'none' }} />
                     <input value={licenseForm.mt4_account_id} onChange={(e) => setLicenseForm((f) => ({ ...f, mt4_account_id: e.target.value }))} placeholder="MT4 account ID, numbers only" style={{ background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '12px 14px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, outline: 'none' }} />
                   </div>
                   {licenseErr && <div style={{ fontFamily: mono, fontSize: 10, color: '#ff4d6d', marginTop: 12 }}>{licenseErr}</div>}

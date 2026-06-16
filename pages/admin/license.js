@@ -122,12 +122,12 @@ export default function LicenseAdminPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1120 }}>
               <thead>
                 <tr style={{ background: '#0e1525' }}>
-                  {['NAME', 'CONTACT', 'ACCOUNT ID', 'INDICATOR', 'PRICE', 'PAID', 'EXPIRY', 'STATUS', 'LAST VERIFIED', 'NOTES', 'ACTIONS'].map((h) => <th key={h} style={hdr}>{h}</th>)}
+                  {['NAME', 'CONTACT', 'TELEGRAM', 'ACCOUNT ID', 'INDICATOR', 'PRICE', 'PAID', 'EXPIRY', 'STATUS', 'LAST VERIFIED', 'NOTES', 'ACTIONS'].map((h) => <th key={h} style={hdr}>{h}</th>)}
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
-                  <tr><td colSpan={11} style={{ ...cell, textAlign: 'center', padding: 40, fontFamily: mono, color: '#2a3550' }}>NO LICENSE REQUESTS</td></tr>
+                  <tr><td colSpan={12} style={{ ...cell, textAlign: 'center', padding: 40, fontFamily: mono, color: '#2a3550' }}>NO LICENSE REQUESTS</td></tr>
                 ) : filtered.map((license) => {
                   const product = productMap[license.product_code] || { name: license.product_code, priceLabel: '-' };
                   const busy = savingId === license.id;
@@ -135,6 +135,7 @@ export default function LicenseAdminPage() {
                     <tr key={license.id} style={{ opacity: busy ? 0.55 : 1 }}>
                       <td style={{ ...cell, fontFamily: orb, fontSize: 11, color: '#e8eaf0' }}>{license.customer_name}</td>
                       <td style={{ ...cell, fontFamily: mono, fontSize: 9 }}>{license.contact}</td>
+                      <td style={{ ...cell, fontFamily: mono, fontSize: 9 }}>{license.telegram_username ? <a href={`https://t.me/${license.telegram_username}`} target="_blank" rel="noopener noreferrer" style={{ color: '#00b4ff' }}>@{license.telegram_username}</a> : '—'}</td>
                       <td style={{ ...cell, fontFamily: mono, color: '#00b4ff' }}>{license.mt4_account_id}</td>
                       <td style={cell}>{product.name}</td>
                       <td style={{ ...cell, fontFamily: mono, color: '#ffd166' }}>{product.priceLabel}</td>
