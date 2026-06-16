@@ -332,7 +332,7 @@ export default function LandingPage() {
                 DOWNLOAD FIRST.<br/><span style={{ color: '#00ff9f' }}>ACTIVATE AFTER APPROVAL.</span>
               </h2>
               <p style={{ fontFamily: raj, fontSize: 16, color: '#6b7fa8', maxWidth: 560, margin: '18px auto 0', lineHeight: 1.55 }}>
-                Request the indicator with your MT4 account ID. Boss-G will confirm payment manually, approve the account, and send the download/payment details.
+                Request the indicator with your MT4 account ID. Panda will confirm payment manually, approve the account, and send the download/payment details.
               </p>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 20 }}>
@@ -418,7 +418,7 @@ export default function LandingPage() {
                   <div style={{ fontFamily: mono, fontSize: 10, letterSpacing: 4, color: '#00b4ff', marginBottom: 8 }}>ACTIVATE INDICATOR</div>
                   <h3 style={{ fontFamily: orb, fontSize: 21, margin: '0 0 8px' }}>{licenseModal.name}</h3>
                   <p style={{ fontFamily: raj, fontSize: 13, color: '#6b7fa8', lineHeight: 1.5, marginBottom: 18 }}>
-                    Enter the MT4 account ID where this indicator will run. Boss-G will approve it after payment.
+                    Enter the MT4 account ID where this indicator will run. Panda will approve it after payment.
                   </p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     <input value={licenseForm.customer_name} onChange={(e) => setLicenseForm((f) => ({ ...f, customer_name: e.target.value }))} placeholder="Your name" style={{ background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '12px 14px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, outline: 'none' }} />
