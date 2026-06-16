@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/router';
 import Head from 'next/head';
 
 const mono = "'Share Tech Mono', monospace";
@@ -316,8 +317,17 @@ function EditUserModal({ user, onClose, onSaved }) {
   );
 }
 
+const ADMIN_TABS = new Set(['USERS','SESSIONS','LOGS']);
+
 export default function AdminPanel() {
-  const [tab, setTab] = useState('USERS');
+  const router = useRouter();
+  const urlTab = typeof router.query.tab === 'string' ? router.query.tab.toUpperCase().replace(/-/g,' ') : null;
+  const [tab, setTabRaw] = useState(urlTab && ADMIN_TABS.has(urlTab) ? urlTab : 'USERS');
+  const setTab = useCallback((t) => {
+    setTabRaw(t);
+    router.replace({ pathname: '/admin', query: { tab: t.toLowerCase().replace(/\s+/g,'-') } }, undefined, { shallow: true });
+  }, [router]);
+  useEffect(() => { if (urlTab && ADMIN_TABS.has(urlTab) && urlTab !== tab) setTabRaw(urlTab); }, [urlTab]);
   const [users, setUsers] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [logs, setLogs] = useState([]);

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useRouter } from 'next/router';
 import Head from 'next/head';
 
 const mono = "'Share Tech Mono',monospace";
@@ -273,8 +274,17 @@ function JournalStats({ trades }) {
   );
 }
 
+const JOURNAL_TABS = new Set(['JOURNAL','STATS','GAMEPLAY']);
+
 export default function JournalPage() {
-  const [tab, setTab] = useState('JOURNAL');
+  const router = useRouter();
+  const urlTab = typeof router.query.tab === 'string' ? router.query.tab.toUpperCase().replace(/-/g,' ') : null;
+  const [tab, setTabRaw] = useState(urlTab && JOURNAL_TABS.has(urlTab) ? urlTab : 'JOURNAL');
+  const setTab = useCallback((t) => {
+    setTabRaw(t);
+    router.replace({ pathname: '/journal', query: { tab: t.toLowerCase().replace(/\s+/g,'-') } }, undefined, { shallow: true });
+  }, [router]);
+  useEffect(() => { if (urlTab && JOURNAL_TABS.has(urlTab) && urlTab !== tab) setTabRaw(urlTab); }, [urlTab]);
   const [trades, setTrades] = useState([]);
   const [strategies, setStrategies] = useState([]);
   const [loading, setLoading] = useState(true);

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useRouter } from 'next/router';
 import Head from 'next/head';
 
 import { AreaChart, Area, ResponsiveContainer } from 'recharts';
@@ -3128,7 +3129,10 @@ function SignalFlashcard({ data, trends }) {
   );
 }
 
+const ALL_TABS_SET = new Set([...TABS, 'ENGINE']);
+
 export default function Dashboard() {
+  const router = useRouter();
   const [data,       setData]       = useState([]);
   const [trends,     setTrends]     = useState({});
   const [cotData,    setCotData]    = useState([]);
@@ -3165,7 +3169,18 @@ export default function Dashboard() {
     });
     return idx;
   }, [aiMemories]);
-  const [tab,        setTab]        = useState('OVERVIEW');
+  // URL-synced tab state
+  const urlTab = typeof router.query.tab === 'string' ? router.query.tab.toUpperCase().replace(/-/g,' ') : null;
+  const [tab, setTabRaw] = useState(urlTab && ALL_TABS_SET.has(urlTab) ? urlTab : 'OVERVIEW');
+  const setTab = useCallback((t) => {
+    setTabRaw(t);
+    const slug = t.toLowerCase().replace(/\s+/g, '-');
+    router.replace({ pathname: '/dashboard', query: { tab: slug } }, undefined, { shallow: true });
+  }, [router]);
+  // Sync tab if user navigates back/forward
+  useEffect(() => {
+    if (urlTab && ALL_TABS_SET.has(urlTab) && urlTab !== tab) setTabRaw(urlTab);
+  }, [urlTab]);
   const [logSub,     setLogSub]     = useState('Signal Log');
   const [user,       setUser]       = useState(null);
   const isAdmin = user?.role === 'admin';
