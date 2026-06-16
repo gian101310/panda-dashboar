@@ -329,10 +329,10 @@ export default function LandingPage() {
             <div style={{ textAlign: 'center', marginBottom: 60 }}>
               <span style={{ fontFamily: mono, fontSize: 10, color: '#ffd166', letterSpacing: 4, display: 'block', marginBottom: 16 }}>MT4 INDICATORS</span>
               <h2 style={{ fontFamily: orb, fontSize: 'clamp(22px,3.5vw,36px)', fontWeight: 900, letterSpacing: 3, margin: 0 }}>
-                DOWNLOAD FIRST.<br/><span style={{ color: '#00ff9f' }}>ACTIVATE AFTER APPROVAL.</span>
+                REQUEST ACCESS.<br/><span style={{ color: '#00ff9f' }}>ACTIVATE AFTER APPROVAL.</span>
               </h2>
               <p style={{ fontFamily: raj, fontSize: 16, color: '#6b7fa8', maxWidth: 560, margin: '18px auto 0', lineHeight: 1.55 }}>
-                Request the indicator with your MT4 account ID. Panda will confirm payment manually, approve the account, and send the download/payment details.
+                Submit your MT4 account ID below. Panda will confirm payment, approve your account, and send the indicator file directly.
               </p>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 20 }}>
@@ -341,9 +341,9 @@ export default function LandingPage() {
                   <div style={{ fontFamily: orb, fontSize: 14, fontWeight: 800, letterSpacing: 2, color: product.code === 'panda_full_v3' ? '#00ff9f' : '#00b4ff', marginBottom: 10 }}>{product.name}</div>
                   <div style={{ fontFamily: mono, fontSize: 10, color: '#ffd166', letterSpacing: 2, marginBottom: 18 }}>{product.priceLabel}</div>
                   <p style={{ fontFamily: raj, fontSize: 14, color: '#8899bb', lineHeight: 1.55, margin: '0 0 22px' }}>
-                    Public download, private activation. The indicator will only run when this MT4 account ID is approved in Panda License admin.
+                    Licensed per MT4 account. The indicator only runs on approved accounts — request access to get started.
                   </p>
-                  <button onClick={() => openLicenseRequest(product)} style={{ width: '100%', background: 'rgba(0,255,159,0.10)', border: '1px solid #00ff9f44', borderRadius: 7, color: '#00ff9f', fontFamily: mono, fontSize: 9, letterSpacing: 2, padding: '11px 12px', cursor: 'pointer' }}>REQUEST DOWNLOAD</button>
+                  <button onClick={() => openLicenseRequest(product)} style={{ width: '100%', background: 'rgba(0,255,159,0.10)', border: '1px solid #00ff9f44', borderRadius: 7, color: '#00ff9f', fontFamily: mono, fontSize: 9, letterSpacing: 2, padding: '11px 12px', cursor: 'pointer' }}>REQUEST ACCESS</button>
                 </div>
               ))}
             </div>
