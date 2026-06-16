@@ -2688,6 +2688,36 @@ function OverviewTab({ data, trends, pdrData, upcomingNews, spikes, confidenceMa
       <div style={{position:'fixed',inset:0,zIndex:0,pointerEvents:'none',backgroundImage:'linear-gradient(rgba(0,180,255,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(0,180,255,0.02) 1px,transparent 1px)',backgroundSize:'40px 40px'}}/>
       <div style={{position:'relative',zIndex:1,display:'flex',flexDirection:'column',gap:20}}>
 
+      {/* DISCLAIMER + TRADING RULES BANNER */}
+      <div style={{background:'linear-gradient(135deg,rgba(255,209,102,0.06),rgba(255,77,109,0.04))',border:'1px solid rgba(255,209,102,0.2)',borderRadius:12,padding:isMobile?'14px 16px':'16px 24px',animation:'fadeSlideUp 0.3s ease both'}}>
+        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
+          <span style={{fontSize:14}}>⚠️</span>
+          <span style={{fontFamily:'Orbitron,sans-serif',fontSize:10,color:'#ffd166',letterSpacing:3,fontWeight:700}}>DISCLAIMER</span>
+        </div>
+        <div style={{fontFamily:'Share Tech Mono,monospace',fontSize:isMobile?9:10,color:'rgba(255,255,255,0.55)',lineHeight:1.6,marginBottom:14,letterSpacing:0.5}}>
+          Panda Engine provides analysis tools only — not financial advice. All trading carries risk. Past performance does not guarantee future results. Always use proper risk management.
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:isMobile?10:16}}>
+          <div style={{background:'rgba(0,180,255,0.05)',border:'1px solid rgba(0,180,255,0.15)',borderRadius:8,padding:'12px 16px'}}>
+            <div style={{fontFamily:'Orbitron,sans-serif',fontSize:9,color:'#00b4ff',letterSpacing:2,fontWeight:700,marginBottom:8}}>📐 LOT SIZING RULES</div>
+            <div style={{fontFamily:'Share Tech Mono,monospace',fontSize:isMobile?9:10,color:'rgba(255,255,255,0.7)',lineHeight:1.8}}>
+              <div><span style={{color:'#00ff9f'}}>$1,000</span> → 0.01 lot</div>
+              <div><span style={{color:'#00ff9f'}}>$2,000</span> → 0.02 lot</div>
+              <div><span style={{color:'#00ff9f'}}>$3,000+</span> → add 0.01 per $1,000</div>
+            </div>
+          </div>
+          <div style={{background:'rgba(255,77,109,0.05)',border:'1px solid rgba(255,77,109,0.15)',borderRadius:8,padding:'12px 16px'}}>
+            <div style={{fontFamily:'Orbitron,sans-serif',fontSize:9,color:'#ff4d6d',letterSpacing:2,fontWeight:700,marginBottom:8}}>🎯 RISK / REWARD RULES</div>
+            <div style={{fontFamily:'Share Tech Mono,monospace',fontSize:isMobile?9:10,color:'rgba(255,255,255,0.7)',lineHeight:1.8}}>
+              <div>TP {'<'} 100 pips → SL = TP / 2</div>
+              <div>TP {'<'} 200 pips → SL = TP / 3</div>
+              <div>TP {'<'} 300 pips → SL = TP / 4</div>
+              <div>TP {'<'} 400 pips → SL = TP / 5</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* ROW 1 — MARKET PULSE BAR */}
       <div style={{...ovGlass,padding:isMobile?'10px 14px':'12px 20px',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:16,animation:'fadeSlideUp 0.4s ease both'}}>
         <div style={{display:'flex',alignItems:'center',gap:isMobile?10:16}}>
@@ -3141,6 +3171,7 @@ export default function Dashboard() {
   const isAdmin = user?.role === 'admin';
   const [showAlertSettings, setShowAlertSettings] = useState(false);
   const [popup,      setPopup]      = useState(null);
+  const [showWelcome, setShowWelcome] = useState(false);
   const [maintenance, setMaintenance] = useState(false);
   const [pageVis, setPageVis] = useState(null);
   const [showPageVis, setShowPageVis] = useState(false);
@@ -3235,9 +3266,10 @@ export default function Dashboard() {
   useEffect(()=>{
     fetch('/api/me')
       .then(r => r.ok ? r.json() : null)
-      .then(d => setUser(d && d.role ? d : null))
+      .then(d => { setUser(d && d.role ? d : null); if(d && d.username) setShowWelcome(true); })
       .catch(() => setUser(null));
   },[]);
+  useEffect(()=>{ if(showWelcome){ const t=setTimeout(()=>setShowWelcome(false),4500); return()=>clearTimeout(t); } },[showWelcome]);
   useEffect(()=>{fetch('/api/page-visibility').then(r=>r.json()).then(d=>setPageVis(d)).catch(()=>{});},[]);
 
   // Maintenance mode check
@@ -3312,8 +3344,20 @@ export default function Dashboard() {
       <Head>
         <title>PANDA ENGINE — {isMarketOpen()?'LIVE':'CLOSED'}</title>
         <meta name="viewport" content="width=device-width,initial-scale=1"/>
-        <style>{`@media print{body{visibility:hidden!important;}} *{-webkit-touch-callout:none;} @media(max-width:767px){*::-webkit-scrollbar{height:3px!important;width:3px!important;} button{min-height:32px;} select,input[type=date]{min-height:32px;} table{font-size:9px!important;}}`}</style>
+        <style>{`@media print{body{visibility:hidden!important;}} *{-webkit-touch-callout:none;} @media(max-width:767px){*::-webkit-scrollbar{height:3px!important;width:3px!important;} button{min-height:32px;} select,input[type=date]{min-height:32px;} table{font-size:9px!important;}} @keyframes fadeIn{from{opacity:0}to{opacity:1}} @keyframes scaleIn{from{opacity:0;transform:scale(0.85)}to{opacity:1;transform:scale(1)}}`}</style>
       </Head>
+
+      {/* WELCOME POPUP */}
+      {showWelcome&&user&&(
+        <div onClick={()=>setShowWelcome(false)} style={{position:'fixed',inset:0,zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.6)',backdropFilter:'blur(6px)',animation:'fadeIn 0.3s ease'}}>
+          <div style={{background:'linear-gradient(135deg,rgba(10,14,20,0.97),rgba(0,30,60,0.95))',border:'1px solid rgba(0,180,255,0.3)',borderRadius:16,padding:isMobile?'28px 24px':'36px 48px',textAlign:'center',maxWidth:420,boxShadow:'0 0 60px rgba(0,180,255,0.15)',animation:'scaleIn 0.3s ease'}}>
+            <div style={{fontSize:32,marginBottom:12}}>🐼</div>
+            <div style={{fontFamily:'Orbitron,sans-serif',fontSize:isMobile?14:18,color:'#00b4ff',letterSpacing:3,fontWeight:700,marginBottom:8}}>WELCOME BACK</div>
+            <div style={{fontFamily:'Rajdhani,sans-serif',fontSize:isMobile?20:26,color:'#ffffff',fontWeight:700,marginBottom:12}}>{user.username?.toUpperCase()}</div>
+            <div style={{fontFamily:'Share Tech Mono,monospace',fontSize:10,color:'rgba(255,255,255,0.5)',letterSpacing:2}}>PANDA ENGINE IS READY</div>
+          </div>
+        </div>
+      )}
 
       {/* ALERT SETTINGS MODAL */}
       {showAlertSettings && <AlertSettingsModal prefs={prefs} onClose={()=>setShowAlertSettings(false)} onSave={setPrefs} />}
