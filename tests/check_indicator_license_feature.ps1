@@ -25,6 +25,7 @@ $required = @(
   "lib\indicatorProducts.mjs",
   "lib\indicatorLicense.mjs",
   "pages\api\indicator-license-request.js",
+  "lib\indicatorRequestAlert.mjs",
   "pages\api\indicator-license.js",
   "pages\api\admin\indicator-licenses.js",
   "pages\admin\license.js",
@@ -42,6 +43,9 @@ Assert-Contains "lib\indicatorProducts.mjs" "/downloads/panda-full-v3-indicator.
 Assert-Contains "lib\indicatorLicense.mjs" "decideIndicatorLicense" "License helper must expose decision logic"
 
 Assert-Contains "pages\api\indicator-license-request.js" "PENDING" "Public request API must create pending requests"
+Assert-Contains "pages\api\indicator-license-request.js" "sendIndicatorRequestAlert" "Public request API must notify Telegram"
+Assert-Contains "lib\indicatorRequestAlert.mjs" "LOGIN_ALERT_BOT_TOKEN" "Indicator request alert must reuse login alert bot config"
+Assert-Contains "lib\indicatorRequestAlert.mjs" "/admin/license" "Indicator request alert must link admin license page"
 Assert-Contains "pages\api\indicator-license.js" "OK\|APPROVED" "MT4 license API must return OK|APPROVED"
 Assert-Contains "pages\api\indicator-license.js" "DENY\|" "MT4 license API must return DENY responses"
 Assert-Contains "pages\api\admin\indicator-licenses.js" "requireAdmin" "Admin license API must require admin"
@@ -54,6 +58,7 @@ Assert-Contains "pages\admin\index.js" "/admin/license" "Admin nav must link to 
 
 Assert-Contains "pages\index.js" "indicator-license-request" "Landing page must submit indicator license requests"
 Assert-Contains "pages\index.js" "product.downloadPath" "Landing page must link configured downloads"
+Assert-Contains "pages\index.js" "REQUEST ACTIVATION" "Landing page must make activation request the main action"
 
 $saleFiles = @(
   "panda-indicators\2026-06-16\v3-release\scoring v3.mq4",
