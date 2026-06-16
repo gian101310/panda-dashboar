@@ -30,16 +30,21 @@ $required = @(
   "pages\api\admin\indicator-licenses.js",
   "pages\admin\license.js",
   "supabase\indicator_licenses.sql",
-  "public\downloads\scoring-v3.ex4",
-  "public\downloads\panda-full-v3-indicator.ex4"
+  "public\downloads\scoring.ex4",
+  "public\downloads\panda-vip.ex4"
 )
 
 foreach ($path in $required) { Assert-File $path }
 
 Assert-Contains "lib\indicatorProducts.mjs" "scoring_v3" "Product config must include scoring_v3"
 Assert-Contains "lib\indicatorProducts.mjs" "panda_full_v3" "Product config must include panda_full_v3"
-Assert-Contains "lib\indicatorProducts.mjs" "/downloads/scoring-v3.ex4" "Product config must include scoring v3 download"
-Assert-Contains "lib\indicatorProducts.mjs" "/downloads/panda-full-v3-indicator.ex4" "Product config must include full v3 download"
+Assert-Contains "lib\indicatorProducts.mjs" "name: 'Scoring'" "Product config must display Scoring"
+Assert-Contains "lib\indicatorProducts.mjs" "name: 'Panda VIP'" "Product config must display Panda VIP"
+Assert-Contains "lib\indicatorProducts.mjs" "\$500 USD" "Scoring price must be $500 USD"
+Assert-Contains "lib\indicatorProducts.mjs" "\$1000 USD" "Panda VIP price must be $1000 USD"
+Assert-Contains "lib\indicatorProducts.mjs" "/downloads/scoring.ex4" "Product config must include scoring download"
+Assert-Contains "lib\indicatorProducts.mjs" "/downloads/panda-vip.ex4" "Product config must include Panda VIP download"
+Assert-NotContains "lib\indicatorProducts.mjs" "Scoring v3|Panda Full v3|Manual price" "Product display text must not expose v3/manual price"
 Assert-Contains "lib\indicatorLicense.mjs" "decideIndicatorLicense" "License helper must expose decision logic"
 
 Assert-Contains "pages\api\indicator-license-request.js" "PENDING" "Public request API must create pending requests"

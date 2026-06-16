@@ -176,7 +176,7 @@ datetime LastAlertTime = 0;
 // ===================================================================
 int OnInit()
 {
-   IndicatorShortName("Panda Full v3 Indicator");
+   IndicatorShortName("Panda VIP");
 
    SetIndexBuffer(0, STBullish);
    SetIndexBuffer(1, STBearish);

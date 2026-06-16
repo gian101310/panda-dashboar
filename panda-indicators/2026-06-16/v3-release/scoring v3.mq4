@@ -187,7 +187,7 @@ string   LicenseStatus = "UNVERIFIED";
 // ===================================================================
 int OnInit()
 {
-   IndicatorShortName("Scoring v3");
+   IndicatorShortName("Scoring");
    if(!ValidateLicense(true))
       return(INIT_FAILED);
 

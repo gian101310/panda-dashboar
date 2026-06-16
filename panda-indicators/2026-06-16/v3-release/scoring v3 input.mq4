@@ -176,7 +176,7 @@ datetime LastAlertTime = 0;
 // ===================================================================
 int OnInit()
 {
-   IndicatorShortName("Scoring v3");
+   IndicatorShortName("Scoring");
 
    SetIndexBuffer(0, STBullish);
    SetIndexBuffer(1, STBearish);

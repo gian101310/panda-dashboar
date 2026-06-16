@@ -187,7 +187,7 @@ string   LicenseStatus = "UNVERIFIED";
 // ===================================================================
 int OnInit()
 {
-   IndicatorShortName("Panda Full v3 Indicator");
+   IndicatorShortName("Panda VIP");
    if(!ValidateLicense(true))
       return(INIT_FAILED);
 
