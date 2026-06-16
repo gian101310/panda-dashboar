@@ -332,7 +332,7 @@ export default function LandingPage() {
                 DOWNLOAD FIRST.<br/><span style={{ color: '#00ff9f' }}>ACTIVATE AFTER APPROVAL.</span>
               </h2>
               <p style={{ fontFamily: raj, fontSize: 16, color: '#6b7fa8', maxWidth: 560, margin: '18px auto 0', lineHeight: 1.55 }}>
-                Request activation with your MT4 account ID first. Boss-G will confirm payment manually, approve the account, and send the download/payment details.
+                Request the indicator with your MT4 account ID. Boss-G will confirm payment manually, approve the account, and send the download/payment details.
               </p>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 20 }}>
@@ -343,10 +343,7 @@ export default function LandingPage() {
                   <p style={{ fontFamily: raj, fontSize: 14, color: '#8899bb', lineHeight: 1.55, margin: '0 0 22px' }}>
                     Public download, private activation. The indicator will only run when this MT4 account ID is approved in Panda License admin.
                   </p>
-                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                    <button onClick={() => openLicenseRequest(product)} style={{ flex: 1, minWidth: 160, background: 'rgba(0,255,159,0.10)', border: '1px solid #00ff9f44', borderRadius: 7, color: '#00ff9f', fontFamily: mono, fontSize: 9, letterSpacing: 2, padding: '11px 12px', cursor: 'pointer' }}>REQUEST ACTIVATION</button>
-                    <a href={product.downloadPath} download style={{ flex: 1, minWidth: 120, textAlign: 'center', background: 'rgba(0,180,255,0.08)', border: '1px solid #00b4ff33', borderRadius: 7, color: '#00b4ff', fontFamily: mono, fontSize: 9, letterSpacing: 2, padding: '11px 12px', textDecoration: 'none' }}>FILE ONLY</a>
-                  </div>
+                  <button onClick={() => openLicenseRequest(product)} style={{ width: '100%', background: 'rgba(0,255,159,0.10)', border: '1px solid #00ff9f44', borderRadius: 7, color: '#00ff9f', fontFamily: mono, fontSize: 9, letterSpacing: 2, padding: '11px 12px', cursor: 'pointer' }}>REQUEST DOWNLOAD</button>
                 </div>
               ))}
             </div>

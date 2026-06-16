@@ -57,8 +57,8 @@ Assert-Contains "pages\admin\license.js" "APPROVE" "Admin license page must have
 Assert-Contains "pages\admin\index.js" "/admin/license" "Admin nav must link to license page"
 
 Assert-Contains "pages\index.js" "indicator-license-request" "Landing page must submit indicator license requests"
-Assert-Contains "pages\index.js" "product.downloadPath" "Landing page must link configured downloads"
-Assert-Contains "pages\index.js" "REQUEST ACTIVATION" "Landing page must make activation request the main action"
+Assert-Contains "pages\index.js" "REQUEST DOWNLOAD" "Landing page must make the request the download action"
+Assert-NotContains "pages\index.js" "product.downloadPath" "Landing page must not expose direct public file links"
 
 $saleFiles = @(
   "panda-indicators\2026-06-16\v3-release\scoring v3.mq4",
