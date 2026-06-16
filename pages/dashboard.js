@@ -3253,6 +3253,13 @@ export default function Dashboard() {
     if(res.ok) setMaintenance(next);
   }
 
+  // Heartbeat — ping every 60s so admin can see who's online
+  useEffect(()=>{
+    fetch('/api/heartbeat',{method:'POST'}).catch(()=>{});
+    const hb=setInterval(()=>fetch('/api/heartbeat',{method:'POST'}).catch(()=>{}),60000);
+    return()=>clearInterval(hb);
+  },[]);
+
   async function handleLogout(){await fetch('/api/logout',{method:'POST'});window.location.href='/login';}
 
   function toggleHeatmap() { setPrefs(p=>({...p,heatmap_visible:!p?.heatmap_visible})); }

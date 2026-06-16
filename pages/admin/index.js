@@ -326,6 +326,8 @@ export default function AdminPanel() {
   const [editUser, setEditUser] = useState(null);
   const [logFilter, setLogFilter] = useState('');
   const [adminUser, setAdminUser] = useState(null);
+  const [onlineUsers, setOnlineUsers] = useState([]);
+  const [showOnline, setShowOnline] = useState(false);
 
   const loadUsers = useCallback(async () => {
     const res = await fetch('/api/admin/users');
@@ -356,6 +358,14 @@ export default function AdminPanel() {
     if (tab === 'SESSIONS') loadSessions();
     if (tab === 'LOGS') loadLogs(logFilter);
   }, [tab, logFilter, loadSessions, loadLogs]);
+
+  // Poll online users every 30s
+  useEffect(() => {
+    const fetchOnline = () => fetch('/api/admin/online-users').then(r => r.json()).then(d => setOnlineUsers(d.online || [])).catch(() => {});
+    fetchOnline();
+    const iv = setInterval(fetchOnline, 30000);
+    return () => clearInterval(iv);
+  }, []);
 
   async function revokeSession(id) {
     await fetch('/api/admin/sessions', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ session_id: id }) });
@@ -423,6 +433,27 @@ export default function AdminPanel() {
         <div style={{ display: 'flex', gap: 8, padding: '12px 24px', zIndex: 1 }}>
           <StatCard label="TOTAL USERS" value={users.length} color="#00b4ff" />
           <StatCard label="ACTIVE" value={totalActive} color="#00ff9f" />
+          {/* Online now — clickable */}
+          <div onClick={() => setShowOnline(v => !v)} style={{ background: 'var(--bg-secondary)', border: `1px solid ${onlineUsers.length > 0 ? '#00ff9f33' : 'var(--border)'}`, borderRadius: 8, padding: '12px 18px', flex: 1, minWidth: 100, cursor: 'pointer', position: 'relative' }}>
+            <div style={{ fontFamily: mono, fontSize: 9, letterSpacing: 2, color: '#445566', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+              {onlineUsers.length > 0 && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#00ff9f', boxShadow: '0 0 6px #00ff9f', display: 'inline-block' }} />}
+              ONLINE NOW
+            </div>
+            <div style={{ fontFamily: orb, fontSize: 22, fontWeight: 700, color: onlineUsers.length > 0 ? '#00ff9f' : '#2a3550', textShadow: onlineUsers.length > 0 ? '0 0 10px #00ff9f55' : 'none' }}>{onlineUsers.length}</div>
+            {showOnline && onlineUsers.length > 0 && (
+              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4, background: '#0e1525', border: '1px solid #1a2540', borderRadius: 8, padding: 10, zIndex: 50, minWidth: 180 }}>
+                {onlineUsers.map((u, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 4px', borderBottom: i < onlineUsers.length - 1 ? '1px solid #1a254066' : 'none' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#00ff9f', display: 'inline-block' }} />
+                      <span style={{ fontFamily: mono, fontSize: 10, color: '#e8eaf0' }}>{u.username}</span>
+                    </div>
+                    <span style={{ fontFamily: mono, fontSize: 8, color: '#445566' }}>{u.pf_tier || u.role}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           <StatCard label="DEVICES" value={totalDevices} color="#ffd166" />
           <StatCard label="SESSIONS" value={totalSessions} color="#ff9944" />
           <StatCard label="DISABLED" value={users.length - totalActive} color="#ff4d6d" />
