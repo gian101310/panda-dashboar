@@ -4,6 +4,11 @@ import { validateSession, hashPassword } from '../../../lib/auth';
 const PF_BOT_TOKEN = process.env.PF_BOT_TOKEN || '';
 const PF_ADMIN_CHAT = process.env.PF_ADMIN_CHAT || '';
 
+const PF_PAYMENT_LINKS = {
+  pro:   'https://pay.ziina.com/PandaEngine/SrakUhZyl?source=app',
+  elite: 'https://pay.ziina.com/PandaEngine/SrakUhZyl?source=app',
+};
+
 function pfGenPassword() { return 'Panda#' + Math.floor(1000 + Math.random() * 9000); }
 
 async function pfSendTelegram(chatId, text) {
@@ -138,6 +143,31 @@ export default async function handler(req, res) {
       const safeTier = ['starter','pro','elite'].includes(tier) ? tier : 'starter';
       await supabase.from('panda_users').update({ pf_tier: safeTier, feature_access: PF_TIER_FEATURES[safeTier] }).eq('id', id);
       return res.status(200).json({ ok: true, pf_tier: safeTier });
+    }
+
+    if (action === 'send_payment_link') {
+      if (!id) return res.status(400).json({ error: 'id required' });
+      const { data: req_row } = await supabase.from('pf_signup_requests')
+        .select('telegram_chat_id, tier, username, email').eq('id', id).single();
+      if (!req_row) return res.status(404).json({ error: 'signup not found' });
+      if (!req_row.telegram_chat_id) return res.status(400).json({ error: 'User has not connected Telegram yet' });
+      const t = req_row.tier || 'pro';
+      const payLink = PF_PAYMENT_LINKS[t] || PF_PAYMENT_LINKS.pro;
+      const price = t === 'elite' ? '$79/mo' : '$29/mo';
+      const dm = [
+        '🐼 <b>PANDA ENGINE — PAYMENT REMINDER</b>',
+        '━━━━━━━━━━━━━━━━━━━━━━',
+        `<b>Plan:</b> ${t.toUpperCase()} (${price})`,
+        `<b>Username:</b> ${req_row.username}`,
+        '',
+        '💳 Complete your payment below:',
+        `<a href="${payLink}">${payLink}</a>`,
+        '',
+        'Once paid, your account will be activated and credentials sent here automatically.',
+        '━━━━━━━━━━━━━━━━━━━━━━',
+      ].join('\n');
+      await pfSendTelegram(req_row.telegram_chat_id, dm);
+      return res.status(200).json({ ok: true });
     }
 
     return res.status(400).json({ error: 'unknown action' });

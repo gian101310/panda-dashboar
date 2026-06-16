@@ -79,6 +79,17 @@ export default function PfApprovalsPage() {
     });
     pfLoad();
   };
+  const pfSendPaymentLink = async (id) => {
+    try {
+      const r = await fetch('/api/admin/pf-approve', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'send_payment_link', id })
+      });
+      const j = await r.json();
+      if (r.ok) alert('Payment link sent via Telegram!');
+      else alert(j.error || 'Failed to send');
+    } catch { alert('Network error'); }
+  };
   const pfToggleApproved = async (id) => {
     await fetch('/api/admin/pf-approve', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -150,6 +161,7 @@ export default function PfApprovalsPage() {
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: 8 }}>
+                        {s.telegram_chat_id && <button onClick={() => pfSendPaymentLink(s.id)} style={{ background: 'transparent', border: '1px solid #ffd16644', borderRadius: 6, color: '#ffd166', fontFamily: orb, fontSize: 10, fontWeight: 700, letterSpacing: 2, padding: '9px 14px', cursor: 'pointer' }}>💳 RESEND LINK</button>}
                         <button onClick={() => pfOpenApprove(s)} style={{ background: '#00ff9f', border: 'none', borderRadius: 6, color: '#050810', fontFamily: orb, fontSize: 10, fontWeight: 700, letterSpacing: 2, padding: '9px 18px', cursor: 'pointer' }}>APPROVE</button>
                         <button onClick={() => pfDeny(s.id)} style={{ background: 'transparent', border: '1px solid #2a1525', borderRadius: 6, color: '#ff4d6d', fontFamily: orb, fontSize: 10, fontWeight: 700, letterSpacing: 2, padding: '9px 16px', cursor: 'pointer' }}>DENY</button>
                       </div>
