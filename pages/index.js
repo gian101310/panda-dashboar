@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
+import { INDICATOR_PRODUCTS } from '../lib/indicatorProducts.mjs';
 
 const mono = "'Share Tech Mono',monospace";
 const orb  = "'Orbitron',sans-serif";
@@ -91,6 +92,11 @@ export default function LandingPage() {
   const [scrollY, setScrollY] = useState(0);
   const [liveSignals, setLiveSignals] = useState([]);
   const [pairCount, setPairCount] = useState(21);
+  const [licenseModal, setLicenseModal] = useState(null);
+  const [licenseForm, setLicenseForm] = useState({ customer_name: '', contact: '', mt4_account_id: '' });
+  const [licenseBusy, setLicenseBusy] = useState(false);
+  const [licenseOk, setLicenseOk] = useState(false);
+  const [licenseErr, setLicenseErr] = useState('');
 
   useEffect(() => {
     fetch('/api/pf-me').then(r => r.json()).then(d => {
@@ -113,6 +119,35 @@ export default function LandingPage() {
       if (d.total) setPairCount(d.total);
     }).catch(() => {});
   }, []);
+
+  function openLicenseRequest(product) {
+    setLicenseModal(product);
+    setLicenseForm({ customer_name: '', contact: '', mt4_account_id: '' });
+    setLicenseOk(false);
+    setLicenseErr('');
+  }
+
+  async function submitLicenseRequest() {
+    if (!licenseModal) return;
+    setLicenseBusy(true);
+    setLicenseErr('');
+    try {
+      const res = await fetch('/api/indicator-license-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...licenseForm, product_code: licenseModal.code }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setLicenseErr(data.error || 'Request failed');
+      } else {
+        setLicenseOk(true);
+      }
+    } catch {
+      setLicenseErr('Network error');
+    }
+    setLicenseBusy(false);
+  }
 
   return (
     <>
@@ -137,6 +172,7 @@ export default function LandingPage() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <a href="#features" style={{ color: '#6b7fa8', fontFamily: mono, fontSize: 10, letterSpacing: 2, textDecoration: 'none', padding: '8px 14px' }}>FEATURES</a>
+            <a href="#indicators" style={{ color: '#6b7fa8', fontFamily: mono, fontSize: 10, letterSpacing: 2, textDecoration: 'none', padding: '8px 14px' }}>INDICATORS</a>
             <a href="#pricing" style={{ color: '#6b7fa8', fontFamily: mono, fontSize: 10, letterSpacing: 2, textDecoration: 'none', padding: '8px 14px' }}>PRICING</a>
             <button onClick={() => router.push('/login')} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, color: '#8899bb', fontFamily: mono, fontSize: 10, letterSpacing: 2, cursor: 'pointer', padding: '8px 18px' }}>LOG IN</button>
             <button onClick={() => router.push('/funnel')} style={{ background: 'linear-gradient(135deg,#00ff9f,#00cc7a)', border: 'none', borderRadius: 6, color: '#050810', fontFamily: orb, fontSize: 9, fontWeight: 700, letterSpacing: 2, cursor: 'pointer', padding: '10px 22px', boxShadow: '0 0 20px rgba(0,255,159,0.2)' }}>GET ACCESS</button>
@@ -287,6 +323,36 @@ export default function LandingPage() {
         </Section>
 
         {/* ═══ PRICING ═══ */}
+        {/* INDICATORS */}
+        <Section id="indicators">
+          <div style={{ maxWidth: 1100, margin: '0 auto', padding: '80px 24px 120px' }}>
+            <div style={{ textAlign: 'center', marginBottom: 60 }}>
+              <span style={{ fontFamily: mono, fontSize: 10, color: '#ffd166', letterSpacing: 4, display: 'block', marginBottom: 16 }}>MT4 INDICATORS</span>
+              <h2 style={{ fontFamily: orb, fontSize: 'clamp(22px,3.5vw,36px)', fontWeight: 900, letterSpacing: 3, margin: 0 }}>
+                DOWNLOAD FIRST.<br/><span style={{ color: '#00ff9f' }}>ACTIVATE AFTER APPROVAL.</span>
+              </h2>
+              <p style={{ fontFamily: raj, fontSize: 16, color: '#6b7fa8', maxWidth: 560, margin: '18px auto 0', lineHeight: 1.55 }}>
+                The files are locked to your MT4 account ID. Download the indicator, send your account ID, and access turns on after manual payment confirmation.
+              </p>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 20 }}>
+              {INDICATOR_PRODUCTS.map((product) => (
+                <div key={product.code} style={{ padding: '30px 26px', background: 'rgba(12,18,32,0.6)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14 }}>
+                  <div style={{ fontFamily: orb, fontSize: 14, fontWeight: 800, letterSpacing: 2, color: product.code === 'panda_full_v3' ? '#00ff9f' : '#00b4ff', marginBottom: 10 }}>{product.name}</div>
+                  <div style={{ fontFamily: mono, fontSize: 10, color: '#ffd166', letterSpacing: 2, marginBottom: 18 }}>{product.priceLabel}</div>
+                  <p style={{ fontFamily: raj, fontSize: 14, color: '#8899bb', lineHeight: 1.55, margin: '0 0 22px' }}>
+                    Public download, private activation. The indicator will only run when this MT4 account ID is approved in Panda License admin.
+                  </p>
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <a href={product.downloadPath} download style={{ flex: 1, minWidth: 120, textAlign: 'center', background: 'rgba(0,180,255,0.10)', border: '1px solid #00b4ff44', borderRadius: 7, color: '#00b4ff', fontFamily: mono, fontSize: 9, letterSpacing: 2, padding: '11px 12px', textDecoration: 'none' }}>DOWNLOAD</a>
+                    <button onClick={() => openLicenseRequest(product)} style={{ flex: 1, minWidth: 120, background: 'rgba(0,255,159,0.10)', border: '1px solid #00ff9f44', borderRadius: 7, color: '#00ff9f', fontFamily: mono, fontSize: 9, letterSpacing: 2, padding: '11px 12px', cursor: 'pointer' }}>REQUEST</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Section>
+
         <Section id="pricing">
           <div style={{ maxWidth: 1100, margin: '0 auto', padding: '80px 24px 120px' }}>
             <div style={{ textAlign: 'center', marginBottom: 60 }}>
@@ -336,6 +402,41 @@ export default function LandingPage() {
           </p>
           <p style={{ fontFamily: mono, fontSize: 8, color: '#1a2538', letterSpacing: 1, marginTop: 8 }}>© 2026 PANDA ENGINE</p>
         </footer>
+
+        {licenseModal && (
+          <div onClick={() => setLicenseModal(null)} style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 430, background: 'linear-gradient(135deg,#0a0e1a,#0e1525)', border: '1px solid #1a2540', borderRadius: 14, padding: 28, position: 'relative' }}>
+              <button onClick={() => setLicenseModal(null)} style={{ position: 'absolute', top: 12, right: 12, background: 'transparent', border: 'none', color: '#445566', fontSize: 20, cursor: 'pointer' }}>x</button>
+              {licenseOk ? (
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontFamily: mono, fontSize: 10, letterSpacing: 4, color: '#00ff9f', marginBottom: 10 }}>REQUEST SENT</div>
+                  <h3 style={{ fontFamily: orb, fontSize: 20, margin: '0 0 12px' }}>{licenseModal.name}</h3>
+                  <p style={{ fontFamily: raj, fontSize: 14, color: '#8899bb', lineHeight: 1.55, marginBottom: 20 }}>
+                    Your account ID is now pending. Access will activate after manual payment confirmation.
+                  </p>
+                  <button onClick={() => setLicenseModal(null)} style={{ width: '100%', background: '#00ff9f', border: 'none', borderRadius: 8, color: '#050810', fontFamily: orb, fontSize: 11, fontWeight: 800, letterSpacing: 2, padding: 12, cursor: 'pointer' }}>CLOSE</button>
+                </div>
+              ) : (
+                <>
+                  <div style={{ fontFamily: mono, fontSize: 10, letterSpacing: 4, color: '#00b4ff', marginBottom: 8 }}>ACTIVATE INDICATOR</div>
+                  <h3 style={{ fontFamily: orb, fontSize: 21, margin: '0 0 8px' }}>{licenseModal.name}</h3>
+                  <p style={{ fontFamily: raj, fontSize: 13, color: '#6b7fa8', lineHeight: 1.5, marginBottom: 18 }}>
+                    Enter the MT4 account ID where this indicator will run. Boss-G will approve it after payment.
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <input value={licenseForm.customer_name} onChange={(e) => setLicenseForm((f) => ({ ...f, customer_name: e.target.value }))} placeholder="Your name" style={{ background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '12px 14px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, outline: 'none' }} />
+                    <input value={licenseForm.contact} onChange={(e) => setLicenseForm((f) => ({ ...f, contact: e.target.value }))} placeholder="Email, Telegram, or WhatsApp" style={{ background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '12px 14px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, outline: 'none' }} />
+                    <input value={licenseForm.mt4_account_id} onChange={(e) => setLicenseForm((f) => ({ ...f, mt4_account_id: e.target.value }))} placeholder="MT4 account ID, numbers only" style={{ background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '12px 14px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, outline: 'none' }} />
+                  </div>
+                  {licenseErr && <div style={{ fontFamily: mono, fontSize: 10, color: '#ff4d6d', marginTop: 12 }}>{licenseErr}</div>}
+                  <button onClick={submitLicenseRequest} disabled={licenseBusy} style={{ width: '100%', background: '#00ff9f', border: 'none', borderRadius: 8, color: '#050810', fontFamily: orb, fontSize: 11, fontWeight: 800, letterSpacing: 2, padding: 13, marginTop: 16, cursor: licenseBusy ? 'not-allowed' : 'pointer', opacity: licenseBusy ? 0.65 : 1 }}>
+                    {licenseBusy ? 'SENDING...' : 'REQUEST APPROVAL'}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ═══ CSS ═══ */}

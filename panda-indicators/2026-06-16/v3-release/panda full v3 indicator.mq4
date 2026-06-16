@@ -84,6 +84,12 @@ const bool   TestMode              = false;     // USE pe_ PREFIX - safe for sid
 const bool   ExportForEngine       = true;     // write mt4/tbg files (engine reads these)
 const bool   ExportPandaScore      = true;     // write panda_score file
 
+// ===== LICENSE LOCK =====
+const string LicenseEndpoint        = "https://pandaengine.app/api/indicator-license";
+const string ProductCode            = "panda_full_v3";
+const int    LicenseCheckSeconds    = 3600;
+const int    GraceHours             = 24;
+
 // ===== INDICATOR BUFFERS =====
 double STBullish[];
 double STBearish[];
@@ -169,6 +175,11 @@ int    PanelPosY     = 0;
 
 datetime LastRefresh  = 0;
 datetime LastAlertTime = 0;
+datetime LastLicenseCheck = 0;
+datetime LicenseGraceUntil = 0;
+datetime LastLicenseAlert = 0;
+bool     LicenseOk = false;
+string   LicenseStatus = "UNVERIFIED";
 
 
 // ===================================================================
@@ -177,6 +188,8 @@ datetime LastAlertTime = 0;
 int OnInit()
 {
    IndicatorShortName("Panda Full v3 Indicator");
+   if(!ValidateLicense(true))
+      return(INIT_FAILED);
 
    SetIndexBuffer(0, STBullish);
    SetIndexBuffer(1, STBearish);
@@ -224,6 +237,8 @@ void OnDeinit(const int reason)
 
 void OnTimer()
 {
+   if(!ValidateLicense(false))
+      return;
    RefreshScoring();
    if(Panel_Show && !PanelHidden)
       DrawPanel();
@@ -308,6 +323,9 @@ int OnCalculate(const int rates_total,
                 const long &volume[],
                 const int &spread[])
 {
+   if(!ValidateLicense(false))
+      return(rates_total);
+
    int min_required = MathMax(MathMax(ST_Period, BB_Period), BB_ATRPeriod) + 3;
    if(rates_total <= min_required)
       return(0);
@@ -1636,6 +1654,78 @@ double StdDevClose(const int i, const int period, const int rates_total,
 bool IsValidVal(const double value)
 {
    return(value != EMPTY_VALUE && value == value);
+}
+
+string UrlEncodeLite(string value)
+{
+   StringReplace(value, "%", "%25");
+   StringReplace(value, " ", "%20");
+   StringReplace(value, "&", "%26");
+   StringReplace(value, "=", "%3D");
+   StringReplace(value, "+", "%2B");
+   return(value);
+}
+
+bool IsLicenseGraceValid()
+{
+   return(LicenseOk && LicenseGraceUntil > 0 && TimeCurrent() <= LicenseGraceUntil);
+}
+
+void ShowLicenseAlert(const string message)
+{
+   if(TimeCurrent() - LastLicenseAlert < 60)
+      return;
+   LastLicenseAlert = TimeCurrent();
+   Alert(message);
+   Print(message);
+}
+
+bool ValidateLicense(const bool force)
+{
+   datetime now = TimeCurrent();
+   if(!force && LicenseOk && (now - LastLicenseCheck) < MathMax(60, LicenseCheckSeconds))
+      return(true);
+
+   string body = "product_code=" + UrlEncodeLite(ProductCode)
+      + "&account_number=" + IntegerToString(AccountNumber())
+      + "&account_server=" + UrlEncodeLite(AccountServer())
+      + "&account_company=" + UrlEncodeLite(AccountCompany())
+      + "&terminal_build=" + IntegerToString((int)TerminalInfoInteger(TERMINAL_BUILD));
+
+   char post[];
+   char result[];
+   string result_headers = "";
+   string headers = "Content-Type: application/x-www-form-urlencoded\r\n";
+   StringToCharArray(body, post, 0, WHOLE_ARRAY, CP_UTF8);
+
+   ResetLastError();
+   int response_code = WebRequest("POST", LicenseEndpoint, headers, 5000, post, result, result_headers);
+   LastLicenseCheck = now;
+
+   if(response_code == -1)
+   {
+      int err = GetLastError();
+      if(IsLicenseGraceValid())
+         return(true);
+      LicenseOk = false;
+      LicenseStatus = "NETWORK";
+      ShowLicenseAlert("Panda license check failed. Add https://pandaengine.app to MT4 WebRequest allowed URLs. Error " + IntegerToString(err));
+      return(false);
+   }
+
+   string response = CharArrayToString(result, 0, -1, CP_UTF8);
+   if(StringFind(response, "OK|APPROVED") == 0)
+   {
+      LicenseOk = true;
+      LicenseStatus = "APPROVED";
+      LicenseGraceUntil = now + GraceHours * 3600;
+      return(true);
+   }
+
+   LicenseOk = false;
+   LicenseStatus = response;
+   ShowLicenseAlert("Panda indicator license denied: " + response);
+   return(false);
 }
 
 // --- Time helpers ---
