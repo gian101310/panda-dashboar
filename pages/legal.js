@@ -286,14 +286,14 @@ export default function LegalPage() {
           {/* TAB BAR */}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 40, borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 16 }}>
             {TABS.map(t => (
-              <button key={t.key} onClick={() => { setActiveTab(t.key); router.replace(`/legal?tab=${t.key}`, undefined, { shallow: true }); }} style={{
+              <a key={t.key} href={`/legal?tab=${t.key}`} onClick={(e) => { e.preventDefault(); setActiveTab(t.key); router.replace(`/legal?tab=${t.key}`, undefined, { shallow: true }); }} style={{
                 background: activeTab === t.key ? 'rgba(0,255,159,0.1)' : 'transparent',
                 border: `1px solid ${activeTab === t.key ? '#00ff9f44' : '#1a2540'}`,
                 borderRadius: 6, padding: '8px 16px', cursor: 'pointer',
                 fontFamily: mono, fontSize: 9, letterSpacing: 2,
                 color: activeTab === t.key ? '#00ff9f' : '#445566',
-                transition: 'all 0.2s',
-              }}>{t.label.toUpperCase()}</button>
+                transition: 'all 0.2s', textDecoration: 'none', display: 'inline-block',
+              }}>{t.label.toUpperCase()}</a>
             ))}
           </div>
 

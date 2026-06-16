@@ -370,7 +370,7 @@ export default function JournalPage() {
         <div style={{display:'flex',alignItems:'center',gap:8,padding:'10px 20px',zIndex:1}}>
           <div style={{display:'flex',background:'var(--bg-secondary)',border:'1px solid var(--border)',borderRadius:7,overflow:'hidden'}}>
             {['JOURNAL','STATS','GAMEPLAY'].map((t,i)=>(
-              <button key={t} onClick={()=>setTab(t)} style={{background:tab===t?'rgba(255,209,102,0.15)':'transparent',border:'none',borderRight:i<2?'1px solid var(--border)':'none',color:tab===t?'#ffd166':'var(--text-muted)',fontFamily:mono,fontSize:9,letterSpacing:2,padding:'7px 16px',cursor:'pointer'}}>{t}</button>
+              <a key={t} href={`/journal?tab=${t.toLowerCase()}`} onClick={(e)=>{e.preventDefault();setTab(t);}} style={{background:tab===t?'rgba(255,209,102,0.15)':'transparent',border:'none',borderRight:i<2?'1px solid var(--border)':'none',color:tab===t?'#ffd166':'var(--text-muted)',fontFamily:mono,fontSize:9,letterSpacing:2,padding:'7px 16px',cursor:'pointer',textDecoration:'none',display:'inline-block'}}>{t}</a>
             ))}
           </div>
           {tab==='JOURNAL'&&<>

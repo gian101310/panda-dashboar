@@ -473,7 +473,7 @@ export default function AdminPanel() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 24px 12px', zIndex: 1 }}>
           <div style={{ display: 'flex', background: '#080c18', border: '1px solid var(--border)', borderRadius: 7, overflow: 'hidden' }}>
             {['USERS', 'SESSIONS', 'LOGS'].map((t, i) => (
-              <button key={t} onClick={() => setTab(t)} style={{ background: tab === t ? 'rgba(255,209,102,0.12)' : 'transparent', border: 'none', borderRight: i < 2 ? '1px solid #1a2540' : 'none', color: tab === t ? '#ffd166' : '#445566', fontFamily: mono, fontSize: 9, letterSpacing: 2, padding: '7px 16px', cursor: 'pointer' }}>{t}</button>
+              <a key={t} href={`/admin?tab=${t.toLowerCase()}`} onClick={(e) => { e.preventDefault(); setTab(t); }} style={{ background: tab === t ? 'rgba(255,209,102,0.12)' : 'transparent', border: 'none', borderRight: i < 2 ? '1px solid #1a2540' : 'none', color: tab === t ? '#ffd166' : '#445566', fontFamily: mono, fontSize: 9, letterSpacing: 2, padding: '7px 16px', cursor: 'pointer', textDecoration: 'none', display: 'inline-block' }}>{t}</a>
             ))}
           </div>
           {tab === 'USERS' && <button onClick={() => setShowCreate(true)} style={{ background: 'rgba(0,255,159,0.1)', border: '1px solid #00ff9f', borderRadius: 5, color: '#00ff9f', fontFamily: mono, fontSize: 9, letterSpacing: 2, padding: '7px 16px', cursor: 'pointer' }}>+ CREATE USER</button>}
