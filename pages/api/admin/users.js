@@ -1,11 +1,11 @@
 import { supabase } from '../../../lib/supabase';
 import { requireAdmin, hashPassword, logAccess } from '../../../lib/auth';
 
-const ALL_FEATURES = ['dashboard','cot','calendar','calculator','journal','signals','engine','accuracy'];
-const ROLE_DEFAULTS = {
-  user:  ['dashboard','cot','calendar','calculator'],
-  vip:   ['dashboard','cot','calendar','calculator','journal','signals'],
-  admin: ['dashboard','cot','calendar','calculator','journal','signals','engine','accuracy'],
+const TIER_FEATURES = {
+  starter: ['signals','calculator'],
+  pro:     ['signals','calculator','panels','table','setups','panda_ai','calendar','cot'],
+  elite:   ['signals','calculator','panels','table','setups','panda_ai','calendar','cot','overview','signal_log','valid_pairs','alerts','spike_log','journal','chart','gap_chart','analytics','heatmap','mt4_indicators','bias_indicators'],
+  admin:   ['overview','panels','table','setups','valid_pairs','spike_log','signal_log','signals','gap_chart','analytics','panda_ai','cot','calendar','calculator','journal','engine','heatmap','spike_banner'],
 };
 
 export default async function handler(req, res) {
@@ -15,7 +15,7 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     const { data: users, error: uErr } = await supabase
       .from('panda_users')
-      .select('id, username, role, is_active, max_devices, created_at, created_by, notes, plain_password, expires_at, feature_access, maintenance_bypass')
+      .select('id, username, role, pf_tier, is_active, max_devices, created_at, created_by, notes, plain_password, expires_at, feature_access, maintenance_bypass')
       .order('created_at', { ascending: false });
 
     if (uErr) return res.status(500).json({ error: uErr.message });
@@ -33,14 +33,14 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'POST') {
-    const { username, password, role = 'user', max_devices = 1, notes = '', expires_at = null, feature_access } = req.body;
+    const { username, password, pf_tier = 'starter', max_devices = 1, notes = '', expires_at = null, feature_access } = req.body;
     if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
     if (password.length < 4) return res.status(400).json({ error: 'Password must be at least 4 characters' });
 
-    const features = feature_access || ROLE_DEFAULTS[role] || ROLE_DEFAULTS.user;
+    const features = feature_access || TIER_FEATURES[pf_tier] || TIER_FEATURES.starter;
     const { error } = await supabase.from('panda_users').insert({
       username: username.trim(), password_hash: hashPassword(password), plain_password: password,
-      role, max_devices: parseInt(max_devices), notes, expires_at: expires_at || null,
+      role: pf_tier === 'admin' ? 'admin' : 'user', pf_tier, max_devices: parseInt(max_devices), notes, expires_at: expires_at || null,
       created_by: admin.username, feature_access: features,
     });
 
@@ -50,7 +50,7 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'PATCH') {
-    const { id, is_active, max_devices, role, notes, password, expires_at, feature_access, maintenance_bypass } = req.body;
+    const { id, is_active, max_devices, pf_tier, notes, password, expires_at, feature_access, maintenance_bypass } = req.body;
     if (!id) return res.status(400).json({ error: 'ID required' });
 
     const updates = {};
@@ -62,10 +62,11 @@ export default async function handler(req, res) {
     if (maintenance_bypass !== undefined) updates.maintenance_bypass = maintenance_bypass;
     if (password) { updates.password_hash = hashPassword(password); updates.plain_password = password; }
 
-    // If role changes, auto-update feature_access unless custom was provided
-    if (role !== undefined) {
-      updates.role = role;
-      if (feature_access === undefined) updates.feature_access = ROLE_DEFAULTS[role] || ROLE_DEFAULTS.user;
+    // If tier changes, auto-update feature_access unless custom was provided
+    if (pf_tier !== undefined) {
+      updates.pf_tier = pf_tier;
+      updates.role = pf_tier === 'admin' ? 'admin' : 'user';
+      if (feature_access === undefined) updates.feature_access = TIER_FEATURES[pf_tier] || TIER_FEATURES.starter;
     }
 
     const { error } = await supabase.from('panda_users').update(updates).eq('id', id);

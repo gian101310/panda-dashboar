@@ -33,10 +33,11 @@ const FEATURE_LABELS = {
   heatmap:      '🗺️ Heatmap widget',
   spike_banner: '🔔 Spike Banner widget',
 };
-const ROLE_DEFAULTS = {
-  user:  ['overview','panels','gap_chart','cot','calendar','calculator','heatmap','spike_banner'],
-  vip:   ['overview','panels','table','setups','valid_pairs','spike_log','signal_log','signals','gap_chart','analytics','panda_ai','cot','calendar','calculator','heatmap','spike_banner'],
-  admin: ['overview','panels','table','setups','valid_pairs','spike_log','signal_log','signals','gap_chart','analytics','panda_ai','cot','calendar','calculator','journal','engine','heatmap','spike_banner'],
+const TIER_FEATURES = {
+  starter: ['signals','calculator'],
+  pro:     ['signals','calculator','panels','table','setups','panda_ai','calendar','cot'],
+  elite:   ['signals','calculator','panels','table','setups','panda_ai','calendar','cot','overview','signal_log','valid_pairs','alerts','spike_log','journal','chart','gap_chart','analytics','heatmap','mt4_indicators','bias_indicators'],
+  admin:   ['overview','panels','table','setups','valid_pairs','spike_log','signal_log','signals','gap_chart','analytics','panda_ai','cot','calendar','calculator','journal','engine','heatmap','spike_banner'],
 };
 const orb = "'Orbitron', sans-serif";
 const raj = "'Rajdhani', sans-serif";
@@ -107,7 +108,7 @@ function PasswordCell({ password, userId }) {
 }
 
 function CreateUserModal({ onClose, onCreated }) {
-  const [form, setForm] = useState({ username: '', password: '', role: 'user', max_devices: 1, notes: '', expires_at: '' });
+  const [form, setForm] = useState({ username: '', password: '', pf_tier: 'starter', max_devices: 1, notes: '', expires_at: '' });
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -139,13 +140,14 @@ function CreateUserModal({ onClose, onCreated }) {
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
             <div style={{ flex: 1 }}>
-              <label style={lbl}>ROLE</label>
-              <select style={inp} value={form.role} onChange={e => {
-                const newRole = e.target.value;
-                setForm(f => ({ ...f, role: newRole, feature_access: ROLE_DEFAULTS[newRole] || ROLE_DEFAULTS.user }));
+              <label style={lbl}>TIER</label>
+              <select style={inp} value={form.pf_tier} onChange={e => {
+                const newTier = e.target.value;
+                setForm(f => ({ ...f, pf_tier: newTier, feature_access: TIER_FEATURES[newTier] || TIER_FEATURES.starter }));
               }}>
-                <option value="user">User</option>
-                <option value="vip">VIP</option>
+                <option value="starter">Starter</option>
+                <option value="pro">Pro</option>
+                <option value="elite">Elite</option>
                 <option value="admin">Admin</option>
               </select>
             </div>
@@ -172,7 +174,7 @@ function CreateUserModal({ onClose, onCreated }) {
 }
 
 function EditUserModal({ user, onClose, onSaved }) {
-  const [form, setForm] = useState({ is_active: user.is_active, max_devices: user.max_devices, role: user.role, notes: user.notes || '', password: '', expires_at: toDateInputValue(user.expires_at), feature_access: user.feature_access || ROLE_DEFAULTS[user.role] || ROLE_DEFAULTS.user, maintenance_bypass: user.maintenance_bypass || false });
+  const [form, setForm] = useState({ is_active: user.is_active, max_devices: user.max_devices, pf_tier: user.pf_tier || user.role || 'starter', notes: user.notes || '', password: '', expires_at: toDateInputValue(user.expires_at), feature_access: user.feature_access || TIER_FEATURES[user.pf_tier] || TIER_FEATURES.starter, maintenance_bypass: user.maintenance_bypass || false });
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -221,13 +223,14 @@ function EditUserModal({ user, onClose, onSaved }) {
               </select>
             </div>
             <div style={{ flex: 1 }}>
-              <label style={lbl}>ROLE</label>
-              <select style={inp} value={form.role} onChange={e => {
-                const newRole = e.target.value;
-                setForm(f => ({ ...f, role: newRole, feature_access: ROLE_DEFAULTS[newRole] || ROLE_DEFAULTS.user }));
+              <label style={lbl}>TIER</label>
+              <select style={inp} value={form.pf_tier} onChange={e => {
+                const newTier = e.target.value;
+                setForm(f => ({ ...f, pf_tier: newTier, feature_access: TIER_FEATURES[newTier] || TIER_FEATURES.starter }));
               }}>
-                <option value="user">User</option>
-                <option value="vip">VIP</option>
+                <option value="starter">Starter</option>
+                <option value="pro">Pro</option>
+                <option value="elite">Elite</option>
                 <option value="admin">Admin</option>
               </select>
             </div>
@@ -270,8 +273,8 @@ function EditUserModal({ user, onClose, onSaved }) {
               <div style={{display:'flex',gap:5}}>
                 <button type="button" onClick={()=>setForm(f=>({...f,feature_access:[...ALL_FEATURES]}))} style={{background:'rgba(0,255,159,0.08)',border:'1px solid #00ff9f44',borderRadius:4,color:'#00ff9f',fontFamily:mono,fontSize:7,padding:'2px 7px',cursor:'pointer'}}>ALL ON</button>
                 <button type="button" onClick={()=>setForm(f=>({...f,feature_access:[]}))} style={{background:'rgba(255,77,109,0.08)',border:'1px solid #ff4d6d44',borderRadius:4,color:'#ff4d6d',fontFamily:mono,fontSize:7,padding:'2px 7px',cursor:'pointer'}}>ALL OFF</button>
-                {Object.keys(ROLE_DEFAULTS).map(r=>(
-                  <button key={r} type="button" onClick={()=>setForm(f=>({...f,feature_access:[...ROLE_DEFAULTS[r]]}))} style={{background:'rgba(0,180,255,0.08)',border:'1px solid #00b4ff44',borderRadius:4,color:'#00b4ff',fontFamily:mono,fontSize:7,padding:'2px 7px',cursor:'pointer'}}>{r.toUpperCase()}</button>
+                {Object.keys(TIER_FEATURES).map(t=>(
+                  <button key={t} type="button" onClick={()=>setForm(f=>({...f,feature_access:[...TIER_FEATURES[t]]}))} style={{background:'rgba(0,180,255,0.08)',border:'1px solid #00b4ff44',borderRadius:4,color:'#00b4ff',fontFamily:mono,fontSize:7,padding:'2px 7px',cursor:'pointer'}}>{t.toUpperCase()}</button>
                 ))}
               </div>
             </div>
@@ -442,7 +445,7 @@ export default function AdminPanel() {
             <table style={{ width: '100%', borderCollapse: 'collapse', background: '#080c18', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
               <thead>
                 <tr style={{ background: '#0e1525' }}>
-                  {['USERNAME', 'ROLE', 'STATUS', 'BYPASS', 'PASSWORD', 'DEVICES', 'EXPIRY', 'LAST SEEN', 'NOTES', 'ACTIONS'].map(h => <th key={h} style={hdr}>{h}</th>)}
+                  {['USERNAME', 'TIER', 'STATUS', 'BYPASS', 'PASSWORD', 'DEVICES', 'EXPIRY', 'LAST SEEN', 'NOTES', 'ACTIONS'].map(h => <th key={h} style={hdr}>{h}</th>)}
                 </tr>
               </thead>
               <tbody>
@@ -453,7 +456,7 @@ export default function AdminPanel() {
                     return (
                       <tr key={u.id} style={{ borderBottom: '1px solid #111827', opacity: u.is_active ? 1 : 0.5 }}>
                         <td style={{ ...tc, fontFamily: orb, fontSize: 11, fontWeight: 700, color: u.is_active ? '#e8eaf0' : '#445566' }}>{u.username}</td>
-                        <td style={tc}><Badge label={u.role.toUpperCase()} color={u.role === 'admin' ? '#ffd166' : u.role === 'vip' ? '#cc77ff' : '#00b4ff'} /></td>
+                        <td style={tc}><Badge label={(u.pf_tier || u.role || 'starter').toUpperCase()} color={{'admin':'#ffd166','elite':'#00b4ff','pro':'#00ff9f','starter':'#445566'}[(u.pf_tier || u.role || 'starter')] || '#445566'} /></td>
                         <td style={tc}><Badge label={u.is_active ? 'ACTIVE' : 'DISABLED'} color={u.is_active ? '#00ff9f' : '#ff4d6d'} /></td>
                         <td style={tc}>
                           <button onClick={() => toggleBypass(u)} style={{
