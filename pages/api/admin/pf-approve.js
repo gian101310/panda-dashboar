@@ -127,7 +127,7 @@ export default async function handler(req, res) {
       }
 
       // Notify admin
-      await pfSendTelegram(PF_ADMIN_CHAT, `🐼 <b>USER APPROVED</b>\n<b>User:</b> ${username}\n<b>Tier:</b> ${safeTier.toUpperCase()}\n<b>Email:</b> ${req_row.email}`);
+      await pfSendApproveBot(PF_ADMIN_CHAT, `🐼 <b>USER APPROVED</b>\n<b>User:</b> ${username}\n<b>Tier:</b> ${safeTier.toUpperCase()}\n<b>Email:</b> ${req_row.email}`);
       return res.status(200).json({ ok: true });
     }
 
@@ -142,7 +142,7 @@ export default async function handler(req, res) {
       const { data: u } = await supabase.from('panda_users').select('pf_approved, username').eq('id', id).single();
       const next = !u.pf_approved;
       await supabase.from('panda_users').update({ pf_approved: next }).eq('id', id);
-      await pfSendTelegram(PF_ADMIN_CHAT, `🐼 <b>APPROVAL ${next ? 'GRANTED' : 'REVOKED'}</b>\n<b>User:</b> ${u.username}`);
+      await pfSendApproveBot(PF_ADMIN_CHAT, `🐼 <b>APPROVAL ${next ? 'GRANTED' : 'REVOKED'}</b>\n<b>User:</b> ${u.username}`);
       return res.status(200).json({ ok: true, pf_approved: next });
     }
 
