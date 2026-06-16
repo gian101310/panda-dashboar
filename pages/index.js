@@ -9,7 +9,7 @@ const raj  = "'Rajdhani',sans-serif";
 
 const FEATURES = [
   { icon:'⚡', title:'REAL-TIME SIGNALS', desc:'BUY and SELL signals generated every 5 minutes across 21 forex pairs. Multi-strategy validation with BB and INTRA logic.', color:'#00ff9f' },
-  { icon:'🎯', title:'GAP SCORING ENGINE', desc:'Proprietary currency strength scoring across D1, H4 and H1 timeframes. The gap score reveals true directional bias — not noise.', color:'#00b4ff' },
+  { icon:'🎯', title:'DIRECTIONAL BIAS', desc:'A multi-timeframe strength model that reveals the dominant side of a currency pair and filters out weak or unclear market conditions.', color:'#00b4ff' },
   { icon:'📊', title:'MOMENTUM TRACKING', desc:'10 momentum states from SPARK to REVERSING. Know when a move is building, peaking, or dying — before it shows on the chart.', color:'#66ffcc' },
   { icon:'🧠', title:'PANDA AI', desc:'AI-powered market narrator that analyzes all 21 pairs, surfaces opportunities, and coaches your decision-making in real time.', color:'#7C3AED' },
   { icon:'🔥', title:'SPIKE DETECTION', desc:'Instant alerts when gap scores jump 7+ points. The engine catches the move — you decide whether to ride it.', color:'#ffd166' },
@@ -23,9 +23,9 @@ const STEPS = [
 ];
 
 const TIERS = [
-  { name:'FREE', price:'0', period:'', color:'#445566', tag:null, features:['Live signals tab','Position calculator','Economic calendar','COT report access'], cta:'START FREE', tier:'starter' },
-  { name:'PRO', price:'29', period:'/mo', color:'#00ff9f', tag:'MOST POPULAR', features:['Everything in Free','Full data table + gap chart','Valid setups tab','Spike detection','Panda AI assistant'], cta:'GO PRO →', tier:'pro' },
-  { name:'ELITE', price:'79', period:'/mo', color:'#00b4ff', tag:'FULL ACCESS', features:['Everything in Pro','Live panels view','Signal analytics','Full signal + spike logs','TradingView charts','Telegram alerts'], cta:'GO ELITE →', tier:'elite' },
+  { name:'STARTER', price:'0', period:'', sub:'FREE FOR 1 WEEK', color:'#445566', tag:null, features:['Live signals tab','Position calculator'], cta:'START FREE TRIAL', tier:'starter' },
+  { name:'PRO', price:'99', period:'/mo', sub:'or $3,499 one-time (lifetime)', color:'#00ff9f', tag:'MOST POPULAR', features:['Everything in Starter, plus:','Panel tab','Full data table','Valid setups tab','Panda AI assistant','Research tab'], cta:'GO PRO →', tier:'pro' },
+  { name:'ELITE', price:'699', period:'/mo', sub:'or $4,999 one-time (lifetime)', color:'#00b4ff', tag:'FULL ACCESS', features:['Everything in Pro, plus:','Overview tab','Signal logs tab','Valid pairs filter','Telegram signal alerts','Spike signal alerts','Private trading journal','Chart tab','MT4/MT5 Panda Indicators','Bias detection indicators'], cta:'GO ELITE →', tier:'elite' },
 ];
 
 const TESTIMONIALS = [
@@ -225,7 +225,7 @@ export default function LandingPage() {
             {[...liveSignals, ...liveSignals].map((s, i) => {
               const c = s.direction === 'BUY' ? '#00ff9f' : '#ff4d6d';
               return <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-                <span style={{ fontFamily: orb, fontSize: 12, fontWeight: 700, color: '#e8f0ff' }}>{s.symbol}</span>
+                <span style={{ fontFamily: orb, fontSize: 12, fontWeight: 700, color: '#e8f0ff', filter: 'blur(5px)', userSelect: 'none' }}>{s.symbol}</span>
                 <span style={{ fontFamily: mono, fontSize: 10, color: c, background: `${c}12`, border: `1px solid ${c}30`, borderRadius: 3, padding: '2px 8px' }}>{s.direction}</span>
                 <span style={{ fontFamily: mono, fontSize: 10, color: '#4a5578' }}>·</span>
               </div>;
@@ -285,14 +285,13 @@ export default function LandingPage() {
               YOUR <span style={{ color: '#00ff9f' }}>COMMAND CENTER</span>
             </h2>
             <div style={{ background: 'rgba(12,18,32,0.8)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: 4, boxShadow: '0 20px 80px rgba(0,0,0,0.5)' }}>
-              <div style={{ background: 'linear-gradient(135deg,#0a0e18,#0d1424)', borderRadius: 12, padding: '40px 32px', display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, minHeight: 300 }}>
-                {['NZDUSD +11.2 BUY', 'GBPAUD -8.1 SELL', 'AUDJPY +7.6 BUY', 'EURNZD -6.8 SELL'].map((s, i) => {
-                  const [sym, gap, dir] = s.split(' ');
+              <div style={{ background: 'linear-gradient(135deg,#0a0e18,#0d1424)', borderRadius: 12, padding: '40px 32px', display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, minHeight: 200 }}>
+                {['NZDUSD BUY', 'GBPAUD SELL', 'AUDJPY BUY', 'EURNZD SELL'].map((s, i) => {
+                  const [sym, dir] = s.split(' ');
                   const c = dir === 'BUY' ? '#00ff9f' : '#ff4d6d';
-                  return <div key={i} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${c}20`, borderRadius: 10, padding: '20px 16px', textAlign: 'left' }}>
-                    <div style={{ fontFamily: orb, fontSize: 14, fontWeight: 700, color: '#e8f0ff', marginBottom: 8 }}>{sym}</div>
-                    <div style={{ fontFamily: orb, fontSize: 28, fontWeight: 900, color: c, marginBottom: 4 }}>{gap}</div>
-                    <span style={{ fontFamily: mono, fontSize: 10, color: c, background: `${c}12`, border: `1px solid ${c}30`, borderRadius: 3, padding: '2px 8px' }}>{dir}</span>
+                  return <div key={i} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${c}20`, borderRadius: 10, padding: '28px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', gap: 12 }}>
+                    <div style={{ fontFamily: orb, fontSize: 18, fontWeight: 900, color: '#e8f0ff', letterSpacing: 2 }}>{sym}</div>
+                    <span style={{ fontFamily: orb, fontSize: 14, fontWeight: 700, color: c, background: `${c}12`, border: `1px solid ${c}30`, borderRadius: 4, padding: '4px 14px', letterSpacing: 2 }}>{dir}</span>
                   </div>;
                 })}
               </div>
@@ -363,6 +362,7 @@ export default function LandingPage() {
                 {t.tag && <div style={{ position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)', fontFamily: mono, fontSize: 9, color: '#050810', background: t.color, padding: '4px 16px', borderRadius: 20, letterSpacing: 2, fontWeight: 700 }}>{t.tag}</div>}
                 <div style={{ fontFamily: orb, fontSize: 14, fontWeight: 700, letterSpacing: 3, color: t.color, marginBottom: 16 }}>{t.name}</div>
                 <div style={{ fontFamily: orb, fontSize: 48, fontWeight: 900, color: '#e8f0ff', lineHeight: 1 }}>${t.price}<span style={{ fontFamily: mono, fontSize: 14, color: '#4a5578' }}>{t.period}</span></div>
+                {t.sub && <div style={{ fontFamily: mono, fontSize: 10, color: '#ffd166', letterSpacing: 1, marginTop: 8 }}>{t.sub}</div>}
                 <div style={{ margin: '24px 0', display: 'flex', flexDirection: 'column', gap: 10, textAlign: 'left' }}>
                   {t.features.map(f => <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: raj, fontSize: 14, color: '#8899bb' }}>
                     <span style={{ color: t.color, fontSize: 12 }}>✓</span>{f}

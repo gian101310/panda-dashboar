@@ -8,18 +8,18 @@ const raj  = "'Rajdhani',sans-serif";
 
 const TIERS = [
   {
-    name: 'FREE', price: '0', period: '', color: '#445566', tag: null,
-    features: ['Live signals tab','Position calculator','Economic calendar','COT report access'],
-    cta: 'START FREE', tier: 'starter',
+    name: 'STARTER', price: '0', period: '', sub: 'FREE FOR 1 WEEK', color: '#445566', tag: null,
+    features: ['Live signals tab','Position calculator'],
+    cta: 'START FREE TRIAL', tier: 'starter',
   },
   {
-    name: 'PRO', price: '29', period: '/mo', color: '#00ff9f', tag: 'MOST POPULAR',
-    features: ['Everything in Free','Full data table + gap chart','Valid setups tab','Spike detection','Panda AI assistant'],
+    name: 'PRO', price: '99', period: '/mo', sub: 'or $3,499 one-time (lifetime)', color: '#00ff9f', tag: 'MOST POPULAR',
+    features: ['Everything in Starter, plus:','Panel tab','Full data table','Valid setups tab','Panda AI assistant','Research tab'],
     cta: 'GO PRO →', tier: 'pro',
   },
   {
-    name: 'ELITE', price: '79', period: '/mo', color: '#00b4ff', tag: 'FULL ACCESS',
-    features: ['Everything in Pro','Live panels view','Signal analytics','Full signal + spike logs','TradingView charts','Telegram alerts'],
+    name: 'ELITE', price: '699', period: '/mo', sub: 'or $4,999 one-time (lifetime)', color: '#00b4ff', tag: 'FULL ACCESS',
+    features: ['Everything in Pro, plus:','Overview tab','Signal logs tab','Valid pairs filter','Telegram signal alerts','Spike signal alerts','Private trading journal','Chart tab','MT4/MT5 Panda Indicators','Bias detection indicators'],
     cta: 'GO ELITE →', tier: 'elite',
   },
 ];
@@ -135,7 +135,7 @@ export default function FunnelPage() {
           <p style={{ fontFamily: raj, fontSize: 15, color: '#6b7d8e', textAlign: 'center', maxWidth: 520, margin: '0 auto 44px', lineHeight: 1.6 }}>Each layer answers a different question. Together, they give you a confirmed trade direction — not a guess.</p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(250px,1fr))', gap: 20 }}>
             {[
-              { n: '01', label: 'GAP SCORE', color: '#00ff9f', icon: '📊', desc: 'Measures the imbalance between base and quote currency across D1, H4, and H1 timeframes. When the gap is wide, the bias is clear.' },
+              { n: '01', label: 'DIRECTIONAL BIAS', color: '#00ff9f', icon: '📊', desc: 'A multi-timeframe strength model that reveals the dominant side of a currency pair and filters out weak or unclear market conditions.' },
               { n: '02', label: 'STRENGTH', color: '#00b4ff', icon: '💪', desc: 'Confirms whether the strong currency is getting stronger and the weak one is getting weaker. No confirmation = no trade.' },
               { n: '03', label: 'MOMENTUM', color: '#ffd166', icon: '⚡', desc: 'Tells you WHEN to enter. Building momentum means the move is starting. Fading momentum means step aside.' },
             ].map((m, i) => (
@@ -151,7 +151,7 @@ export default function FunnelPage() {
             ))}
           </div>
           <div style={{ textAlign: 'center', marginTop: 32 }}>
-            <span style={{ fontFamily: mono, fontSize: 11, color: '#445566', letterSpacing: 2 }}>GAP tells direction → STRENGTH confirms → MOMENTUM times entry</span>
+            <span style={{ fontFamily: mono, fontSize: 11, color: '#445566', letterSpacing: 2 }}>BIAS tells direction → STRENGTH confirms → MOMENTUM times entry</span>
           </div>
         </section>
 
@@ -168,11 +168,11 @@ export default function FunnelPage() {
                 return (
                   <div key={i} style={{ background: 'linear-gradient(135deg,#0a0e1a,#0e1525)', border: `1px solid ${c}22`, borderRadius: 10, padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <span style={{ fontFamily: orb, fontSize: 14, fontWeight: 900, letterSpacing: 2, color: '#e8eaf0' }}>{s.symbol}</span>
+                      <span style={{ fontFamily: orb, fontSize: 14, fontWeight: 900, letterSpacing: 2, color: '#e8eaf0', filter: 'blur(5px)', userSelect: 'none' }}>{s.symbol}</span>
                       <span style={{ fontFamily: mono, fontSize: 10, color: c, background: `${c}12`, border: `1px solid ${c}33`, borderRadius: 4, padding: '2px 8px', fontWeight: 700 }}>{s.direction}</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                      <span style={{ fontFamily: mono, fontSize: 11, color: c }}>GAP {s.gap}</span>
+                      <span style={{ fontFamily: mono, fontSize: 11, color: c, filter: 'blur(5px)', userSelect: 'none' }}>GAP {s.gap}</span>
                       <span style={{ fontFamily: mono, fontSize: 10, color: '#8899aa' }}>{s.momentum}</span>
                     </div>
                   </div>
@@ -253,11 +253,13 @@ export default function FunnelPage() {
                 <div key={i} style={{ background: isPro ? 'linear-gradient(135deg,#0a1420,#0e1a2a)' : 'linear-gradient(135deg,#0a0e1a,#0e1525)', border: `1px solid ${isPro ? '#00ff9f33' : '#1a2540'}`, borderRadius: 14, padding: '36px 28px', position: 'relative', transform: isPro ? 'scale(1.03)' : 'none', boxShadow: isPro ? '0 0 50px rgba(0,255,159,0.08)' : 'none' }}>
                   {t.tag && <div style={{ position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)', background: t.color, color: '#050810', fontFamily: orb, fontSize: 8, fontWeight: 700, letterSpacing: 2, padding: '4px 14px', borderRadius: 20 }}>{t.tag}</div>}
                   <div style={{ fontFamily: orb, fontSize: 12, fontWeight: 700, letterSpacing: 3, color: t.color, marginBottom: 20 }}>{t.name}</div>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 28 }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 8 }}>
                     <span style={{ fontFamily: mono, fontSize: 14, color: '#445566' }}>$</span>
                     <span style={{ fontFamily: orb, fontSize: 48, fontWeight: 900, color: '#e8eaf0' }}>{t.price}</span>
                     <span style={{ fontFamily: mono, fontSize: 12, color: '#445566' }}>{t.period}</span>
                   </div>
+                  {t.sub && <div style={{ fontFamily: mono, fontSize: 10, color: '#ffd166', letterSpacing: 1, marginBottom: 22 }}>{t.sub}</div>}
+                  {!t.sub && <div style={{ marginBottom: 22 }} />}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 28 }}>
                     {t.features.map((f, j) => (
                       <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
