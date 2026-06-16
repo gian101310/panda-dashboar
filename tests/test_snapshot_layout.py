@@ -199,6 +199,36 @@ class SchedulerTimingTests(unittest.TestCase):
         self.assertEqual(calls, ["first_step", "first_ran", "second_step", "second_ran"])
 
 
+class TelegramAiUpdateTests(unittest.TestCase):
+    def test_ai_snapshot_fallback_uses_polished_market_update_format(self):
+        app = _load_app()
+        active = [
+            {"symbol": "EURUSD", "bias": "BUY", "gap": 8.4, "momentum": "BUILDING", "pl_zone": "ABOVE"},
+            {"symbol": "GBPJPY", "bias": "SELL", "gap": -7.2, "momentum": "STRONG", "pl_zone": "BELOW"},
+            {"symbol": "AUDCAD", "bias": "BUY", "gap": 5.6, "momentum": "COOLING", "pl_zone": "BELOW"},
+        ]
+
+        fallback = app.build_ai_snapshot_fallback(active, "LONDON")
+
+        self.assertIn("LONDON session", fallback)
+        self.assertIn("EURUSD BUY", fallback)
+        self.assertIn("GBPJPY SELL", fallback)
+        self.assertNotIn("gap:", fallback)
+        self.assertNotIn("mom:", fallback)
+        self.assertLessEqual(len(fallback.splitlines()), 4)
+
+    def test_ai_snapshot_fallback_handles_no_active_pairs(self):
+        app = _load_app()
+
+        fallback = app.build_ai_snapshot_fallback([], "ASIAN")
+
+        self.assertEqual(
+            fallback,
+            "ASIAN session is quiet right now, with no active pairs above the signal gap threshold.\n"
+            "Current dashboard data is still available in the snapshot image."
+        )
+
+
 class NewsAlertTimingTests(unittest.TestCase):
     def test_news_alert_threshold_selects_current_warning_bucket(self):
         app = _load_app()

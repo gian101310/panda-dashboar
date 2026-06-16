@@ -22,6 +22,7 @@ socket.setdefaulttimeout(30)
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
+import html
 import os
 import re
 import requests
@@ -2192,6 +2193,31 @@ def check_news_alerts():
         print(f"[NEWS ALERT ERROR]: {e}")
 
 # ---- AI SNAPSHOT NARRATOR ----
+def build_ai_snapshot_fallback(active, session):
+    if not active:
+        return (
+            f"{session} session is quiet right now, with no active pairs above the signal gap threshold.\n"
+            "Current dashboard data is still available in the snapshot image."
+        )
+
+    buy_count = len([p for p in active if p.get("bias") == "BUY"])
+    sell_count = len([p for p in active if p.get("bias") == "SELL"])
+    top_pairs = []
+    for p in active[:4]:
+        symbol = p.get("symbol", "-")
+        bias = p.get("bias", "WAIT")
+        gap = p.get("gap") or 0
+        momentum = p.get("momentum") or "UNKNOWN"
+        pl_zone = p.get("pl_zone") or "-"
+        top_pairs.append(f"{symbol} {bias} ({abs(gap):.1f} gap, {momentum}, PL {pl_zone})")
+
+    return (
+        f"{session} session has {len(active)} active bias setups: {buy_count} BUY and {sell_count} SELL.\n"
+        f"Strongest names: {', '.join(top_pairs)}.\n"
+        "Use the snapshot image for full pair context and current validation state."
+    )
+
+
 def send_ai_snapshot():
     """
     Calls OpenAI to generate a brief market narration and sends it to Telegram.
@@ -2202,6 +2228,7 @@ def send_ai_snapshot():
         print(f"[AI SNAPSHOT] Market closed - skipped ({market_time_label()})")
         return
     if not telegram_circuit.allow():
+        print(f"[AI SNAPSHOT] Skipped - Telegram circuit locked (locked_until={telegram_circuit.locked_until}, now={time.time():.0f})")
         return
     try:
         # Fetch current dashboard data
@@ -2210,6 +2237,7 @@ def send_ai_snapshot():
         ).execute()
         pairs = res.data or []
         if not pairs:
+            print("[AI SNAPSHOT] Skipped - dashboard returned 0 pairs")
             return
 
         # Build compact market summary for prompt
@@ -2239,33 +2267,46 @@ def send_ai_snapshot():
             f"Keep under 150 words. Use plain text, no markdown."
         )
 
-        response = requests.post(
-            "https://api.openai.com/v1/chat/completions",
-            headers={"Authorization": f"Bearer {OPENAI_API_KEY}", "Content-Type": "application/json"},
-            json={
-                "model": "gpt-4o-mini",
-                "messages": [
-                    {"role": "system", "content": "You are Panda AI — a currency bias narrator. Describe market data factually. Never recommend trades."},
-                    {"role": "user", "content": prompt}
-                ],
-                "max_tokens": 200,
-                "temperature": 0.3
-            },
-            timeout=20
-        )
+        # Retry OpenAI up to 3 times with exponential backoff
+        ai_text = None
+        for attempt in range(1, 4):
+            try:
+                response = requests.post(
+                    "https://api.openai.com/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {OPENAI_API_KEY}", "Content-Type": "application/json"},
+                    json={
+                        "model": "gpt-4o-mini",
+                        "messages": [
+                            {"role": "system", "content": "You are Panda AI — a currency bias narrator. Describe market data factually. Never recommend trades."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        "max_tokens": 200,
+                        "temperature": 0.3
+                    },
+                    timeout=20
+                )
+                if response.status_code == 200:
+                    ai_text = response.json()["choices"][0]["message"]["content"].strip()
+                    break
+                else:
+                    print(f"[AI SNAPSHOT] OpenAI error {response.status_code} (attempt {attempt}/3)")
+            except Exception as oai_err:
+                print(f"[AI SNAPSHOT] OpenAI request failed (attempt {attempt}/3): {oai_err}")
+            if attempt < 3:
+                time.sleep(2 ** attempt)  # 2s, 4s backoff
 
-        if response.status_code != 200:
-            print(f"[AI SNAPSHOT] OpenAI error: {response.status_code}")
-            return
-
-        ai_text = response.json()["choices"][0]["message"]["content"].strip()
+        # Fallback: send data-only update if OpenAI completely failed
+        if not ai_text:
+            print("[AI SNAPSHOT] OpenAI failed all 3 attempts — sending polished data fallback")
+            ai_text = build_ai_snapshot_fallback(active, session)
         now_str = datetime.now().strftime("%H:%M")
+        safe_ai_text = html.escape(ai_text)
 
         msg = (
             f"🤖 <b>PANDA AI — Market Update</b>\n"
             f"━━━━━━━━━━━━━━━━━━━━━\n"
             f"🕐 {now_str} | 📍 {session} SESSION\n\n"
-            f"{ai_text}\n\n"
+            f"{safe_ai_text}\n\n"
             f"<i>⚠️ Currency bias data only. Not financial advice.</i>\n"
             f"🐼 PANDA ENGINE"
         )
@@ -2357,7 +2398,14 @@ async def master_scheduler():
                             print("[HOURLY] Circuit breaker was locked — auto-resetting for snapshot")
                             telegram_circuit.failures = 0
                             telegram_circuit.locked_until = 0
-                        await run_scheduler_step("hourly-alerts", send_snapshot, send_ai_snapshot, daily_cleanup)
+                        await run_scheduler_step("hourly-snapshot", send_snapshot)
+                        # Reset breaker again before AI snapshot — snapshot failure must not kill market update
+                        if not telegram_circuit.allow():
+                            print("[HOURLY] Circuit breaker tripped during snapshot — resetting for AI market update")
+                            telegram_circuit.failures = 0
+                            telegram_circuit.locked_until = 0
+                        await run_scheduler_step("hourly-ai-update", send_ai_snapshot)
+                        await run_scheduler_step("hourly-cleanup", daily_cleanup)
                     except Exception as e:
                         print("[ENGINE ERROR - hourly]:", e)
                 LAST_HOUR_MARK = hour_mark
