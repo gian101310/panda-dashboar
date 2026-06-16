@@ -374,6 +374,37 @@ export default function LandingPage() {
           </div>
         </Section>
 
+        {/* ═══ SOCIAL PROOF CAROUSEL ═══ */}
+        <Section id="proof">
+          <div style={{ maxWidth: 1100, margin: '0 auto', padding: '80px 24px 100px', textAlign: 'center' }}>
+            <span style={{ fontFamily: mono, fontSize: 10, color: '#ffd166', letterSpacing: 4, display: 'block', marginBottom: 16 }}>WHY TRADERS CHOOSE PANDA</span>
+            <h2 style={{ fontFamily: orb, fontSize: 'clamp(20px,3vw,32px)', fontWeight: 900, letterSpacing: 3, margin: '0 0 50px', color: '#e8f0ff' }}>
+              What our users are saying
+            </h2>
+            <div style={{ position: 'relative', overflow: 'hidden' }}>
+              <div style={{ display: 'flex', animation: 'proofScroll 25s linear infinite', gap: 20, width: 'max-content' }}>
+                {[
+                  { stat: '89%', text: 'of users feel more confident identifying directional bias' },
+                  { stat: '3x', text: 'faster pair screening compared to manual chart analysis' },
+                  { stat: '21', text: 'currency pairs scanned every 5 minutes automatically' },
+                  { stat: '93%', text: 'of users would recommend Panda Engine to other traders' },
+                  { stat: '81%', text: 'of users report improved consistency in their trading decisions' },
+                  { stat: '89%', text: 'of users feel more confident identifying directional bias' },
+                  { stat: '3x', text: 'faster pair screening compared to manual chart analysis' },
+                  { stat: '21', text: 'currency pairs scanned every 5 minutes automatically' },
+                  { stat: '93%', text: 'of users would recommend Panda Engine to other traders' },
+                  { stat: '81%', text: 'of users report improved consistency in their trading decisions' },
+                ].map((item, i) => (
+                  <div key={i} style={{ minWidth: 200, padding: '32px 24px', background: i % 5 === 0 ? 'rgba(0,255,159,0.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${i % 5 === 0 ? '#00ff9f20' : 'rgba(255,255,255,0.04)'}`, borderRadius: 14, flexShrink: 0 }}>
+                    <div style={{ fontFamily: orb, fontSize: 36, fontWeight: 900, color: '#e8f0ff', marginBottom: 12 }}>{item.stat}</div>
+                    <p style={{ fontFamily: raj, fontSize: 14, color: '#6b7fa8', lineHeight: 1.5, margin: 0 }}>{item.text}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </Section>
+
         {/* ═══ FINAL CTA ═══ */}
         <section style={{ position: 'relative', zIndex: 1, padding: '100px 24px 120px', textAlign: 'center' }}>
           <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 600, height: 600, borderRadius: '50%', background: 'radial-gradient(circle,rgba(0,255,159,0.05) 0%,transparent 60%)', pointerEvents: 'none' }}/>
@@ -389,15 +420,51 @@ export default function LandingPage() {
         </section>
 
         {/* ═══ FOOTER ═══ */}
-        <footer style={{ position: 'relative', zIndex: 1, borderTop: '1px solid rgba(255,255,255,0.04)', padding: '32px 24px', textAlign: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 12 }}>
-            <span style={{ fontSize: 20 }}>🐼</span>
-            <span style={{ fontFamily: orb, fontSize: 11, fontWeight: 700, letterSpacing: 3, color: '#00ff9f' }}>PANDA ENGINE</span>
+        <footer style={{ position: 'relative', zIndex: 1, borderTop: '1px solid rgba(255,255,255,0.06)', padding: '60px 24px 32px' }}>
+          <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 40, marginBottom: 40 }}>
+            {/* Brand */}
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                <span style={{ fontSize: 22 }}>🐼</span>
+                <span style={{ fontFamily: orb, fontSize: 12, fontWeight: 700, letterSpacing: 3, color: '#00ff9f' }}>PANDA ENGINE</span>
+              </div>
+              <p style={{ fontFamily: raj, fontSize: 14, color: '#6b7fa8', lineHeight: 1.6 }}>
+                Forex intelligence platform. Automated directional bias, momentum analysis, and signal detection across 21 pairs.
+              </p>
+            </div>
+            {/* Navigate */}
+            <div>
+              <div style={{ fontFamily: orb, fontSize: 10, fontWeight: 700, letterSpacing: 3, color: '#e8f0ff', marginBottom: 16 }}>NAVIGATE</div>
+              {[{label:'Home',href:'/'},{label:'Pricing',href:'/pricing'},{label:'Dashboard',href:'/dashboard'},{label:'Login',href:'/login'}].map(l => (
+                <a key={l.label} href={l.href} style={{ display: 'block', fontFamily: raj, fontSize: 14, color: '#6b7fa8', textDecoration: 'none', marginBottom: 10, transition: 'color 0.2s' }}>{l.label}</a>
+              ))}
+            </div>
+            {/* Company */}
+            <div>
+              <div style={{ fontFamily: orb, fontSize: 10, fontWeight: 700, letterSpacing: 3, color: '#e8f0ff', marginBottom: 16 }}>COMPANY</div>
+              {[{label:'About',href:'/legal?tab=about'},{label:'FAQ',href:'/legal?tab=faq'},{label:'Contact',href:'/legal?tab=contact'},{label:'Legal',href:'/legal'}].map(l => (
+                <a key={l.label} href={l.href} style={{ display: 'block', fontFamily: raj, fontSize: 14, color: '#6b7fa8', textDecoration: 'none', marginBottom: 10, transition: 'color 0.2s' }}>{l.label}</a>
+              ))}
+            </div>
+            {/* Contact */}
+            <div>
+              <div style={{ fontFamily: orb, fontSize: 10, fontWeight: 700, letterSpacing: 3, color: '#e8f0ff', marginBottom: 16 }}>CONTACT</div>
+              <p style={{ fontFamily: raj, fontSize: 14, color: '#6b7fa8', lineHeight: 1.6 }}>
+                support@pandaengine.app
+              </p>
+              <p style={{ fontFamily: raj, fontSize: 13, color: '#445566', lineHeight: 1.6, marginTop: 12 }}>
+                Response within 24 hours
+              </p>
+            </div>
           </div>
-          <p style={{ fontFamily: mono, fontSize: 9, color: '#2a3548', letterSpacing: 2, margin: 0 }}>
-            FOREX INTELLIGENCE PLATFORM · NOT FINANCIAL ADVICE · USE AT YOUR OWN RISK
-          </p>
-          <p style={{ fontFamily: mono, fontSize: 8, color: '#1a2538', letterSpacing: 1, marginTop: 8 }}>© 2026 PANDA ENGINE</p>
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: 24, display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+            <p style={{ fontFamily: mono, fontSize: 8, color: '#1a2538', letterSpacing: 1, margin: 0 }}>© 2026 PandaEngine.app · All rights reserved</p>
+            <div style={{ display: 'flex', gap: 20 }}>
+              {[{label:'Terms',href:'/legal?tab=terms'},{label:'Privacy',href:'/legal?tab=privacy'},{label:'Disclaimer',href:'/legal?tab=disclaimer'}].map(l => (
+                <a key={l.label} href={l.href} style={{ fontFamily: mono, fontSize: 8, color: '#2a3548', textDecoration: 'none', letterSpacing: 1, transition: 'color 0.2s' }}>{l.label}</a>
+              ))}
+            </div>
+          </div>
         </footer>
 
         {licenseModal && (
@@ -445,6 +512,7 @@ export default function LandingPage() {
         @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
         @keyframes orbSpin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
         @keyframes tickerScroll { from { transform:translateX(0); } to { transform:translateX(-50%); } }
+        @keyframes proofScroll { from { transform:translateX(0); } to { transform:translateX(-50%); } }
         button:hover { opacity:0.9; transform:translateY(-1px); }
         a:hover { color:#00ff9f !important; }
         ::-webkit-scrollbar { width:4px; }
