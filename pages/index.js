@@ -247,7 +247,7 @@ export default function LandingPage() {
                 SIX LAYERS OF<br/><span style={{ color: '#00ff9f' }}>INTELLIGENCE</span>
               </h2>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(340px,1fr))', gap: 20 }}>
+            <div id="features-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(340px,1fr))', gap: 20 }}>
               {FEATURES.map((f, i) => <div key={f.title} style={{ padding: '32px 28px', background: 'rgba(12,18,32,0.6)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, position: 'relative', overflow: 'hidden', transition: 'all 0.3s', cursor: 'default' }}>
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg,transparent,${f.color}60,transparent)` }}/>
                 <div style={{ fontSize: 28, marginBottom: 16 }}>{f.icon}</div>
@@ -397,7 +397,7 @@ export default function LandingPage() {
               YOUR <span style={{ color: '#00ff9f' }}>COMMAND CENTER</span>
             </h2>
             <div style={{ background: 'rgba(12,18,32,0.8)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: 4, boxShadow: '0 20px 80px rgba(0,0,0,0.5)' }}>
-              <div style={{ background: 'linear-gradient(135deg,#0a0e18,#0d1424)', borderRadius: 12, padding: '40px 32px', display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, minHeight: 200 }}>
+              <div id="command-center-grid" style={{ background: 'linear-gradient(135deg,#0a0e18,#0d1424)', borderRadius: 12, padding: '40px 32px', display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, minHeight: 200 }}>
                 {['NZDUSD BUY', 'GBPAUD SELL', 'AUDJPY BUY', 'EURNZD SELL'].map((s, i) => {
                   const [sym, dir] = s.split(' ');
                   const c = dir === 'BUY' ? '#00ff9f' : '#ff4d6d';
@@ -423,7 +423,7 @@ export default function LandingPage() {
             </div>
             {/* Trader count */}
             <div style={{ textAlign: 'center', marginBottom: 50 }}>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12, background: 'rgba(0,255,159,0.06)', border: '1px solid rgba(0,255,159,0.12)', borderRadius: 30, padding: '10px 24px' }}>
+              <div id="trader-count-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: 12, background: 'rgba(0,255,159,0.06)', border: '1px solid rgba(0,255,159,0.12)', borderRadius: 30, padding: '10px 24px' }}>
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#00ff9f', boxShadow: '0 0 8px #00ff9f' }} />
                 <span style={{ fontFamily: orb, fontSize: 18, fontWeight: 900, color: '#e8f0ff' }}>240+</span>
                 <span style={{ fontFamily: mono, fontSize: 10, color: '#6b7fa8', letterSpacing: 2 }}>TRADERS USING PANDA ENGINE</span>
@@ -432,7 +432,12 @@ export default function LandingPage() {
             {/* Carousel */}
             {(() => {
               const [tIdx, setTIdx] = useState(0);
-              const perPage = typeof window !== 'undefined' && window.innerWidth < 768 ? 1 : 2;
+              const [perPage, setPerPage] = useState(typeof window !== 'undefined' && window.innerWidth < 768 ? 1 : 2);
+              useEffect(() => {
+                const onResize = () => setPerPage(window.innerWidth < 768 ? 1 : 2);
+                window.addEventListener('resize', onResize);
+                return () => window.removeEventListener('resize', onResize);
+              }, []);
               const totalPages = Math.ceil(TESTIMONIALS.length / perPage);
               useEffect(() => {
                 const timer = setInterval(() => setTIdx(p => (p + 1) % totalPages), 5000);
@@ -672,6 +677,10 @@ export default function LandingPage() {
           nav { padding:12px 16px !important; }
           nav > div:last-child a { display:none; }
           #deep-bias > div > div, #deep-momentum > div > div { grid-template-columns:1fr !important; gap:32px !important; }
+          #command-center-grid { grid-template-columns:1fr 1fr !important; }
+          #features-grid { grid-template-columns:1fr !important; }
+          #trader-count-badge { flex-direction:column !important; gap:6px !important; padding:12px 18px !important; }
+          #trader-count-badge span:last-child { font-size:8px !important; }
         }
       `}</style>
     </>
