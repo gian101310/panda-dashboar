@@ -3365,11 +3365,12 @@ export default function Dashboard() {
       {/* WELCOME POPUP */}
       {showWelcome&&user&&(
         <div onClick={()=>setShowWelcome(false)} style={{position:'fixed',inset:0,zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.6)',backdropFilter:'blur(6px)',animation:'fadeIn 0.3s ease'}}>
-          <div style={{background:'linear-gradient(135deg,rgba(10,14,20,0.97),rgba(0,30,60,0.95))',border:'1px solid rgba(0,180,255,0.3)',borderRadius:16,padding:isMobile?'28px 24px':'36px 48px',textAlign:'center',maxWidth:420,boxShadow:'0 0 60px rgba(0,180,255,0.15)',animation:'scaleIn 0.3s ease'}}>
-            <div style={{fontSize:32,marginBottom:12}}>🐼</div>
-            <div style={{fontFamily:'Orbitron,sans-serif',fontSize:isMobile?14:18,color:'#00b4ff',letterSpacing:3,fontWeight:700,marginBottom:8}}>WELCOME BACK</div>
-            <div style={{fontFamily:'Rajdhani,sans-serif',fontSize:isMobile?20:26,color:'#ffffff',fontWeight:700,marginBottom:12}}>{user.username?.toUpperCase()}</div>
-            <div style={{fontFamily:'Share Tech Mono,monospace',fontSize:10,color:'rgba(255,255,255,0.5)',letterSpacing:2}}>PANDA ENGINE IS READY</div>
+          <div style={{background:'linear-gradient(135deg,rgba(10,14,20,0.97),rgba(0,30,60,0.95))',border:'1px solid rgba(0,180,255,0.3)',borderRadius:20,padding:isMobile?'40px 30px':'52px 64px',textAlign:'center',maxWidth:520,width:'90vw',boxShadow:'0 0 80px rgba(0,180,255,0.2), 0 0 120px rgba(0,180,255,0.08)',animation:'scaleIn 0.3s ease'}}>
+            <div style={{fontSize:isMobile?42:56,marginBottom:16}}>🐼</div>
+            <div style={{fontFamily:'Orbitron,sans-serif',fontSize:isMobile?11:13,color:'#00b4ff',letterSpacing:4,fontWeight:700,marginBottom:10,opacity:0.8}}>WELCOME BACK</div>
+            <div style={{fontFamily:'Rajdhani,sans-serif',fontSize:isMobile?28:36,color:'#ffffff',fontWeight:700,marginBottom:16}}>{user.username?.toUpperCase()}</div>
+            <div style={{fontFamily:'Rajdhani,sans-serif',fontSize:isMobile?16:20,color:'#00ff9f',fontWeight:600,marginBottom:8}}>Good to See You Again!</div>
+            <div style={{fontFamily:'Share Tech Mono,monospace',fontSize:isMobile?10:11,color:'rgba(255,255,255,0.5)',letterSpacing:1,lineHeight:1.6}}>Your account is active and the latest<br/>market insights are ready for review.</div>
           </div>
         </div>
       )}
