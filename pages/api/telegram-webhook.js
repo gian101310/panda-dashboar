@@ -87,7 +87,7 @@ export default async function handler(req, res) {
           '',
           'Your signup is in the queue! Admin will reach out with payment details and activate your account shortly.',
           '━━━━━━━━━━━━━━━━━━━━━━',
-          '📩 Questions? Message @Boss_G',
+          '📩 Questions? Message @Panda_new_user_alert_bot',
         ].join('\n');
         await pfBotSend(chatId, dm);
 
