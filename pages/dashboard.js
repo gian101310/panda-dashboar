@@ -3086,16 +3086,13 @@ function SignalFlashcard({ data, trends }) {
         }}>
           {/* Decorative big bg text */}
           <div style={{position:'absolute',bottom:-8,right:12,fontFamily:orb,fontSize:80,fontWeight:900,color:bc+'07',pointerEvents:'none',lineHeight:1,userSelect:'none'}}>{row.bias}</div>
-          {/* Top section */}
-          <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between'}}>
-            <div style={{display:'flex',flexDirection:'column',gap:6}}>
-              <span style={{fontFamily:orb,fontSize:38,fontWeight:900,letterSpacing:4,color:'var(--text-primary)',lineHeight:1}}>{row.symbol}</span>
-
-            </div>
-            <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:8}}>
-              <span style={{fontFamily:mono,fontSize:16,fontWeight:700,color:bc,background:bc+'18',border:`1px solid ${bc}55`,borderRadius:8,padding:'6px 20px',letterSpacing:3}}>{row.bias}</span>
-              {t.momentum && <span style={{fontFamily:mono,fontSize:11,color:momColor,background:momColor+'12',border:`1px solid ${momColor}30`,borderRadius:5,padding:'3px 10px'}}>{t.momentum}</span>}
-            </div>
+          {/* Top section — centered pair + bias */}
+          <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:16,flex:1}}>
+            <span style={{fontFamily:orb,fontSize:44,fontWeight:900,letterSpacing:6,color:'var(--text-primary)',lineHeight:1}}>{row.symbol}</span>
+            <span style={{fontFamily:orb,fontSize:32,fontWeight:900,color:bc,letterSpacing:4,textShadow:`0 0 20px ${bc}44`}}>{row.bias}</span>
+          </div>
+          <div style={{display:'flex',justifyContent:'center'}}>
+            {t.momentum && <span style={{fontFamily:mono,fontSize:11,color:momColor,background:momColor+'12',border:`1px solid ${momColor}30`,borderRadius:5,padding:'3px 10px'}}>{t.momentum}</span>}
           </div>
           {/* Pulse bar */}
           <div style={{height:3,borderRadius:2,background:`linear-gradient(90deg,transparent,${bc},transparent)`,opacity:0.55,animation:'pulse 2s ease-in-out infinite'}}/>
