@@ -2,6 +2,7 @@ import { supabase } from '../../../lib/supabase';
 import { validateSession, hashPassword } from '../../../lib/auth';
 
 const PF_BOT_TOKEN = process.env.PF_BOT_TOKEN || '';
+const PF_APPROVE_BOT_TOKEN = process.env.PF_APPROVE_BOT_TOKEN || PF_BOT_TOKEN;
 const PF_ADMIN_CHAT = process.env.PF_ADMIN_CHAT || '';
 
 const PF_PAYMENT_LINKS = {
@@ -11,6 +12,17 @@ const PF_PAYMENT_LINKS = {
 
 function pfGenPassword() { return 'Panda#' + Math.floor(1000 + Math.random() * 9000); }
 
+// Send via old bot (@panda_engine_alerts_bot) for approved/existing users
+async function pfSendApproveBot(chatId, text) {
+  try {
+    await fetch(`https://api.telegram.org/bot${PF_APPROVE_BOT_TOKEN}/sendMessage`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' })
+    });
+  } catch {}
+}
+
+// Send via new signup bot for admin notifications
 async function pfSendTelegram(chatId, text) {
   try {
     await fetch(`https://api.telegram.org/bot${PF_BOT_TOKEN}/sendMessage`, {
@@ -110,10 +122,10 @@ export default async function handler(req, res) {
             `<b>Password:</b> ${password}`,
             `<b>Tier:</b> ${safeTier.toUpperCase()}`,
             '━━━━━━━━━━━━━━━━━━━━━━',
-            '🔗 <a href="https://panda-dashboard.vercel.app/login">Login Now</a>',
+            '🔗 <a href="https://pandaengine.app/login">Login Now</a>',
             '🐼 Welcome to the system.',
           ].join('\n');
-          await pfSendTelegram(tgChat.chat_id, dm);
+          await pfSendApproveBot(tgChat.chat_id, dm);
           await supabase.from('pf_signup_requests').update({ pending_password: null }).eq('id', id);
         }
       }
@@ -166,7 +178,7 @@ export default async function handler(req, res) {
         'Once paid, your account will be activated and credentials sent here automatically.',
         '━━━━━━━━━━━━━━━━━━━━━━',
       ].join('\n');
-      await pfSendTelegram(req_row.telegram_chat_id, dm);
+      await pfSendApproveBot(req_row.telegram_chat_id, dm);
       return res.status(200).json({ ok: true });
     }
 
