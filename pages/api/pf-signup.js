@@ -4,7 +4,7 @@ import crypto from 'crypto';
 
 const PF_BOT_TOKEN  = process.env.PF_BOT_TOKEN || '';
 const PF_ADMIN_CHAT = process.env.PF_ADMIN_CHAT || '';
-const PF_STARTER_FEATURES = ['signals','calendar','calculator','cot'];
+const PF_STARTER_FEATURES = ['overview','signals','calendar','calculator','cot'];
 
 function pfGetIp(req) {
   return (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket?.remoteAddress || '';
@@ -26,12 +26,13 @@ async function pfSendTelegram(chatId, text) {
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
-  const { email, username, tier } = req.body || {};
+  const { email, username, telegram, tier } = req.body || {};
   if (!email || !email.includes('@')) return res.status(400).json({ error: 'Valid email required' });
 
   const ip = pfGetIp(req);
   const safeTier = ['starter','pro','elite'].includes(tier) ? tier : 'starter';
   const safeUser = (username || '').trim();
+  const safeTelegram = (telegram || '').trim().replace(/^@/, '');
 
   // Username required
   if (!safeUser) return res.status(400).json({ error: 'Username is required' });
@@ -65,6 +66,7 @@ export default async function handler(req, res) {
       await supabase.from('pf_signup_requests').insert({
         email: email.trim().toLowerCase(),
         username: safeUser,
+        telegram_username: safeTelegram || null,
         tier: 'starter',
         token,
         pending_password: password,
@@ -73,7 +75,7 @@ export default async function handler(req, res) {
       });
 
       await pfSendTelegram(PF_ADMIN_CHAT,
-        `🐼 <b>NEW STARTER USER</b>\n<b>User:</b> ${safeUser}\n<b>Email:</b> ${email}\n<i>Auto-approved — no action needed.</i>`
+        `🐼 <b>NEW STARTER USER</b>\n<b>User:</b> ${safeUser}\n<b>Email:</b> ${email}${safeTelegram ? '\n<b>Telegram:</b> @' + safeTelegram : ''}\n<i>Auto-approved — no action needed.</i>`
       );
       return res.status(200).json({ ok: true, status: 'APPROVED', auto: true, token });
     }
@@ -82,6 +84,7 @@ export default async function handler(req, res) {
     await supabase.from('pf_signup_requests').insert({
       email: email.trim().toLowerCase(),
       username: safeUser,
+      telegram_username: safeTelegram || null,
       tier: safeTier,
       token,
       ip,
@@ -94,10 +97,11 @@ export default async function handler(req, res) {
       `<b>Email:</b> ${email}`,
       `<b>Username:</b> ${safeUser}`,
       `<b>Tier:</b> ${safeTier.toUpperCase()}`,
+      safeTelegram ? `<b>Telegram:</b> @${safeTelegram}` : null,
       `<b>IP:</b> ${ip}`,
       '━━━━━━━━━━━━━━━━━━━━━━',
       '✅ Action: approve in admin panel'
-    ].join('\n'));
+    ].filter(Boolean).join('\n'));
     return res.status(200).json({ ok: true, status: 'PENDING', token });
 
   } catch (err) {

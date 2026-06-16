@@ -8,18 +8,18 @@ const raj = "'Rajdhani',sans-serif";
 
 const TIERS = [
   {
-    name: 'FREE', price: '0', period: '', color: '#445566', tag: null,
-    features: ['Live signals tab', 'Position calculator', 'Economic calendar', 'COT report access'],
+    name: 'STARTER', price: '0', period: '', color: '#445566', tag: null,
+    features: ['Dashboard overview', 'Live signals tab', 'Economic calendar', 'Position calculator', 'COT report access'],
     cta: 'START FREE', href: '/login',
   },
   {
     name: 'PRO', price: '29', period: '/mo', color: '#00ff9f', tag: 'MOST POPULAR',
-    features: ['Live signals (real-time)', 'Full data table', 'Gap score chart', 'Economic calendar', 'Position calculator', 'COT report', 'Valid setups tab', 'Spike detection widgets'],
+    features: ['Everything in Starter', 'Full data table', 'Gap score chart', 'Valid setups tab', 'Spike log history', 'Panda AI assistant'],
     cta: 'GO PRO →', href: '/login',
   },
   {
     name: 'ELITE', price: '79', period: '/mo', color: '#00b4ff', tag: 'FULL ACCESS',
-    features: ['Live panels view', 'Live signals (real-time)', 'Full data table', 'Gap score chart', 'Economic calendar', 'Position calculator', 'COT report', 'Valid setups tab', 'Spike detection widgets', 'Spike log history', 'Telegram alerts', 'Private trading journal', 'TradingView chart tab'],
+    features: ['Everything in Pro', 'Live panels view', 'Signal log & analytics', 'Valid pairs filter', 'Telegram alerts', 'Private trading journal', 'Panda AI assistant'],
     cta: 'GO ELITE →', href: '/login',
   },
 ];
@@ -36,11 +36,12 @@ export default function PricingPage() {
   const [pfSignupOk, setPfSignupOk] = useState(false);
   const [pfSignupErr, setPfSignupErr] = useState('');
   const [pfSignupToken, setPfSignupToken] = useState('');
+  const [pfSignupTelegram, setPfSignupTelegram] = useState('');
 
   useEffect(() => { setVisible(true); }, []);
 
   const pfOpenSignup = (tier) => {
-    setPfSignupTier(tier); setPfSignupEmail(''); setPfSignupUsername('');
+    setPfSignupTier(tier); setPfSignupEmail(''); setPfSignupUsername(''); setPfSignupTelegram('');
     setPfSignupOk(false); setPfSignupErr(''); setPfSignupToken(''); setPfSignupOpen(true);
   };
   const pfSubmitSignup = async () => {
@@ -50,7 +51,7 @@ export default function PricingPage() {
       const r = await fetch('/api/pf-signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: pfSignupEmail, username: pfSignupUsername, tier: pfSignupTier })
+        body: JSON.stringify({ email: pfSignupEmail, username: pfSignupUsername, telegram: pfSignupTelegram, tier: pfSignupTier })
       });
       const j = await r.json();
       if (r.ok) { setPfSignupOk(true); setPfSignupToken(j.token || ''); } else setPfSignupErr(j.error || 'Request failed');
@@ -150,7 +151,7 @@ export default function PricingPage() {
             ) : (
               <div style={{ display: 'flex', gap: 8 }}>
                 <input value={email} onChange={e => setEmail(e.target.value)} placeholder="your@email.com" style={{ flex: 1, background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '12px 14px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, outline: 'none' }} />
-                <button onClick={() => { if (email.includes('@')) setSubmitted(true); }} style={{ background: '#00ff9f', border: 'none', borderRadius: 6, color: '#050810', fontFamily: orb, fontSize: 10, fontWeight: 700, letterSpacing: 2, padding: '12px 20px', cursor: 'pointer', whiteSpace: 'nowrap' }} className="cta-btn">NOTIFY ME</button>
+                <button onClick={async () => { if (!email.includes('@')) return; try { await fetch('/api/waitlist', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) }); setSubmitted(true); } catch {} }} style={{ background: '#00ff9f', border: 'none', borderRadius: 6, color: '#050810', fontFamily: orb, fontSize: 10, fontWeight: 700, letterSpacing: 2, padding: '12px 20px', cursor: 'pointer', whiteSpace: 'nowrap' }} className="cta-btn">NOTIFY ME</button>
               </div>
             )}
           </div>
@@ -169,7 +170,7 @@ export default function PricingPage() {
                 <div style={{ textAlign: 'center', padding: '12px 0' }}>
                   <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
                   <div style={{ fontFamily: mono, fontSize: 10, letterSpacing: 4, color: '#00ff9f', marginBottom: 10 }}>REQUEST RECEIVED</div>
-                  <h3 style={{ fontFamily: orb, fontSize: 20, fontWeight: 900, margin: '0 0 12px' }}>{pfSignupTier === 'starter' ? 'ACCOUNT CREATED' : 'PENDING APPROVAL'}</h3>
+                  <h3 style={{ fontFamily: orb, fontSize: 20, fontWeight: 900, margin: '0 0 12px' }}>{pfSignupTier === 'starter' ? 'STARTER ACCOUNT CREATED' : 'PENDING APPROVAL'}</h3>
                   <p style={{ fontFamily: raj, fontSize: 14, color: '#8899aa', lineHeight: 1.6, marginBottom: 20 }}>
                     {pfSignupTier === 'starter' ? 'Your STARTER account is ready! Message our Telegram bot below to receive your login credentials instantly.' : 'Your ' + pfSignupTier.toUpperCase() + ' request is in the queue. Admin has been notified. Message our bot to receive your credentials once approved.'}
                   </p>
@@ -185,8 +186,8 @@ export default function PricingPage() {
                   </p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 18 }}>
                     <input value={pfSignupEmail} onChange={e => setPfSignupEmail(e.target.value)} placeholder="your@email.com" type="email" style={{ background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '12px 14px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, outline: 'none' }} />
-                    <input value={pfSignupUsername} onChange={e => setPfSignupUsername(e.target.value)} placeholder="preferred username (optional)" style={{ background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '12px 14px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, outline: 'none' }} />
-
+                    <input value={pfSignupUsername} onChange={e => setPfSignupUsername(e.target.value)} placeholder="preferred username" style={{ background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '12px 14px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, outline: 'none' }} />
+                    <input value={pfSignupTelegram} onChange={e => setPfSignupTelegram(e.target.value)} placeholder="@telegram username (optional)" style={{ background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '12px 14px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, outline: 'none' }} />
                   </div>
                   {pfSignupErr && <div style={{ fontFamily: mono, fontSize: 11, color: '#ff4d6d', marginBottom: 12 }}>⚠ {pfSignupErr}</div>}
                   <button onClick={pfSubmitSignup} disabled={pfSignupBusy} style={{ width: '100%', background: '#00ff9f', border: 'none', borderRadius: 8, color: '#050810', fontFamily: orb, fontSize: 12, fontWeight: 700, letterSpacing: 2, padding: '14px', cursor: 'pointer', opacity: pfSignupBusy ? 0.6 : 1, marginBottom: 10 }}>{pfSignupBusy ? 'SUBMITTING...' : 'REQUEST ACCESS →'}</button>

@@ -144,6 +144,7 @@ export default function PfApprovalsPage() {
                         </div>
                         <div style={{ fontFamily: mono, fontSize: 10, color: '#6b7d8e', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                           {s.username && <span>USER: <span style={{ color: '#00ff9f' }}>{s.username}</span></span>}
+                          {s.telegram_username && <span>TG: <span style={{ color: '#00b4ff' }}>@{s.telegram_username}</span></span>}
                           <span>IP: {s.ip || '—'}</span>
                           <span>{pfFormatTime(s.created_at)}</span>
                         </div>

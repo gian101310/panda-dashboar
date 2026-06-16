@@ -3,7 +3,7 @@ import crypto from 'crypto';
 
 const PF_BOT_TOKEN = process.env.PF_BOT_TOKEN || '';
 const ADMIN_CHAT_ID = process.env.PF_ADMIN_CHAT || '';
-const FREE_TABS = ['signals','gap_chart','calendar','calculator'];
+const FREE_TABS = ['overview','signals','calendar','calculator','cot'];
 // Set TG_WEBHOOK_SECRET in Vercel env vars, then re-register webhook with:
 // https://api.telegram.org/bot<TOKEN>/setWebhook?url=<URL>&secret_token=<SECRET>
 const TG_WEBHOOK_SECRET = process.env.TG_WEBHOOK_SECRET || '';
@@ -119,7 +119,7 @@ export default async function handler(req, res) {
         password_hash: pwHash,
         plain_password: plainPw,
         role: 'user',
-        pf_tier: 'free',
+        pf_tier: 'starter',
         pf_approved: true,
         is_active: true,
         feature_access: FREE_TABS,
@@ -150,7 +150,7 @@ export default async function handler(req, res) {
         `⏰ <b>Trial expires:</b> ${expDisplay}`,
         '━━━━━━━━━━━━━━━━━━━━━━',
         '📊 <b>You have access to:</b>',
-        '• Signals • Gap Chart • Research • Calculator',
+        '• Overview • Signals • Calendar • Calculator • COT',
         '',
         '🔗 <a href="https://pandaengine.app/login">Login Now</a>',
         '',
