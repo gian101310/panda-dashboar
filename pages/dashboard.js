@@ -2824,7 +2824,7 @@ const TAB_FEATURE = {
   'VALID PAIRS': 'valid_pairs',
   'SPIKE LOG':   'spike_log',
   'ENGINE':      'engine',
-  'CHART':       'panels',
+  'CHART':       'chart',
   'ANALYTICS':   'analytics',
   'LOGS':        'signal_log',
   'PANDA AI':    'panda_ai',

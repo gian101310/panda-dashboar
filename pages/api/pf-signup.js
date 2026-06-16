@@ -4,7 +4,7 @@ import crypto from 'crypto';
 
 const PF_BOT_TOKEN  = process.env.PF_BOT_TOKEN || '';
 const PF_ADMIN_CHAT = process.env.PF_ADMIN_CHAT || '';
-const PF_STARTER_FEATURES = ['overview','signals','calendar','calculator','cot'];
+const PF_STARTER_FEATURES = ['signals','calculator'];
 
 function pfGetIp(req) {
   return (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket?.remoteAddress || '';

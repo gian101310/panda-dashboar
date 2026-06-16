@@ -6,6 +6,16 @@ const mono = "'Share Tech Mono',monospace";
 const orb  = "'Orbitron',sans-serif";
 const raj  = "'Rajdhani',sans-serif";
 
+const PF_TIER_FEATURES = {
+  starter: ['signals','calculator'],
+  pro:     ['signals','calculator','panels','table','setups','panda_ai','calendar','cot'],
+  elite:   ['signals','calculator','panels','table','setups','panda_ai','calendar','cot','overview','signal_log','valid_pairs','alerts','spike_log','journal','chart','gap_chart','analytics','heatmap','mt4_indicators','bias_indicators']
+};
+const PF_TIER_LABELS = {
+  starter: { price: 'FREE (1 week trial)', color: '#445566' },
+  pro:     { price: '$99/mo or $3,499 lifetime', color: '#00ff9f' },
+  elite:   { price: '$699/mo or $4,999 lifetime', color: '#00b4ff' },
+};
 const PRIORITY_COLOR = {
   CRITICAL: '#ff4d6d',
   HIGH:     '#ffaa44',
@@ -151,7 +161,7 @@ export default function PfApprovalsPage() {
                       <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6, flexWrap: 'wrap' }}>
                           <span style={{ fontFamily: orb, fontSize: 15, fontWeight: 700, color: '#e8eaf0' }}>{s.email}</span>
-                          <span style={{ fontFamily: mono, fontSize: 9, letterSpacing: 2, color: '#050810', background: s.tier === 'elite' ? '#00b4ff' : s.tier === 'pro' ? '#00ff9f' : '#445566', padding: '3px 10px', borderRadius: 4 }}>{(s.tier || 'starter').toUpperCase()}</span>
+                          <span style={{ fontFamily: mono, fontSize: 9, letterSpacing: 2, color: '#050810', background: (PF_TIER_LABELS[s.tier]||PF_TIER_LABELS.starter).color, padding: '3px 10px', borderRadius: 4 }}>{(s.tier || 'starter').toUpperCase()} — {(PF_TIER_LABELS[s.tier]||PF_TIER_LABELS.starter).price}</span>
                         </div>
                         <div style={{ fontFamily: mono, fontSize: 10, color: '#6b7d8e', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                           {s.username && <span>USER: <span style={{ color: '#00ff9f' }}>{s.username}</span></span>}
@@ -235,17 +245,18 @@ export default function PfApprovalsPage() {
                   <input value={pfApUser} onChange={e => setPfApUser(e.target.value)} style={{ display: 'block', width: '100%', marginTop: 4, background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '10px 12px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
                 </label>
                 <div style={{ fontFamily: mono, fontSize: 9, letterSpacing: 2, color: '#445566', padding: '8px 0' }}>PASSWORD — <span style={{color:'#00ff9f'}}>auto-generated and sent to user via Telegram</span></div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  <label style={{ fontFamily: mono, fontSize: 9, letterSpacing: 2, color: '#445566' }}>TIER
-                    <select value={pfApTier} onChange={e => setPfApTier(e.target.value)} style={{ display: 'block', width: '100%', marginTop: 4, background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '10px 12px', color: '#e8eaf0', fontFamily: mono, fontSize: 12, outline: 'none' }}>
-                      <option value="starter">STARTER</option><option value="pro">PRO</option><option value="elite">ELITE</option>
-                    </select>
-                  </label>
-                  <label style={{ fontFamily: mono, fontSize: 9, letterSpacing: 2, color: '#445566' }}>ROLE
-                    <select value={pfApRole} onChange={e => setPfApRole(e.target.value)} style={{ display: 'block', width: '100%', marginTop: 4, background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '10px 12px', color: '#e8eaf0', fontFamily: mono, fontSize: 12, outline: 'none' }}>
-                      <option value="user">USER</option><option value="vip">VIP</option><option value="admin">ADMIN</option>
-                    </select>
-                  </label>
+                <label style={{ fontFamily: mono, fontSize: 9, letterSpacing: 2, color: '#445566' }}>TIER
+                  <select value={pfApTier} onChange={e => setPfApTier(e.target.value)} style={{ display: 'block', width: '100%', marginTop: 4, background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '10px 12px', color: '#e8eaf0', fontFamily: mono, fontSize: 12, outline: 'none' }}>
+                    <option value="starter">STARTER — FREE (1 week trial)</option>
+                    <option value="pro">PRO — $99/mo or $3,499 lifetime</option>
+                    <option value="elite">ELITE — $699/mo or $4,999 lifetime</option>
+                  </select>
+                </label>
+                <div style={{ marginTop: 10, background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '10px 12px' }}>
+                  <div style={{ fontFamily: mono, fontSize: 9, letterSpacing: 2, color: (PF_TIER_LABELS[pfApTier]||{}).color||'#445566', marginBottom: 6 }}>{pfApTier.toUpperCase()} FEATURES ({(PF_TIER_FEATURES[pfApTier]||[]).length})</div>
+                  <div style={{ fontFamily: mono, fontSize: 10, color: '#6b7d8e', lineHeight: 1.8 }}>
+                    {(PF_TIER_FEATURES[pfApTier]||[]).map(f => f.toUpperCase().replace(/_/g,' ')).join(' · ')}
+                  </div>
                 </div>
               </div>
               {pfApErr && <div style={{ fontFamily: mono, fontSize: 11, color: '#ff4d6d', marginBottom: 10 }}>⚠ {pfApErr}</div>}

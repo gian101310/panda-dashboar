@@ -8,18 +8,18 @@ const raj = "'Rajdhani',sans-serif";
 
 const TIERS = [
   {
-    name: 'STARTER', price: '0', period: '', color: '#445566', tag: null,
-    features: ['Dashboard overview', 'Live signals tab', 'Economic calendar', 'Position calculator', 'COT report access'],
-    cta: 'START FREE', href: '/login',
+    name: 'STARTER', price: '0', period: '', sub: 'FREE FOR 1 WEEK', color: '#445566', tag: null,
+    features: ['Live signals tab', 'Position calculator'],
+    cta: 'START FREE TRIAL', href: '/login',
   },
   {
-    name: 'PRO', price: '29', period: '/mo', color: '#00ff9f', tag: 'MOST POPULAR',
-    features: ['Everything in Starter', 'Full data table', 'Gap score chart', 'Valid setups tab', 'Spike log history', 'Panda AI assistant'],
+    name: 'PRO', price: '99', period: '/mo', sub: 'or $3,499 one-time (lifetime)', color: '#00ff9f', tag: 'MOST POPULAR',
+    features: ['Everything in Starter, plus:', 'Panel tab', 'Full data table', 'Valid setups tab', 'Panda AI assistant', 'Research tab'],
     cta: 'GO PRO →', href: '/login',
   },
   {
-    name: 'ELITE', price: '79', period: '/mo', color: '#00b4ff', tag: 'FULL ACCESS',
-    features: ['Everything in Pro', 'Live panels view', 'Signal log & analytics', 'Valid pairs filter', 'Telegram alerts', 'Private trading journal', 'Panda AI assistant'],
+    name: 'ELITE', price: '699', period: '/mo', sub: 'or $4,999 one-time (lifetime)', color: '#00b4ff', tag: 'FULL ACCESS',
+    features: ['Everything in Pro, plus:', 'Overview tab', 'Signal logs tab', 'Valid pairs filter', 'Telegram signal alerts', 'Spike signal alerts', 'Private trading journal', 'Chart tab', 'MT4/MT5 Panda Indicators', 'Bias detection indicators'],
     cta: 'GO ELITE →', href: '/login',
   },
 ];
@@ -102,11 +102,14 @@ export default function PricingPage() {
                 <div key={i} style={{ background: isPro ? 'linear-gradient(135deg,#0a1420,#0e1a2a)' : 'linear-gradient(135deg,#0a0e1a,#0e1525)', border: `1px solid ${isPro ? '#00ff9f33' : '#1a2540'}`, borderRadius: 14, padding: '36px 28px', position: 'relative', transform: isPro ? 'scale(1.03)' : 'none', boxShadow: isPro ? '0 0 50px rgba(0,255,159,0.08)' : 'none' }} className="tier-card">
                   {t.tag && <div style={{ position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)', background: t.color, color: '#050810', fontFamily: orb, fontSize: 8, fontWeight: 700, letterSpacing: 2, padding: '4px 14px', borderRadius: 20 }}>{t.tag}</div>}
                   <div style={{ fontFamily: orb, fontSize: 12, fontWeight: 700, letterSpacing: 3, color: t.color, marginBottom: 20 }}>{t.name}</div>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 28 }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 6 }}>
                     <span style={{ fontFamily: mono, fontSize: 14, color: '#445566' }}>$</span>
                     <span style={{ fontFamily: orb, fontSize: 48, fontWeight: 900, color: '#e8eaf0' }}>{t.price}</span>
                     <span style={{ fontFamily: mono, fontSize: 12, color: '#445566' }}>{t.period}</span>
-                  </div>                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 28 }}>
+                  </div>
+                  {t.sub && <div style={{ fontFamily: mono, fontSize: 10, color: '#ffd166', letterSpacing: 1, marginBottom: 22 }}>{t.sub}</div>}
+                  {!t.sub && <div style={{ marginBottom: 22 }} />}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 28 }}>
                     {t.features.map((f, j) => (
                       <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <span style={{ color: t.color, fontSize: 12 }}>✓</span>

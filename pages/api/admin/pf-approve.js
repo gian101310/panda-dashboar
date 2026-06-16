@@ -42,9 +42,9 @@ async function pfSendUserDM(tgUsername, text) {
 }
 
 const PF_TIER_FEATURES = {
-  starter: ['overview','signals','calendar','calculator','cot'],
-  pro:     ['overview','signals','table','gap_chart','calendar','calculator','cot','setups','spike_log','panda_ai'],
-  elite:   ['overview','signals','table','gap_chart','calendar','calculator','cot','setups','spike_log','signal_log','alerts','journal','panels','analytics','valid_pairs','panda_ai']
+  starter: ['signals','calculator'],
+  pro:     ['signals','calculator','panels','table','setups','panda_ai','calendar','cot'],
+  elite:   ['signals','calculator','panels','table','setups','panda_ai','calendar','cot','overview','signal_log','valid_pairs','alerts','spike_log','journal','chart','gap_chart','analytics','heatmap','mt4_indicators','bias_indicators']
 };
 
 async function pfRequireAdmin(req, res) {
@@ -161,7 +161,7 @@ export default async function handler(req, res) {
       if (!req_row.telegram_chat_id) return res.status(400).json({ error: 'User has not connected Telegram yet' });
       const t = req_row.tier || 'pro';
       const payLink = PF_PAYMENT_LINKS[t] || PF_PAYMENT_LINKS.pro;
-      const price = t === 'elite' ? '$79/mo' : '$29/mo';
+      const price = t === 'elite' ? '$699/mo' : '$99/mo';
       const dm = [
         '🐼 <b>PANDA ENGINE — PAYMENT REMINDER</b>',
         '━━━━━━━━━━━━━━━━━━━━━━',

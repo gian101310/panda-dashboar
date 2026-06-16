@@ -3,7 +3,7 @@ import crypto from 'crypto';
 
 const PF_BOT_TOKEN = process.env.PF_BOT_TOKEN || '';
 const ADMIN_CHAT_ID = process.env.PF_ADMIN_CHAT || '';
-const FREE_TABS = ['overview','signals','calendar','calculator','cot'];
+const FREE_TABS = ['signals','calculator'];
 
 const PAYMENT_LINKS = {
   pro:   'https://pay.ziina.com/PandaEngine/SrakUhZyl?source=app',
@@ -82,7 +82,7 @@ export default async function handler(req, res) {
 
         const tier = row.tier || 'pro';
         const payLink = PAYMENT_LINKS[tier] || PAYMENT_LINKS.pro;
-        const price = tier === 'elite' ? '$79/mo' : '$29/mo';
+        const price = tier === 'elite' ? '$699/mo' : '$99/mo';
         const dm = [
           '<b>PANDA ENGINE — REQUEST RECEIVED</b>',
           '━━━━━━━━━━━━━━━━━━━━━━',
@@ -181,7 +181,7 @@ export default async function handler(req, res) {
         `⏰ <b>Trial expires:</b> ${expDisplay}`,
         '━━━━━━━━━━━━━━━━━━━━━━',
         '📊 <b>You have access to:</b>',
-        '• Overview • Signals • Calendar • Calculator • COT',
+        '• Live Signals • Calculator',
         '',
         '🔗 <a href="https://pandaengine.app/login">Login Now</a>',
         '',
