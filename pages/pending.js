@@ -20,7 +20,7 @@ export default function PfPendingPage() {
     }).catch(() => router.replace('/login'));
   }, []);
 
-  const pfOpenTelegram = () => window.open('https://t.me/panda_engine_alerts_bot', '_blank');
+  const pfOpenTelegram = () => window.open('https://t.me/Panda_new_user_alert_bot', '_blank');
   const pfLogout = async () => { try { await fetch('/api/logout', { method: 'POST' }); } catch {} router.replace('/login'); };
   if (!pfChecked) {
     return <div style={{ background: '#050810', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#445566', fontFamily: pfMono, fontSize: 11, letterSpacing: 3 }}>VERIFYING ACCESS...</div>;

@@ -59,7 +59,7 @@ export default function PricingPage() {
     setPfSignupBusy(false);
   };
   const pfCloseSignup = () => setPfSignupOpen(false);
-  const pfOpenTelegram = () => window.open('https://t.me/panda_engine_alerts_bot', '_blank');
+  const pfOpenTelegram = () => window.open('https://t.me/Panda_new_user_alert_bot', '_blank');
 
   return (
     <>
@@ -174,7 +174,7 @@ export default function PricingPage() {
                   <p style={{ fontFamily: raj, fontSize: 14, color: '#8899aa', lineHeight: 1.6, marginBottom: 20 }}>
                     {pfSignupTier === 'starter' ? 'Your STARTER account is ready! Message our Telegram bot below to receive your login credentials instantly.' : 'Your ' + pfSignupTier.toUpperCase() + ' request is in the queue. Admin has been notified. Message our bot to receive your credentials once approved.'}
                   </p>
-                  <button onClick={() => window.open('https://t.me/panda_engine_alerts_bot?start=' + pfSignupToken, '_blank')} style={{ width: '100%', background: '#00b4ff', border: 'none', borderRadius: 8, color: '#050810', fontFamily: orb, fontSize: 11, fontWeight: 700, letterSpacing: 2, padding: '12px', cursor: 'pointer', marginBottom: 10 }}>📨 GET MY PASSWORD</button>
+                  <button onClick={() => window.open('https://t.me/Panda_new_user_alert_bot?start=' + pfSignupToken, '_blank')} style={{ width: '100%', background: '#00b4ff', border: 'none', borderRadius: 8, color: '#050810', fontFamily: orb, fontSize: 11, fontWeight: 700, letterSpacing: 2, padding: '12px', cursor: 'pointer', marginBottom: 10 }}>📨 GET MY PASSWORD</button>
                   <button onClick={pfCloseSignup} style={{ width: '100%', background: 'transparent', border: '1px solid #1a2540', borderRadius: 8, color: '#445566', fontFamily: mono, fontSize: 10, letterSpacing: 2, padding: '10px', cursor: 'pointer' }}>CLOSE</button>
                 </div>
               ) : (

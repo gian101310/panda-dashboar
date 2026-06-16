@@ -300,7 +300,7 @@ export default function FunnelPage() {
                   <p style={{ fontFamily: raj, fontSize: 14, color: '#8899aa', lineHeight: 1.6, marginBottom: 20 }}>
                     {modalTier === 'starter' ? 'Your FREE account is ready. Message our Telegram bot below to receive your login credentials instantly.' : 'Your ' + modalTier.toUpperCase() + ' request is queued. Admin has been notified. Message the bot to get credentials once approved.'}
                   </p>
-                  <button onClick={() => window.open('https://t.me/panda_engine_alerts_bot?start=' + modalToken, '_blank')} style={{ width: '100%', background: '#00b4ff', border: 'none', borderRadius: 8, color: '#050810', fontFamily: orb, fontSize: 11, fontWeight: 700, letterSpacing: 2, padding: '12px', cursor: 'pointer', marginBottom: 10 }}>📨 GET MY PASSWORD</button>
+                  <button onClick={() => window.open('https://t.me/Panda_new_user_alert_bot?start=' + modalToken, '_blank')} style={{ width: '100%', background: '#00b4ff', border: 'none', borderRadius: 8, color: '#050810', fontFamily: orb, fontSize: 11, fontWeight: 700, letterSpacing: 2, padding: '12px', cursor: 'pointer', marginBottom: 10 }}>📨 GET MY PASSWORD</button>
                   <button onClick={() => setModalOpen(false)} style={{ width: '100%', background: 'transparent', border: '1px solid #1a2540', borderRadius: 8, color: '#445566', fontFamily: mono, fontSize: 10, letterSpacing: 2, padding: '10px', cursor: 'pointer' }}>CLOSE</button>
                 </div>
               ) : (
