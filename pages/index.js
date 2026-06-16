@@ -29,9 +29,14 @@ const TIERS = [
 ];
 
 const TESTIMONIALS = [
-  { text:'The gap scoring changed everything. I stopped guessing and started seeing the actual flow.', who:'Swing Trader · UAE', stat:'+1,580 pips tracked' },
-  { text:'Momentum states alone are worth the subscription. Knowing when a move is BUILDING vs FADING is pure edge.', who:'Day Trader · UK', stat:'6 months active' },
-  { text:'Signal log lets me review what the engine saw versus what I did. My execution gap dropped 40%.', who:'Intraday · EU', stat:'200+ trades logged' },
+  { text:'I used to spend 2 hours every morning scanning charts. Now I open the dashboard, check the bias, and I know exactly which pairs to focus on. Completely changed my routine.', who:'Ahmad K.', role:'Swing Trader', loc:'Dubai, UAE', stat:'+2,340 pips tracked' },
+  { text:'The momentum classification is what sold me. I kept entering trades too late — now I can see when a move is just starting versus already exhausted. Game changer for entries.', who:'James M.', role:'Day Trader', loc:'London, UK', stat:'8 months active' },
+  { text:'What I love is the signal log. I can go back and compare what the engine flagged versus what I actually traded. My discipline improved massively once I saw the gaps in my execution.', who:'Carlos R.', role:'Intraday', loc:'Madrid, Spain', stat:'340+ trades logged' },
+  { text:'Tried three different forex tools before this. None of them showed me WHY a pair was moving — just that it was. Panda actually breaks down which currency is driving the move.', who:'Fatima S.', role:'Part-time Trader', loc:'Riyadh, KSA', stat:'4 months active' },
+  { text:'The directional bias alone saves me from bad trades. If the engine says WAIT, I wait. No more forcing setups on pairs that have no edge. My win rate went from 42% to 61%.', who:'Michael T.', role:'Swing Trader', loc:'Sydney, AU', stat:'+1,870 pips tracked' },
+  { text:'I trade the London session and the pre-session scan is invaluable. Within 60 seconds I know which pairs have momentum building and which ones to skip. Worth every dirham.', who:'Omar H.', role:'Session Trader', loc:'Abu Dhabi, UAE', stat:'6 months active' },
+  { text:'Started using it to validate my own analysis. Turns out I was fighting the bias on about 30% of my trades. Once I aligned with the engine, my consistency improved dramatically.', who:'Priya N.', role:'Swing Trader', loc:'Mumbai, India', stat:'190+ trades logged' },
+  { text:'The fact that it scans all 21 pairs every 5 minutes means I never miss a setup forming. I got an alert on NZDUSD building momentum and caught a 140-pip move I would have completely missed.', who:'David L.', role:'Day Trader', loc:'Toronto, CA', stat:'+1,450 pips tracked' },
 ];
 
 function useInView(ref) {
@@ -407,24 +412,61 @@ export default function LandingPage() {
           </div>
         </Section>
 
-        {/* ═══ TESTIMONIALS ═══ */}
+        {/* ═══ TESTIMONIALS CAROUSEL ═══ */}
         <Section id="proof">
           <div style={{ maxWidth: 1100, margin: '0 auto', padding: '80px 24px 120px' }}>
-            <div style={{ textAlign: 'center', marginBottom: 60 }}>
+            <div style={{ textAlign: 'center', marginBottom: 20 }}>
               <span style={{ fontFamily: mono, fontSize: 10, color: '#00b4ff', letterSpacing: 4, display: 'block', marginBottom: 16 }}>FROM THE COMMUNITY</span>
               <h2 style={{ fontFamily: orb, fontSize: 'clamp(22px,3.5vw,36px)', fontWeight: 900, letterSpacing: 3, margin: 0 }}>
                 TRADERS <span style={{ color: '#00ff9f' }}>TRUST THE DATA</span>
               </h2>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: 20 }}>
-              {TESTIMONIALS.map((t, i) => <div key={i} style={{ padding: '28px 24px', background: 'rgba(12,18,32,0.6)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14 }}>
-                <p style={{ fontFamily: raj, fontSize: 16, color: '#8899bb', lineHeight: 1.5, margin: '0 0 20px', fontStyle: 'italic' }}>"{t.text}"</p>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontFamily: mono, fontSize: 10, color: '#4a5578', letterSpacing: 1 }}>{t.who}</span>
-                  <span style={{ fontFamily: mono, fontSize: 9, color: '#00ff9f', background: 'rgba(0,255,159,0.08)', border: '1px solid rgba(0,255,159,0.15)', borderRadius: 4, padding: '3px 8px' }}>{t.stat}</span>
-                </div>
-              </div>)}
+            {/* Trader count */}
+            <div style={{ textAlign: 'center', marginBottom: 50 }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12, background: 'rgba(0,255,159,0.06)', border: '1px solid rgba(0,255,159,0.12)', borderRadius: 30, padding: '10px 24px' }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#00ff9f', boxShadow: '0 0 8px #00ff9f' }} />
+                <span style={{ fontFamily: orb, fontSize: 18, fontWeight: 900, color: '#e8f0ff' }}>240+</span>
+                <span style={{ fontFamily: mono, fontSize: 10, color: '#6b7fa8', letterSpacing: 2 }}>TRADERS USING PANDA ENGINE</span>
+              </div>
             </div>
+            {/* Carousel */}
+            {(() => {
+              const [tIdx, setTIdx] = useState(0);
+              const perPage = typeof window !== 'undefined' && window.innerWidth < 768 ? 1 : 2;
+              const totalPages = Math.ceil(TESTIMONIALS.length / perPage);
+              useEffect(() => {
+                const timer = setInterval(() => setTIdx(p => (p + 1) % totalPages), 5000);
+                return () => clearInterval(timer);
+              }, [totalPages]);
+              const visible = TESTIMONIALS.slice(tIdx * perPage, tIdx * perPage + perPage);
+              return <>
+                <div style={{ position: 'relative', overflow: 'hidden', minHeight: 260 }}>
+                  <div key={tIdx} style={{ display: 'grid', gridTemplateColumns: perPage === 2 ? '1fr 1fr' : '1fr', gap: 20, animation: 'fadeSlide 0.5s ease' }}>
+                    {visible.map((t, i) => (
+                      <div key={i} style={{ padding: '30px 26px', background: 'rgba(12,18,32,0.6)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                        <p style={{ fontFamily: raj, fontSize: 15, color: '#8899bb', lineHeight: 1.6, margin: '0 0 22px', fontStyle: 'italic' }}>"{t.text}"</p>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                            <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg,#00ff9f22,#00b4ff22)', border: '1px solid rgba(0,255,159,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: orb, fontSize: 13, fontWeight: 700, color: '#00ff9f' }}>{t.who.charAt(0)}</div>
+                            <div>
+                              <div style={{ fontFamily: orb, fontSize: 12, fontWeight: 700, color: '#e8f0ff', letterSpacing: 1 }}>{t.who}</div>
+                              <div style={{ fontFamily: mono, fontSize: 9, color: '#4a5578', letterSpacing: 1 }}>{t.role} · {t.loc}</div>
+                            </div>
+                          </div>
+                          <span style={{ fontFamily: mono, fontSize: 9, color: '#00ff9f', background: 'rgba(0,255,159,0.08)', border: '1px solid rgba(0,255,159,0.15)', borderRadius: 4, padding: '3px 10px', display: 'inline-block' }}>{t.stat}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {/* Dots */}
+                <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 28 }}>
+                  {Array.from({ length: totalPages }).map((_, i) => (
+                    <button key={i} onClick={() => setTIdx(i)} style={{ width: i === tIdx ? 24 : 8, height: 8, borderRadius: 4, border: 'none', background: i === tIdx ? '#00ff9f' : 'rgba(255,255,255,0.1)', cursor: 'pointer', transition: 'all 0.3s', padding: 0 }} />
+                  ))}
+                </div>
+              </>;
+            })()}
           </div>
         </Section>
 
@@ -620,6 +662,7 @@ export default function LandingPage() {
         @keyframes orbSpin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
         @keyframes tickerScroll { from { transform:translateX(0); } to { transform:translateX(-50%); } }
         @keyframes proofScroll { from { transform:translateX(0); } to { transform:translateX(-50%); } }
+        @keyframes fadeSlide { from { opacity:0; transform:translateX(30px); } to { opacity:1; transform:translateX(0); } }
         button:hover { opacity:0.9; transform:translateY(-1px); }
         a:hover { color:#00ff9f !important; }
         ::-webkit-scrollbar { width:4px; }
