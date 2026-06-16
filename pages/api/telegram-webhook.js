@@ -80,14 +80,14 @@ export default async function handler(req, res) {
 
         const tier = row.tier || 'pro';
         const dm = [
-          '🐼 <b>PANDA ENGINE — REQUEST RECEIVED</b>',
+          '<b>PANDA ENGINE — REQUEST RECEIVED</b>',
           '━━━━━━━━━━━━━━━━━━━━━━',
           `<b>Plan:</b> ${tier.toUpperCase()}`,
           `<b>Username:</b> ${row.username}`,
           '',
-          'Your signup is in the queue! Admin will reach out with payment details and activate your account shortly.',
+          'Your signup is in the queue!',
+          'To get approval and payment links, message @panda_engine_alerts_bot',
           '━━━━━━━━━━━━━━━━━━━━━━',
-          '📩 Questions? Message @Panda_new_user_alert_bot',
         ].join('\n');
         await pfBotSend(chatId, dm);
 
