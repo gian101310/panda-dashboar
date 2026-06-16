@@ -32,6 +32,9 @@ export default function LicenseAdminPage() {
   const [savingId, setSavingId] = useState('');
   const [filter, setFilter] = useState('ALL');
   const [error, setError] = useState('');
+  const [showCreate, setShowCreate] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [form, setForm] = useState({ customer_name: '', contact: '', telegram_username: '', mt4_account_id: '', product_code: INDICATOR_PRODUCTS[0].code, paid_confirmed: false, price_override: '', notes: '' });
 
   const load = useCallback(async () => {
     const res = await fetch('/api/admin/indicator-licenses');
@@ -75,6 +78,24 @@ export default function LicenseAdminPage() {
     setSavingId('');
   }
 
+  async function createLicense(e) {
+    e.preventDefault();
+    if (!form.customer_name || !form.mt4_account_id) { setError('Name and Account ID required'); return; }
+    setCreating(true);
+    setError('');
+    const res = await fetch('/api/admin/indicator-licenses', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { setError(data.error || 'Create failed'); setCreating(false); return; }
+    setForm({ customer_name: '', contact: '', telegram_username: '', mt4_account_id: '', product_code: INDICATOR_PRODUCTS[0].code, paid_confirmed: false, price_override: '', notes: '' });
+    setShowCreate(false);
+    setCreating(false);
+    await load();
+  }
+
   const filtered = useMemo(() => filter === 'ALL' ? licenses : licenses.filter((license) => license.status === filter), [licenses, filter]);
   const counts = useMemo(() => ({
     ALL: licenses.length,
@@ -102,6 +123,7 @@ export default function LicenseAdminPage() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontFamily: mono, fontSize: 9, color: '#2a3550' }}>{adminUser?.username}</span>
+            <button onClick={() => setShowCreate(!showCreate)} style={smallBtn('#ffd166')}>+ CREATE</button>
             <button onClick={() => window.location.href = '/admin'} style={smallBtn('#ffd166')}>ADMIN</button>
             <button onClick={() => window.location.href = '/dashboard'} style={smallBtn('#00ff9f')}>DASHBOARD</button>
             <button onClick={load} style={smallBtn('#00b4ff')}>REFRESH</button>
@@ -116,6 +138,56 @@ export default function LicenseAdminPage() {
               </button>
             ))}
           </div>
+          {/* Manual Create Form */}
+          {showCreate && (
+            <form onSubmit={createLicense} style={{ background: '#0e1525', border: '1px solid #1a2540', borderRadius: 10, padding: 20, marginBottom: 16 }}>
+              <div style={{ fontFamily: orb, fontSize: 10, letterSpacing: 3, color: '#ffd166', marginBottom: 16 }}>CREATE MANUAL LICENSE</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 12 }}>
+                <div>
+                  <label style={{ fontFamily: mono, fontSize: 8, color: '#445566', letterSpacing: 1, display: 'block', marginBottom: 4 }}>NAME *</label>
+                  <input value={form.customer_name} onChange={(e) => setForm({ ...form, customer_name: e.target.value })} placeholder="Client name" style={{ ...input, width: '100%' }} required />
+                </div>
+                <div>
+                  <label style={{ fontFamily: mono, fontSize: 8, color: '#445566', letterSpacing: 1, display: 'block', marginBottom: 4 }}>CONTACT (EMAIL/PHONE)</label>
+                  <input value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} placeholder="email or phone" style={{ ...input, width: '100%' }} />
+                </div>
+                <div>
+                  <label style={{ fontFamily: mono, fontSize: 8, color: '#445566', letterSpacing: 1, display: 'block', marginBottom: 4 }}>TELEGRAM</label>
+                  <input value={form.telegram_username} onChange={(e) => setForm({ ...form, telegram_username: e.target.value })} placeholder="@username" style={{ ...input, width: '100%' }} />
+                </div>
+                <div>
+                  <label style={{ fontFamily: mono, fontSize: 8, color: '#445566', letterSpacing: 1, display: 'block', marginBottom: 4 }}>MT4 ACCOUNT ID *</label>
+                  <input value={form.mt4_account_id} onChange={(e) => setForm({ ...form, mt4_account_id: e.target.value })} placeholder="e.g. 3242354235" style={{ ...input, width: '100%' }} required />
+                </div>
+                <div>
+                  <label style={{ fontFamily: mono, fontSize: 8, color: '#445566', letterSpacing: 1, display: 'block', marginBottom: 4 }}>INDICATOR</label>
+                  <select value={form.product_code} onChange={(e) => setForm({ ...form, product_code: e.target.value })} style={{ ...input, width: '100%' }}>
+                    {INDICATOR_PRODUCTS.map((p) => <option key={p.code} value={p.code}>{p.name} — {p.priceLabel}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontFamily: mono, fontSize: 8, color: '#445566', letterSpacing: 1, display: 'block', marginBottom: 4 }}>PAID STATUS</label>
+                  <select value={form.paid_confirmed ? 'true' : 'false'} onChange={(e) => setForm({ ...form, paid_confirmed: e.target.value === 'true' })} style={{ ...input, width: '100%' }}>
+                    <option value="false">UNPAID</option>
+                    <option value="true">PAID</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontFamily: mono, fontSize: 8, color: '#445566', letterSpacing: 1, display: 'block', marginBottom: 4 }}>PRICE (CUSTOM)</label>
+                  <input value={form.price_override} onChange={(e) => setForm({ ...form, price_override: e.target.value })} placeholder="e.g. $300 USD" style={{ ...input, width: '100%' }} />
+                </div>
+                <div>
+                  <label style={{ fontFamily: mono, fontSize: 8, color: '#445566', letterSpacing: 1, display: 'block', marginBottom: 4 }}>NOTES</label>
+                  <input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="optional" style={{ ...input, width: '100%' }} />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+                <button type="submit" disabled={creating} style={{ ...smallBtn('#00ff9f'), padding: '8px 20px', opacity: creating ? 0.5 : 1 }}>{creating ? 'CREATING...' : 'CREATE LICENSE'}</button>
+                <button type="button" onClick={() => setShowCreate(false)} style={{ ...smallBtn('#445566'), padding: '8px 14px' }}>CANCEL</button>
+              </div>
+            </form>
+          )}
+
           {error && <div style={{ fontFamily: mono, fontSize: 10, color: '#ff4d6d', border: '1px solid #ff4d6d44', background: 'rgba(255,77,109,0.08)', borderRadius: 6, padding: 10, marginBottom: 14 }}>{error}</div>}
 
           <div style={{ overflowX: 'auto', border: '1px solid #1a2540', borderRadius: 10, background: '#080c18' }}>
@@ -137,12 +209,17 @@ export default function LicenseAdminPage() {
                       <td style={{ ...cell, fontFamily: mono, fontSize: 9 }}>{license.contact}</td>
                       <td style={{ ...cell, fontFamily: mono, fontSize: 9 }}>{license.telegram_username ? <a href={`https://t.me/${license.telegram_username}`} target="_blank" rel="noopener noreferrer" style={{ color: '#00b4ff' }}>@{license.telegram_username}</a> : '—'}</td>
                       <td style={{ ...cell, fontFamily: mono, color: '#00b4ff' }}>{license.mt4_account_id}</td>
-                      <td style={cell}>{product.name}</td>
-                      <td style={{ ...cell, fontFamily: mono, color: '#ffd166' }}>{product.priceLabel}</td>
                       <td style={cell}>
-                        <button onClick={() => patch(license.id, { paid_confirmed: !license.paid_confirmed })} style={smallBtn(license.paid_confirmed ? '#00ff9f' : '#ff4d6d')}>
-                          {license.paid_confirmed ? 'PAID' : 'UNPAID'}
-                        </button>
+                        <select value={license.product_code} onChange={(e) => patch(license.id, { product_code: e.target.value })} style={{ ...input, width: '100%', minWidth: 130 }}>
+                          {INDICATOR_PRODUCTS.map((p) => <option key={p.code} value={p.code}>{p.name}</option>)}
+                        </select>
+                      </td>
+                      <td style={{ ...cell, fontFamily: mono, color: '#ffd166', minWidth: 80 }}>{license.price_override || product.priceLabel}</td>
+                      <td style={cell}>
+                        <select value={license.paid_confirmed ? 'PAID' : 'UNPAID'} onChange={(e) => patch(license.id, { paid_confirmed: e.target.value === 'PAID' })} style={{ ...input, color: license.paid_confirmed ? '#00ff9f' : '#ff4d6d', minWidth: 80 }}>
+                          <option value="UNPAID">UNPAID</option>
+                          <option value="PAID">PAID</option>
+                        </select>
                       </td>
                       <td style={cell}>
                         <input type="date" value={license.expires_at ? new Date(license.expires_at).toISOString().split('T')[0] : ''} onChange={(e) => patch(license.id, { expires_at: e.target.value || null })} style={input} />
