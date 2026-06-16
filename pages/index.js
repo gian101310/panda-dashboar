@@ -281,32 +281,27 @@ export default function LandingPage() {
         <Section id="deep-bias">
           <div style={{ maxWidth: 1100, margin: '0 auto', padding: '100px 24px 60px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 60, alignItems: 'center' }}>
-              {/* Visual — mock scoring panel */}
+              {/* Visual — strength bars */}
               <div style={{ background: 'rgba(12,18,32,0.8)', border: '1px solid rgba(0,255,159,0.12)', borderRadius: 16, padding: '32px 28px', boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}>
-                <div style={{ fontFamily: mono, fontSize: 9, color: '#4a5578', letterSpacing: 3, marginBottom: 20 }}>DIRECTIONAL BIAS · LIVE</div>
+                <div style={{ fontFamily: mono, fontSize: 9, color: '#4a5578', letterSpacing: 3, marginBottom: 24 }}>STRENGTH ANALYSIS · REAL-TIME</div>
                 {[
-                  { pair: 'NZDUSD', gap: 14, dir: 'BUY', d1: '+6', h4: '+5', h1: '+3' },
-                  { pair: 'GBPAUD', gap: -12, dir: 'SELL', d1: '-5', h4: '-4', h1: '-3' },
-                  { pair: 'EURJPY', gap: 3, dir: 'WAIT', d1: '+2', h4: '+1', h1: '0' },
+                  { pair: 'NZDUSD', strength: 82, dir: 'BUY', label: 'STRONG BIAS' },
+                  { pair: 'GBPAUD', strength: 71, dir: 'SELL', label: 'CONFIRMED' },
+                  { pair: 'EURJPY', strength: 28, dir: 'WAIT', label: 'NO EDGE' },
                 ].map((r, i) => {
                   const c = r.dir === 'BUY' ? '#00ff9f' : r.dir === 'SELL' ? '#ff4d6d' : '#4a5578';
-                  return <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0', borderBottom: i < 2 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
-                    <span style={{ fontFamily: orb, fontSize: 14, fontWeight: 700, color: '#e8f0ff', letterSpacing: 2, width: 100 }}>{r.pair}</span>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      {[{ label: 'D1', val: r.d1 }, { label: 'H4', val: r.h4 }, { label: 'H1', val: r.h1 }].map(t => (
-                        <div key={t.label} style={{ textAlign: 'center' }}>
-                          <div style={{ fontFamily: mono, fontSize: 8, color: '#4a5578', letterSpacing: 1 }}>{t.label}</div>
-                          <div style={{ fontFamily: mono, fontSize: 12, color: t.val.startsWith('-') ? '#ff4d6d' : t.val === '0' ? '#4a5578' : '#00ff9f' }}>{t.val}</div>
-                        </div>
-                      ))}
+                  return <div key={i} style={{ marginBottom: i < 2 ? 20 : 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <span style={{ fontFamily: orb, fontSize: 14, fontWeight: 700, color: '#e8f0ff', letterSpacing: 2 }}>{r.pair}</span>
+                      <span style={{ fontFamily: mono, fontSize: 9, color: c, background: `${c}12`, border: `1px solid ${c}30`, borderRadius: 3, padding: '2px 10px', letterSpacing: 1 }}>{r.dir}</span>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontFamily: orb, fontSize: 16, fontWeight: 900, color: c }}>{Math.abs(r.gap)}</span>
-                      <span style={{ fontFamily: mono, fontSize: 9, color: c, background: `${c}12`, border: `1px solid ${c}30`, borderRadius: 3, padding: '2px 8px', letterSpacing: 1 }}>{r.dir}</span>
+                    <div style={{ width: '100%', height: 6, background: '#0a0e1a', borderRadius: 3, overflow: 'hidden' }}>
+                      <div style={{ width: `${r.strength}%`, height: '100%', background: `linear-gradient(90deg,${c}44,${c})`, borderRadius: 3, transition: 'width 1.5s ease' }} />
                     </div>
+                    <div style={{ fontFamily: mono, fontSize: 8, color: '#4a5578', letterSpacing: 1, marginTop: 4 }}>{r.label}</div>
                   </div>;
                 })}
-                <div style={{ marginTop: 16, fontFamily: mono, fontSize: 9, color: '#334', letterSpacing: 1, textAlign: 'center', color: '#4a5578' }}>GAP = BASE SCORE − QUOTE SCORE · RANGE ±18</div>
+                <div style={{ marginTop: 20, fontFamily: mono, fontSize: 9, color: '#4a5578', letterSpacing: 1, textAlign: 'center' }}>MULTI-TIMEFRAME · 21 PAIRS · EVERY 5 MIN</div>
               </div>
               {/* Copy */}
               <div>
@@ -315,13 +310,13 @@ export default function LandingPage() {
                   Know Which Side<br/>Is <span style={{ color: '#00ff9f' }}>Actually Strong</span>
                 </h2>
                 <p style={{ fontFamily: raj, fontSize: 16, color: '#8899bb', lineHeight: 1.6, margin: '0 0 24px' }}>
-                  The engine scores each currency independently across Daily, H4, and H1 timeframes — then calculates the gap between them. A gap of +14 means one side is overwhelmingly stronger. A gap of +3 means the market hasn't decided yet.
+                  The engine analyzes currency strength across multiple timeframes simultaneously. It doesn't just tell you a pair is moving — it tells you which currency is driving the move and whether the bias is strong enough to act on.
                 </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   {[
-                    { icon: '🎯', text: 'Gap ≥ 5 = clear directional bias (BUY or SELL)' },
-                    { icon: '⚡', text: 'Gap ≥ 9 = strong enough for market execution' },
-                    { icon: '🛡️', text: 'Gap < 5 = WAIT — no edge, no trade' },
+                    { icon: '🎯', text: 'Multi-timeframe strength analysis across 21 pairs' },
+                    { icon: '⚡', text: 'Clear BUY, SELL, or WAIT — no ambiguity' },
+                    { icon: '🛡️', text: 'Weak setups filtered out automatically' },
                   ].map((b, i) => (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                       <span style={{ fontSize: 16 }}>{b.icon}</span>
@@ -345,13 +340,13 @@ export default function LandingPage() {
                   See When a Move<br/>Is <span style={{ color: '#00b4ff' }}>Building or Dying</span>
                 </h2>
                 <p style={{ fontFamily: raj, fontSize: 16, color: '#8899bb', lineHeight: 1.6, margin: '0 0 24px' }}>
-                  Most traders enter too late — after the move already happened. The engine classifies every pair into one of 10 momentum states, from the first spark of energy to full exhaustion. You see the lifecycle of a move in real time.
+                  Most traders enter too late — after the move already happened. The engine classifies momentum in real time so you can catch moves early, ride them with confidence, and step aside before they reverse.
                 </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   {[
-                    { icon: '🔥', text: 'BUILDING / ACCELERATING — early move, best entries' },
-                    { icon: '📈', text: 'STRONG / EXTENDED — move in progress, ride or wait' },
-                    { icon: '⚠️', text: 'FADING / REVERSING — momentum dying, protect or exit' },
+                    { icon: '🔥', text: 'Catch moves early — before the crowd sees them' },
+                    { icon: '📈', text: 'Know when momentum supports your position' },
+                    { icon: '⚠️', text: 'Get warned when energy is fading — before price shows it' },
                   ].map((b, i) => (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                       <span style={{ fontSize: 16 }}>{b.icon}</span>
@@ -360,26 +355,30 @@ export default function LandingPage() {
                   ))}
                 </div>
               </div>
-              {/* Visual — momentum state cards */}
+              {/* Visual — momentum lifecycle */}
               <div style={{ background: 'rgba(12,18,32,0.8)', border: '1px solid rgba(0,180,255,0.12)', borderRadius: 16, padding: '32px 28px', boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}>
-                <div style={{ fontFamily: mono, fontSize: 9, color: '#4a5578', letterSpacing: 3, marginBottom: 20 }}>MOMENTUM STATES · LIVE</div>
+                <div style={{ fontFamily: mono, fontSize: 9, color: '#4a5578', letterSpacing: 3, marginBottom: 24 }}>MOMENTUM LIFECYCLE</div>
                 {[
-                  { pair: 'NZDUSD', state: 'BUILDING', icon: '🔥', color: '#00ff9f', change: '+3.2' },
-                  { pair: 'GBPJPY', state: 'ACCELERATING', icon: '🚀', color: '#00b4ff', change: '+5.8' },
-                  { pair: 'EURUSD', state: 'STRONG', icon: '📈', color: '#66ffcc', change: '+1.4' },
-                  { pair: 'USDCAD', state: 'FADING', icon: '📉', color: '#ffd166', change: '-2.1' },
-                  { pair: 'AUDJPY', state: 'REVERSING', icon: '🔄', color: '#ff4d6d', change: '-4.6' },
+                  { phase: 'EARLY ENTRY', icon: '🔥', color: '#00ff9f', desc: 'Momentum just ignited', bar: 25 },
+                  { phase: 'ACCELERATING', icon: '🚀', color: '#00b4ff', desc: 'Move gaining speed', bar: 55 },
+                  { phase: 'PEAK STRENGTH', icon: '📈', color: '#66ffcc', desc: 'Maximum energy', bar: 90 },
+                  { phase: 'FADING', icon: '📉', color: '#ffd166', desc: 'Energy draining', bar: 45 },
+                  { phase: 'REVERSAL ZONE', icon: '🔄', color: '#ff4d6d', desc: 'Opposite side building', bar: 15 },
                 ].map((r, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: i < 4 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
-                    <span style={{ fontFamily: orb, fontSize: 13, fontWeight: 700, color: '#e8f0ff', letterSpacing: 2, width: 90 }}>{r.pair}</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ fontSize: 14 }}>{r.icon}</span>
-                      <span style={{ fontFamily: mono, fontSize: 10, color: r.color, letterSpacing: 1 }}>{r.state}</span>
+                  <div key={i} style={{ marginBottom: i < 4 ? 16 : 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 14 }}>{r.icon}</span>
+                        <span style={{ fontFamily: orb, fontSize: 10, fontWeight: 700, color: r.color, letterSpacing: 1 }}>{r.phase}</span>
+                      </div>
+                      <span style={{ fontFamily: mono, fontSize: 9, color: '#4a5578' }}>{r.desc}</span>
                     </div>
-                    <span style={{ fontFamily: mono, fontSize: 12, color: r.change.startsWith('-') ? '#ff4d6d' : '#00ff9f' }}>{r.change}</span>
+                    <div style={{ width: '100%', height: 4, background: '#0a0e1a', borderRadius: 2, overflow: 'hidden' }}>
+                      <div style={{ width: `${r.bar}%`, height: '100%', background: `linear-gradient(90deg,${r.color}44,${r.color})`, borderRadius: 2 }} />
+                    </div>
                   </div>
                 ))}
-                <div style={{ marginTop: 16, fontFamily: mono, fontSize: 9, color: '#4a5578', letterSpacing: 1, textAlign: 'center' }}>10 STATES · UPDATED EVERY CYCLE</div>
+                <div style={{ marginTop: 20, fontFamily: mono, fontSize: 9, color: '#4a5578', letterSpacing: 1, textAlign: 'center' }}>REAL-TIME CLASSIFICATION · EVERY CYCLE</div>
               </div>
             </div>
           </div>
