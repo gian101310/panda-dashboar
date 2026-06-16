@@ -109,6 +109,110 @@ export default function FunnelPage() {
           </div>
         </section>
 
+        {/* ═══ DEEP DIVE: DIRECTIONAL BIAS ═══ */}
+        <section style={{ ...S.section, padding: '80px 24px', maxWidth: 1100, margin: '0 auto' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 60, alignItems: 'center' }} className="deep-grid">
+            {/* Visual — mock scoring panel */}
+            <div style={{ background: 'linear-gradient(135deg,#0a0e1a,#0e1525)', border: '1px solid rgba(0,255,159,0.12)', borderRadius: 16, padding: '32px 28px', boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}>
+              <div style={{ fontFamily: mono, fontSize: 9, color: '#445566', letterSpacing: 3, marginBottom: 20 }}>DIRECTIONAL BIAS · LIVE</div>
+              {[
+                { pair: 'NZDUSD', gap: 14, dir: 'BUY', d1: '+6', h4: '+5', h1: '+3' },
+                { pair: 'GBPAUD', gap: -12, dir: 'SELL', d1: '-5', h4: '-4', h1: '-3' },
+                { pair: 'EURJPY', gap: 3, dir: 'WAIT', d1: '+2', h4: '+1', h1: '0' },
+              ].map((r, i) => {
+                const c = r.dir === 'BUY' ? '#00ff9f' : r.dir === 'SELL' ? '#ff4d6d' : '#445566';
+                return <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0', borderBottom: i < 2 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                  <span style={{ fontFamily: orb, fontSize: 14, fontWeight: 700, color: '#e8eaf0', letterSpacing: 2, width: 100 }}>{r.pair}</span>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {[{ label: 'D1', val: r.d1 }, { label: 'H4', val: r.h4 }, { label: 'H1', val: r.h1 }].map(t => (
+                      <div key={t.label} style={{ textAlign: 'center' }}>
+                        <div style={{ fontFamily: mono, fontSize: 8, color: '#445566', letterSpacing: 1 }}>{t.label}</div>
+                        <div style={{ fontFamily: mono, fontSize: 12, color: t.val.startsWith('-') ? '#ff4d6d' : t.val === '0' ? '#445566' : '#00ff9f' }}>{t.val}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontFamily: orb, fontSize: 16, fontWeight: 900, color: c }}>{Math.abs(r.gap)}</span>
+                    <span style={{ fontFamily: mono, fontSize: 9, color: c, background: `${c}12`, border: `1px solid ${c}30`, borderRadius: 3, padding: '2px 8px', letterSpacing: 1 }}>{r.dir}</span>
+                  </div>
+                </div>;
+              })}
+              <div style={{ marginTop: 16, fontFamily: mono, fontSize: 9, color: '#445566', letterSpacing: 1, textAlign: 'center' }}>GAP = BASE SCORE − QUOTE SCORE · RANGE ±18</div>
+            </div>
+            {/* Copy */}
+            <div>
+              <span style={{ fontFamily: mono, fontSize: 9, color: '#00ff9f', letterSpacing: 4, background: 'rgba(0,255,159,0.08)', border: '1px solid rgba(0,255,159,0.15)', borderRadius: 4, padding: '4px 12px', display: 'inline-block', marginBottom: 20 }}>DIRECTIONAL BIAS</span>
+              <h2 style={{ fontFamily: orb, fontSize: 'clamp(22px,3vw,34px)', fontWeight: 900, letterSpacing: 2, lineHeight: 1.2, margin: '0 0 20px' }}>
+                Know Which Side Is <span style={{ color: '#00ff9f' }}>Actually Strong</span>
+              </h2>
+              <p style={{ fontFamily: raj, fontSize: 16, color: '#8899aa', lineHeight: 1.65, margin: '0 0 24px' }}>
+                The engine scores each currency independently across Daily, H4, and H1 timeframes — then calculates the gap between them. A gap of +14 means one side is overwhelmingly stronger. A gap of +3 means the market hasn't decided yet.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {[
+                  { icon: '🎯', text: 'Gap ≥ 5 = clear directional bias (BUY or SELL)' },
+                  { icon: '⚡', text: 'Gap ≥ 9 = strong enough for market execution' },
+                  { icon: '🛡️', text: 'Gap < 5 = WAIT — no edge, no trade' },
+                ].map((b, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ fontSize: 16 }}>{b.icon}</span>
+                    <span style={{ fontFamily: raj, fontSize: 14, color: '#6b7d8e' }}>{b.text}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ═══ DEEP DIVE: MOMENTUM INTELLIGENCE ═══ */}
+        <section style={{ ...S.section, padding: '40px 24px 80px', maxWidth: 1100, margin: '0 auto' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 60, alignItems: 'center' }} className="deep-grid">
+            {/* Copy (left — alternating) */}
+            <div>
+              <span style={{ fontFamily: mono, fontSize: 9, color: '#00b4ff', letterSpacing: 4, background: 'rgba(0,180,255,0.08)', border: '1px solid rgba(0,180,255,0.15)', borderRadius: 4, padding: '4px 12px', display: 'inline-block', marginBottom: 20 }}>MOMENTUM INTELLIGENCE</span>
+              <h2 style={{ fontFamily: orb, fontSize: 'clamp(22px,3vw,34px)', fontWeight: 900, letterSpacing: 2, lineHeight: 1.2, margin: '0 0 20px' }}>
+                See When a Move Is <span style={{ color: '#00b4ff' }}>Building or Dying</span>
+              </h2>
+              <p style={{ fontFamily: raj, fontSize: 16, color: '#8899aa', lineHeight: 1.65, margin: '0 0 24px' }}>
+                Most traders enter too late — after the move already happened. The engine classifies every pair into one of 10 momentum states, from the first spark of energy to full exhaustion.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {[
+                  { icon: '🔥', text: 'BUILDING / ACCELERATING — early move, best entries' },
+                  { icon: '📈', text: 'STRONG / EXTENDED — move in progress, ride or wait' },
+                  { icon: '⚠️', text: 'FADING / REVERSING — momentum dying, protect or exit' },
+                ].map((b, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ fontSize: 16 }}>{b.icon}</span>
+                    <span style={{ fontFamily: raj, fontSize: 14, color: '#6b7d8e' }}>{b.text}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* Visual — momentum state cards */}
+            <div style={{ background: 'linear-gradient(135deg,#0a0e1a,#0e1525)', border: '1px solid rgba(0,180,255,0.12)', borderRadius: 16, padding: '32px 28px', boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}>
+              <div style={{ fontFamily: mono, fontSize: 9, color: '#445566', letterSpacing: 3, marginBottom: 20 }}>MOMENTUM STATES · LIVE</div>
+              {[
+                { pair: 'NZDUSD', state: 'BUILDING', icon: '🔥', color: '#00ff9f', change: '+3.2' },
+                { pair: 'GBPJPY', state: 'ACCELERATING', icon: '🚀', color: '#00b4ff', change: '+5.8' },
+                { pair: 'EURUSD', state: 'STRONG', icon: '📈', color: '#66ffcc', change: '+1.4' },
+                { pair: 'USDCAD', state: 'FADING', icon: '📉', color: '#ffd166', change: '-2.1' },
+                { pair: 'AUDJPY', state: 'REVERSING', icon: '🔄', color: '#ff4d6d', change: '-4.6' },
+              ].map((r, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: i < 4 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                  <span style={{ fontFamily: orb, fontSize: 13, fontWeight: 700, color: '#e8eaf0', letterSpacing: 2, width: 90 }}>{r.pair}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 14 }}>{r.icon}</span>
+                    <span style={{ fontFamily: mono, fontSize: 10, color: r.color, letterSpacing: 1 }}>{r.state}</span>
+                  </div>
+                  <span style={{ fontFamily: mono, fontSize: 12, color: r.change.startsWith('-') ? '#ff4d6d' : '#00ff9f' }}>{r.change}</span>
+                </div>
+              ))}
+              <div style={{ marginTop: 16, fontFamily: mono, fontSize: 9, color: '#445566', letterSpacing: 1, textAlign: 'center' }}>10 STATES · UPDATED EVERY CYCLE</div>
+            </div>
+          </div>
+        </section>
+
         {/* PROBLEM */}
         <section style={{ ...S.section, padding: '80px 24px', maxWidth: 800, margin: '0 auto' }}>
           <div style={{ fontFamily: mono, fontSize: 10, letterSpacing: 5, color: '#ff4d6d', marginBottom: 14, textAlign: 'center' }}>THE REAL PROBLEM</div>
@@ -329,6 +433,9 @@ export default function FunnelPage() {
           * { box-sizing: border-box; margin: 0; padding: 0; }
           body { background: #050810; }
           button:hover { opacity: 0.92; }
+          @media (max-width:768px) {
+            .deep-grid { grid-template-columns: 1fr !important; gap: 32px !important; }
+          }
         `}</style>
       </div>
     </>
