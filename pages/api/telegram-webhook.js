@@ -5,15 +5,9 @@ const PF_BOT_TOKEN = process.env.PF_BOT_TOKEN || '';
 const ADMIN_CHAT_ID = process.env.PF_ADMIN_CHAT || '';
 const FREE_TABS = ['overview','signals','calendar','calculator','cot'];
 
-const PAYMENT_LINKS = {
-  pro:   'https://pay.ziina.com/PandaEngine/SrakUhZyl?source=app',
-  elite: 'https://pay.ziina.com/PandaEngine/SrakUhZyl?source=app',
-};
+// Payment links — update once pricing is finalized
+// const PAYMENT_LINKS = { pro: '...', elite: '...' };
 
-const PAYMENT_LINKS = {
-  pro:   'https://pay.ziina.com/PandaEngine/SrakUhZyl?source=app',
-  elite: 'https://pay.ziina.com/PandaEngine/SrakUhZyl?source=app',
-};
 // Set TG_WEBHOOK_SECRET in Vercel env vars, then re-register webhook with:
 // https://api.telegram.org/bot<TOKEN>/setWebhook?url=<URL>&secret_token=<SECRET>
 const TG_WEBHOOK_SECRET = process.env.TG_WEBHOOK_SECRET || '';
@@ -79,31 +73,26 @@ export default async function handler(req, res) {
           .update({ pending_password: null })
           .eq('token', token);
       } else if (row && row.status === 'PENDING') {
-        // Store chat_id so admin can resend / bot can DM after approval
+        // Store chat_id so admin can DM after approval
         await supabase.from('pf_signup_requests')
           .update({ telegram_chat_id: chatId })
           .eq('token', token);
 
         const tier = row.tier || 'pro';
-        const payLink = PAYMENT_LINKS[tier] || PAYMENT_LINKS.pro;
-        const price = tier === 'elite' ? '$79/mo' : '$29/mo';
         const dm = [
-          '🐼 <b>PANDA ENGINE — PAYMENT REQUIRED</b>',
+          '🐼 <b>PANDA ENGINE — REQUEST RECEIVED</b>',
           '━━━━━━━━━━━━━━━━━━━━━━',
-          `<b>Plan:</b> ${tier.toUpperCase()} (${price})`,
+          `<b>Plan:</b> ${tier.toUpperCase()}`,
           `<b>Username:</b> ${row.username}`,
           '',
-          '💳 Complete your payment below:',
-          `<a href="${payLink}">${payLink}</a>`,
-          '',
-          'Once paid, your account will be activated and credentials sent here automatically.',
+          'Your signup is in the queue! Admin will reach out with payment details and activate your account shortly.',
           '━━━━━━━━━━━━━━━━━━━━━━',
           '📩 Questions? Message @Boss_G',
         ].join('\n');
         await pfBotSend(chatId, dm);
 
-        // Notify admin
-        await pfBotSend(ADMIN_CHAT_ID, `💰 <b>PAYMENT LINK SENT</b>\n<b>User:</b> ${row.username}\n<b>Tier:</b> ${tier.toUpperCase()}\n<i>User received Ziina link via bot.</i>`);
+        // Notify admin user is on Telegram and ready
+        await pfBotSend(ADMIN_CHAT_ID, `📬 <b>USER ON TELEGRAM</b>\n<b>User:</b> ${row.username}\n<b>Tier:</b> ${tier.toUpperCase()}\n<b>Chat ID:</b> ${chatId}\n<i>Ready to receive payment link.</i>`);
       } else if (row) {
         await pfBotSend(chatId, '🐼 Your request is being processed. You\'ll receive your credentials here soon.');
       } else {
