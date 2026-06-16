@@ -5,8 +5,10 @@ const PF_BOT_TOKEN = process.env.PF_BOT_TOKEN || '';
 const ADMIN_CHAT_ID = process.env.PF_ADMIN_CHAT || '';
 const FREE_TABS = ['overview','signals','calendar','calculator','cot'];
 
-// Payment links — update once pricing is finalized
-// const PAYMENT_LINKS = { pro: '...', elite: '...' };
+const PAYMENT_LINKS = {
+  pro:   'https://pay.ziina.com/PandaEngine/SrakUhZyl?source=app',
+  elite: 'https://pay.ziina.com/PandaEngine/SrakUhZyl?source=app',
+};
 
 // Set TG_WEBHOOK_SECRET in Vercel env vars, then re-register webhook with:
 // https://api.telegram.org/bot<TOKEN>/setWebhook?url=<URL>&secret_token=<SECRET>
@@ -79,14 +81,18 @@ export default async function handler(req, res) {
           .eq('token', token);
 
         const tier = row.tier || 'pro';
+        const payLink = PAYMENT_LINKS[tier] || PAYMENT_LINKS.pro;
+        const price = tier === 'elite' ? '$79/mo' : '$29/mo';
         const dm = [
           '<b>PANDA ENGINE — REQUEST RECEIVED</b>',
           '━━━━━━━━━━━━━━━━━━━━━━',
-          `<b>Plan:</b> ${tier.toUpperCase()}`,
+          `<b>Plan:</b> ${tier.toUpperCase()} (${price})`,
           `<b>Username:</b> ${row.username}`,
           '',
-          'Your signup is in the queue!',
-          'To get approval and payment links, message @panda_engine_alerts_bot',
+          '💳 <b>Complete your payment to activate:</b>',
+          `<a href="${payLink}">${payLink}</a>`,
+          '',
+          'Once paid, your account will be activated and credentials sent here automatically.',
           '━━━━━━━━━━━━━━━━━━━━━━',
         ].join('\n');
         await pfBotSend(chatId, dm);
