@@ -6,8 +6,10 @@ const PF_APPROVE_BOT_TOKEN = process.env.PF_APPROVE_BOT_TOKEN || PF_BOT_TOKEN;
 const PF_ADMIN_CHAT = process.env.PF_ADMIN_CHAT || '';
 
 const PF_PAYMENT_LINKS = {
-  pro:   'https://pay.ziina.com/PandaEngine/SrakUhZyl?source=app',
-  elite: 'https://pay.ziina.com/PandaEngine/SrakUhZyl?source=app',
+  pro:            'https://pay.ziina.com/PandaEngine/T-57VTBVN?source=app',
+  elite:          'https://pay.ziina.com/PandaEngine/iCPVN84Mw?source=app',
+  pro_lifetime:   'https://pay.ziina.com/PandaEngine/qaur8a9nV?source=app',
+  elite_lifetime: 'https://pay.ziina.com/PandaEngine/YJrPnZIsG?source=app',
 };
 
 function pfGenPassword() { return 'Panda#' + Math.floor(1000 + Math.random() * 9000); }

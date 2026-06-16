@@ -6,8 +6,10 @@ const ADMIN_CHAT_ID = process.env.PF_ADMIN_CHAT || '';
 const FREE_TABS = ['signals','calculator'];
 
 const PAYMENT_LINKS = {
-  pro:   'https://pay.ziina.com/PandaEngine/SrakUhZyl?source=app',
-  elite: 'https://pay.ziina.com/PandaEngine/SrakUhZyl?source=app',
+  pro:            'https://pay.ziina.com/PandaEngine/T-57VTBVN?source=app',
+  elite:          'https://pay.ziina.com/PandaEngine/iCPVN84Mw?source=app',
+  pro_lifetime:   'https://pay.ziina.com/PandaEngine/qaur8a9nV?source=app',
+  elite_lifetime: 'https://pay.ziina.com/PandaEngine/YJrPnZIsG?source=app',
 };
 
 // Set TG_WEBHOOK_SECRET in Vercel env vars, then re-register webhook with:

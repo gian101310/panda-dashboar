@@ -15,12 +15,12 @@ const TIERS = [
   {
     name: 'PRO', price: '99', period: '/mo', sub: 'or $3,499 one-time (lifetime)', color: '#00ff9f', tag: 'MOST POPULAR',
     features: ['Everything in Starter, plus:', 'Panel tab', 'Full data table', 'Valid setups tab', 'Panda AI assistant', 'Research tab'],
-    cta: 'GO PRO →', href: '/login',
+    cta: 'GO PRO →', href: 'https://pay.ziina.com/PandaEngine/T-57VTBVN?source=app',
   },
   {
     name: 'ELITE', price: '699', period: '/mo', sub: 'or $4,999 one-time (lifetime)', color: '#00b4ff', tag: 'FULL ACCESS',
     features: ['Everything in Pro, plus:', 'Overview tab', 'Signal logs tab', 'Valid pairs filter', 'Telegram signal alerts', 'Spike signal alerts', 'Private trading journal', 'Chart tab', 'MT4/MT5 Panda Indicators', 'Bias detection indicators'],
-    cta: 'GO ELITE →', href: '/login',
+    cta: 'GO ELITE →', href: 'https://pay.ziina.com/PandaEngine/iCPVN84Mw?source=app',
   },
 ];
 export default function PricingPage() {
