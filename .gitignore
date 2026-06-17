@@ -36,7 +36,3 @@ Thumbs.db
 snapshot.png
 snapshot_send.png
 .vercel
-
-# Private download artifacts
-public/downloads/scoring.ex4
-public/downloads/bias-detection.ex4
