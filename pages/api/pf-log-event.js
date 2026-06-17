@@ -1,8 +1,6 @@
 import { supabase } from '../../lib/supabase';
+import { getSecurityAlertConfig } from '../../lib/securityAlert.mjs';
 import crypto from 'crypto';
-
-const ADMIN_BOT = process.env.PF_BOT_TOKEN || '';
-const ADMIN_CHAT = process.env.PF_ADMIN_CHAT || '';
 
 const FLAGS = {
   LOGIN_SUCCESS:        ['🆕 First Login'],
@@ -68,10 +66,15 @@ async function pfSendAdminAlert(evt, meta, flags, priority) {
     flags.length ? flags.join('  ') : '',
   ].filter(Boolean).join('\n');
   try {
-    await fetch(`https://api.telegram.org/bot${ADMIN_BOT}/sendMessage`, {
+    const { token, chatId } = getSecurityAlertConfig();
+    if (!token || !chatId) {
+      console.error('pf_alert_err missing LOGIN_ALERT_BOT_TOKEN or LOGIN_ALERT_CHAT_ID');
+      return;
+    }
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: ADMIN_CHAT, text: msg, parse_mode: 'HTML', disable_web_page_preview: true })
+      body: JSON.stringify({ chat_id: chatId, text: msg, parse_mode: 'HTML', disable_web_page_preview: true })
     });
   } catch(e) { console.error('pf_alert_err', e); }
 }
