@@ -68,7 +68,7 @@ async function pfSendAdminAlert(evt, meta, flags, priority) {
   try {
     const { token, chatId } = getSecurityAlertConfig();
     if (!token || !chatId) {
-      console.error('pf_alert_err missing LOGIN_ALERT_BOT_TOKEN or LOGIN_ALERT_CHAT_ID');
+      console.error('pf_alert_err missing PF_APPROVE_BOT_TOKEN or PF_ADMIN_CHAT');
       return;
     }
     await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {

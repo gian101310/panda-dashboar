@@ -3,22 +3,21 @@ import { test } from 'node:test';
 
 import { getSecurityAlertConfig } from '../lib/securityAlert.mjs';
 
-test('getSecurityAlertConfig uses dedicated login alert bot config', () => {
+test('getSecurityAlertConfig uses approved-user bot config', () => {
   const config = getSecurityAlertConfig({
-    LOGIN_ALERT_BOT_TOKEN: 'alert-bot-token',
-    LOGIN_ALERT_CHAT_ID: 'alert-chat-id',
+    PF_APPROVE_BOT_TOKEN: 'approve-bot-token',
     PF_BOT_TOKEN: 'signup-bot-token',
-    PF_ADMIN_CHAT: 'signup-chat-id',
+    PF_ADMIN_CHAT: 'admin-chat-id',
   });
 
-  assert.deepEqual(config, { token: 'alert-bot-token', chatId: 'alert-chat-id' });
+  assert.deepEqual(config, { token: 'approve-bot-token', chatId: 'admin-chat-id' });
 });
 
-test('getSecurityAlertConfig does not fall back to signup bot config', () => {
+test('getSecurityAlertConfig does not fall back to signup bot token', () => {
   const config = getSecurityAlertConfig({
     PF_BOT_TOKEN: 'signup-bot-token',
     PF_ADMIN_CHAT: 'signup-chat-id',
   });
 
-  assert.deepEqual(config, { token: '', chatId: '' });
+  assert.deepEqual(config, { token: '', chatId: 'signup-chat-id' });
 });

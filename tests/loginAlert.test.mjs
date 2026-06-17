@@ -3,24 +3,23 @@ import { test } from 'node:test';
 
 import { buildLoginAlertMessage, getLoginAlertConfig, sendLoginAlert } from '../lib/loginAlert.mjs';
 
-test('getLoginAlertConfig does not fall back to signup bot config', () => {
+test('getLoginAlertConfig does not fall back to signup bot token', () => {
   const config = getLoginAlertConfig({
     PF_BOT_TOKEN: 'signup-bot-token',
     PF_ADMIN_CHAT: 'signup-chat-id',
   });
 
-  assert.deepEqual(config, { token: '', chatId: '' });
+  assert.deepEqual(config, { token: '', chatId: 'signup-chat-id' });
 });
 
-test('getLoginAlertConfig uses dedicated login alert config', () => {
+test('getLoginAlertConfig uses approved-user bot config', () => {
   const config = getLoginAlertConfig({
-    LOGIN_ALERT_BOT_TOKEN: 'alert-bot-token',
-    LOGIN_ALERT_CHAT_ID: 'alert-chat-id',
+    PF_APPROVE_BOT_TOKEN: 'approve-bot-token',
     PF_BOT_TOKEN: 'signup-bot-token',
-    PF_ADMIN_CHAT: 'signup-chat-id',
+    PF_ADMIN_CHAT: 'admin-chat-id',
   });
 
-  assert.deepEqual(config, { token: 'alert-bot-token', chatId: 'alert-chat-id' });
+  assert.deepEqual(config, { token: 'approve-bot-token', chatId: 'admin-chat-id' });
 });
 
 test('buildLoginAlertMessage includes dashboard login context', () => {
