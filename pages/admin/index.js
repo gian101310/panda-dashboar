@@ -78,9 +78,9 @@ function Badge({ label, color }) {
 
 function StatCard({ label, value, color }) {
   return (
-    <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 18px', flex: 1, minWidth: 100 }}>
-      <div style={{ fontFamily: mono, fontSize: 9, letterSpacing: 2, color: '#445566', marginBottom: 4 }}>{label}</div>
-      <div style={{ fontFamily: orb, fontSize: 22, fontWeight: 700, color, textShadow: `0 0 10px ${color}55` }}>{value}</div>
+    <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', flex: '0 0 auto', minWidth: 90 }}>
+      <div style={{ fontFamily: mono, fontSize: 9, letterSpacing: 2, color: '#445566', marginBottom: 4, whiteSpace: 'nowrap' }}>{label}</div>
+      <div style={{ fontFamily: orb, fontSize: 20, fontWeight: 700, color, textShadow: `0 0 10px ${color}55` }}>{value}</div>
     </div>
   );
 }
@@ -437,29 +437,29 @@ export default function AdminPanel() {
       <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column' }}>
         <div style={{ position: 'fixed', inset: 0, backgroundImage: 'linear-gradient(rgba(0,180,255,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(0,180,255,0.02) 1px,transparent 1px)', backgroundSize: '40px 40px', pointerEvents: 'none', zIndex: 0 }} />
 
-        <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 24px', background: '#080c18', borderBottom: '1px solid #1a2540', position: 'sticky', top: 0, zIndex: 100 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <header style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', gap: 8, background: '#080c18', borderBottom: '1px solid #1a2540', position: 'sticky', top: 0, zIndex: 100 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: 20 }}>🐼</span>
             <div>
-              <div style={{ fontFamily: orb, fontSize: 13, fontWeight: 900, letterSpacing: 4, color: '#ffd166' }}>ADMIN PANEL</div>
-              <div style={{ fontFamily: mono, fontSize: 8, letterSpacing: 3, color: '#2a3550' }}>PANDA ENGINE · USER CONTROL</div>
+              <div style={{ fontFamily: orb, fontSize: 12, fontWeight: 900, letterSpacing: 3, color: '#ffd166' }}>ADMIN PANEL</div>
+              <div style={{ fontFamily: mono, fontSize: 8, letterSpacing: 3, color: '#2a3550' }}>PANDA ENGINE</div>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
             <span style={{ fontFamily: mono, fontSize: 9, color: '#2a3550' }}>👤 {adminUser?.username}</span>
-            <button onClick={() => window.location.href = '/dashboard'} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(0,255,159,0.08)', border: '1px solid #00ff9f44', borderRadius: 6, color: '#00ff9f', fontFamily: mono, fontSize: 9, letterSpacing: 2, padding: '6px 14px', cursor: 'pointer' }}>📊 DASHBOARD</button>
-            <button style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(255,209,102,0.15)', border: '1px solid #ffd166', borderRadius: 6, color: '#ffd166', fontFamily: mono, fontSize: 9, letterSpacing: 2, padding: '6px 14px', cursor: 'default' }}>🛡️ ADMIN</button>
-            <button onClick={() => window.location.href = '/admin/license'} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(0,180,255,0.10)', border: '1px solid #00b4ff44', borderRadius: 6, color: '#00b4ff', fontFamily: mono, fontSize: 9, letterSpacing: 2, padding: '6px 14px', cursor: 'pointer' }}>LICENSE</button>
-            <button onClick={() => window.location.href = '/admin/pf-approvals'} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(0,180,255,0.10)', border: '1px solid #00b4ff44', borderRadius: 6, color: '#00b4ff', fontFamily: mono, fontSize: 9, letterSpacing: 2, padding: '6px 14px', cursor: 'pointer' }}>✅ APPROVALS</button>
-            <button onClick={async () => { await fetch('/api/logout', { method: 'POST' }); window.location.href = '/login'; }} style={{ background: 'transparent', border: '1px solid #2a1525', borderRadius: 6, color: '#ff4d6d', fontFamily: mono, fontSize: 9, padding: '6px 12px', cursor: 'pointer' }}>LOGOUT</button>
+            <button onClick={() => window.location.href = '/dashboard'} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(0,255,159,0.08)', border: '1px solid #00ff9f44', borderRadius: 6, color: '#00ff9f', fontFamily: mono, fontSize: 8, letterSpacing: 1, padding: '5px 10px', cursor: 'pointer' }}>📊 DASH</button>
+            <button style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(255,209,102,0.15)', border: '1px solid #ffd166', borderRadius: 6, color: '#ffd166', fontFamily: mono, fontSize: 8, letterSpacing: 1, padding: '5px 10px', cursor: 'default' }}>🛡️ ADMIN</button>
+            <button onClick={() => window.location.href = '/admin/license'} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(0,180,255,0.10)', border: '1px solid #00b4ff44', borderRadius: 6, color: '#00b4ff', fontFamily: mono, fontSize: 8, letterSpacing: 1, padding: '5px 10px', cursor: 'pointer' }}>LICENSE</button>
+            <button onClick={() => window.location.href = '/admin/pf-approvals'} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(0,180,255,0.10)', border: '1px solid #00b4ff44', borderRadius: 6, color: '#00b4ff', fontFamily: mono, fontSize: 8, letterSpacing: 1, padding: '5px 10px', cursor: 'pointer' }}>✅ APPROVE</button>
+            <button onClick={async () => { await fetch('/api/logout', { method: 'POST' }); window.location.href = '/login'; }} style={{ background: 'transparent', border: '1px solid #2a1525', borderRadius: 6, color: '#ff4d6d', fontFamily: mono, fontSize: 8, padding: '5px 10px', cursor: 'pointer' }}>LOGOUT</button>
           </div>
         </header>
 
-        <div style={{ display: 'flex', gap: 8, padding: '12px 24px', zIndex: 1 }}>
+        <div style={{ display: 'flex', gap: 8, padding: '12px 16px', zIndex: 1, overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'thin' }}>
           <StatCard label="TOTAL USERS" value={users.length} color="#00b4ff" />
           <StatCard label="ACTIVE" value={totalActive} color="#00ff9f" />
           {/* Online now — clickable */}
-          <div onClick={() => setShowOnline(v => !v)} style={{ background: 'var(--bg-secondary)', border: `1px solid ${onlineUsers.length > 0 ? '#00ff9f33' : 'var(--border)'}`, borderRadius: 8, padding: '12px 18px', flex: 1, minWidth: 100, cursor: 'pointer', position: 'relative' }}>
+          <div onClick={() => setShowOnline(v => !v)} style={{ background: 'var(--bg-secondary)', border: `1px solid ${onlineUsers.length > 0 ? '#00ff9f33' : 'var(--border)'}`, borderRadius: 8, padding: '10px 14px', flex: '0 0 auto', minWidth: 90, cursor: 'pointer', position: 'relative' }}>
             <div style={{ fontFamily: mono, fontSize: 9, letterSpacing: 2, color: '#445566', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
               {onlineUsers.length > 0 && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#00ff9f', boxShadow: '0 0 6px #00ff9f', display: 'inline-block' }} />}
               ONLINE NOW
@@ -484,7 +484,7 @@ export default function AdminPanel() {
           <StatCard label="DISABLED" value={users.length - totalActive} color="#ff4d6d" />
           <StatCard label="⏰ EXPIRING" value={expiringSoon} color={expiringSoon > 0 ? '#ffd166' : '#2a3550'} />
           {/* Global Telegram Kill Switch */}
-          <div onClick={toggleTgGlobal} style={{ background: 'var(--bg-secondary)', border: `1px solid ${tgGlobalEnabled ? '#00b4ff33' : '#ff4d6d33'}`, borderRadius: 8, padding: '12px 18px', flex: 1, minWidth: 130, cursor: tgToggleLoading ? 'wait' : 'pointer', display: 'flex', flexDirection: 'column', justifyContent: 'center', opacity: tgToggleLoading ? 0.6 : 1 }}>
+          <div onClick={toggleTgGlobal} style={{ background: 'var(--bg-secondary)', border: `1px solid ${tgGlobalEnabled ? '#00b4ff33' : '#ff4d6d33'}`, borderRadius: 8, padding: '10px 14px', flex: '0 0 auto', minWidth: 110, cursor: tgToggleLoading ? 'wait' : 'pointer', display: 'flex', flexDirection: 'column', justifyContent: 'center', opacity: tgToggleLoading ? 0.6 : 1 }}>
             <div style={{ fontFamily: mono, fontSize: 9, letterSpacing: 2, color: '#445566', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
               <span>📢 TG ALERTS</span>
             </div>
@@ -508,7 +508,7 @@ export default function AdminPanel() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 24px 12px', zIndex: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 16px 12px', zIndex: 1, flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', background: '#080c18', border: '1px solid var(--border)', borderRadius: 7, overflow: 'hidden' }}>
             {['USERS', 'SESSIONS', 'LOGS'].map((t, i) => (
               <a key={t} href={`/admin?tab=${t.toLowerCase()}`} onClick={(e) => { e.preventDefault(); setTab(t); }} style={{ background: tab === t ? 'rgba(255,209,102,0.12)' : 'transparent', border: 'none', borderRight: i < 2 ? '1px solid #1a2540' : 'none', color: tab === t ? '#ffd166' : '#445566', fontFamily: mono, fontSize: 9, letterSpacing: 2, padding: '7px 16px', cursor: 'pointer', textDecoration: 'none', display: 'inline-block' }}>{t}</a>
@@ -519,7 +519,7 @@ export default function AdminPanel() {
           {tab === 'SESSIONS' && <button onClick={loadSessions} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 5, color: '#00b4ff', fontFamily: mono, fontSize: 9, padding: '7px 12px', cursor: 'pointer' }}>⟳ REFRESH</button>}
         </div>
 
-        <div style={{ flex: 1, padding: '0 24px 24px', zIndex: 1, overflowX: 'auto' }}>
+        <div style={{ flex: 1, padding: '0 16px 24px', zIndex: 1, overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
           {tab === 'USERS' && (
             <table style={{ width: '100%', borderCollapse: 'collapse', background: '#080c18', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
               <thead>
@@ -625,11 +625,24 @@ export default function AdminPanel() {
           )}
         </div>
 
-        <div style={{ fontFamily: mono, fontSize: 9, letterSpacing: 2, color: '#2a3550', textAlign: 'center', padding: '8px 24px', borderTop: '1px solid #1a2540' }}>
+        <div style={{ fontFamily: mono, fontSize: 9, letterSpacing: 2, color: '#2a3550', textAlign: 'center', padding: '8px 16px', borderTop: '1px solid #1a2540' }}>
           PANDA ENGINE ADMIN · {users.length} USERS · {totalSessions} ACTIVE SESSIONS
         </div>
       </div>
-      <style>{`button:hover{opacity:0.8;} input:focus,select:focus{outline:none;border-color:#00b4ff!important;} select option{background:#06080f;} input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(0.5);}`}</style>
+      <style>{`
+        button:hover{opacity:0.8;}
+        input:focus,select:focus{outline:none;border-color:#00b4ff!important;}
+        select option{background:#06080f;}
+        input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(0.5);}
+        /* Mobile scrollbar */
+        ::-webkit-scrollbar{height:4px;}
+        ::-webkit-scrollbar-track{background:transparent;}
+        ::-webkit-scrollbar-thumb{background:#1a2540;border-radius:2px;}
+        /* Ensure tables scroll horizontally on mobile */
+        @media(max-width:768px){
+          table{min-width:700px;}
+        }
+      `}</style>
     </>
   );
 }
