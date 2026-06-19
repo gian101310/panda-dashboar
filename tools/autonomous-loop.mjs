@@ -137,6 +137,13 @@ async function sendTelegramNotification(message) {
     console.log('NOTIFY_SKIP | No Telegram credentials configured');
     return false;
   }
+  // Check global kill switch
+  try {
+    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+    const { data } = await supabase.from('engine_config').select('value').eq('key', 'telegram_notifications_enabled').single();
+    if (data?.value === 'false') { console.log('NOTIFY_SKIP | Global Telegram alerts disabled'); return false; }
+  } catch {}
+
   try {
     const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
     const res = await fetch(url, {

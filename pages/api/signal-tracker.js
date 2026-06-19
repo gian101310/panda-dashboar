@@ -291,9 +291,12 @@ export default async function handler(req, res) {
           const delta = totalSignals - (lastAgent[0].sample_size || 0);
           if (delta > 50) {
             agentStale = true;
+            // Check global Telegram kill switch before sending
+            const { data: tgToggle } = await supabase.from('engine_config').select('value').eq('key', 'telegram_notifications_enabled').single();
+            const tgEnabled = tgToggle?.value !== 'false';
             const TG_TOKEN = process.env.TELEGRAM_TOKEN || '';
             const TG_CHAT = process.env.TELEGRAM_CHAT_ID || '';
-            if (TG_TOKEN && TG_CHAT) {
+            if (tgEnabled && TG_TOKEN && TG_CHAT) {
               await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
                 method:'POST', headers:{'Content-Type':'application/json'},
                 body: JSON.stringify({ chat_id: TG_CHAT, text: `⚠️ Signal Agent stale — ${delta} new signals since last run. Re-run agents.` })

@@ -21,6 +21,17 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, skipped: 'market_closed', sent: [] });
   }
 
+  // Global kill switch
+  const { data: globalToggle } = await supabase
+    .from('engine_config')
+    .select('value')
+    .eq('key', 'telegram_notifications_enabled')
+    .single();
+
+  if (globalToggle?.value === 'false') {
+    return res.status(200).json({ ok: true, skipped: 'notifications_disabled', sent: [] });
+  }
+
   const text = buildSignalAlertText({ symbol, gap, bias, momentum, strength, type });
   if (!text) return res.status(400).json({ error: 'Unsupported alert type' });
 

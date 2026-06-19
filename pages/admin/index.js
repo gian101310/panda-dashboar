@@ -338,6 +338,8 @@ export default function AdminPanel() {
   const [adminUser, setAdminUser] = useState(null);
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [showOnline, setShowOnline] = useState(false);
+  const [tgGlobalEnabled, setTgGlobalEnabled] = useState(true);
+  const [tgToggleLoading, setTgToggleLoading] = useState(false);
 
   const loadUsers = useCallback(async () => {
     const res = await fetch('/api/admin/users');
@@ -368,6 +370,19 @@ export default function AdminPanel() {
     if (tab === 'SESSIONS') loadSessions();
     if (tab === 'LOGS') loadLogs(logFilter);
   }, [tab, logFilter, loadSessions, loadLogs]);
+
+  // Fetch global Telegram toggle
+  useEffect(() => {
+    fetch('/api/admin/telegram-toggle').then(r => r.json()).then(d => setTgGlobalEnabled(d.enabled)).catch(() => {});
+  }, []);
+
+  async function toggleTgGlobal() {
+    setTgToggleLoading(true);
+    const newVal = !tgGlobalEnabled;
+    await fetch('/api/admin/telegram-toggle', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: newVal }) });
+    setTgGlobalEnabled(newVal);
+    setTgToggleLoading(false);
+  }
 
   // Poll online users every 30s
   useEffect(() => {
@@ -468,6 +483,29 @@ export default function AdminPanel() {
           <StatCard label="SESSIONS" value={totalSessions} color="#ff9944" />
           <StatCard label="DISABLED" value={users.length - totalActive} color="#ff4d6d" />
           <StatCard label="⏰ EXPIRING" value={expiringSoon} color={expiringSoon > 0 ? '#ffd166' : '#2a3550'} />
+          {/* Global Telegram Kill Switch */}
+          <div onClick={toggleTgGlobal} style={{ background: 'var(--bg-secondary)', border: `1px solid ${tgGlobalEnabled ? '#00b4ff33' : '#ff4d6d33'}`, borderRadius: 8, padding: '12px 18px', flex: 1, minWidth: 130, cursor: tgToggleLoading ? 'wait' : 'pointer', display: 'flex', flexDirection: 'column', justifyContent: 'center', opacity: tgToggleLoading ? 0.6 : 1 }}>
+            <div style={{ fontFamily: mono, fontSize: 9, letterSpacing: 2, color: '#445566', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span>📢 TG ALERTS</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{
+                background: tgGlobalEnabled ? 'rgba(0,180,255,0.15)' : 'rgba(255,77,109,0.08)',
+                border: `1px solid ${tgGlobalEnabled ? '#00b4ff55' : '#ff4d6d44'}`,
+                borderRadius: 20, width: 44, height: 22, position: 'relative', transition: 'all 0.2s', flexShrink: 0
+              }}>
+                <div style={{
+                  width: 16, height: 16, borderRadius: '50%',
+                  background: tgGlobalEnabled ? '#00b4ff' : '#ff4d6d',
+                  boxShadow: `0 0 6px ${tgGlobalEnabled ? '#00b4ff55' : '#ff4d6d55'}`,
+                  position: 'absolute', top: 2,
+                  left: tgGlobalEnabled ? 24 : 3,
+                  transition: 'all 0.2s'
+                }} />
+              </div>
+              <span style={{ fontFamily: orb, fontSize: 13, fontWeight: 700, color: tgGlobalEnabled ? '#00b4ff' : '#ff4d6d' }}>{tgGlobalEnabled ? 'ON' : 'OFF'}</span>
+            </div>
+          </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 24px 12px', zIndex: 1 }}>
