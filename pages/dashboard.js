@@ -3450,7 +3450,7 @@ export default function Dashboard() {
                 <span style={{fontFamily:mono,fontSize:9,color:pageVis.bypass_enabled?'#00ff9f':'#ff4d6d',letterSpacing:1,fontWeight:700}}>BYPASS {pageVis.bypass_enabled?'ON':'OFF'}</span>
               </div>
             </div>
-            {pageVis.bypass_enabled&&<div style={{fontFamily:mono,fontSize:9,color:'#00ff9f',marginBottom:8,letterSpacing:1}}>✅ BYPASS ON — All pages open to visitors. Toggle individual pages below to override even with bypass.</div>}
+            {pageVis.bypass_enabled&&<div style={{fontFamily:mono,fontSize:9,color:'#00ff9f',marginBottom:8,letterSpacing:1}}>✅ BYPASS ON — All controlled pages are open. Individual switches are saved but take effect only when bypass is OFF.</div>}
             {!pageVis.bypass_enabled&&<div style={{fontFamily:mono,fontSize:9,color:'#ff4d6d',marginBottom:8,letterSpacing:1}}>🔒 BYPASS OFF — Only toggled-ON pages are visible. Disabled pages show "Coming Soon".</div>}
             <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
               {PAGES.map(pg=>{

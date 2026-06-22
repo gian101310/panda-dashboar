@@ -5,6 +5,7 @@ import {
   DEFAULT_PAGE_VISIBILITY,
   getPageAccessDecision,
   normalizePageVisibility,
+  ROUTE_TO_PAGE_KEY,
 } from '../lib/pageVisibility.mjs';
 
 test('normalizePageVisibility keeps all public pages open by default', () => {
@@ -61,4 +62,9 @@ test('administrators bypass maintenance and disabled public pages', () => {
     }),
     'allow',
   );
+});
+
+test('maps every dashboard-controlled public route', () => {
+  assert.equal(ROUTE_TO_PAGE_KEY['/guardian'], 'guardian');
+  assert.equal(ROUTE_TO_PAGE_KEY['/stream'], 'stream');
 });

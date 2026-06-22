@@ -50,9 +50,6 @@ function ComingSoonScreen() {
 
 export default function App({ Component, pageProps }) {
   const router = useRouter();
-  const [maintenance, setMaintenance] = useState(false);
-  const [canBypass, setCanBypass] = useState(false);
-  const [pageBlocked, setPageBlocked] = useState(false);
   const [checked, setChecked] = useState(false);
   const [accessDecision, setAccessDecision] = useState('checking');
 
@@ -88,10 +85,6 @@ export default function App({ Component, pageProps }) {
           const mData = await mRes.json();
           maintenanceEnabled = mData.maintenance === true;
         }
-        if (maintenanceEnabled) {
-          setMaintenance(true);
-          if (hasMaintBypass) setCanBypass(true);
-        }
       } catch {}
 
       // 3) Page visibility check (only for public-facing pages)
@@ -101,13 +94,6 @@ export default function App({ Component, pageProps }) {
           if (pvRes.ok) {
             const pv = await pvRes.json();
             visibility = pv;
-            // If bypass is ON, all pages are open
-            if (!pv.bypass_enabled) {
-              // Bypass OFF — check individual page toggle
-              if (pv[pageKey] === false) {
-                setPageBlocked(true);
-              }
-            }
           }
         } catch {}
       }
@@ -126,14 +112,9 @@ export default function App({ Component, pageProps }) {
     checkAccess();
   }, [router.pathname]);
 
-  // Still checking — show nothing (prevents flash)
   if (!checked || accessDecision === 'checking') return null;
   if (accessDecision === 'maintenance') return <MaintenanceScreen />;
   if (accessDecision === 'coming_soon') return <ComingSoonScreen />;
-
-  // Maintenance is on, user can NOT bypass, and NOT on login page
-
-  // Page is toggled OFF for visitors
 
   return <Component {...pageProps} />;
 }
