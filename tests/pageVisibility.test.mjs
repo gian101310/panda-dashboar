@@ -50,3 +50,15 @@ test('page controls apply only when global bypass is off', () => {
     'allow',
   );
 });
+
+test('administrators bypass maintenance and disabled public pages', () => {
+  assert.equal(
+    getPageAccessDecision({
+      isAdmin: true,
+      maintenanceEnabled: true,
+      pageKey: 'login',
+      visibility: { login: false, bypass_enabled: false },
+    }),
+    'allow',
+  );
+});

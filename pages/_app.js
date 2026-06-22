@@ -2,7 +2,11 @@ import '../styles/globals.css';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
-import { ROUTE_TO_PAGE_KEY } from '../lib/pageVisibility.mjs';
+import {
+  DEFAULT_PAGE_VISIBILITY,
+  getPageAccessDecision,
+  ROUTE_TO_PAGE_KEY,
+} from '../lib/pageVisibility.mjs';
 
 function MaintenanceScreen() {
   return (
@@ -50,17 +54,22 @@ export default function App({ Component, pageProps }) {
   const [canBypass, setCanBypass] = useState(false);
   const [pageBlocked, setPageBlocked] = useState(false);
   const [checked, setChecked] = useState(false);
+  const [accessDecision, setAccessDecision] = useState('checking');
 
   useEffect(() => {
     // Skip checks for API routes (they handle their own auth)
     if (router.pathname.startsWith('/api')) {
       setChecked(true);
+      setAccessDecision('allow');
       return;
     }
 
     async function checkAccess() {
       let isAdmin = false;
       let hasMaintBypass = false;
+      let maintenanceEnabled = false;
+      let visibility = DEFAULT_PAGE_VISIBILITY;
+      const pageKey = ROUTE_TO_PAGE_KEY[router.pathname];
 
       // 1) Check who the user is (if logged in)
       try {
@@ -72,34 +81,26 @@ export default function App({ Component, pageProps }) {
         }
       } catch {}
 
-      // Admins skip ALL gates
-      if (isAdmin) {
-        setChecked(true);
-        return;
-      }
-
       // 2) Maintenance check
       try {
         const mRes = await fetch('/api/maintenance');
-        const mData = await mRes.json();
-        if (mData.maintenance) {
+        if (mRes.ok) {
+          const mData = await mRes.json();
+          maintenanceEnabled = mData.maintenance === true;
+        }
+        if (maintenanceEnabled) {
           setMaintenance(true);
           if (hasMaintBypass) setCanBypass(true);
-          // If maintenance is on and user can't bypass, stop here
-          if (!hasMaintBypass) {
-            setChecked(true);
-            return;
-          }
         }
       } catch {}
 
       // 3) Page visibility check (only for public-facing pages)
-      const pageKey = ROUTE_TO_PAGE_KEY[router.pathname];
       if (pageKey) {
         try {
           const pvRes = await fetch('/api/page-visibility-public');
           if (pvRes.ok) {
             const pv = await pvRes.json();
+            visibility = pv;
             // If bypass is ON, all pages are open
             if (!pv.bypass_enabled) {
               // Bypass OFF — check individual page toggle
@@ -111,24 +112,28 @@ export default function App({ Component, pageProps }) {
         } catch {}
       }
 
+      setAccessDecision(getPageAccessDecision({
+        isAdmin,
+        hasMaintenanceBypass: hasMaintBypass,
+        maintenanceEnabled,
+        pageKey,
+        visibility,
+      }));
       setChecked(true);
     }
 
+    setAccessDecision('checking');
     checkAccess();
   }, [router.pathname]);
 
   // Still checking — show nothing (prevents flash)
-  if (!checked) return null;
+  if (!checked || accessDecision === 'checking') return null;
+  if (accessDecision === 'maintenance') return <MaintenanceScreen />;
+  if (accessDecision === 'coming_soon') return <ComingSoonScreen />;
 
   // Maintenance is on, user can NOT bypass, and NOT on login page
-  if (maintenance && !canBypass && router.pathname !== '/login') {
-    return <MaintenanceScreen />;
-  }
 
   // Page is toggled OFF for visitors
-  if (pageBlocked && router.pathname !== '/login') {
-    return <ComingSoonScreen />;
-  }
 
   return <Component {...pageProps} />;
 }
