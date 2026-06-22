@@ -66,7 +66,9 @@ export default function App({ Component, pageProps }) {
       let hasMaintBypass = false;
       let maintenanceEnabled = false;
       let visibility = DEFAULT_PAGE_VISIBILITY;
+      let hasAdminLoginAccess = false;
       const pageKey = ROUTE_TO_PAGE_KEY[router.pathname];
+      const isAdminMaintenanceEntry = router.pathname === '/admin-login';
 
       // 1) Check who the user is (if logged in)
       try {
@@ -87,6 +89,16 @@ export default function App({ Component, pageProps }) {
         }
       } catch {}
 
+      if (pageKey === 'login') {
+        try {
+          const accessRes = await fetch('/api/admin-maintenance-access');
+          if (accessRes.ok) {
+            const accessData = await accessRes.json();
+            hasAdminLoginAccess = accessData.allowed === true;
+          }
+        } catch {}
+      }
+
       // 3) Page visibility check (only for public-facing pages)
       if (pageKey) {
         try {
@@ -98,9 +110,10 @@ export default function App({ Component, pageProps }) {
         } catch {}
       }
 
-      setAccessDecision(getPageAccessDecision({
+      setAccessDecision(isAdminMaintenanceEntry ? 'allow' : getPageAccessDecision({
         isAdmin,
         hasMaintenanceBypass: hasMaintBypass,
+        hasAdminLoginAccess,
         maintenanceEnabled,
         pageKey,
         visibility,
