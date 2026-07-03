@@ -1,12 +1,20 @@
 import { supabase } from '../../lib/supabase';
 import { validateSession } from '../../lib/auth';
 
+// Module-level cache — trends are same for all users, refresh only every 20s
+let _cache = { trends: null, ts: 0 };
+const CACHE_TTL_MS = 20_000;
+
 export default async function handler(req, res) {
   const token = req.cookies?.panda_session;
   const session = await validateSession(token);
   if (!session) return res.status(401).json({ error: 'Unauthorized' });
 
   try {
+    if (_cache.trends && (Date.now() - _cache.ts) < CACHE_TTL_MS) {
+      return res.status(200).json(_cache.trends);
+    }
+
     // Get last 32 entries per symbol = 8 hours of 15min data
     const { data, error } = await supabase
       .from('strength_log')
@@ -125,6 +133,7 @@ export default async function handler(req, res) {
       };
     }
 
+    _cache = { trends, ts: Date.now() };
     return res.status(200).json(trends);
   } catch (err) {
     return res.status(500).json({ error: err.message });

@@ -886,7 +886,12 @@ function EngineHealth() {
   const [health,setHealth]=useState(null);
   const [loading,setLoading]=useState(true);
   const load=useCallback(async()=>{setLoading(true);try{const res=await fetch('/api/engine-health');if(res.ok) setHealth(await res.json());}catch{}setLoading(false);},[]);
-  useEffect(()=>{load();const t=setInterval(load,30000);return()=>clearInterval(t);},[load]);
+  useEffect(()=>{
+    load();
+    const tick=()=>{ if(typeof document!=='undefined' && document.visibilityState==='hidden') return; load(); };
+    const t=setInterval(tick,60000);
+    return()=>clearInterval(t);
+  },[load]);
   if(loading) return <div style={{textAlign:'center',padding:60,fontFamily:mono,fontSize:10,color:'var(--text-muted)',letterSpacing:3}}>LOADING ENGINE STATUS...</div>;
   if(!health) return <div style={{textAlign:'center',padding:60,fontFamily:mono,fontSize:10,color:'#ff4d6d'}}>ENGINE HEALTH UNAVAILABLE</div>;
   const statusColor=health.isAlive?'#00ff9f':'#ff4d6d';
@@ -1557,7 +1562,8 @@ function OpenTradesPanel() {
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 30000);
+    const tick=()=>{ if(typeof document!=='undefined' && document.visibilityState==='hidden') return; load(); };
+    const t = setInterval(tick, 60000);
     return () => clearInterval(t);
   }, [load]);
 
@@ -2911,7 +2917,7 @@ function SignalAnalytics() {
 
       {/* STRATEGY FILTER */}
       <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
-        {['ALL','BB','INTRA'].map(st=>(
+        {['ALL','BB','INTRA','PANDA'].map(st=>(
           <button key={st} onClick={()=>setStratFilter(st)} style={{fontFamily:mono,fontSize:9,padding:'4px 12px',borderRadius:4,border:`1px solid ${stratFilter===st?'#00b4ff':'var(--border)'}`,background:stratFilter===st?'rgba(0,180,255,0.15)':'var(--bg-card)',color:stratFilter===st?'#00b4ff':'var(--text-muted)',cursor:'pointer',letterSpacing:2}}>{st}</button>
         ))}
         <select value={pairFilter} onChange={e=>setPairFilter(e.target.value)} style={{fontFamily:mono,fontSize:9,padding:'4px 8px',borderRadius:4,border:'1px solid var(--border)',background:'var(--bg-card)',color:'var(--text-primary)',cursor:'pointer',letterSpacing:1}}>
@@ -3271,8 +3277,18 @@ export default function Dashboard() {
     const t = setInterval(fetchNews, 5 * 60 * 1000);
     return () => clearInterval(t);
   },[]);
-  useEffect(()=>{const t=setInterval(()=>fetchData(true),15000);return()=>clearInterval(t);},[fetchData]);
-  useEffect(()=>{const t=setInterval(fetchSpikes,15000);fetchSpikes();return()=>clearInterval(t);},[fetchSpikes]);
+  // Polling — paused when tab hidden to save Vercel Fluid CPU
+  useEffect(()=>{
+    const tick=()=>{ if(typeof document!=='undefined' && document.visibilityState==='hidden') return; fetchData(true); };
+    const t=setInterval(tick,30000);
+    return()=>clearInterval(t);
+  },[fetchData]);
+  useEffect(()=>{
+    const tick=()=>{ if(typeof document!=='undefined' && document.visibilityState==='hidden') return; fetchSpikes(); };
+    const t=setInterval(tick,30000);
+    fetchSpikes();
+    return()=>clearInterval(t);
+  },[fetchSpikes]);
   useEffect(()=>{if(tab==='RESEARCH'&&cotData.length===0) fetchCot();},[tab,cotData.length,fetchCot]);
   useEffect(()=>{fetchCot();},[fetchCot]);
   useEffect(()=>{
@@ -3297,10 +3313,13 @@ export default function Dashboard() {
     if(res.ok) setMaintenance(next);
   }
 
-  // Heartbeat — ping every 60s so admin can see who's online
+  // Heartbeat — ping every 2 min so admin can see who's online (skips when tab hidden)
   useEffect(()=>{
     fetch('/api/heartbeat',{method:'POST'}).catch(()=>{});
-    const hb=setInterval(()=>fetch('/api/heartbeat',{method:'POST'}).catch(()=>{}),60000);
+    const hb=setInterval(()=>{
+      if(typeof document!=='undefined' && document.visibilityState==='hidden') return;
+      fetch('/api/heartbeat',{method:'POST'}).catch(()=>{});
+    },120000);
     return()=>clearInterval(hb);
   },[]);
 
