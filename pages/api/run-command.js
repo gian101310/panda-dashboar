@@ -31,10 +31,20 @@ const ALLOWED_COMMANDS = [
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
 
-  const token = req.cookies?.panda_session;
-  const session = await validateSession(token);
-  if (!session) return res.status(401).json({ error: 'Unauthorized' });
-  if (session.panda_users?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+  // Block on Vercel — exec() only works locally
+  if (process.env.VERCEL) {
+    return res.status(400).json({ error: 'Commands only work on localhost. Open http://localhost:3001/guardian' });
+  }
+
+  // Skip auth on localhost, require admin on production
+  const host = req.headers.host || '';
+  const isLocal = host.startsWith('localhost') || host.startsWith('127.0.0.1');
+  if (!isLocal) {
+    const token = req.cookies?.panda_session;
+    const session = await validateSession(token);
+    if (!session) return res.status(401).json({ error: 'Unauthorized' });
+    if (session.panda_users?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+  }
 
   const { command } = req.body || {};
   if (!command) return res.status(400).json({ error: 'command required' });

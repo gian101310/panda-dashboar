@@ -790,6 +790,64 @@ def check_bb_entry(symbol, gap, scores, pl_data, momentum="", parsed=None):
     log_signal(symbol, direction, gap, "BB", price, scores, pl_data, momentum, parsed)
 
 
+def check_panda_entry(symbol, gap, scores, pl_data, momentum="", parsed=None):
+    """
+    PANDA strategy — data-refined BB with multi-layer pre-filters (forward test).
+    Based on signal performance analysis of 3,260 signals.
+
+    ENTRY FILTERS (all must pass):
+    1. Gap crosses from <6 to >=6 (skip gap-5 noise — 45.6% WR vs 47.4% at gap 6)
+    2. Session: ASIAN or NEW_YORK only (London = -272 pips historical)
+    3. A-tier pairs only (proven positive EV: 48%+ WR and net positive pips)
+    4. Blacklist negative-EV pairs (CADJPY -330p, AUDCAD -196p, AUDUSD -154p)
+    5. Momentum: must be STRONG, BUILDING, or SPARK (expanding/igniting momentum)
+       — skip FADING/REVERSING/COOLING (decaying signals) and NEUTRAL
+    6. Box H4 alignment: H4 box trend must match direction (UPTREND for BUY, DOWNTREND for SELL)
+       — structural confirmation that higher-timeframe price action agrees
+    7. No Panda Lines requirement (data: 46.92% confirmed vs 46.64% unconfirmed = non-factor)
+    """
+    PANDA_A_TIER = {"EURAUD", "AUDJPY", "EURNZD", "NZDUSD", "GBPUSD", "EURJPY"}
+    PANDA_BLACKLIST = {"CADJPY", "AUDCAD", "AUDUSD"}
+    PANDA_GOOD_MOMENTUM = {"STRONG", "BUILDING", "SPARK"}
+
+    # 1. Gap threshold crossover
+    prev = PREV_GAP.get(symbol, 0)
+    if abs(prev) >= 6 or abs(gap) < 6:
+        return
+
+    # 2. Pair filter
+    if symbol in PANDA_BLACKLIST or symbol not in PANDA_A_TIER:
+        return
+
+    # 3. Session filter
+    session = get_session()
+    if session == "LONDON":
+        return
+
+    # 4. Neutral matchup filter
+    if is_neutral_matchup(scores.get("base_score", 0), scores.get("quote_score", 0)):
+        return
+
+    # 5. Momentum filter — only enter on expanding/igniting momentum
+    if momentum not in PANDA_GOOD_MOMENTUM:
+        return
+
+    # 6. Box H4 alignment — structural confirmation
+    direction = "BUY" if gap >= 6 else "SELL"
+    boxes = parsed.get("boxes", []) if parsed else []
+    _, box_h4 = compute_box_trends(boxes)
+    expected_box = "UPTREND" if direction == "BUY" else "DOWNTREND"
+    if box_h4 != expected_box:
+        return
+
+    # 7. No duplicate PENDING
+    if has_pending_signal(symbol, "PANDA"):
+        return
+
+    price = pl_data.get("pl_price")
+    log_signal(symbol, direction, gap, "PANDA", price, scores, pl_data, momentum, parsed)
+
+
 def check_intra_entry(symbol, gap, scores, pl_data, momentum="", parsed=None):
     """
     INTRA (Intraday) strategy entry:
@@ -880,6 +938,22 @@ def evaluate_pending_signals(all_scores, all_pl_map):
             # INTRA: hard close at 10AM UAE (06:00 UTC) — no exceptions
             if now.hour >= 6 and now.hour < 22:
                 exit_reason = "INTRA_10AM_CLOSE"
+        elif strategy == "PANDA":
+            # PANDA exits: same as BB + 16h flat timeout
+            if abs_gap < 5:
+                exit_reason = "BIAS_FLIP"
+            elif drop_from_peak >= 2:
+                exit_reason = "MOMENTUM_LOSS"
+            else:
+                # 16h flat exit — if held >16h and pips between -5 and +5, close as FLAT
+                try:
+                    created = sig.get("created_at", "")
+                    entry_time = datetime.fromisoformat(created.replace("Z", "+00:00").replace("+00:00", ""))
+                    age_hours = (now.replace(tzinfo=None) - entry_time.replace(tzinfo=None)).total_seconds() / 3600
+                    if age_hours >= 16 and -5 <= pips <= 5:
+                        exit_reason = "FLAT_TIMEOUT_16H"
+                except Exception:
+                    pass
         else:
             # BB exits
             if abs_gap < 5:
@@ -1154,10 +1228,11 @@ def run_gap_once():
                     "confidence": confidence,
                 })
 
-        # ---- Signal entry: dual strategy (BB + INTRA) ----
+        # ---- Signal entry: triple strategy (BB + INTRA + PANDA) ----
         pl_data = all_pl_map.get(symbol, {})
         check_bb_entry(symbol, gap, scores, pl_data, momentum, parsed)
         check_intra_entry(symbol, gap, scores, pl_data, momentum, parsed)
+        check_panda_entry(symbol, gap, scores, pl_data, momentum, parsed)
 
         # ---- Gap Alert: abs(gap) 9–12 + valid Panda Lines ----
         _abs_gap = abs(gap)

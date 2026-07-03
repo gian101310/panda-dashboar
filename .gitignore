@@ -36,3 +36,13 @@ Thumbs.db
 snapshot.png
 snapshot_send.png
 .vercel
+
+# Private download artifacts
+public/downloads/scoring.ex4
+public/downloads/bias-detection.ex4
+
+# Watchdog runtime files
+.watchdog.pid
+.watchdog.heartbeat
+.watchdog.stop
+guardian-watchdog.log

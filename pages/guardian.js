@@ -176,6 +176,118 @@ function OutputPanel({ result }) {
   );
 }
 
+function WatchdogPanel({ onCommandResult }) {
+  const [wd, setWd] = useState(null);
+  const [acting, setActing] = useState(false);
+  const [showLog, setShowLog] = useState(false);
+
+  const fetchWd = useCallback(async () => {
+    try {
+      const res = await fetch('/api/watchdog');
+      if (res.ok) setWd(await res.json());
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    fetchWd();
+    const tick = () => { if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return; fetchWd(); };
+    const iv = setInterval(tick, 15000);
+    return () => clearInterval(iv);
+  }, [fetchWd]);
+
+  const doAction = async (action) => {
+    setActing(true);
+    try {
+      const res = await fetch('/api/watchdog', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+      const data = await res.json();
+      if (action === 'logs') {
+        setWd(w => w ? { ...w, log: data.log } : w);
+        setShowLog(true);
+      } else {
+        await fetchWd();
+      }
+    } catch {}
+    setActing(false);
+  };
+
+  const running = wd?.running;
+  const statusColor = running ? '#00ff9f' : '#ff4d6d';
+  const statusText = running ? (wd?.isCooldown ? 'RESTARTING' : 'RUNNING') : 'STOPPED';
+  const age = wd?.heartbeatAgeSec;
+  const ageTxt = age != null ? (age < 60 ? `${age}s ago` : `${Math.round(age / 60)}m ago`) : '—';
+
+  return (
+    <div style={{ background: 'rgba(8,14,28,0.92)', border: `1px solid ${statusColor}33`, borderRadius: 8, padding: 14, marginBottom: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{
+            width: 10, height: 10, borderRadius: '50%',
+            background: statusColor,
+            boxShadow: running ? `0 0 8px ${statusColor}` : 'none',
+            animation: running ? 'pulse 2s infinite' : 'none',
+          }} />
+          <div>
+            <div style={{ fontFamily: orb, fontSize: 13, fontWeight: 900, color: statusColor, letterSpacing: 2 }}>
+              WATCHDOG {statusText}
+            </div>
+            <div style={{ fontFamily: mono, fontSize: 9, color: 'rgba(200,221,240,0.5)', marginTop: 2 }}>
+              Heartbeat: {ageTxt} {wd?.isCooldown ? '(cooldown)' : ''}
+            </div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {!running && (
+            <button onClick={() => doAction('start')} disabled={acting} style={{
+              background: 'rgba(0,255,159,0.12)', border: '1px solid #00ff9f', borderRadius: 6,
+              padding: '8px 16px', color: '#00ff9f', fontFamily: mono, fontSize: 10, fontWeight: 700,
+              cursor: 'pointer',
+            }}>
+              {acting ? '...' : '▶ START'}
+            </button>
+          )}
+          {running && (
+            <button onClick={() => doAction('stop')} disabled={acting} style={{
+              background: 'rgba(255,77,109,0.12)', border: '1px solid #ff4d6d', borderRadius: 6,
+              padding: '8px 16px', color: '#ff4d6d', fontFamily: mono, fontSize: 10, fontWeight: 700,
+              cursor: 'pointer',
+            }}>
+              {acting ? '...' : '⏹ STOP'}
+            </button>
+          )}
+          <button onClick={() => { setShowLog(s => !s); if (!showLog) doAction('logs'); }} style={{
+            background: 'rgba(0,180,255,0.08)', border: '1px solid rgba(0,180,255,0.35)', borderRadius: 6,
+            padding: '8px 12px', color: '#00b4ff', fontFamily: mono, fontSize: 10, fontWeight: 700,
+            cursor: 'pointer',
+          }}>
+            {showLog ? '▲ HIDE' : '▼ LOGS'}
+          </button>
+        </div>
+      </div>
+
+      {showLog && wd?.log && (
+        <pre style={{
+          fontFamily: mono, fontSize: 9, color: 'rgba(200,221,240,0.65)', margin: 0,
+          background: 'rgba(0,0,0,0.3)', borderRadius: 6, padding: 10,
+          whiteSpace: 'pre-wrap', maxHeight: 250, overflow: 'auto',
+        }}>
+          {wd.log}
+        </pre>
+      )}
+
+      <style jsx>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.4; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 export default function GuardianPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -289,6 +401,9 @@ export default function GuardianPage() {
           </div>
         </div>
 
+        {/* WATCHDOG PANEL */}
+        <WatchdogPanel onCommandResult={setCmdResult} />
+
         {loading && <div style={{ fontFamily: mono, color: 'rgba(200,221,240,0.5)' }}>Loading...</div>}
 
         {!loading && (
@@ -380,6 +495,11 @@ export default function GuardianPage() {
 }
 
 export async function getServerSideProps({ req }) {
+  // Skip auth on localhost — Guardian commands only work locally anyway
+  const host = req.headers.host || '';
+  if (host.startsWith('localhost') || host.startsWith('127.0.0.1')) {
+    return { props: {} };
+  }
   const session = await requireAdmin(req);
   if (!session) {
     return {
