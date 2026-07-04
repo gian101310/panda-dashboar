@@ -136,13 +136,15 @@ function computePhase(row, pdr) {
   const utcH = new Date().getUTCHours();
   const asian = utcH >= 22 || utcH < 6;
 
+  const igniting = mom === 'SPARK' || mom === 'BUILDING' || mom === 'EMERGING';
   let phase;
   if (state.startsWith('DEEP_PULLBACK')) phase = { label: '⚠ TREND AT RISK', color: '#ff4d6d', tip: 'Deep pullback — trend may be ending. No new entries.' };
   else if (state.startsWith('PULLBACK')) phase = { label: '🎯 PULLBACK ZONE', color: '#ffd166', tip: 'Healthy pullback inside a valid trend — this is the continuation entry window, not chasing.' };
   else if (fading) phase = { label: "🌙 LATE — DON'T CHASE", color: '#ffaa44', tip: 'Momentum fading — the move is mature. Entering here is chasing.' };
+  else if (igniting && ag <= 9) phase = { label: '🚀 START — CATCHING', color: '#00ff9f', tip: 'Momentum igniting (SPARK/BUILDING) with gap still early — catching the start of the trend.' };
   else if (state.startsWith('EXPAND') && ag <= 9) phase = { label: '🚀 START — CATCHING', color: '#00ff9f', tip: 'Fresh expansion, gap still early — catching the start of the trend.' };
-  else if (state.startsWith('EXPAND')) phase = { label: '🔥 MID — RIDING', color: '#00b4ff', tip: 'Established trend still expanding — good for holders, be selective adding new.' };
-  else if (ag >= 12) phase = { label: '🌙 EXTENDED', color: '#ffaa44', tip: 'Gap stretched — much of the move may be done. Wait for a pullback.' };
+  else if (igniting || state.startsWith('EXPAND')) phase = { label: '🔥 MID — RIDING', color: '#00b4ff', tip: 'Established trend still pushing — good for holders, be selective adding new.' };
+  else if (ag >= 12) phase = { label: '🌙 EXTENDED', color: '#ffaa44', tip: 'Gap at the top of the valid range (5–12) — much of the move may be done. Wait for a pullback.' };
   else phase = withTrend
     ? { label: '🔥 MID — RIDING', color: '#00b4ff', tip: 'Trend intact and gap holding with direction.' }
     : { label: '⏸ STALLING', color: '#6b7280', tip: 'Gap not making progress — wait for expansion or a pullback.' };
@@ -170,6 +172,36 @@ function PhaseBadge({ row, pdr }) {
         {p.checks.map(c=>(<span key={c.k} style={{fontFamily:monoF,fontSize:7,color:c.ok?'#00ff9f':'#6b7280',background:c.ok?'rgba(0,255,159,0.08)':'rgba(107,114,128,0.08)',border:`1px solid ${c.ok?'#00ff9f30':'#6b728030'}`,borderRadius:3,padding:'1px 5px',letterSpacing:0.5}}>{c.ok?'✓':'○'} {c.k}</span>))}
         {p.continuation && <span title="Valid bias + strong aligned PDR + Asian session — your continuation checklist is complete." style={{fontFamily:monoF,fontSize:8,color:'#ffd166',background:'rgba(255,209,102,0.12)',border:'1px solid rgba(255,209,102,0.4)',borderRadius:3,padding:'1px 6px',fontWeight:700,letterSpacing:0.5,cursor:'help'}}>★ CONTINUATION SETUP</span>}
       </div>
+    </div>
+  );
+}
+
+// ===== PHASE LEGEND (fixed banner under Overview) =====
+const PHASE_LEGEND = [
+  { icon: '🚀', name: 'START — CATCHING', color: '#00ff9f', what: 'Gap fresh (5–9) and momentum igniting (SPARK/BUILDING) or expanding.', action: 'Best entries live here. You are catching the start, not chasing.' },
+  { icon: '🔥', name: 'MID — RIDING', color: '#00b4ff', what: 'Trend established and still pushing with direction.', action: 'Good for trades already open. Be selective adding new — prefer a pullback.' },
+  { icon: '🎯', name: 'PULLBACK ZONE', color: '#ffd166', what: 'Healthy pullback inside a valid trend.', action: 'Your continuation entry window. With ✓ PDR + ✓ ASIAN this is the A+ setup.' },
+  { icon: '🌙', name: "LATE — DON'T CHASE", color: '#ffaa44', what: 'Momentum FADING/COOLING — the move is mature.', action: 'No new entries. Entering here is chasing the end of the move.' },
+  { icon: '🌙', name: 'EXTENDED', color: '#ffaa44', what: 'Gap at the top of the valid 5–12 range.', action: 'Most of the move may be done. Wait for the pullback instead.' },
+  { icon: '⚠', name: 'TREND AT RISK', color: '#ff4d6d', what: 'Deep pullback — trend structure breaking down.', action: 'Stand aside. Existing trades: consider tightening or closing.' },
+  { icon: '⏸', name: 'STALLING', color: '#6b7280', what: 'Valid gap but no progress either way.', action: 'Wait for expansion or a pullback before acting.' },
+];
+
+function PhaseLegend({ isMobile }) {
+  const monoF = "'Share Tech Mono',monospace";
+  return (
+    <div style={{marginTop:14,background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:10,padding:'12px 14px'}}>
+      <div style={{fontFamily:"'Orbitron',sans-serif",fontSize:11,fontWeight:700,letterSpacing:2,color:'var(--text-secondary)',marginBottom:8}}>PHASE GUIDE — WHERE AM I IN THE TREND?</div>
+      <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(auto-fit,minmax(280px,1fr))',gap:8}}>
+        {PHASE_LEGEND.map(p=>(
+          <div key={p.name} style={{display:'flex',flexDirection:'column',gap:3,background:'rgba(0,0,0,0.15)',border:`1px solid ${p.color}25`,borderRadius:7,padding:'8px 10px'}}>
+            <span style={{fontFamily:monoF,fontSize:10,color:p.color,fontWeight:700,letterSpacing:0.5}}>{p.icon} {p.name}</span>
+            <span style={{fontFamily:monoF,fontSize:9,color:'var(--text-muted)',lineHeight:1.45}}>{p.what}</span>
+            <span style={{fontFamily:monoF,fontSize:9,color:'var(--text-secondary)',lineHeight:1.45}}>👉 {p.action}</span>
+          </div>
+        ))}
+      </div>
+      <div style={{fontFamily:monoF,fontSize:9,color:'var(--text-muted)',marginTop:8,lineHeight:1.5}}>Checklist chips on each card: <span style={{color:'#00ff9f'}}>✓ BIAS</span> gap in valid 5–12 range · <span style={{color:'#00ff9f'}}>✓ PDR</span> yesterday closed strong in your direction · <span style={{color:'#00ff9f'}}>✓ ASIAN</span> Asian session live. All three + a catchable phase = <span style={{color:'#ffd166',fontWeight:700}}>★ CONTINUATION SETUP</span>.</div>
     </div>
   );
 }
@@ -3617,7 +3649,7 @@ export default function Dashboard() {
               <span style={{fontFamily:mono,fontSize:12,letterSpacing:3,color:'var(--text-muted)'}}>LOADING...</span>
             </div>
 ):tab==='OVERVIEW'?(
-<OverviewTab data={data} trends={trends} pdrData={pdrData} upcomingNews={upcomingNews} spikes={spikes} confidenceMap={confidenceMap} memoryIndex={memoryIndex} onSelectPair={setSelectedPair} isMobile={isMobile} lastUpdate={lastUpdate}/>
+<><OverviewTab data={data} trends={trends} pdrData={pdrData} upcomingNews={upcomingNews} spikes={spikes} confidenceMap={confidenceMap} memoryIndex={memoryIndex} onSelectPair={setSelectedPair} isMobile={isMobile} lastUpdate={lastUpdate}/><PhaseLegend isMobile={isMobile}/></>
           ):tab==='PANELS'?(
             displayed.length===0
               ?<div style={{textAlign:'center',padding:60,fontFamily:mono,fontSize:11,letterSpacing:3,color:'var(--text-muted)'}}>NO PAIRS MATCH</div>
