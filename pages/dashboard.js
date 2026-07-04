@@ -120,6 +120,60 @@ function PdrBadge({ pdr }) {
   );
 }
 
+// ===== TREND PHASE (catching vs riding vs chasing) =====
+// Combines structural state + momentum + gap trajectory + PDR into one
+// entry-timing answer. Read-only view logic — no locked formulas touched.
+function computePhase(row, pdr) {
+  const gap = row.gap ?? 0, ag = Math.abs(gap);
+  if (ag < 5 || row.hard_invalid) return null;
+  const dir = gap > 0 ? 'BUY' : 'SELL';
+  const state = row.state || '';
+  const mom = row.momentum || '';
+  const dm = row.delta_mid ?? 0;
+  const withTrend = dir === 'BUY' ? dm > 0 : dm < 0;
+  const fading = mom === 'FADING' || mom === 'COOLING' || mom === 'REVERSING' || mom === 'REVERSAL';
+  const pdrAligned = !!(pdr && pdr.strong && ((dir === 'BUY' && pdr.direction === 'BULLISH') || (dir === 'SELL' && pdr.direction === 'BEARISH')));
+  const utcH = new Date().getUTCHours();
+  const asian = utcH >= 22 || utcH < 6;
+
+  let phase;
+  if (state.startsWith('DEEP_PULLBACK')) phase = { label: '⚠ TREND AT RISK', color: '#ff4d6d', tip: 'Deep pullback — trend may be ending. No new entries.' };
+  else if (state.startsWith('PULLBACK')) phase = { label: '🎯 PULLBACK ZONE', color: '#ffd166', tip: 'Healthy pullback inside a valid trend — this is the continuation entry window, not chasing.' };
+  else if (fading) phase = { label: "🌙 LATE — DON'T CHASE", color: '#ffaa44', tip: 'Momentum fading — the move is mature. Entering here is chasing.' };
+  else if (state.startsWith('EXPAND') && ag <= 9) phase = { label: '🚀 START — CATCHING', color: '#00ff9f', tip: 'Fresh expansion, gap still early — catching the start of the trend.' };
+  else if (state.startsWith('EXPAND')) phase = { label: '🔥 MID — RIDING', color: '#00b4ff', tip: 'Established trend still expanding — good for holders, be selective adding new.' };
+  else if (ag >= 12) phase = { label: '🌙 EXTENDED', color: '#ffaa44', tip: 'Gap stretched — much of the move may be done. Wait for a pullback.' };
+  else phase = withTrend
+    ? { label: '🔥 MID — RIDING', color: '#00b4ff', tip: 'Trend intact and gap holding with direction.' }
+    : { label: '⏸ STALLING', color: '#6b7280', tip: 'Gap not making progress — wait for expansion or a pullback.' };
+
+  const checks = [
+    { k: 'BIAS', ok: true },
+    { k: 'PDR', ok: pdrAligned },
+    { k: 'ASIAN', ok: asian },
+  ];
+  const continuation = pdrAligned && asian && (phase.label.includes('PULLBACK') || phase.label.includes('START') || phase.label.includes('MID'));
+  return { ...phase, dir, checks, continuation, pdrAligned, asian };
+}
+
+function PhaseBadge({ row, pdr }) {
+  const p = computePhase(row, pdr);
+  if (!p) return null;
+  const monoF = "'Share Tech Mono',monospace";
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:3,marginTop:2}}>
+      <div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}>
+        <span style={{fontFamily:monoF,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>PHASE</span>
+        <span title={p.tip} style={{fontFamily:monoF,fontSize:9,color:p.color,background:p.color+'14',border:`1px solid ${p.color}40`,borderRadius:4,padding:'1px 7px',fontWeight:700,cursor:'help',letterSpacing:0.5}}>{p.label}</span>
+      </div>
+      <div style={{display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>
+        {p.checks.map(c=>(<span key={c.k} style={{fontFamily:monoF,fontSize:7,color:c.ok?'#00ff9f':'#6b7280',background:c.ok?'rgba(0,255,159,0.08)':'rgba(107,114,128,0.08)',border:`1px solid ${c.ok?'#00ff9f30':'#6b728030'}`,borderRadius:3,padding:'1px 5px',letterSpacing:0.5}}>{c.ok?'✓':'○'} {c.k}</span>))}
+        {p.continuation && <span title="Valid bias + strong aligned PDR + Asian session — your continuation checklist is complete." style={{fontFamily:monoF,fontSize:8,color:'#ffd166',background:'rgba(255,209,102,0.12)',border:'1px solid rgba(255,209,102,0.4)',borderRadius:3,padding:'1px 6px',fontWeight:700,letterSpacing:0.5,cursor:'help'}}>★ CONTINUATION SETUP</span>}
+      </div>
+    </div>
+  );
+}
+
 // ===== BOX TREND DETECTION =====
 function boxTrend(trend) {
   if (!trend || trend === 'UNKNOWN') return null;
@@ -994,6 +1048,7 @@ function PairCard({ row, trend, cotBias, confidence, memoryIndex, pdr, newsAlert
         </div>
         <Sparkline data={t.history} color={sparkColor}/>
       </div>
+      <PhaseBadge row={row} pdr={pdr}/>
       {(()=>{const mu=getMatchup(row);if(!mu)return null;return(<div style={{display:'flex',alignItems:'center',gap:6,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>MATCHUP</span><span style={{fontFamily:mono,fontSize:9,color:mu.color,background:mu.color+'12',border:`1px solid ${mu.color}30`,borderRadius:4,padding:'1px 7px',whiteSpace:'nowrap'}}>{mu.label}</span>{mu.note==='IDEAL'&&<span style={{fontFamily:mono,fontSize:7,color:mu.color,letterSpacing:1,opacity:0.8}}>IDEAL</span>}{mu.note==='AVOID'&&<span style={{fontFamily:mono,fontSize:7,color:'#ffaa44',letterSpacing:1,opacity:0.8}}>AVOID</span>}</div>);})()}
       {(()=>{const bh1=boxTrend(row.box_h1_trend),bh4=boxTrend(row.box_h4_trend);if(!bh1&&!bh4)return null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>BOX</span>{bh4&&<span style={{fontFamily:mono,fontSize:8,color:bh4.color,background:bh4.bg,border:`1px solid ${bh4.border}`,borderRadius:3,padding:'1px 6px'}}>H4 {bh4.label}</span>}{bh1&&<span style={{fontFamily:mono,fontSize:8,color:bh1.color,background:bh1.bg,border:`1px solid ${bh1.border}`,borderRadius:3,padding:'1px 6px'}}>H1 {bh1.label}</span>}</div>);})()}
       {(()=>{ const pl=plZoneBadge(row.pl_zone,row.bias); if(!pl)return null; const plTip=pl.valid?'Panda Lines confirmed: Panda Lines agree with gap direction. This is the price confirmation layer.':'Panda Lines not confirmed: price structure does not yet agree with gap direction. Wait for alignment or use as additional caution.'; return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>PL</span><span title={plTip} style={{fontFamily:mono,fontSize:8,color:pl.color,background:pl.bg,border:`1px solid ${pl.border}`,borderRadius:3,padding:'1px 6px',fontWeight:700,cursor:'help'}}>{pl.label}</span>{pl.valid&&<span style={{fontFamily:mono,fontSize:7,color:'#00ff9f',letterSpacing:1}}>✅</span>}{!pl.valid&&<span style={{fontFamily:mono,fontSize:7,color:'#ff7744',letterSpacing:1}}>⛔</span>}</div>);})()}{(()=>{
@@ -1168,6 +1223,11 @@ function PairCardModal({ row, trend, cotBias, onClose, isMobile, confidence, mem
           <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2}}>PDR</span>
           <PdrBadge pdr={pdr}/>
         </div>}
+
+        {/* Trend Phase */}
+        <div style={{padding:'8px 12px',background:'rgba(0,0,0,0.15)',borderRadius:8}}>
+          <PhaseBadge row={row} pdr={pdr}/>
+        </div>
 
         {/* Pullback Entry Zones — Nearest S/R + SL */}
         {(()=>{const isBuy=bias.label==='BUY',isSell=bias.label==='SELL';if(!isBuy&&!isSell)return null;const price=row.pl_price;if(!price)return null;const isJpy=row.symbol?.includes('JPY');const dec=isJpy?3:5;const pip=isJpy?0.01:0.0001;const fmt=v=>v!=null?Number(v).toFixed(dec):'—';const toPips=v=>Math.round(Math.abs(v)/pip);const entryColor=isBuy?'#00ff9f':'#ff4d6d';

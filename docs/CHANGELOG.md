@@ -4,6 +4,21 @@
 
 ---
 
+## Jul 4, 2026 — Trend Phase Indicator + Shadow Tracker
+
+**Data analysis session:** full factor analysis of 4,170 BB signals — edge concentrates at |gap|≥9 (peak-gap ≥9 trades: +3,566 net pips; <9: −1,696), TBG-aligned + LONDON positive, NEW_YORK negative, FADING momentum negative. April profitable, May–Jul negative (regime-dependent).
+
+**Dashboard (dashboard.js):**
+- New `computePhase()` + `PhaseBadge` — PHASE line on every PairCard and PairCardModal: START—CATCHING / MID—RIDING / PULLBACK ZONE / LATE—DON'T CHASE / EXTENDED / TREND AT RISK, derived from state + momentum + delta_mid + gap. View-only; no locked formulas touched.
+- Continuation checklist chips on cards: BIAS / PDR / ASIAN, with ★ CONTINUATION SETUP when all conditions met (Boss-G's continuation play: valid bias + strong aligned PDR + Asian session).
+
+**Engine (app.py, local — not in this repo):**
+- Shadow tracker added: logs |gap| tier crossings (9/10/11/12) to new `shadow_tracker` Supabase table independently of BB's concurrent-position rule. Write-only research logger, BB-style exits, DB unique index prevents dupes. Locked scoring untouched.
+
+**Supabase:** new `shadow_tracker` table (migration `create_shadow_tracker`).
+
+---
+
 ## Jun 14, 2026 — Full Repository Audit
 
 **Audit performed by Claude (Cowork). Zero application code modified.**
