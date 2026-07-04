@@ -132,7 +132,10 @@ function computePhase(row, pdr) {
   const dm = row.delta_mid ?? 0;
   const withTrend = dir === 'BUY' ? dm > 0 : dm < 0;
   const fading = mom === 'FADING' || mom === 'COOLING' || mom === 'REVERSING' || mom === 'REVERSAL';
-  const pdrAligned = !!(pdr && pdr.strong && ((dir === 'BUY' && pdr.direction === 'BULLISH') || (dir === 'SELL' && pdr.direction === 'BEARISH')));
+  // Live broker PDR (v2 exporter) preferred; Twelve Data fallback
+  const pdrAligned = row.pdr_dir != null
+    ? !!(row.pdr_strong_live && ((dir === 'BUY' && row.pdr_dir === 'BULLISH') || (dir === 'SELL' && row.pdr_dir === 'BEARISH')))
+    : !!(pdr && pdr.strong && ((dir === 'BUY' && pdr.direction === 'BULLISH') || (dir === 'SELL' && pdr.direction === 'BEARISH')));
   const utcH = new Date().getUTCHours();
   const asian = utcH >= 22 || utcH < 6;
 
@@ -144,10 +147,17 @@ function computePhase(row, pdr) {
   else if (igniting && ag <= 9) phase = { label: '🚀 START — CATCHING', color: '#00ff9f', tip: 'Momentum igniting (SPARK/BUILDING) with gap still early — catching the start of the trend.' };
   else if (state.startsWith('EXPAND') && ag <= 9) phase = { label: '🚀 START — CATCHING', color: '#00ff9f', tip: 'Fresh expansion, gap still early — catching the start of the trend.' };
   else if (igniting || state.startsWith('EXPAND')) phase = { label: '🔥 MID — RIDING', color: '#00b4ff', tip: 'Established trend still pushing — good for holders, be selective adding new.' };
+  else if (row.consolidating === true) phase = { label: '🔵 CONSOLIDATING', color: '#6b7280', tip: 'Price compressed — last 6 hours covered under 25% of an average day. Energy building; wait for the break.' };
   else if (ag >= 12) phase = { label: '🌙 EXTENDED', color: '#ffaa44', tip: 'Gap at the top of the valid range (5–12) — much of the move may be done. Wait for a pullback.' };
   else phase = withTrend
     ? { label: '🔥 MID — RIDING', color: '#00b4ff', tip: 'Trend intact and gap holding with direction.' }
     : { label: '⏸ STALLING', color: '#6b7280', tip: 'Gap not making progress — wait for expansion or a pullback.' };
+
+  // Live ADR check overrides optimistic phases: fuel mostly burned = late, price-confirmed
+  const adrUsed = row.adr_used_pct;
+  if (adrUsed != null && adrUsed >= 70 && (phase.label.includes('START') || phase.label.includes('MID'))) {
+    phase = { label: '🌙 LATE — ADR SPENT', color: '#ffaa44', tip: `Today already used ${Math.round(adrUsed)}% of its average daily range — most of the fuel is burned. Wait for a pullback or the next session.` };
+  }
 
   const checks = [
     { k: 'BIAS', ok: true },
@@ -155,7 +165,7 @@ function computePhase(row, pdr) {
     { k: 'ASIAN', ok: asian },
   ];
   const continuation = pdrAligned && asian && (phase.label.includes('PULLBACK') || phase.label.includes('START') || phase.label.includes('MID'));
-  return { ...phase, dir, checks, continuation, pdrAligned, asian };
+  return { ...phase, dir, checks, continuation, pdrAligned, asian, adrUsed, pullbackPct: row.pullback_pct, livePdr: row.pdr_dir != null };
 }
 
 function PhaseBadge({ row, pdr }) {
@@ -172,6 +182,11 @@ function PhaseBadge({ row, pdr }) {
         {p.checks.map(c=>(<span key={c.k} style={{fontFamily:monoF,fontSize:7,color:c.ok?'#00ff9f':'#6b7280',background:c.ok?'rgba(0,255,159,0.08)':'rgba(107,114,128,0.08)',border:`1px solid ${c.ok?'#00ff9f30':'#6b728030'}`,borderRadius:3,padding:'1px 5px',letterSpacing:0.5}}>{c.ok?'✓':'○'} {c.k}</span>))}
         {p.continuation && <span title="Valid bias + strong aligned PDR + Asian session — your continuation checklist is complete." style={{fontFamily:monoF,fontSize:8,color:'#ffd166',background:'rgba(255,209,102,0.12)',border:'1px solid rgba(255,209,102,0.4)',borderRadius:3,padding:'1px 6px',fontWeight:700,letterSpacing:0.5,cursor:'help'}}>★ CONTINUATION SETUP</span>}
       </div>
+      {(p.adrUsed!=null||p.pullbackPct!=null)&&<div style={{display:'flex',alignItems:'center',gap:6}}>
+        {p.adrUsed!=null&&<span title="How much of an average daily range today has already covered. Above 70% = the move is mostly done for the day." style={{fontFamily:monoF,fontSize:8,color:p.adrUsed>=70?'#ffaa44':'var(--text-muted)',cursor:'help'}}>ADR {Math.round(p.adrUsed)}% used</span>}
+        {p.pullbackPct!=null&&<span title="How far price has retraced from today's extreme in your trade direction. 30-60% = healthy continuation pullback; above 80% = trend failing." style={{fontFamily:monoF,fontSize:8,color:p.pullbackPct>=30&&p.pullbackPct<=60?'#ffd166':'var(--text-muted)',cursor:'help'}}>PB {Math.round(p.pullbackPct)}%</span>}
+        {p.livePdr&&<span title="PDR computed live from your broker's daily candles (v2 exporter)" style={{fontFamily:monoF,fontSize:7,color:'#00ff9f',letterSpacing:0.5}}>LIVE</span>}
+      </div>}
     </div>
   );
 }
@@ -185,6 +200,8 @@ const PHASE_LEGEND = [
   { icon: '🌙', name: 'EXTENDED', color: '#ffaa44', what: 'Gap at the top of the valid 5–12 range.', action: 'Most of the move may be done. Wait for the pullback instead.' },
   { icon: '⚠', name: 'TREND AT RISK', color: '#ff4d6d', what: 'Deep pullback — trend structure breaking down.', action: 'Stand aside. Existing trades: consider tightening or closing.' },
   { icon: '⏸', name: 'STALLING', color: '#6b7280', what: 'Valid gap but no progress either way.', action: 'Wait for expansion or a pullback before acting.' },
+  { icon: '🔵', name: 'CONSOLIDATING', color: '#6b7280', what: 'Price compressed — last 6 hours covered under 25% of an average day.', action: 'Energy is building. Wait for the breakout; do not trade inside the box.' },
+  { icon: '🌙', name: 'LATE — ADR SPENT', color: '#ffaa44', what: 'Today already used 70%+ of its average daily range.', action: 'Fuel is burned. No chasing — wait for a pullback or the next session.' },
 ];
 
 function PhaseLegend({ isMobile }) {
