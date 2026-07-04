@@ -17,6 +17,12 @@
 
 **Supabase:** new `shadow_tracker` table (migration `create_shadow_tracker`).
 
+**Live price context (v2 exporter, same session):**
+- New `Panda_Exporter_v2.mq4` (compiled clean, 0 errors) — adds PDO/PDC, DAYO/DAYH/DAYL, ADR(14), H1R6 lines to tbg files. v1 exporter remains as rollback.
+- app.py: `compute_price_context()` — live PDR (broker candles), ADR-used %, pullback depth %, consolidation flag → dashboard table (6 new columns, migration `dashboard_price_context_v2`).
+- dashboard.js: phase now price-confirmed — LATE—ADR SPENT override (≥70% ADR used), CONSOLIDATING phase (H1R6 < 25% ADR), live PDR preferred over Twelve Data (LIVE tag), ADR/PB metrics line on cards.
+- Telegram snapshot: PDR column added per pair row (▲/▼ strength S/w).
+
 ---
 
 ## Jun 14, 2026 — Full Repository Audit
