@@ -143,30 +143,57 @@ function PdrVerdict({ row, pdr }) {
   );
 }
 
-// ===== TRADE VERDICT (one instruction: what to do right now) =====
-function computeVerdict(row, pdr, t) {
-  const p = computePhase(row, pdr);
-  if (!p) {
-    if (row?.consolidating === true) return { icon: '🔵', txt: 'NO TRADE — WAIT FOR BREAKOUT', hint: 'Price is compressed. Let it pick a direction first.', c: '#6b7280' };
-    return { icon: '⚪', txt: 'NO TRADE — WAIT', hint: 'No valid bias right now.', c: '#6b7280' };
-  }
-  const dir = p.dir;
-  if ((t && t.closeAlert) || p.label.includes('AT RISK')) return { icon: '🔴', txt: 'CLOSE / PROTECT', hint: 'Trend is at risk. No new entries — protect any open trade.', c: '#ff4d6d' };
-  if (p.label.includes('LATE') || p.label.includes('EXTENDED')) return { icon: '🟠', txt: "TOO LATE — DON'T CHASE", hint: 'The move is mature or the daily range is spent. Wait for a fresh setup.', c: '#ffaa44' };
+// ===== TRADE VERDICT (Boss-G execution rules) =====
+// Rule 1: |gap| >= 9 + Panda Lines agree = MARKET EXECUTION. PDR = bonus confirmation only.
+// Rule 2: valid bias (|gap| 5-8.9, or 9+ without PL) = PULLBACK PLAY — never "no trade".
+// Rule 3: live pullback detection — price retraced 30-60% of today's move OR sitting at a Panda Line.
+function isPullbackZoneNow(row, dir) {
   const pb = row?.pullback_pct;
-  if (p.label.includes('PULLBACK')) {
-    if (p.continuation || (p.pdrAligned && pb != null && pb >= 30 && pb <= 60))
-      return { icon: '🟢', txt: `ENTER ${dir} — CONFIRMED PULLBACK`, hint: 'Healthy pullback + yesterday supports the move. Enter at the PB ENTRY level, stop beyond it.', c: '#00ff9f' };
-    return { icon: '🟡', txt: `WATCH ${dir} — PULLBACK FORMING`, hint: 'Wait for price to reach the PB ENTRY level' + (p.pdrAligned ? '.' : ' — PDR not supporting, so smaller size or skip.'), c: '#ffd166' };
+  const pbOk = pb != null && pb >= 30 && pb <= 60;
+  let lineOk = false;
+  const price = row?.pl_price, st = row?.pl_st, fl = row?.pl_fl, atr = row?.atr;
+  if (price && atr && (st != null || fl != null)) {
+    const pip = row.symbol?.includes('JPY') ? 0.01 : 0.0001;
+    const lines = [st, fl].filter(x => x != null);
+    const distPips = Math.min(...lines.map(l => Math.abs(price - l))) / pip;
+    lineOk = distPips <= atr * 0.15; // within 15% of daily ATR of a Panda Line
   }
-  if (p.label.includes('START')) {
-    return p.pdrAligned
-      ? { icon: '🟢', txt: `ENTER ${dir} — CONTINUATION START`, hint: 'Fresh trend and yesterday supports it — best conditions to catch the start.', c: '#00ff9f' }
-      : { icon: '🟡', txt: `EARLY ${dir} — NEEDS CONFIRMATION`, hint: 'Fresh move but yesterday does not support it. Wait for PL confirmation or take reduced size.', c: '#ffd166' };
+  return { now: pbOk || lineOk, pbOk, lineOk, pb };
+}
+
+function computeVerdict(row, pdr, t) {
+  const gap = row?.gap ?? 0;
+  const ag = Math.abs(gap);
+  if (ag < 5 || row?.hard_invalid) {
+    if (row?.consolidating === true) return { icon: '🔵', txt: 'NO TRADE — WAIT FOR BREAKOUT', hint: 'No valid bias and price is compressed. Let it pick a direction first.', c: '#6b7280' };
+    return { icon: '⚪', txt: 'NO TRADE — WAIT', hint: 'No valid bias right now (gap below 5 or hard invalid).', c: '#6b7280' };
   }
-  if (p.label.includes('CONSOLIDATING')) return { icon: '🔵', txt: 'NO TRADE — WAIT FOR BREAKOUT', hint: 'Compressed range — wait for expansion.', c: '#6b7280' };
-  if (p.label.includes('MID')) return { icon: '🔷', txt: `IN TREND ${dir} — WAIT FOR PULLBACK`, hint: 'Trend is running. Holders keep riding; new entries wait for the pullback zone.', c: '#00b4ff' };
-  return { icon: '⚪', txt: 'NO TRADE — WAIT', hint: 'Gap valid but nothing actionable — wait for expansion or a pullback.', c: '#6b7280' };
+  const dir = gap > 0 ? 'BUY' : 'SELL';
+  const p = computePhase(row, pdr) || {};
+  const label = p.label || '';
+  const pdrAligned = !!p.pdrAligned;
+  const pdrNote = pdrAligned ? ' PDR supports — bonus confirmation ✓.' : '';
+
+  // Safety overrides first
+  if ((t && t.closeAlert) || label.includes('AT RISK')) return { icon: '🔴', txt: 'CLOSE / PROTECT', hint: 'Trend is at risk. No new entries — protect any open trade.', c: '#ff4d6d' };
+  if (label.includes('LATE') || label.includes('EXTENDED')) return { icon: '🟠', txt: `${dir} VALID — TOO LATE, WAIT FOR PULLBACK`, hint: 'Bias is valid but the move is mature or the daily range is spent. No market entry — only a pullback re-entry.', c: '#ffaa44' };
+
+  const zone = (row?.pl_zone || '').toUpperCase();
+  const plValid = (dir === 'BUY' && zone === 'ABOVE') || (dir === 'SELL' && zone === 'BELOW');
+  const z = isPullbackZoneNow(row, dir);
+
+  // RULE 1 — market execution
+  if (ag >= 9 && plValid) {
+    return { icon: '🟢', txt: `MARKET EXECUTE ${dir}`, hint: `Gap 9+ with Panda Lines confirmed — market execution rule met.${pdrNote || ' PDR not aligned — still valid, bonus missing.'}`, c: '#00ff9f' };
+  }
+
+  // RULE 2 — pullback play (valid bias, gap 5-8.9, or 9+ without PL confirmation)
+  if (z.now) {
+    const where = z.lineOk && z.pbOk ? 'price is AT the Panda Line and retraced ' + Math.round(z.pb) + '%' : z.lineOk ? 'price is AT the Panda Line' : `retraced ${Math.round(z.pb)}% of today's move`;
+    return { icon: '🟢', txt: `ENTER ${dir} — IN PULLBACK ZONE NOW`, hint: `Bias confirmed and ${where} — this is the pullback area. Market-enter here with stop beyond the line/extreme instead of waiting for a pending order.${pdrNote}`, c: '#00ff9f' };
+  }
+  const pbInfo = z.pb != null ? ` Currently retraced ${Math.round(z.pb)}%.` : '';
+  return { icon: '🟡', txt: `PULLBACK PLAY ${dir} — WAIT FOR ZONE`, hint: `Bias confirmed${ag >= 9 ? ' (gap 9+ but Panda Lines not confirming yet)' : ''} — wait for a 30-60% retrace or a tag of the Panda Line / PB ENTRY level.${pbInfo}${pdrNote}`, c: '#ffd166' };
 }
 
 function VerdictBanner({ row, pdr, t, compact }) {
