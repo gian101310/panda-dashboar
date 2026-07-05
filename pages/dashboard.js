@@ -1415,6 +1415,37 @@ function ValidSetupsTab({ data, trends, cotMap, confidenceMap }) {
       <div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2,marginBottom:4}}>
         {valid.length} VALID SETUP{valid.length!==1?'S':''} · GAP &gt;= 5
       </div>
+      {/* ONE-GLANCE ACTION BOARD */}
+      {(()=>{
+        const groups = { trade: [], pullback: [], watch: [], close: [] };
+        valid.forEach(r=>{
+          const p = computePhase(r, null);
+          if (!p) return;
+          const t2 = trends[r.symbol] || {};
+          if (t2.closeAlert || p.label.includes('AT RISK')) { groups.close.push({r,p}); return; }
+          if (p.label.includes('PULLBACK')) { groups.pullback.push({r,p}); return; }
+          if (p.label.includes('START') || p.continuation) { groups.trade.push({r,p}); return; }
+          if (p.label.includes('LATE') || p.label.includes('EXTENDED')) { groups.watch.push({r,p}); return; }
+        });
+        const box=(title,color,items,hint)=>(
+          <div style={{flex:'1 1 220px',background:'var(--bg-card)',border:`1px solid ${color}30`,borderRadius:10,padding:'10px 12px',minWidth:200}}>
+            <div style={{fontFamily:mono,fontSize:9,color,letterSpacing:1.5,fontWeight:700,marginBottom:6}}>{title} ({items.length})</div>
+            {items.length===0?<span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>none</span>:
+              <div style={{display:'flex',flexWrap:'wrap',gap:5}}>
+                {items.map(({r,p})=><span key={r.symbol} title={p.tip} style={{fontFamily:mono,fontSize:9,color,background:color+'12',border:`1px solid ${color}30`,borderRadius:4,padding:'2px 7px',fontWeight:700,cursor:'help'}}>{r.symbol} {r.gap>0?'+':''}{Number(r.gap).toFixed(0)}{p.continuation?' ★':''}</span>)}
+              </div>}
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',marginTop:6}}>{hint}</div>
+          </div>
+        );
+        return (
+          <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:10}}>
+            {box('✅ READY TO TRADE','#00ff9f',groups.trade,'Catching the start — check the PB ENTRY level, then execute')}
+            {box('🎯 ON PULLBACK','#ffd166',groups.pullback,'Continuation window — enter at the PB ENTRY level · ★ = full checklist')}
+            {box('⚠️ WATCH OUT','#ffaa44',groups.watch,'Late or exhausted — no new entries, wait for reset')}
+            {box('🔴 CLOSE IF OPEN','#ff4d6d',groups.close,'Trend at risk or close alert — protect open trades')}
+          </div>
+        );
+      })()}
       {valid.map(row => {
         const gap = row.gap ?? 0;
         const bias = gap > 0 ? { label:'BUY', color:'#00ff9f', border:'#00ff9f33', bg:'rgba(0,255,159,0.08)' }
@@ -3069,6 +3100,7 @@ const TAB_FEATURE = {
   'ENGINE':      'engine',
   'CHART':       'chart',
   'ANALYTICS':   'analytics',
+  'SHADOW':      'shadow',
   'LOGS':        'signal_log',
   'PANDA AI':    'panda_ai',
 };
@@ -3739,7 +3771,7 @@ export default function Dashboard() {
         {/* TABS */}
         <div style={{display:'flex',alignItems:'center',gap:7,padding:isMobile?'0 12px 10px':'0 20px 10px',flexWrap:'nowrap',overflowX:'auto',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',zIndex:1}}>
           <div style={{display:'flex',background:'var(--bg-secondary)',border:'1px solid var(--border)',borderRadius:7,overflow:'visible',flexShrink:0}}>
-            {TABS.filter(t=>{ const feat=TAB_FEATURE[t]; if(!feat) return true; if(isAdmin) return true; const fa=user?.feature_access||[]; return fa.includes(feat)||fa.includes('dashboard');}).map((t,i,arr)=><a key={t} href={`/dashboard?tab=${t.toLowerCase().replace(/\s+/g,'-')}`} onClick={(e)=>{e.preventDefault();setTab(t);}} style={{background:tab===t?'rgba(0,180,255,0.15)':'rgba(255,255,255,0.03)',border:'none',borderRight:i<TABS.length-1?'1px solid var(--border)':'none',color:tab===t?'#00b4ff':'#c8ddf0',fontFamily:mono,fontSize:9,fontWeight:tab===t?700:500,letterSpacing:2,padding:'7px 12px',cursor:'pointer',whiteSpace:'nowrap',textDecoration:'none',display:'inline-block'}}>{t}</a>)}
+            {TABS.filter(t=>{ const feat=TAB_FEATURE[t]; if(!feat) return true; if(isAdmin) return true; const fa=user?.feature_access||[]; if(t==='SHADOW') return fa.includes('shadow'); return fa.includes(feat)||fa.includes('dashboard');}).map((t,i,arr)=><a key={t} href={`/dashboard?tab=${t.toLowerCase().replace(/\s+/g,'-')}`} onClick={(e)=>{e.preventDefault();setTab(t);}} style={{background:tab===t?'rgba(0,180,255,0.15)':'rgba(255,255,255,0.03)',border:'none',borderRight:i<TABS.length-1?'1px solid var(--border)':'none',color:tab===t?'#00b4ff':'#c8ddf0',fontFamily:mono,fontSize:9,fontWeight:tab===t?700:500,letterSpacing:2,padding:'7px 12px',cursor:'pointer',whiteSpace:'nowrap',textDecoration:'none',display:'inline-block'}}>{t}</a>)}
             {isAdmin&&<a href="/dashboard?tab=engine" onClick={(e)=>{e.preventDefault();setTab('ENGINE');}} style={{background:tab==='ENGINE'?'rgba(255,209,102,0.15)':'rgba(255,255,255,0.03)',border:'none',borderLeft:'1px solid var(--border)',color:tab==='ENGINE'?'#ffd166':'#c8ddf0',fontFamily:mono,fontSize:9,fontWeight:tab==='ENGINE'?700:500,letterSpacing:2,padding:'7px 12px',cursor:'pointer',textDecoration:'none',display:'inline-block'}}>🏥 ENGINE</a>}
           </div>
           {['PANELS','TABLE'].includes(tab)&&(
@@ -3773,7 +3805,7 @@ export default function Dashboard() {
               </div></>
           ):tab==='SETUPS'?(<ValidSetupsTab data={data} trends={trends} cotMap={cotMap} confidenceMap={confidenceMap}/>
 ):tab==='VALID PAIRS'?(<ValidPairsTab data={data} trends={trends} cotMap={cotMap} confidenceMap={confidenceMap}/>
-):tab==='SHADOW'?(
+):tab==='SHADOW'&&(isAdmin||(user?.feature_access||[]).includes('shadow'))?(
 <ShadowTab/>
           ):tab==='SPIKE LOG'||tab==='LOGS'?(
 <div>

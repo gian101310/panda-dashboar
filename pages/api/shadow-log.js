@@ -8,6 +8,12 @@ export default async function handler(req, res) {
   const session = await validateSession(token);
   if (!session) return res.status(401).json({ error: 'Unauthorized' });
 
+  // Shadow tracker is opt-in: admin always, others only with 'shadow' feature
+  const u = session.panda_users || {};
+  if (u.role !== 'admin' && !(u.feature_access || []).includes('shadow')) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
   const { symbol, tier, status, limit = 300 } = req.query;
 
   let query = supabase
