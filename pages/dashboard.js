@@ -143,6 +143,47 @@ function PdrVerdict({ row, pdr }) {
   );
 }
 
+// ===== TRADE VERDICT (one instruction: what to do right now) =====
+function computeVerdict(row, pdr, t) {
+  const p = computePhase(row, pdr);
+  if (!p) {
+    if (row?.consolidating === true) return { icon: '🔵', txt: 'NO TRADE — WAIT FOR BREAKOUT', hint: 'Price is compressed. Let it pick a direction first.', c: '#6b7280' };
+    return { icon: '⚪', txt: 'NO TRADE — WAIT', hint: 'No valid bias right now.', c: '#6b7280' };
+  }
+  const dir = p.dir;
+  if ((t && t.closeAlert) || p.label.includes('AT RISK')) return { icon: '🔴', txt: 'CLOSE / PROTECT', hint: 'Trend is at risk. No new entries — protect any open trade.', c: '#ff4d6d' };
+  if (p.label.includes('LATE') || p.label.includes('EXTENDED')) return { icon: '🟠', txt: "TOO LATE — DON'T CHASE", hint: 'The move is mature or the daily range is spent. Wait for a fresh setup.', c: '#ffaa44' };
+  const pb = row?.pullback_pct;
+  if (p.label.includes('PULLBACK')) {
+    if (p.continuation || (p.pdrAligned && pb != null && pb >= 30 && pb <= 60))
+      return { icon: '🟢', txt: `ENTER ${dir} — CONFIRMED PULLBACK`, hint: 'Healthy pullback + yesterday supports the move. Enter at the PB ENTRY level, stop beyond it.', c: '#00ff9f' };
+    return { icon: '🟡', txt: `WATCH ${dir} — PULLBACK FORMING`, hint: 'Wait for price to reach the PB ENTRY level' + (p.pdrAligned ? '.' : ' — PDR not supporting, so smaller size or skip.'), c: '#ffd166' };
+  }
+  if (p.label.includes('START')) {
+    return p.pdrAligned
+      ? { icon: '🟢', txt: `ENTER ${dir} — CONTINUATION START`, hint: 'Fresh trend and yesterday supports it — best conditions to catch the start.', c: '#00ff9f' }
+      : { icon: '🟡', txt: `EARLY ${dir} — NEEDS CONFIRMATION`, hint: 'Fresh move but yesterday does not support it. Wait for PL confirmation or take reduced size.', c: '#ffd166' };
+  }
+  if (p.label.includes('CONSOLIDATING')) return { icon: '🔵', txt: 'NO TRADE — WAIT FOR BREAKOUT', hint: 'Compressed range — wait for expansion.', c: '#6b7280' };
+  if (p.label.includes('MID')) return { icon: '🔷', txt: `IN TREND ${dir} — WAIT FOR PULLBACK`, hint: 'Trend is running. Holders keep riding; new entries wait for the pullback zone.', c: '#00b4ff' };
+  return { icon: '⚪', txt: 'NO TRADE — WAIT', hint: 'Gap valid but nothing actionable — wait for expansion or a pullback.', c: '#6b7280' };
+}
+
+function VerdictBanner({ row, pdr, t, compact }) {
+  const v = computeVerdict(row, pdr, t);
+  if (!v) return null;
+  const monoF = "'Share Tech Mono',monospace";
+  if (compact) return (
+    <span title={v.hint} style={{fontFamily:monoF,fontSize:9,color:v.c,background:v.c+'14',border:`1px solid ${v.c}40`,borderRadius:4,padding:'2px 8px',fontWeight:700,letterSpacing:0.5,cursor:'help',whiteSpace:'nowrap',display:'inline-block'}}>{v.icon} {v.txt}</span>
+  );
+  return (
+    <div title={v.hint} style={{display:'flex',flexDirection:'column',gap:2,background:v.c+'10',border:`1px solid ${v.c}45`,borderLeft:`3px solid ${v.c}`,borderRadius:6,padding:'6px 10px',cursor:'help'}}>
+      <span style={{fontFamily:monoF,fontSize:10,color:v.c,fontWeight:700,letterSpacing:1}}>{v.icon} {v.txt}</span>
+      <span style={{fontFamily:monoF,fontSize:8,color:'var(--text-muted)',lineHeight:1.35}}>{v.hint}</span>
+    </div>
+  );
+}
+
 // ===== TREND PHASE (catching vs riding vs chasing) =====
 // Combines structural state + momentum + gap trajectory + PDR into one
 // entry-timing answer. Read-only view logic — no locked formulas touched.
@@ -1119,6 +1160,7 @@ function PairCard({ row, trend, cotBias, confidence, memoryIndex, pdr, newsAlert
       {t.closeAlert&&<div style={{background:'rgba(255,77,109,0.1)',border:'1px solid rgba(255,77,109,0.4)',borderRadius:5,padding:'4px 8px',display:'flex',alignItems:'center',gap:5}}><span>⚠️</span><span style={{fontFamily:mono,fontSize:9,color:'#ff4d6d',letterSpacing:1}}>CONSIDER CLOSING</span></div>}
       {newsAlert&&<div style={{background:'rgba(255,209,102,0.08)',border:'1px solid rgba(255,209,102,0.35)',borderRadius:5,padding:'3px 8px',display:'flex',alignItems:'center',gap:5}}><span style={{fontSize:10}}>📰</span><span style={{fontFamily:mono,fontSize:9,color:'#ffd166',letterSpacing:1,fontWeight:700}}>HIGH IMPACT NEWS</span></div>}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}><span style={{fontFamily:orb,fontSize:13,fontWeight:900,letterSpacing:2,color:'var(--text-primary)'}}>{row.symbol}</span><div style={{display:'flex',alignItems:'center',gap:5}}><span style={{fontSize:12}}>{sig.icon}</span><span style={{fontFamily:mono,fontSize:10,color:bias.color,background:bias.bg,border:`1px solid ${bias.border}`,borderRadius:4,padding:'2px 7px',fontWeight:700}}>{bias.label}</span></div></div>
+      <VerdictBanner row={row} pdr={pdr} t={t}/>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
         <div style={{display:'flex',alignItems:'center',gap:6}}>
           <span style={{fontFamily:orb,fontSize:26,fontWeight:900,color:bias.color,textShadow:`0 0 14px ${bias.color}99`,lineHeight:1}}>{gap>0?'+':''}{Number(gap).toFixed(1)}</span>
@@ -1289,6 +1331,9 @@ function PairCardModal({ row, trend, cotBias, onClose, isMobile, confidence, mem
             <span title={edgeTip} style={{fontFamily:mono,fontSize:10,color:fc,background:fc+'12',border:`1px solid ${fc}33`,borderRadius:5,padding:'2px 10px',fontWeight:700,cursor:'help'}}>{icon} {lbl}</span>
             <span style={{fontFamily:mono,fontSize:10,color:'var(--text-muted)'}}>Win:{wrPct}%{resPct!=null?` | Res:${resPct}%`:''} (n={em.sample})</span>
           </div>);})()}
+
+        {/* Trade Verdict */}
+        <VerdictBanner row={row} pdr={pdr} t={trend}/>
 
         {/* Confidence Conflict */}
         {confidence&&confidence.conflict&&<div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',background:'rgba(255,77,109,0.08)',borderRadius:8,border:'1px solid rgba(255,77,109,0.25)'}}>
@@ -1511,6 +1556,7 @@ function ValidSetupsTab({ data, trends, cotMap, confidenceMap }) {
 
             {/* MOMENTUM + ACTION */}
             <div style={{flex:1}}>
+              <div style={{marginBottom:5}}><VerdictBanner row={row} pdr={null} t={t} compact/></div>
               <div style={{fontFamily:mono,fontSize:9,color:t.momentumColor||'var(--text-muted)',background:(t.momentumColor||'var(--text-muted)')+'18',border:`1px solid ${(t.momentumColor||'var(--text-muted)')}30`,borderRadius:4,padding:'2px 8px',display:'inline-block',marginBottom:4}}>{t.momentum||'NEUTRAL'}</div>
               {g && <div style={{fontFamily:mono,fontSize:10,color:g.color,fontWeight:700}}>👉 {g.action}</div>}{(()=>{const mu=getMatchup(row);if(!mu)return null;return(<div style={{fontFamily:mono,fontSize:9,color:mu.color,background:mu.color+'12',border:`1px solid ${mu.color}28`,borderRadius:4,padding:'2px 7px',display:'inline-block',marginTop:3,whiteSpace:'nowrap'}}>{mu.label}{mu.note&&<span style={{marginLeft:5,opacity:0.7,fontSize:8}}>{mu.note}</span>}</div>);})()}
               {(()=>{const bh4=boxTrend(row.box_h4_trend),bh1=boxTrend(row.box_h1_trend);if(!bh4&&!bh1)return null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>BOX</span>{bh4&&<span style={{fontFamily:mono,fontSize:8,color:bh4.color,background:bh4.bg,border:`1px solid ${bh4.border}`,borderRadius:3,padding:'1px 6px'}}>H4 {bh4.label}</span>}{bh1&&<span style={{fontFamily:mono,fontSize:8,color:bh1.color,background:bh1.bg,border:`1px solid ${bh1.border}`,borderRadius:3,padding:'1px 6px'}}>H1 {bh1.label}</span>}</div>);})()}
@@ -1629,6 +1675,7 @@ function ValidPairsTab({ data, trends, cotMap, confidenceMap }) {
           <div style={{fontFamily:"'Orbitron',sans-serif",fontSize:22,fontWeight:900,color:bias.color,lineHeight:1}}>{gap>0?'+':''}{Number(gap).toFixed(0)}</div>
         </div>
         <div style={{flex:1,display:'flex',flexDirection:'column',gap:4}}>
+          <div><VerdictBanner row={row} pdr={null} t={t} compact/></div>
           <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
             {t.momentum&&<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:mc,background:mc+'18',border:`1px solid ${mc}30`,borderRadius:4,padding:'2px 8px'}}>{t.momentum}</span>}
             {(()=>{const mu=getMatchup(row);if(!mu)return null;return(<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:mu.color,background:mu.color+'12',border:`1px solid ${mu.color}28`,borderRadius:4,padding:'1px 7px',whiteSpace:'nowrap'}}>{mu.label}</span>);})()}
