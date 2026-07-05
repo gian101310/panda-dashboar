@@ -1956,6 +1956,103 @@ function ChartTab({ data }) {
   );
 }
 
+// ===== SHADOW TRACKER TAB (gap 9/10/11/12 research logger) =====
+function ShadowTab() {
+  const monoF = "'Share Tech Mono',monospace";
+  const orbF = "'Orbitron',sans-serif";
+  const [rows, setRows] = useState([]);
+  const [summary, setSummary] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [filterTier, setFilterTier] = useState('');
+  const [filterStatus, setFilterStatus] = useState('ALL');
+
+  const fetchRows = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (filterTier) params.set('tier', filterTier);
+      if (filterStatus !== 'ALL') params.set('status', filterStatus);
+      const res = await fetch(`/api/shadow-log?${params}`);
+      const d = await res.json();
+      setRows(d.rows || []);
+      setSummary(d.summary || null);
+    } catch (e) { console.error(e); }
+    setLoading(false);
+  }, [filterTier, filterStatus]);
+
+  useEffect(() => { fetchRows(); }, [fetchRows]);
+
+  const fmtT = (ts) => { try { return new Date(ts).toLocaleString('en-GB', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit', hour12:false }); } catch { return '—'; } };
+  const selS = { fontFamily:monoF, fontSize:10, padding:'5px 8px', borderRadius:5, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text-primary)', cursor:'pointer' };
+  const hd = { fontFamily:monoF, fontSize:9, color:'var(--text-secondary)', letterSpacing:1, padding:'6px 8px', textAlign:'left', whiteSpace:'nowrap' };
+  const td = { fontFamily:monoF, fontSize:10, padding:'5px 8px', whiteSpace:'nowrap' };
+  const statCard = (label, val, color) => (
+    <div style={{background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:8,padding:'10px 16px',display:'flex',flexDirection:'column',gap:3}}>
+      <span style={{fontFamily:monoF,fontSize:8,color:'var(--text-muted)',letterSpacing:1.5}}>{label}</span>
+      <span style={{fontFamily:orbF,fontSize:16,fontWeight:700,color:color||'var(--text-primary)'}}>{val}</span>
+    </div>
+  );
+
+  return (
+    <div style={{maxWidth:1100,margin:'0 auto'}}>
+      <div style={{fontFamily:orbF,fontSize:15,fontWeight:700,color:'#00b4ff',letterSpacing:3,marginBottom:6}}>SHADOW TRACKER</div>
+      <div style={{fontFamily:monoF,fontSize:9,color:'var(--text-muted)',letterSpacing:2,marginBottom:14}}>HIGH-GAP RESEARCH LOG · TIERS 9/10/11/12 · NO REAL TRADES · VALIDATING THE 9+ EDGE</div>
+
+      {summary && <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:14}}>
+        {statCard('ENTRIES', summary.total)}
+        {statCard('OPEN', summary.open, '#00b4ff')}
+        {statCard('CLOSED', summary.done)}
+        {statCard('WINS', summary.wins, '#00ff9f')}
+        {statCard('LOSSES', summary.losses, '#ff4d6d')}
+        {statCard('NET PIPS', summary.net_pips, summary.net_pips >= 0 ? '#00ff9f' : '#ff4d6d')}
+        {statCard('AVG/TRADE', summary.avg_pips, summary.avg_pips >= 0 ? '#00ff9f' : '#ff4d6d')}
+      </div>}
+
+      <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:14,flexWrap:'wrap'}}>
+        <select value={filterTier} onChange={e=>setFilterTier(e.target.value)} style={selS}>
+          <option value="">ALL TIERS</option>
+          {[9,10,11,12].map(t=><option key={t} value={t}>TIER {t}</option>)}
+        </select>
+        <select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)} style={selS}>
+          {['ALL','PENDING','DONE'].map(s=><option key={s} value={s}>{s}</option>)}
+        </select>
+        <button onClick={fetchRows} style={{...selS,color:'#00b4ff'}}>↻ REFRESH</button>
+        {loading && <span style={{fontFamily:monoF,fontSize:9,color:'var(--text-muted)'}}>loading…</span>}
+      </div>
+
+      {rows.length === 0 && !loading && <div style={{fontFamily:monoF,fontSize:11,color:'var(--text-muted)',padding:'30px 0',textAlign:'center'}}>No shadow entries yet — they appear when any pair&apos;s |gap| crosses 9, 10, 11, or 12 while the engine is running.</div>}
+
+      {rows.length > 0 && <div style={{overflowX:'auto',background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:10}}>
+        <table style={{width:'100%',borderCollapse:'collapse'}}>
+          <thead><tr style={{background:'var(--bg-hover)'}}>{['OPENED','SYMBOL','TIER','DIR','ENTRY GAP','PEAK','PIPS','OUTCOME','EXIT REASON','SESSION','PL ZONE','STATUS'].map(h=><th key={h} style={hd}>{h}</th>)}</tr></thead>
+          <tbody>
+            {rows.map(r=>{
+              const dirC = r.direction==='BUY'?'#00ff9f':'#ff4d6d';
+              const outC = r.outcome==='WIN'?'#00ff9f':r.outcome==='LOSS'?'#ff4d6d':'var(--text-muted)';
+              return (
+                <tr key={r.id} style={{borderTop:'1px solid var(--border)'}}>
+                  <td style={{...td,color:'var(--text-muted)'}}>{fmtT(r.created_at)}</td>
+                  <td style={{...td,fontWeight:700}}>{r.symbol}</td>
+                  <td style={{...td,color:'#ffd166'}}>T{r.tier}</td>
+                  <td style={{...td,color:dirC,fontWeight:700}}>{r.direction}</td>
+                  <td style={td}>{r.entry_gap!=null?Number(r.entry_gap).toFixed(1):'—'}</td>
+                  <td style={td}>{r.peak_gap!=null?Number(r.peak_gap).toFixed(1):'—'}</td>
+                  <td style={{...td,color:outC,fontWeight:700}}>{r.pips!=null?Number(r.pips).toFixed(1):'—'}</td>
+                  <td style={{...td,color:outC}}>{r.outcome||'—'}</td>
+                  <td style={{...td,color:'var(--text-muted)'}}>{r.exit_reason||'—'}</td>
+                  <td style={{...td,color:'var(--text-muted)'}}>{r.session||'—'}</td>
+                  <td style={{...td,color:'var(--text-muted)'}}>{r.pl_zone||'—'}</td>
+                  <td style={{...td,color:r.status==='PENDING'?'#00b4ff':'var(--text-muted)'}}>{r.status}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>}
+    </div>
+  );
+}
+
 // ===== SIGNAL LOG TAB =====
 function SignalLogTab() {
   const mono = "'Share Tech Mono',monospace";
@@ -2956,7 +3053,7 @@ function OverviewTab({ data, trends, pdrData, upcomingNews, spikes, confidenceMa
 }
 
 
-const TABS = ['OVERVIEW','PANELS','SIGNALS','TABLE','GAP CHART','RESEARCH','CALCULATOR','SETUPS','VALID PAIRS','CHART','ANALYTICS','LOGS','PANDA AI'];
+const TABS = ['OVERVIEW','PANELS','SIGNALS','TABLE','GAP CHART','RESEARCH','CALCULATOR','SETUPS','VALID PAIRS','CHART','ANALYTICS','SHADOW','LOGS','PANDA AI'];
 // Maps each tab to the feature_access key that controls it
 const TAB_FEATURE = {
   'OVERVIEW':    'overview',
@@ -3676,7 +3773,9 @@ export default function Dashboard() {
               </div></>
           ):tab==='SETUPS'?(<ValidSetupsTab data={data} trends={trends} cotMap={cotMap} confidenceMap={confidenceMap}/>
 ):tab==='VALID PAIRS'?(<ValidPairsTab data={data} trends={trends} cotMap={cotMap} confidenceMap={confidenceMap}/>
-):tab==='SPIKE LOG'||tab==='LOGS'?(
+):tab==='SHADOW'?(
+<ShadowTab/>
+          ):tab==='SPIKE LOG'||tab==='LOGS'?(
 <div>
   <div style={{display:'flex',gap:8,marginBottom:12}}>
     {['Signal Log','Spike Log'].map(st=>(
