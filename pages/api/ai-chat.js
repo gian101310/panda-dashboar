@@ -111,6 +111,12 @@ That's me! You can:
 - BOX TREND: Whether price structure on H1 and H4 is trending up, down, or ranging.
 - VALID vs INVALID: Valid signals pass all the engine's checks. Invalid means something conflicts.
 - SESSIONS: Asian (evening UAE), London (morning UAE), New York (afternoon UAE). Different sessions have different characteristics.
+- PDR (Previous Day Rally): Did yesterday's daily candle move decisively and HOLD its move? ▲ = yesterday was bullish, ▼ = bearish. STRONG (S) = big body that kept most of its gains. WEAK (w) = small or heavily-retraced body.
+- PDR VERDICT chip (plain language): "✓ SUPPORTS BUY/SELL" = yesterday moved the same direction as today's bias and held it — the best backdrop for a continuation. "~ WEAK SUPPORT" = right direction but no conviction — neutral. "✗ AGAINST" = yesterday moved the OPPOSITE way — today's bias is trying to turn the trend, which is riskier; the setup is not a continuation.
+- PHASE badge: answers "where am I in the trend?" — 🚀 START (catching the beginning), 🔥 MID (riding, be selective), 🎯 PULLBACK ZONE (continuation entry window), 🌙 LATE/EXTENDED/ADR SPENT (too late, don't chase), ⚠ TREND AT RISK (protect open trades), 🔵 CONSOLIDATING (compressed, wait for the break).
+- ADR used %: how much of an average day's range has already been traveled today. Above 70% = most of the day's fuel is burned.
+- PB %: how far price pulled back from today's extreme. 30-60% is the classic healthy continuation pullback; above 80% suggests the trend is failing.
+- ★ CONTINUATION SETUP: appears when valid bias + strong aligned PDR + Asian session all line up during a catchable phase — the highest-alignment condition the dashboard tracks.
 
 ── TIPS FOR NEW USERS ──
 1. Start with the OVERVIEW or PANELS tab to scan the market.

@@ -120,6 +120,29 @@ function PdrBadge({ pdr }) {
   );
 }
 
+// ===== PDR VERDICT (plain-language: does yesterday support this trade?) =====
+function PdrVerdict({ row, pdr }) {
+  const gap = row?.gap ?? 0;
+  if (Math.abs(gap) < 5) return null;
+  const dir = gap > 0 ? 'BUY' : 'SELL';
+  // Prefer live broker PDR (v2 exporter), fallback to Twelve Data
+  const pdrDir = row?.pdr_dir != null ? row.pdr_dir : pdr?.direction;
+  const pdrStrong = row?.pdr_dir != null ? !!row.pdr_strong_live : !!pdr?.strong;
+  if (pdrDir == null) return null;
+  const monoF = "'Share Tech Mono',monospace";
+  const aligned = (dir === 'BUY' && pdrDir === 'BULLISH') || (dir === 'SELL' && pdrDir === 'BEARISH');
+  let v;
+  if (aligned && pdrStrong) v = { txt: `✓ SUPPORTS ${dir}`, c: '#00ff9f', tip: `Yesterday was a strong ${pdrDir.toLowerCase()} day that held its move — it supports today's ${dir} bias. Continuation conditions met on the PDR side.` };
+  else if (aligned) v = { txt: '~ WEAK SUPPORT', c: '#ffd166', tip: `Yesterday moved with the ${dir} bias but without conviction (small body or heavy retrace). Not a filter-kill, but no real tailwind either.` };
+  else v = { txt: `✗ AGAINST ${dir}`, c: '#ffaa44', tip: `Yesterday moved AGAINST today's ${dir} bias. This is NOT a continuation setup — treat it as a riskier trend-turn attempt: extra confirmation, smaller size, or skip.` };
+  return (
+    <span title={v.tip} style={{fontFamily:monoF,fontSize:8,padding:'1px 6px',borderRadius:4,marginLeft:4,
+      color:v.c,background:v.c+'12',border:`1px solid ${v.c}35`,fontWeight:700,letterSpacing:0.5,cursor:'help'}}>
+      {v.txt}
+    </span>
+  );
+}
+
 // ===== TREND PHASE (catching vs riding vs chasing) =====
 // Combines structural state + momentum + gap trajectory + PDR into one
 // entry-timing answer. Read-only view logic — no locked formulas touched.
@@ -219,6 +242,12 @@ function PhaseLegend({ isMobile }) {
         ))}
       </div>
       <div style={{fontFamily:monoF,fontSize:9,color:'var(--text-muted)',marginTop:8,lineHeight:1.5}}>Checklist chips on each card: <span style={{color:'#00ff9f'}}>✓ BIAS</span> gap in valid 5–12 range · <span style={{color:'#00ff9f'}}>✓ PDR</span> yesterday closed strong in your direction · <span style={{color:'#00ff9f'}}>✓ ASIAN</span> Asian session live. All three + a catchable phase = <span style={{color:'#ffd166',fontWeight:700}}>★ CONTINUATION SETUP</span>.</div>
+      <div style={{fontFamily:monoF,fontSize:9,color:'var(--text-muted)',marginTop:6,lineHeight:1.6}}>
+        <span style={{color:'var(--text-secondary)',fontWeight:700,letterSpacing:1}}>PDR — DOES YESTERDAY SUPPORT THE TRADE? </span>
+        <span style={{color:'#00ff9f'}}>✓ SUPPORTS</span> yesterday moved your direction and held it — best conditions (A-play) ·
+        <span style={{color:'#ffd166'}}> ~ WEAK SUPPORT</span> right direction, no conviction — neutral ·
+        <span style={{color:'#ffaa44'}}> ✗ AGAINST</span> yesterday moved the other way — not a continuation; trend-turn attempt only with extra confirmation, smaller size, or skip.
+      </div>
     </div>
   );
 }
@@ -1120,7 +1149,7 @@ function PairCard({ row, trend, cotBias, confidence, memoryIndex, pdr, newsAlert
 </div>);})()}{cotBias&&<div style={{display:'flex',alignItems:'center',gap:4}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>COT</span><span style={{fontFamily:mono,fontSize:9,color:cotBias.bias==='BULLISH'?'#00ff9f':'#ff4d6d',background:cotBias.bias==='BULLISH'?'rgba(0,255,159,0.08)':'rgba(255,77,109,0.08)',border:`1px solid ${cotBias.bias==='BULLISH'?'#00ff9f33':'#ff4d6d33'}`,borderRadius:3,padding:'1px 5px'}}>{cotBias.bias==='BULLISH'?'▲':'▼'} {cotBias.bias}</span></div>}
       {(()=>{if(!confidence)return null;const cs=confStyle(confidence.confidence);if(!cs)return null;const tip=confidence.reasons?confidence.reasons.join(' · '):'';return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>CONF</span><span title={tip} style={{fontFamily:mono,fontSize:9,color:cs.color,background:cs.bg,border:`1px solid ${cs.border}`,borderRadius:4,padding:'1px 7px',fontWeight:700,cursor:'help'}}>{confidence.confidence} {cs.label}</span>{confidence.conflict&&<span title="Real-time confidence is high but historical win rate for this gap level is ≤50%. Proceed with caution." style={{fontFamily:mono,fontSize:8,color:'#ff4d6d',background:'rgba(255,77,109,0.1)',border:'1px solid rgba(255,77,109,0.3)',borderRadius:4,padding:'1px 6px',fontWeight:700,cursor:'help'}}>⚠️ CONFLICT</span>}</div>);})()}
       {(()=>{const em=getEdgeMemory(row,memoryIndex);if(!em)return null;const fc=em.flag==='PROVEN_EDGE'?'#00ff9f':em.flag==='DEAD_ZONE'?'#ff4d6d':'#00b4ff';const icon=em.flag==='PROVEN_EDGE'?'✅':em.flag==='DEAD_ZONE'?'⛔':'📊';const lbl=em.flag?em.flag.replace('_',' '):(em.maturity||'').toUpperCase();const wrPct=Math.round((em.winRate||0)*100);const resPct=em.resRate!=null?Math.round(em.resRate*100):null;const edgeTip=em.flag==='PROVEN_EDGE'?`Proven edge: ${wrPct}% win rate from ${em.sample} resolved signals at this gap level. High probability setup.`:em.flag==='DEAD_ZONE'?`Dead zone: only ${wrPct}% win rate from ${em.sample} signals. Historically this gap level loses money.`:`${(em.maturity||'').toUpperCase()}: ${wrPct}% win rate from ${em.sample} signals. Needs more data to confirm edge.`;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2,flexWrap:'wrap'}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>EDGE</span><span title={edgeTip} style={{fontFamily:mono,fontSize:9,color:fc,background:fc+'12',border:`1px solid ${fc}33`,borderRadius:4,padding:'1px 7px',fontWeight:700,cursor:'help'}}>{icon} {lbl}</span><span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>Win:{wrPct}%{resPct!=null?` | Res:${resPct}%`:''} (n={em.sample})</span></div>);})()}
-      {pdr&&<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>PDR</span><PdrBadge pdr={pdr}/></div>}
+      {pdr&&<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2,flexWrap:'wrap'}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>PDR</span><PdrBadge pdr={pdr}/><PdrVerdict row={row} pdr={pdr}/></div>}
       {(()=>{const isBuy=bias.label==='BUY',isSell=bias.label==='SELL';if(!isBuy&&!isSell)return null;const isJpy=row.symbol?.includes('JPY');const dec=isJpy?3:5;const levels=isBuy?[{l:'PDL',v:row.pdl},{l:'PWL',v:row.pwl},{l:'PML',v:row.pml},{l:'PYL',v:row.pyl}].filter(x=>x.v!=null).sort((a,b)=>b.v-a.v):[{l:'PDH',v:row.pdh},{l:'PWH',v:row.pwh},{l:'PMH',v:row.pmh},{l:'PYH',v:row.pyh}].filter(x=>x.v!=null).sort((a,b)=>a.v-b.v);const top2=levels.slice(0,2);if(!top2.length)return null;const c1=isBuy?'#00ff9f':'#ff4d6d';const c2='#00b4ff';return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2,flexWrap:'wrap'}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>PB ENTRY</span>{top2.map((lv,i)=><span key={lv.l} style={{fontFamily:mono,fontSize:9,color:i===0?c1:c2,background:(i===0?c1:c2)+'12',border:`1px solid ${(i===0?c1:c2)}28`,borderRadius:3,padding:'1px 6px',fontWeight:600}}>{lv.l} {Number(lv.v).toFixed(dec)}</span>)}</div>);})()}
       <div style={{display:'flex',flexDirection:'column',gap:3}}>
         <div style={{display:'flex',alignItems:'center',gap:6}}>
@@ -1268,9 +1297,10 @@ function PairCardModal({ row, trend, cotBias, onClose, isMobile, confidence, mem
         </div>}
 
         {/* PDR */}
-        {pdr&&<div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',background:'rgba(0,0,0,0.15)',borderRadius:8}}>
+        {pdr&&<div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',background:'rgba(0,0,0,0.15)',borderRadius:8,flexWrap:'wrap'}}>
           <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2}}>PDR</span>
           <PdrBadge pdr={pdr}/>
+          <PdrVerdict row={row} pdr={pdr}/>
         </div>}
 
         {/* Trend Phase */}
