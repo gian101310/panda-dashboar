@@ -1230,7 +1230,8 @@ function ScoreTfBadge({ row, showLabel = true, mt = 2 }) {
   const qc = row?.quote_currency || row?.symbol?.slice(3, 6) || 'QUOTE';
   const side = (cur, str, keyp) => {
     if (!str) return null;
-    const toks = str.split(/\s+/).filter(Boolean);
+    // Only accept new-format tokens like "D1+4" / "H1-6"; ignore legacy values.
+    const toks = str.split(/\s+/).filter(t => /^(D1|H4|H1)[+-]\d+$/.test(t));
     if (!toks.length) return null;
     return (
       <span key={keyp} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
