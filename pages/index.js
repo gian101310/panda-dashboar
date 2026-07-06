@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { INDICATOR_PRODUCTS } from '../lib/indicatorProducts.mjs';
+import { curSym, mapDbTiers, FALLBACK_TIERS } from '../lib/pricingClient';
 
 const mono = "'Share Tech Mono',monospace";
 const orb  = "'Orbitron',sans-serif";
@@ -22,11 +23,7 @@ const STEPS = [
   { num:'03', title:'YOU DECIDE', desc:'Signals land on your dashboard with all the data. Confidence score, edge history, session context. You make the call.', color:'#7C3AED' },
 ];
 
-const TIERS = [
-  { name:'STARTER', price:'0', period:'', sub:'FREE FOR 1 WEEK', color:'#445566', tag:null, features:['Live signals tab','Position calculator'], cta:'START FREE TRIAL', tier:'starter' },
-  { name:'PRO', price:'49', was:'99', period:'/mo', sub:'LAUNCH PRICE · ≈ $13 USD · or AED 499 lifetime', color:'#00ff9f', tag:'MOST POPULAR', features:['Everything in Starter, plus:','Panel tab','Full data table','Valid setups tab','Panda AI assistant','Research tab'], cta:'GO PRO →', tier:'pro' },
-  { name:'ELITE', price:'99', was:'699', period:'/mo', sub:'LAUNCH PRICE · ≈ $27 USD · or AED 999 lifetime', color:'#00b4ff', tag:'FULL ACCESS', features:['Everything in Pro, plus:','Overview tab','Signal logs tab','Valid pairs filter','Telegram signal alerts','Spike signal alerts','Private trading journal','Chart tab','MT4/MT5 Panda Indicators','Bias detection indicators'], cta:'GO ELITE →', tier:'elite' },
-];
+// Live tier pricing comes from /api/pricing (edited in /admin/pricing); FALLBACK_TIERS used if unreachable
 
 const TESTIMONIALS = [
   { text:'I used to spend 2 hours every morning scanning charts. Now I open the dashboard, check the bias, and I know exactly which pairs to focus on. Completely changed my routine.', who:'Ahmad K.', role:'Swing Trader', loc:'Dubai, UAE', stat:'+2,340 pips tracked' },
@@ -95,10 +92,17 @@ function OrbitalRing() {
 export default function LandingPage() {
   const router = useRouter();
   const [scrollY, setScrollY] = useState(0);
+  const [TIERS, setTIERS] = useState(FALLBACK_TIERS);
   const [liveSignals, setLiveSignals] = useState([]);
   const [pairCount, setPairCount] = useState(21);
   const [licenseModal, setLicenseModal] = useState(null);
   const [licenseForm, setLicenseForm] = useState({ customer_name: '', contact: '', mt4_account_id: '', telegram_username: '' });
+
+  useEffect(() => {
+    fetch('/api/pricing').then(r => r.json()).then(j => {
+      if (j?.tiers?.length) setTIERS(mapDbTiers(j.tiers));
+    }).catch(() => {});
+  }, []);
   const [licenseBusy, setLicenseBusy] = useState(false);
   const [licenseOk, setLicenseOk] = useState(false);
   const [licenseErr, setLicenseErr] = useState('');
@@ -180,7 +184,7 @@ export default function LandingPage() {
             <a href="#indicators" style={{ color: '#6b7fa8', fontFamily: mono, fontSize: 10, letterSpacing: 2, textDecoration: 'none', padding: '8px 14px' }}>INDICATORS</a>
             <a href="#pricing" style={{ color: '#6b7fa8', fontFamily: mono, fontSize: 10, letterSpacing: 2, textDecoration: 'none', padding: '8px 14px' }}>PRICING</a>
             <button onClick={() => router.push('/login')} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, color: '#8899bb', fontFamily: mono, fontSize: 10, letterSpacing: 2, cursor: 'pointer', padding: '8px 18px' }}>LOG IN</button>
-            <button onClick={() => router.push('/funnel')} style={{ background: 'linear-gradient(135deg,#00ff9f,#00cc7a)', border: 'none', borderRadius: 6, color: '#050810', fontFamily: orb, fontSize: 9, fontWeight: 700, letterSpacing: 2, cursor: 'pointer', padding: '10px 22px', boxShadow: '0 0 20px rgba(0,255,159,0.2)' }}>GET ACCESS</button>
+            <button onClick={() => router.push('/get-started')} style={{ background: 'linear-gradient(135deg,#00ff9f,#00cc7a)', border: 'none', borderRadius: 6, color: '#050810', fontFamily: orb, fontSize: 9, fontWeight: 700, letterSpacing: 2, cursor: 'pointer', padding: '10px 22px', boxShadow: '0 0 20px rgba(0,255,159,0.2)' }}>GET ACCESS</button>
           </div>
         </nav>
 
@@ -211,7 +215,7 @@ export default function LandingPage() {
 
           {/* CTAs */}
           <div style={{ display: 'flex', gap: 16, animation: 'fadeSlideUp 0.8s ease 0.8s both', flexWrap: 'wrap', justifyContent: 'center' }}>
-            <button onClick={() => router.push('/funnel')} style={{ background: 'linear-gradient(135deg,#00ff9f,#00cc7a)', border: 'none', borderRadius: 8, color: '#050810', fontFamily: orb, fontSize: 12, fontWeight: 700, letterSpacing: 3, cursor: 'pointer', padding: '16px 40px', boxShadow: '0 0 30px rgba(0,255,159,0.25)', transition: 'all 0.3s' }}>START FREE</button>
+            <button onClick={() => router.push('/get-started')} style={{ background: 'linear-gradient(135deg,#00ff9f,#00cc7a)', border: 'none', borderRadius: 8, color: '#050810', fontFamily: orb, fontSize: 12, fontWeight: 700, letterSpacing: 3, cursor: 'pointer', padding: '16px 40px', boxShadow: '0 0 30px rgba(0,255,159,0.25)', transition: 'all 0.3s' }}>START FREE</button>
             <button onClick={() => { const el = document.getElementById('features'); el?.scrollIntoView({ behavior: 'smooth' }); }} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: '#8899bb', fontFamily: mono, fontSize: 11, letterSpacing: 2, cursor: 'pointer', padding: '16px 32px', transition: 'all 0.3s' }}>SEE HOW IT WORKS ↓</button>
           </div>
 
@@ -515,14 +519,14 @@ export default function LandingPage() {
               {TIERS.map((t, i) => <div key={t.name} style={{ padding: '32px 28px', background: t.tag ? 'rgba(0,255,159,0.03)' : 'rgba(12,18,32,0.6)', border: `1px solid ${t.tag ? 'rgba(0,255,159,0.2)' : 'rgba(255,255,255,0.06)'}`, borderRadius: 14, position: 'relative', textAlign: 'center' }}>
                 {t.tag && <div style={{ position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)', fontFamily: mono, fontSize: 9, color: '#050810', background: t.color, padding: '4px 16px', borderRadius: 20, letterSpacing: 2, fontWeight: 700 }}>{t.tag}</div>}
                 <div style={{ fontFamily: orb, fontSize: 14, fontWeight: 700, letterSpacing: 3, color: t.color, marginBottom: 16 }}>{t.name}</div>
-                <div style={{ fontFamily: orb, fontSize: 48, fontWeight: 900, color: '#e8f0ff', lineHeight: 1 }}><span style={{ fontFamily: mono, fontSize: 16, color: '#4a5578' }}>AED </span>{t.price}<span style={{ fontFamily: mono, fontSize: 14, color: '#4a5578' }}>{t.period}</span>{t.was && <span style={{ fontFamily: mono, fontSize: 16, color: '#4a5578', textDecoration: 'line-through', marginLeft: 8 }}>AED {t.was}</span>}</div>
+                <div style={{ fontFamily: orb, fontSize: 48, fontWeight: 900, color: '#e8f0ff', lineHeight: 1 }}><span style={{ fontFamily: mono, fontSize: 16, color: '#4a5578' }}>{curSym(t.cur)}</span>{t.price}<span style={{ fontFamily: mono, fontSize: 14, color: '#4a5578' }}>{t.period}</span>{t.was && <span style={{ fontFamily: mono, fontSize: 16, color: '#4a5578', textDecoration: 'line-through', marginLeft: 8 }}>{curSym(t.cur)}{t.was}</span>}</div>
                 {t.sub && <div style={{ fontFamily: mono, fontSize: 10, color: '#ffd166', letterSpacing: 1, marginTop: 8 }}>{t.sub}</div>}
                 <div style={{ margin: '24px 0', display: 'flex', flexDirection: 'column', gap: 10, textAlign: 'left' }}>
                   {t.features.map(f => <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: raj, fontSize: 14, color: '#8899bb' }}>
                     <span style={{ color: t.color, fontSize: 12 }}>✓</span>{f}
                   </div>)}
                 </div>
-                <button onClick={() => router.push('/funnel')} style={{ width: '100%', padding: '14px 0', fontFamily: orb, fontSize: 10, fontWeight: 700, letterSpacing: 3, cursor: 'pointer', borderRadius: 8, border: t.tag ? 'none' : `1px solid ${t.color}40`, background: t.tag ? `linear-gradient(135deg,${t.color},${t.color}cc)` : 'rgba(255,255,255,0.04)', color: t.tag ? '#050810' : t.color, boxShadow: t.tag ? `0 0 20px ${t.color}25` : 'none', transition: 'all 0.3s' }}>{t.cta}</button>
+                <button onClick={() => router.push('/get-started')} style={{ width: '100%', padding: '14px 0', fontFamily: orb, fontSize: 10, fontWeight: 700, letterSpacing: 3, cursor: 'pointer', borderRadius: 8, border: t.tag ? 'none' : `1px solid ${t.color}40`, background: t.tag ? `linear-gradient(135deg,${t.color},${t.color}cc)` : 'rgba(255,255,255,0.04)', color: t.tag ? '#050810' : t.color, boxShadow: t.tag ? `0 0 20px ${t.color}25` : 'none', transition: 'all 0.3s' }}>{t.cta}</button>
               </div>)}
             </div>
           </div>
@@ -569,7 +573,7 @@ export default function LandingPage() {
             <p style={{ fontFamily: raj, fontSize: 18, color: '#6b7fa8', lineHeight: 1.5, marginBottom: 40 }}>
               The engine is already running. 21 pairs. Every 5 minutes. The only question is whether you're watching.
             </p>
-            <button onClick={() => router.push('/funnel')} style={{ background: 'linear-gradient(135deg,#00ff9f,#00cc7a)', border: 'none', borderRadius: 8, color: '#050810', fontFamily: orb, fontSize: 14, fontWeight: 700, letterSpacing: 4, cursor: 'pointer', padding: '18px 48px', boxShadow: '0 0 40px rgba(0,255,159,0.3)', transition: 'all 0.3s' }}>GET ACCESS NOW</button>
+            <button onClick={() => router.push('/get-started')} style={{ background: 'linear-gradient(135deg,#00ff9f,#00cc7a)', border: 'none', borderRadius: 8, color: '#050810', fontFamily: orb, fontSize: 14, fontWeight: 700, letterSpacing: 4, cursor: 'pointer', padding: '18px 48px', boxShadow: '0 0 40px rgba(0,255,159,0.3)', transition: 'all 0.3s' }}>GET ACCESS NOW</button>
           </div>
         </section>
 

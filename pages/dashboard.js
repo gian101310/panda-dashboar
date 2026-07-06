@@ -3823,7 +3823,7 @@ export default function Dashboard() {
         {isAdmin&&showPageVis&&pageVis&&(()=>{
           const PAGES = [
             { key:'landing',   label:'🏠 LANDING',   route:'/' },
-            { key:'funnel',    label:'🔄 FUNNEL',    route:'/funnel' },
+            { key:'funnel',    label:'🔄 GET STARTED', route:'/get-started' },
             { key:'pricing',   label:'💰 PRICING',   route:'/pricing' },
             { key:'portfolio', label:'📁 PORTFOLIO', route:'/portfolio' },
             { key:'login',     label:'🔐 LOGIN',     route:'/login' },

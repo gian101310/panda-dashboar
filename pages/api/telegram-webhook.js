@@ -12,6 +12,23 @@ const PAYMENT_LINKS = {
   elite_lifetime: 'https://pay.ziina.com/pandaengine/7R5dOWfTe?source=app',  // AED 999
 };
 
+// Live pricing from admin panel — falls back to PAYMENT_LINKS above if DB read fails
+async function getTierPricing(tierKey) {
+  try {
+    const { data } = await supabase.from('pricing_tiers')
+      .select('currency, price_monthly, pay_link_monthly')
+      .eq('tier_key', tierKey).maybeSingle();
+    return data || null;
+  } catch { return null; }
+}
+function fmtPrice(tp, tierKey) {
+  if (tp && tp.price_monthly != null) {
+    const sym = tp.currency === 'USD' ? '$' : (tp.currency || '') + ' ';
+    return `${sym}${tp.price_monthly}/mo`;
+  }
+  return tierKey === 'elite' ? '$27/mo' : '$13/mo';
+}
+
 // Set TG_WEBHOOK_SECRET in Vercel env vars, then re-register webhook with:
 // https://api.telegram.org/bot<TOKEN>/setWebhook?url=<URL>&secret_token=<SECRET>
 const TG_WEBHOOK_SECRET = process.env.TG_WEBHOOK_SECRET || '';
@@ -83,8 +100,9 @@ export default async function handler(req, res) {
           .eq('token', token);
 
         const tier = row.tier || 'pro';
-        const payLink = PAYMENT_LINKS[tier] || PAYMENT_LINKS.pro;
-        const price = tier === 'elite' ? 'AED 99/mo' : 'AED 49/mo';
+        const tp = await getTierPricing(tier);
+        const payLink = tp?.pay_link_monthly || PAYMENT_LINKS[tier] || PAYMENT_LINKS.pro;
+        const price = fmtPrice(tp, tier);
         const dm = [
           '<b>PANDA ENGINE — REQUEST RECEIVED</b>',
           '━━━━━━━━━━━━━━━━━━━━━━',

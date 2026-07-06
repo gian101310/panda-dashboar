@@ -15,6 +15,23 @@ const PF_PAYMENT_LINKS = {
 
 function pfGenPassword() { return 'Panda#' + crypto.randomBytes(4).toString('hex'); }
 
+// Live pricing from admin panel — falls back to PF_PAYMENT_LINKS if DB read fails
+async function getTierPricing(tierKey) {
+  try {
+    const { data } = await supabase.from('pricing_tiers')
+      .select('currency, price_monthly, pay_link_monthly')
+      .eq('tier_key', tierKey).maybeSingle();
+    return data || null;
+  } catch { return null; }
+}
+function fmtPrice(tp, tierKey) {
+  if (tp && tp.price_monthly != null) {
+    const sym = tp.currency === 'USD' ? '$' : (tp.currency || '') + ' ';
+    return `${sym}${tp.price_monthly}/mo`;
+  }
+  return tierKey === 'elite' ? '$27/mo' : '$13/mo';
+}
+
 // Send via old bot (@panda_engine_alerts_bot) for approved/existing users
 async function pfSendApproveBot(chatId, text) {
   try {
@@ -163,8 +180,9 @@ export default async function handler(req, res) {
       if (!req_row) return res.status(404).json({ error: 'signup not found' });
       if (!req_row.telegram_chat_id) return res.status(400).json({ error: 'User has not connected Telegram yet' });
       const t = req_row.tier || 'pro';
-      const payLink = PF_PAYMENT_LINKS[t] || PF_PAYMENT_LINKS.pro;
-      const price = t === 'elite' ? 'AED 99/mo' : 'AED 49/mo';
+      const tp = await getTierPricing(t);
+      const payLink = tp?.pay_link_monthly || PF_PAYMENT_LINKS[t] || PF_PAYMENT_LINKS.pro;
+      const price = fmtPrice(tp, t);
       const dm = [
         '🐼 <b>PANDA ENGINE — PAYMENT REMINDER</b>',
         '━━━━━━━━━━━━━━━━━━━━━━',
