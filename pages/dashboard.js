@@ -1216,6 +1216,35 @@ function PlatformButtons({symbol}){
 }
 
 // ===== PAIR CARD =====
+// ===== SCORE SOURCE-TIMEFRAME BADGE =====
+// Shows which timeframe (D1/H4/H1) produced each side's Panda score.
+// Reads base_score_tf / quote_score_tf written by the engine (derive_score_tf).
+// "ALL" = every timeframe is extreme (|v|>=4) in the winning direction.
+function ScoreTfBadge({ row, showLabel = true, mt = 2 }) {
+  const mono = "'Share Tech Mono',monospace";
+  const b = row?.base_score_tf || '';
+  const q = row?.quote_score_tf || '';
+  if (!b && !q) return null;
+  const bc = row?.base_currency || row?.symbol?.slice(0, 3) || 'BASE';
+  const qc = row?.quote_currency || row?.symbol?.slice(3, 6) || 'QUOTE';
+  const pill = (cur, tf, key) => {
+    if (!tf) return null;
+    const all = tf === 'ALL';
+    const col = all ? '#ffd166' : '#00b4ff';
+    const tip = all
+      ? `${cur}: every timeframe (D1/H4/H1) is extreme (|score| >= 4)`
+      : `${cur} score is derived from ${tf.replace(/\+/g, ' + ')}`;
+    return <span key={key} title={tip} style={{ fontFamily: mono, fontSize: 8, color: col, background: col + '14', border: `1px solid ${col}33`, borderRadius: 3, padding: '1px 6px', whiteSpace: 'nowrap', fontWeight: all ? 700 : 600, cursor: 'help' }}>{all ? '⚡ ' : ''}{cur} {tf}</span>;
+  };
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: mt, flexWrap: 'wrap' }}>
+      {showLabel && <span style={{ fontFamily: mono, fontSize: 8, color: 'var(--text-secondary)', letterSpacing: 1, fontWeight: 600 }}>SCORE TF</span>}
+      {pill(bc, b, 'b')}
+      {pill(qc, q, 'q')}
+    </div>
+  );
+}
+
 function PairCard({ row, trend, cotBias, confidence, memoryIndex, pdr, newsAlert }) {
   const gap=row.gap??0,valid=isValid(gap)&&!row.hard_invalid&&!isNeutralMatchup(row),bias=biasFromGap(gap),sig=signalLabel(row.signal,row.strength),strVal=row.strength??0,sc=stateColor(row.state),t=trend||{};
   const sparkColor=t.trend1h==='STRONGER'?'#00ff9f':t.trend1h==='WEAKER'?'#ff4d6d':'var(--text-muted)';
@@ -1243,6 +1272,7 @@ function PairCard({ row, trend, cotBias, confidence, memoryIndex, pdr, newsAlert
       </div>
       <PhaseBadge row={row} pdr={pdr}/>
       {(()=>{const mu=getMatchup(row);if(!mu)return null;return(<div style={{display:'flex',alignItems:'center',gap:6,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>MATCHUP</span><span style={{fontFamily:mono,fontSize:9,color:mu.color,background:mu.color+'12',border:`1px solid ${mu.color}30`,borderRadius:4,padding:'1px 7px',whiteSpace:'nowrap'}}>{mu.label}</span>{mu.note==='IDEAL'&&<span style={{fontFamily:mono,fontSize:7,color:mu.color,letterSpacing:1,opacity:0.8}}>IDEAL</span>}{mu.note==='AVOID'&&<span style={{fontFamily:mono,fontSize:7,color:'#ffaa44',letterSpacing:1,opacity:0.8}}>AVOID</span>}</div>);})()}
+      <ScoreTfBadge row={row}/>
       {(()=>{const bh1=boxTrend(row.box_h1_trend),bh4=boxTrend(row.box_h4_trend);if(!bh1&&!bh4)return null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>BOX</span>{bh4&&<span style={{fontFamily:mono,fontSize:8,color:bh4.color,background:bh4.bg,border:`1px solid ${bh4.border}`,borderRadius:3,padding:'1px 6px'}}>H4 {bh4.label}</span>}{bh1&&<span style={{fontFamily:mono,fontSize:8,color:bh1.color,background:bh1.bg,border:`1px solid ${bh1.border}`,borderRadius:3,padding:'1px 6px'}}>H1 {bh1.label}</span>}</div>);})()}
       {(()=>{ const pl=plZoneBadge(row.pl_zone,row.bias); if(!pl)return null; const plTip=pl.valid?'Panda Lines confirmed: Panda Lines agree with gap direction. This is the price confirmation layer.':'Panda Lines not confirmed: price structure does not yet agree with gap direction. Wait for alignment or use as additional caution.'; return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>PL</span><span title={plTip} style={{fontFamily:mono,fontSize:8,color:pl.color,background:pl.bg,border:`1px solid ${pl.border}`,borderRadius:3,padding:'1px 6px',fontWeight:700,cursor:'help'}}>{pl.label}</span>{pl.valid&&<span style={{fontFamily:mono,fontSize:7,color:'#00ff9f',letterSpacing:1}}>✅</span>}{!pl.valid&&<span style={{fontFamily:mono,fontSize:7,color:'#ff7744',letterSpacing:1}}>⛔</span>}</div>);})()}{(()=>{
   const bc=boxConfirm(row.bias,row.box_h4_trend,row.box_h1_trend);
@@ -1628,6 +1658,7 @@ function ValidSetupsTab({ data, trends, cotMap, confidenceMap }) {
               <div style={{marginBottom:5}}><VerdictBanner row={row} pdr={null} t={t} compact/></div>
               <div style={{fontFamily:mono,fontSize:9,color:t.momentumColor||'var(--text-muted)',background:(t.momentumColor||'var(--text-muted)')+'18',border:`1px solid ${(t.momentumColor||'var(--text-muted)')}30`,borderRadius:4,padding:'2px 8px',display:'inline-block',marginBottom:4}}>{t.momentum||'NEUTRAL'}</div>
               {(()=>{const mu=getMatchup(row);if(!mu)return null;return(<div style={{fontFamily:mono,fontSize:9,color:mu.color,background:mu.color+'12',border:`1px solid ${mu.color}28`,borderRadius:4,padding:'2px 7px',display:'inline-block',marginTop:3,whiteSpace:'nowrap'}}>{mu.label}{mu.note&&<span style={{marginLeft:5,opacity:0.7,fontSize:8}}>{mu.note}</span>}</div>);})()}
+              <ScoreTfBadge row={row}/>
               {(()=>{const bh4=boxTrend(row.box_h4_trend),bh1=boxTrend(row.box_h1_trend);if(!bh4&&!bh1)return null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>BOX</span>{bh4&&<span style={{fontFamily:mono,fontSize:8,color:bh4.color,background:bh4.bg,border:`1px solid ${bh4.border}`,borderRadius:3,padding:'1px 6px'}}>H4 {bh4.label}</span>}{bh1&&<span style={{fontFamily:mono,fontSize:8,color:bh1.color,background:bh1.bg,border:`1px solid ${bh1.border}`,borderRadius:3,padding:'1px 6px'}}>H1 {bh1.label}</span>}</div>);})()}
               {(()=>{ const pl=plZoneBadge(row.pl_zone,row.bias); if(!pl)return null; return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>PL</span><span style={{fontFamily:mono,fontSize:9,color:pl.color,background:pl.bg,border:`1px solid ${pl.border}`,borderRadius:4,padding:'1px 8px',fontWeight:700}}>{pl.label}</span>{pl.valid&&<span style={{fontFamily:mono,fontSize:8,color:'#00ff9f',fontWeight:700}}>G1 ✅</span>}{!pl.valid&&<span style={{fontFamily:mono,fontSize:8,color:'#ff7744'}}>G1 ⛔</span>}</div>);})()}
               {(()=>{
@@ -1749,6 +1780,7 @@ function ValidPairsTab({ data, trends, cotMap, confidenceMap }) {
             {t.momentum&&<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:mc,background:mc+'18',border:`1px solid ${mc}30`,borderRadius:4,padding:'2px 8px'}}>{t.momentum}</span>}
             {(()=>{const mu=getMatchup(row);if(!mu)return null;return(<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:mu.color,background:mu.color+'12',border:`1px solid ${mu.color}28`,borderRadius:4,padding:'1px 7px',whiteSpace:'nowrap'}}>{mu.label}</span>);})()}
           </div>
+          <ScoreTfBadge row={row}/>
           {(()=>{
             const bh4=boxTrend(row.box_h4_trend),bh1=boxTrend(row.box_h1_trend);
             const bconf=boxConfirm(row.bias,row.box_h4_trend,row.box_h1_trend);
@@ -2839,6 +2871,7 @@ function OvSignalCard({ pair, tier, onClick, delay }) {
       <span style={{fontFamily:mono,fontSize:9,color:OV_COLORS.textMuted,letterSpacing:1}}>{Math.abs(pair.gap)>=9&&pair.pl_zone!=='BETWEEN'?'INTRA':'BB'}</span>
       {pair.pdr_strong&&<span style={{fontFamily:mono,fontSize:9,color:OV_COLORS.buy,background:OV_COLORS.buyDim,border:`1px solid ${OV_COLORS.buy}25`,borderRadius:3,padding:'2px 6px'}}>PDR ✓</span>}
     </div>}
+    {!isL&&<div style={{marginBottom:8}}><ScoreTfBadge row={pair} mt={0}/></div>}
     {(()=>{const isBuy=pair.bias==='BUY',isSell=pair.bias==='SELL';if(!isBuy&&!isSell)return null;const isJpy=pair.symbol?.includes('JPY');const dec=isJpy?3:5;const levels=isBuy?[{l:'PDL',v:pair.pdl},{l:'PWL',v:pair.pwl},{l:'PML',v:pair.pml},{l:'PYL',v:pair.pyl}].filter(x=>x.v!=null).sort((a,b)=>b.v-a.v):[{l:'PDH',v:pair.pdh},{l:'PWH',v:pair.pwh},{l:'PMH',v:pair.pmh},{l:'PYH',v:pair.pyh}].filter(x=>x.v!=null).sort((a,b)=>a.v-b.v);const top2=levels.slice(0,2);if(!top2.length)return null;const c1=isBuy?OV_COLORS.buy:OV_COLORS.sell;const c2='#00b4ff';return(<div style={{display:'flex',alignItems:'center',gap:isL?4:6,marginBottom:isL?4:8}}>
       <span style={{fontFamily:mono,fontSize:isL?7:8,color:OV_COLORS.textMuted,letterSpacing:2,fontWeight:600}}>PB ENTRY</span>
       {top2.map((lv,i)=><span key={lv.l} style={{fontFamily:mono,fontSize:isH?11:isL?9:10,color:i===0?c1:c2,background:(i===0?c1:c2)+'12',border:`1px solid ${(i===0?c1:c2)}28`,borderRadius:isL?3:4,padding:isL?'1px 5px':'2px 8px',fontWeight:700,letterSpacing:0.5}}>{lv.l} {Number(lv.v).toFixed(dec)}</span>)}
@@ -3037,6 +3070,7 @@ function OverviewTab({ data, trends, pdrData, upcomingNews, spikes, confidenceMa
     conflict:confidenceMap[row.symbol]?.conflict||false,
     news:upcomingNews?.affected_pairs?.includes(row.symbol)||false, hard_invalid:row.hard_invalid||false,
     pdl:row.pdl, pdh:row.pdh, pwl:row.pwl, pwh:row.pwh, pml:row.pml, pmh:row.pmh, pyl:row.pyl, pyh:row.pyh,
+    base_score_tf:row.base_score_tf||'', quote_score_tf:row.quote_score_tf||'', base_currency:row.base_currency, quote_currency:row.quote_currency,
   })).sort((a,b)=>b.conf-a.conf), [data,trends,pdrData,confidenceMap,upcomingNews]);
 
   // Session + market mode

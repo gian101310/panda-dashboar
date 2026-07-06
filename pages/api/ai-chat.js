@@ -353,7 +353,8 @@ async function fetchMarketContext() {
 
 async function fetchReviewContext() {
   const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-  const [signals, tracker] = await Promise.all([
+  const since90 = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+  const [signals, tracker, highGap] = await Promise.all([
     supabase.from('signal_results')
       .select('symbol,strategy,direction,entry_gap,peak_gap,pips,outcome,momentum,pl_zone,duration_min,created_at')
       .gte('created_at', since)
@@ -363,13 +364,27 @@ async function fetchReviewContext() {
       .select('symbol,strategy,direction,gap_at_open,peak_gap,net_pips,close_reason,momentum_at_open,pl_zone_at_open,session_at_open,opened_at,closed_at,status')
       .gte('opened_at', since)
       .order('opened_at', { ascending: false })
-      .limit(50)
+      .limit(50),
+    // High-gap signals are rare (e.g. |gap| 11-12) and get pushed out of the recent-100 window,
+    // which made the AI wrongly report "no records" for them. Pull them explicitly over 90 days.
+    supabase.from('signal_results')
+      .select('symbol,strategy,direction,entry_gap,peak_gap,pips,outcome,pl_zone,created_at')
+      .or('entry_gap.gte.9,entry_gap.lte.-9')
+      .gte('created_at', since90)
+      .order('created_at', { ascending: false })
+      .limit(60)
   ]);
   let ctx = '';
   if (signals.data?.length) {
     ctx += 'SIGNAL RESULTS (last 30 days):\n';
     ctx += signals.data.map(s =>
       `${s.symbol} ${s.strategy} ${s.direction} gap:${s.entry_gap} peak:${s.peak_gap} pips:${s.pips ?? 'pending'} outcome:${s.outcome || 'PENDING'} pl:${s.pl_zone || '-'} mom:${s.momentum || '-'} dur:${s.duration_min || '-'}m`
+    ).join('\n');
+  }
+  if (highGap.data?.length) {
+    ctx += '\n\nHIGH-GAP SIGNALS |gap|>=9 (last 90 days — includes rare gap 11/12):\n';
+    ctx += highGap.data.map(s =>
+      `${s.symbol} ${s.strategy} ${s.direction} gap:${s.entry_gap} peak:${s.peak_gap} pips:${s.pips ?? 'pending'} outcome:${s.outcome || 'PENDING'} pl:${s.pl_zone || '-'} ${String(s.created_at).slice(0,10)}`
     ).join('\n');
   }
   if (tracker.data?.length) {
