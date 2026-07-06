@@ -120,6 +120,21 @@ function PdrBadge({ pdr }) {
   );
 }
 
+// ===== LIVE PDR BADGE (broker data from v2 exporter — preferred over Twelve Data) =====
+function LivePdrBadge({ row }) {
+  if (row?.pdr_dir == null) return null;
+  const monoF = "'Share Tech Mono',monospace";
+  const strong = !!row.pdr_strong_live;
+  const color = strong ? '#00ff9f' : '#6b7280';
+  return (
+    <span style={{fontFamily:monoF,fontSize:8,padding:'1px 5px',borderRadius:4,
+      background:strong?'rgba(0,255,159,0.12)':'rgba(107,114,128,0.12)',
+      color,border:`1px solid ${color}40`,letterSpacing:1}}>
+      {row.pdr_dir==='BULLISH'?'▲':'▼'} {Number(row.pdr_ratio??0).toFixed(2)} {strong?'STRONG':'WEAK'} <span style={{color:'#00ff9f',fontSize:7}}>LIVE</span>
+    </span>
+  );
+}
+
 // ===== PDR VERDICT (plain-language: does yesterday support this trade?) =====
 function PdrVerdict({ row, pdr }) {
   const gap = row?.gap ?? 0;
@@ -1218,18 +1233,14 @@ function PairCard({ row, trend, cotBias, confidence, memoryIndex, pdr, newsAlert
 </div>);})()}{cotBias&&<div style={{display:'flex',alignItems:'center',gap:4}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>COT</span><span style={{fontFamily:mono,fontSize:9,color:cotBias.bias==='BULLISH'?'#00ff9f':'#ff4d6d',background:cotBias.bias==='BULLISH'?'rgba(0,255,159,0.08)':'rgba(255,77,109,0.08)',border:`1px solid ${cotBias.bias==='BULLISH'?'#00ff9f33':'#ff4d6d33'}`,borderRadius:3,padding:'1px 5px'}}>{cotBias.bias==='BULLISH'?'▲':'▼'} {cotBias.bias}</span></div>}
       {(()=>{if(!confidence)return null;const cs=confStyle(confidence.confidence);if(!cs)return null;const tip=confidence.reasons?confidence.reasons.join(' · '):'';return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>CONF</span><span title={tip} style={{fontFamily:mono,fontSize:9,color:cs.color,background:cs.bg,border:`1px solid ${cs.border}`,borderRadius:4,padding:'1px 7px',fontWeight:700,cursor:'help'}}>{confidence.confidence} {cs.label}</span>{confidence.conflict&&<span title="Real-time confidence is high but historical win rate for this gap level is ≤50%. Proceed with caution." style={{fontFamily:mono,fontSize:8,color:'#ff4d6d',background:'rgba(255,77,109,0.1)',border:'1px solid rgba(255,77,109,0.3)',borderRadius:4,padding:'1px 6px',fontWeight:700,cursor:'help'}}>⚠️ CONFLICT</span>}</div>);})()}
       {(()=>{const em=getEdgeMemory(row,memoryIndex);if(!em)return null;const fc=em.flag==='PROVEN_EDGE'?'#00ff9f':em.flag==='DEAD_ZONE'?'#ff4d6d':'#00b4ff';const icon=em.flag==='PROVEN_EDGE'?'✅':em.flag==='DEAD_ZONE'?'⛔':'📊';const lbl=em.flag?em.flag.replace('_',' '):(em.maturity||'').toUpperCase();const wrPct=Math.round((em.winRate||0)*100);const resPct=em.resRate!=null?Math.round(em.resRate*100):null;const edgeTip=em.flag==='PROVEN_EDGE'?`Proven edge: ${wrPct}% win rate from ${em.sample} resolved signals at this gap level. High probability setup.`:em.flag==='DEAD_ZONE'?`Dead zone: only ${wrPct}% win rate from ${em.sample} signals. Historically this gap level loses money.`:`${(em.maturity||'').toUpperCase()}: ${wrPct}% win rate from ${em.sample} signals. Needs more data to confirm edge.`;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2,flexWrap:'wrap'}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>EDGE</span><span title={edgeTip} style={{fontFamily:mono,fontSize:9,color:fc,background:fc+'12',border:`1px solid ${fc}33`,borderRadius:4,padding:'1px 7px',fontWeight:700,cursor:'help'}}>{icon} {lbl}</span><span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>Win:{wrPct}%{resPct!=null?` | Res:${resPct}%`:''} (n={em.sample})</span></div>);})()}
-      {pdr&&<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2,flexWrap:'wrap'}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>PDR</span><PdrBadge pdr={pdr}/><PdrVerdict row={row} pdr={pdr}/></div>}
+      {(pdr||row.pdr_dir!=null)&&<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2,flexWrap:'wrap'}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>PDR</span>{row.pdr_dir!=null?<LivePdrBadge row={row}/>:<PdrBadge pdr={pdr}/>}<PdrVerdict row={row} pdr={pdr}/></div>}
       {(()=>{const isBuy=bias.label==='BUY',isSell=bias.label==='SELL';if(!isBuy&&!isSell)return null;const isJpy=row.symbol?.includes('JPY');const dec=isJpy?3:5;const levels=isBuy?[{l:'PDL',v:row.pdl},{l:'PWL',v:row.pwl},{l:'PML',v:row.pml},{l:'PYL',v:row.pyl}].filter(x=>x.v!=null).sort((a,b)=>b.v-a.v):[{l:'PDH',v:row.pdh},{l:'PWH',v:row.pwh},{l:'PMH',v:row.pmh},{l:'PYH',v:row.pyh}].filter(x=>x.v!=null).sort((a,b)=>a.v-b.v);const top2=levels.slice(0,2);if(!top2.length)return null;const c1=isBuy?'#00ff9f':'#ff4d6d';const c2='#00b4ff';return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2,flexWrap:'wrap'}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>PB ENTRY</span>{top2.map((lv,i)=><span key={lv.l} style={{fontFamily:mono,fontSize:9,color:i===0?c1:c2,background:(i===0?c1:c2)+'12',border:`1px solid ${(i===0?c1:c2)}28`,borderRadius:3,padding:'1px 6px',fontWeight:600}}>{lv.l} {Number(lv.v).toFixed(dec)}</span>)}</div>);})()}
       <div style={{display:'flex',flexDirection:'column',gap:3}}>
         <div style={{display:'flex',alignItems:'center',gap:6}}>
           <span style={{fontFamily:mono,fontSize:10,color:t.momentumColor||'var(--text-muted)',background:(t.momentumColor||'var(--text-muted)')+'18',border:`1px solid ${(t.momentumColor||'var(--text-muted)')}30`,borderRadius:4,padding:'2px 8px',letterSpacing:1}}>{momIcons[t.momentum]||'▬'} {t.momentum||'NEUTRAL'}</span>
           {t.velocity&&t.velocity!=='STABLE'&&<span style={{fontFamily:mono,fontSize:9,color:t.velocity==='ACCELERATING'?'#00ff9f':'#ffaa44'}}>{t.velocity==='ACCELERATING'?'⚡ ACC':'↘ DEC'}</span>}
         </div>
-        {(() => { const g = getMomentumAction(t.momentum, row.bias, t); return g ? (
-          <div style={{display:'flex',alignItems:'center',gap:4}}>
-            <span style={{fontFamily:mono,fontSize:9,color:g.color,background:g.color+'12',borderRadius:3,padding:'1px 6px',letterSpacing:0.5,fontWeight:700}}>👉 {g.action}</span>
-          </div>
-        ) : null; })()}
+        {/* momentum 👉 action removed — the VERDICT banner is the single instruction; momentum stays as data */}
       </div>
       <div style={{display:'flex',background:'var(--bg-card)',borderRadius:6,padding:'6px 8px'}}><DeltaChip label="1H" delta={t.delta1h}/><div style={{width:1,background:'var(--border)',margin:'0 4px'}}/><DeltaChip label="4H" delta={t.delta4h}/><div style={{width:1,background:'var(--border)',margin:'0 4px'}}/><DeltaChip label="8H" delta={t.delta8h}/></div>
       <div style={{display:'flex',alignItems:'center',gap:5}}><div style={{width:5,height:5,borderRadius:'50%',background:sc,flexShrink:0}}/><span style={{fontFamily:mono,fontSize:9,color:sc}}>{row.state||'NEUTRAL'}</span></div>
@@ -1369,9 +1380,9 @@ function PairCardModal({ row, trend, cotBias, onClose, isMobile, confidence, mem
         </div>}
 
         {/* PDR */}
-        {pdr&&<div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',background:'rgba(0,0,0,0.15)',borderRadius:8,flexWrap:'wrap'}}>
+        {(pdr||row.pdr_dir!=null)&&<div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',background:'rgba(0,0,0,0.15)',borderRadius:8,flexWrap:'wrap'}}>
           <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2}}>PDR</span>
-          <PdrBadge pdr={pdr}/>
+          {row.pdr_dir!=null?<LivePdrBadge row={row}/>:<PdrBadge pdr={pdr}/>}
           <PdrVerdict row={row} pdr={pdr}/>
         </div>}
 
@@ -1585,7 +1596,7 @@ function ValidSetupsTab({ data, trends, cotMap, confidenceMap }) {
             <div style={{flex:1}}>
               <div style={{marginBottom:5}}><VerdictBanner row={row} pdr={null} t={t} compact/></div>
               <div style={{fontFamily:mono,fontSize:9,color:t.momentumColor||'var(--text-muted)',background:(t.momentumColor||'var(--text-muted)')+'18',border:`1px solid ${(t.momentumColor||'var(--text-muted)')}30`,borderRadius:4,padding:'2px 8px',display:'inline-block',marginBottom:4}}>{t.momentum||'NEUTRAL'}</div>
-              {g && <div style={{fontFamily:mono,fontSize:10,color:g.color,fontWeight:700}}>👉 {g.action}</div>}{(()=>{const mu=getMatchup(row);if(!mu)return null;return(<div style={{fontFamily:mono,fontSize:9,color:mu.color,background:mu.color+'12',border:`1px solid ${mu.color}28`,borderRadius:4,padding:'2px 7px',display:'inline-block',marginTop:3,whiteSpace:'nowrap'}}>{mu.label}{mu.note&&<span style={{marginLeft:5,opacity:0.7,fontSize:8}}>{mu.note}</span>}</div>);})()}
+              {(()=>{const mu=getMatchup(row);if(!mu)return null;return(<div style={{fontFamily:mono,fontSize:9,color:mu.color,background:mu.color+'12',border:`1px solid ${mu.color}28`,borderRadius:4,padding:'2px 7px',display:'inline-block',marginTop:3,whiteSpace:'nowrap'}}>{mu.label}{mu.note&&<span style={{marginLeft:5,opacity:0.7,fontSize:8}}>{mu.note}</span>}</div>);})()}
               {(()=>{const bh4=boxTrend(row.box_h4_trend),bh1=boxTrend(row.box_h1_trend);if(!bh4&&!bh1)return null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>BOX</span>{bh4&&<span style={{fontFamily:mono,fontSize:8,color:bh4.color,background:bh4.bg,border:`1px solid ${bh4.border}`,borderRadius:3,padding:'1px 6px'}}>H4 {bh4.label}</span>}{bh1&&<span style={{fontFamily:mono,fontSize:8,color:bh1.color,background:bh1.bg,border:`1px solid ${bh1.border}`,borderRadius:3,padding:'1px 6px'}}>H1 {bh1.label}</span>}</div>);})()}
               {(()=>{ const pl=plZoneBadge(row.pl_zone,row.bias); if(!pl)return null; return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>PL</span><span style={{fontFamily:mono,fontSize:9,color:pl.color,background:pl.bg,border:`1px solid ${pl.border}`,borderRadius:4,padding:'1px 8px',fontWeight:700}}>{pl.label}</span>{pl.valid&&<span style={{fontFamily:mono,fontSize:8,color:'#00ff9f',fontWeight:700}}>G1 ✅</span>}{!pl.valid&&<span style={{fontFamily:mono,fontSize:8,color:'#ff7744'}}>G1 ⛔</span>}</div>);})()}
               {(()=>{
@@ -2989,8 +3000,8 @@ function OverviewTab({ data, trends, pdrData, upcomingNews, spikes, confidenceMa
     symbol:row.symbol, gap:row.gap??0, bias:row.bias||'WAIT',
     momentum:trends[row.symbol]?.momentum||'NEUTRAL', closeAlert:trends[row.symbol]?.closeAlert||false,
     pl_zone:row.pl_zone||'BETWEEN', box_h4:row.box_h4_trend||'RANGING', box_h1:row.box_h1_trend||'RANGING',
-    pdr_strong:pdrData[row.symbol]?.strong||false, pdr_strength:pdrData[row.symbol]?.strength||0,
-    pdr_direction:pdrData[row.symbol]?.direction||'NEUTRAL',
+    pdr_strong:(row.pdr_dir!=null?!!row.pdr_strong_live:(pdrData[row.symbol]?.strong||false)), pdr_strength:(row.pdr_dir!=null?(row.pdr_ratio||0):(pdrData[row.symbol]?.strength||0)),
+    pdr_direction:(row.pdr_dir!=null?row.pdr_dir:(pdrData[row.symbol]?.direction||'NEUTRAL')),
     edge:confidenceMap[row.symbol]?.historical?.flag||null, conf:confidenceMap[row.symbol]?.confidence||0,
     conflict:confidenceMap[row.symbol]?.conflict||false,
     news:upcomingNews?.affected_pairs?.includes(row.symbol)||false, hard_invalid:row.hard_invalid||false,
