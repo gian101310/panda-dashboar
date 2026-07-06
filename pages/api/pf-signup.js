@@ -49,7 +49,7 @@ export default async function handler(req, res) {
     if (safeTier === 'starter') {
       const password = pfGenPassword();
 
-      const expiresAt = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString();
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
       await supabase.from('panda_users').insert({
         username: safeUser,
