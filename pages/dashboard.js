@@ -164,14 +164,20 @@ function PdrVerdict({ row, pdr }) {
 // Rule 3: live pullback detection — price retraced 30-60% of today's move OR sitting at a Panda Line.
 function isPullbackZoneNow(row, dir) {
   const pb = row?.pullback_pct;
-  const pbOk = pb != null && pb >= 30 && pb <= 60;
+  const adrUsed = row?.adr_used_pct;
+  // GUARD: there must be a real move to pull back FROM (day covered >=30% of ADR)
+  // and price must have actually retraced (>=20%). Being near a line without a
+  // prior move is NOT a pullback — it's just proximity.
+  const moved = adrUsed != null && adrUsed >= 30;
+  const retraced = pb != null && pb >= 20;
+  const pbOk = moved && pb != null && pb >= 30 && pb <= 60;
   let lineOk = false;
   const price = row?.pl_price, st = row?.pl_st, fl = row?.pl_fl, atr = row?.atr;
-  if (price && atr && (st != null || fl != null)) {
+  if (moved && retraced && price && atr && (st != null || fl != null)) {
     const pip = row.symbol?.includes('JPY') ? 0.01 : 0.0001;
     const lines = [st, fl].filter(x => x != null);
     const distPips = Math.min(...lines.map(l => Math.abs(price - l))) / pip;
-    lineOk = distPips <= atr * 0.15; // within 15% of daily ATR of a Panda Line
+    lineOk = distPips <= atr * 0.15; // at a Panda Line AFTER a real retrace
   }
   return { now: pbOk || lineOk, pbOk, lineOk, pb };
 }
