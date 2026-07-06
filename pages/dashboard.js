@@ -391,12 +391,21 @@ function atrFill(atrPoints, currentPrice, entryPrice) {
 // D1 ADV → next-month bias (critical last 3 days of month — hold into new month?)
 // Returns: { label, color, bg, border, detail, level, verdicts:{h1,h4,d1}, holdExit }
 function advScore(row) {
+  // ADV SUBSTITUTION READING (Boss-G spec):
+  // NEXT DAY  = current D1 + current H4 + ADV H1 (replaces H1 only where ADV H1 has a score)
+  // NEXT WEEK = current D1 + ADV H4 + ADV H1 (replace where present; valid from Friday close)
+  // NEXT MONTH = ADV D1 + ADV H4 + ADV H1 (replace where present)
+  // ADV score of 0 = walang score -> keep the current TF score (nothing changes).
   if (!row) return null;
-  const bD1 = row.adv_base_d1 ?? 0, bH4 = row.adv_base_h4 ?? 0, bH1 = row.adv_base_h1 ?? 0;
-  const qD1 = row.adv_quote_d1 ?? 0, qH4 = row.adv_quote_h4 ?? 0, qH1 = row.adv_quote_h1 ?? 0;
-  const advH1 = bH1 - qH1;
-  const advH4 = bH4 - qH4;
-  const advD1 = bD1 - qD1;
+  const abD1 = row.adv_base_d1 ?? 0, abH4 = row.adv_base_h4 ?? 0, abH1 = row.adv_base_h1 ?? 0;
+  const aqD1 = row.adv_quote_d1 ?? 0, aqH4 = row.adv_quote_h4 ?? 0, aqH1 = row.adv_quote_h1 ?? 0;
+  if (!abD1 && !abH4 && !abH1 && !aqD1 && !aqH4 && !aqH1) return null; // no advance data at all
+  const bD1c = row.base_d1 ?? 0, bH4c = row.base_h4 ?? 0, bH1c = row.base_h1 ?? 0;
+  const qD1c = row.quote_d1 ?? 0, qH4c = row.quote_h4 ?? 0, qH1c = row.quote_h1 ?? 0;
+  const sub = (adv, cur) => (adv !== 0 ? adv : cur);
+  const advH1 = (bD1c + bH4c + sub(abH1, bH1c)) - (qD1c + qH4c + sub(aqH1, qH1c));                       // next-day reading
+  const advH4 = (bD1c + sub(abH4, bH4c) + sub(abH1, bH1c)) - (qD1c + sub(aqH4, qH4c) + sub(aqH1, qH1c)); // next-week reading
+  const advD1 = (sub(abD1, bD1c) + sub(abH4, bH4c) + sub(abH1, bH1c)) - (sub(aqD1, qD1c) + sub(aqH4, qH4c) + sub(aqH1, qH1c)); // next-month reading
   const isBuy = (row.gap ?? 0) > 0;
   const okH1 = isBuy ? advH1 >= 5 : advH1 <= -5;
   const okH4 = isBuy ? advH4 >= 5 : advH4 <= -5;
@@ -409,9 +418,10 @@ function advScore(row) {
   const isFriWindow = dow >= 4 || dow === 0; // Thu-Sun: weekend decision window
   const isMonthEnd  = (lastDay - dom) <= 2;  // Last 3 days of month
   // Per-TF verdicts
-  const h1v = okH1 ? {tag:'HOLD',note:'Next-day bias aligned',c:'#00ff9f'} : {tag:'EXIT',note:'Tomorrow gap may flip',c:'#ff4d6d'};
-  const h4v = okH4 ? {tag:'HOLD',note:isFriWindow?'Safe to hold over weekend':'Weekly bias aligned',c:'#00ff9f'} : {tag:'EXIT',note:isFriWindow?'Exit before weekend — H4 weak':'Next-week gap weakening',c:'#ff4d6d'};
-  const d1v = okD1 ? {tag:'HOLD',note:isMonthEnd?'Safe to hold into new month':'Monthly bias aligned',c:'#00ff9f'} : {tag:'EXIT',note:isMonthEnd?'Exit before month end — D1 weak':'Next-month bias fading',c:'#ff4d6d'};
+  const fmtg = v => (v>0?'+':'')+v;
+  const h1v = okH1 ? {tag:'HOLD',note:`Next-day reading ${fmtg(advH1)} keeps the bias`,c:'#00ff9f'} : {tag:'EXIT',note:`Next-day reading ${fmtg(advH1)} loses the bias`,c:'#ff4d6d'};
+  const h4v = okH4 ? {tag:'HOLD',note:(isFriWindow?'Safe to hold over weekend':`Next-week reading ${fmtg(advH4)} keeps the bias`)+' · valid from Fri close',c:'#00ff9f'} : {tag:'EXIT',note:(isFriWindow?'Exit before weekend — next-week reading weak':`Next-week reading ${fmtg(advH4)} loses the bias`)+' · valid from Fri close',c:'#ff4d6d'};
+  const d1v = okD1 ? {tag:'HOLD',note:isMonthEnd?'Safe to hold into new month':`Next-month reading ${fmtg(advD1)} keeps the bias`,c:'#00ff9f'} : {tag:'EXIT',note:isMonthEnd?'Exit before month end — next-month reading weak':`Next-month reading ${fmtg(advD1)} loses the bias`,c:'#ff4d6d'};
   // Combined hold/exit
   const exits = [!okH1, !okH4, !okD1].filter(Boolean).length;
   let holdExit, label, color, bg, border, level;
@@ -429,7 +439,7 @@ function advScore(row) {
     bg = 'rgba(255,209,102,0.10)'; border = 'rgba(255,209,102,0.35)'; level = 'WARN';
   }
   const fmt = v => (v>0?'+':'')+v;
-  const detail = `H1:${fmt(advH1)} H4:${fmt(advH4)} D1:${fmt(advD1)}`;
+  const detail = `TMRW:${fmt(advH1)} WK:${fmt(advH4)} MTH:${fmt(advD1)}`;
   // Contextual urgency flags
   const urgent = [];
   if (isFriWindow && !okH4) urgent.push('⚠️ WEEKEND');
@@ -1228,7 +1238,7 @@ function PairCard({ row, trend, cotBias, confidence, memoryIndex, pdr, newsAlert
 {adv.urgent&&adv.urgent.map((u,i)=><span key={i} style={{fontFamily:mono,fontSize:7,color:'#ff4d6d',fontWeight:700,letterSpacing:0.5}}>{u}</span>)}
 </div>
 <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
-{[['H1',adv.verdicts.h1,adv.gaps.h1],['H4',adv.verdicts.h4,adv.gaps.h4],['D1',adv.verdicts.d1,adv.gaps.d1]].map(([tf,v,g])=><span key={tf} style={{fontFamily:mono,fontSize:7,color:v.c,background:v.c+'12',border:`1px solid ${v.c}28`,borderRadius:3,padding:'1px 5px',whiteSpace:'nowrap'}}>{tf} {v.tag} {g>0?'+':''}{g}</span>)}
+{[['TMRW',adv.verdicts.h1,adv.gaps.h1],['NEXT WK',adv.verdicts.h4,adv.gaps.h4],['NEXT MTH',adv.verdicts.d1,adv.gaps.d1]].map(([tf,v,g])=><span key={tf} title={v.note} style={{fontFamily:mono,fontSize:7,color:v.c,background:v.c+'12',border:`1px solid ${v.c}28`,borderRadius:3,padding:'1px 5px',whiteSpace:'nowrap',cursor:'help'}}>{tf} {v.tag} {g>0?'+':''}{g}</span>)}
 </div>
 </div>);})()}{cotBias&&<div style={{display:'flex',alignItems:'center',gap:4}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>COT</span><span style={{fontFamily:mono,fontSize:9,color:cotBias.bias==='BULLISH'?'#00ff9f':'#ff4d6d',background:cotBias.bias==='BULLISH'?'rgba(0,255,159,0.08)':'rgba(255,77,109,0.08)',border:`1px solid ${cotBias.bias==='BULLISH'?'#00ff9f33':'#ff4d6d33'}`,borderRadius:3,padding:'1px 5px'}}>{cotBias.bias==='BULLISH'?'▲':'▼'} {cotBias.bias}</span></div>}
       {(()=>{if(!confidence)return null;const cs=confStyle(confidence.confidence);if(!cs)return null;const tip=confidence.reasons?confidence.reasons.join(' · '):'';return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>CONF</span><span title={tip} style={{fontFamily:mono,fontSize:9,color:cs.color,background:cs.bg,border:`1px solid ${cs.border}`,borderRadius:4,padding:'1px 7px',fontWeight:700,cursor:'help'}}>{confidence.confidence} {cs.label}</span>{confidence.conflict&&<span title="Real-time confidence is high but historical win rate for this gap level is ≤50%. Proceed with caution." style={{fontFamily:mono,fontSize:8,color:'#ff4d6d',background:'rgba(255,77,109,0.1)',border:'1px solid rgba(255,77,109,0.3)',borderRadius:4,padding:'1px 6px',fontWeight:700,cursor:'help'}}>⚠️ CONFLICT</span>}</div>);})()}
