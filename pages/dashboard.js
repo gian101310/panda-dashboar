@@ -1216,10 +1216,11 @@ function PlatformButtons({symbol}){
 }
 
 // ===== PAIR CARD =====
-// ===== SCORE SOURCE-TIMEFRAME BADGE =====
-// Shows which timeframe (D1/H4/H1) produced each side's Panda score.
-// Reads base_score_tf / quote_score_tf written by the engine (derive_score_tf).
-// "ALL" = every timeframe is extreme (|v|>=4) in the winning direction.
+// ===== EXTREME-TIMEFRAME BADGE =====
+// Lists every timeframe whose Panda score is extreme (|value| 4/5/6), with its
+// signed value. Non-extreme values (1/2/3) are ignored. A side with no extreme
+// timeframe (e.g. CAD) is omitted. Reads base_score_tf / quote_score_tf written
+// by the engine (derive_score_tf), format "D1+4 H4+5".
 function ScoreTfBadge({ row, showLabel = true, mt = 2 }) {
   const mono = "'Share Tech Mono',monospace";
   const b = row?.base_score_tf || '';
@@ -1227,20 +1228,28 @@ function ScoreTfBadge({ row, showLabel = true, mt = 2 }) {
   if (!b && !q) return null;
   const bc = row?.base_currency || row?.symbol?.slice(0, 3) || 'BASE';
   const qc = row?.quote_currency || row?.symbol?.slice(3, 6) || 'QUOTE';
-  const pill = (cur, tf, key) => {
-    if (!tf) return null;
-    const all = tf === 'ALL';
-    const col = all ? '#ffd166' : '#00b4ff';
-    const tip = all
-      ? `${cur}: every timeframe (D1/H4/H1) is extreme (|score| >= 4)`
-      : `${cur} score is derived from ${tf.replace(/\+/g, ' + ')}`;
-    return <span key={key} title={tip} style={{ fontFamily: mono, fontSize: 8, color: col, background: col + '14', border: `1px solid ${col}33`, borderRadius: 3, padding: '1px 6px', whiteSpace: 'nowrap', fontWeight: all ? 700 : 600, cursor: 'help' }}>{all ? '⚡ ' : ''}{cur} {tf}</span>;
+  const side = (cur, str, keyp) => {
+    if (!str) return null;
+    const toks = str.split(/\s+/).filter(Boolean);
+    if (!toks.length) return null;
+    return (
+      <span key={keyp} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+        <span style={{ fontFamily: mono, fontSize: 8, color: 'var(--text-secondary)', fontWeight: 700, letterSpacing: 0.5 }}>{cur}</span>
+        {toks.map((t, i) => {
+          const tf = t.slice(0, 2);
+          const val = t.slice(2);
+          const pos = !val.startsWith('-');
+          const col = pos ? '#00ff9f' : '#ff4d6d';
+          return <span key={i} title={`${cur} ${tf} score ${val} (extreme)`} style={{ fontFamily: mono, fontSize: 8, color: col, background: col + '14', border: `1px solid ${col}33`, borderRadius: 3, padding: '1px 5px', whiteSpace: 'nowrap', fontWeight: 600, cursor: 'help' }}>{tf} {val}</span>;
+        })}
+      </span>
+    );
   };
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: mt, flexWrap: 'wrap' }}>
-      {showLabel && <span style={{ fontFamily: mono, fontSize: 8, color: 'var(--text-secondary)', letterSpacing: 1, fontWeight: 600 }}>SCORE TF</span>}
-      {pill(bc, b, 'b')}
-      {pill(qc, q, 'q')}
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: mt, flexWrap: 'wrap' }}>
+      {showLabel && <span style={{ fontFamily: mono, fontSize: 8, color: 'var(--text-secondary)', letterSpacing: 1, fontWeight: 600 }}>EXTREME TF</span>}
+      {side(bc, b, 'b')}
+      {side(qc, q, 'q')}
     </div>
   );
 }

@@ -524,64 +524,29 @@ def extract_panda_score(line):
 
 def derive_score_tf(line):
     """
-    Companion to extract_panda_score (which is LOCKED and unchanged).
-    Reports WHICH timeframe produced a currency's score, using the IDENTICAL
-    selection rule: strongest value by absolute magnitude across D1/H4/H1,
-    reading raw split values (e.g. '+2/-1') as separate candidates.
+    Lists the timeframes whose Panda score is EXTREME (|value| >= 4, i.e.
+    4/5/6 positive or negative). Non-extreme values (1/2/3) are ignored.
     Display/reporting only — never feeds back into gap or scoring.
 
-    Returns a short label:
-      ""            -> no score / ambiguous / both directions present / ADV line
-      "D1"/"H4"/"H1"-> single dominant timeframe
-      "H4+H1" (etc) -> tie: multiple timeframes hold the winning value
-      "ALL"         -> every timeframe is extreme (|v|>=4) in the winning direction
-    Selection logic MUST stay in lock-step with extract_panda_score.
+    Reads raw split values (e.g. '+5/-1') and includes each extreme part.
+    Returns a compact string of TF+signedvalue tokens in D1/H4/H1 order,
+    e.g. "D1+4 H4+5" or "H1-6", or "" if no timeframe is extreme.
     """
     if line.strip().startswith("ADV"):
         return ""
 
     matches = re.findall(r"(D1|H4|H1)\s*:\s*([+-]?\d+)(?:/([+-]?\d+))?", line)
-    all_values = []            # list of (tf, value)
-    pos_sig = neg_sig = False
-    for tf, v1s, v2s in matches:
-        v1 = int(v1s)
-        all_values.append((tf, v1))
-        if v1 >= 4:  pos_sig = True
-        if v1 <= -4: neg_sig = True
-        if v2s:
-            v2 = int(v2s)
-            all_values.append((tf, v2))
-            if v2 >= 4:  pos_sig = True
-            if v2 <= -4: neg_sig = True
-
-    # Both significant directions present -> extract_panda_score returns 0 (invalid)
-    if pos_sig and neg_sig:
-        return ""
-    if not all_values:
-        return ""
-
-    vals = [v for _, v in all_values]
-    strongest_pos = max((v for v in vals if v > 0), default=0)
-    strongest_neg = min((v for v in vals if v < 0), default=0)
-    abs_pos, abs_neg = abs(strongest_pos), abs(strongest_neg)
-
-    if abs_pos == abs_neg and abs_pos != 0:   # equal-and-opposite -> score 0
-        return ""
-    winner = strongest_neg if abs_neg > abs_pos else strongest_pos
-    if winner == 0:
-        return ""
-
     order = {"D1": 0, "H4": 1, "H1": 2}
-    winning_tfs = sorted({tf for tf, v in all_values if v == winner},
-                         key=lambda t: order.get(t, 9))
-
-    # ALL-extreme: every timeframe is extreme (|v|>=4) in the winning direction
-    sign = 1 if winner > 0 else -1
-    if all(any((v * sign) >= 4 for tf, v in all_values if tf == t)
-           for t in ("D1", "H4", "H1")):
-        return "ALL"
-
-    return "+".join(winning_tfs)
+    out = []                       # list of (tf_order, tf, value)
+    for tf, v1s, v2s in matches:
+        for vs in (v1s, v2s):
+            if not vs:
+                continue
+            v = int(vs)
+            if abs(v) >= 4:        # only extreme 4/5/6 (or -4/-5/-6)
+                out.append((order.get(tf, 9), tf, v))
+    out.sort(key=lambda x: x[0])
+    return " ".join(f"{tf}{'+' if v > 0 else ''}{v}" for _, tf, v in out)
 
 
 def _build_currency_line(parsed, side):
