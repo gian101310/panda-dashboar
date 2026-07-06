@@ -10,7 +10,7 @@ function pfGetIp(req) {
   return (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket?.remoteAddress || '';
 }
 function pfGenPassword() {
-  return 'Panda#' + Math.floor(1000 + Math.random() * 9000);
+  return 'Panda#' + crypto.randomBytes(4).toString('hex');
 }
 function pfGenToken() {
   return crypto.randomBytes(16).toString('hex');

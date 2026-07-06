@@ -1,18 +1,19 @@
 import { supabase } from '../../../lib/supabase';
 import { validateSession, hashPassword } from '../../../lib/auth';
+import crypto from 'crypto';
 
 const PF_BOT_TOKEN = process.env.PF_BOT_TOKEN || '';
 const PF_APPROVE_BOT_TOKEN = process.env.PF_APPROVE_BOT_TOKEN || PF_BOT_TOKEN;
 const PF_ADMIN_CHAT = process.env.PF_ADMIN_CHAT || '';
 
 const PF_PAYMENT_LINKS = {
-  pro:            'https://pay.ziina.com/pandaengine/-N_F9jwMf?source=app',  // $49/mo
-  elite:          'https://pay.ziina.com/pandaengine/_pOykTgTs?source=app',  // $99/mo
-  pro_lifetime:   'https://pay.ziina.com/pandaengine/gZMGfgrNt?source=app',  // $499
-  elite_lifetime: 'https://pay.ziina.com/pandaengine/7R5dOWfTe?source=app',  // $999
+  pro:            'https://pay.ziina.com/pandaengine/-N_F9jwMf?source=app',  // AED 49/mo
+  elite:          'https://pay.ziina.com/pandaengine/_pOykTgTs?source=app',  // AED 99/mo
+  pro_lifetime:   'https://pay.ziina.com/pandaengine/gZMGfgrNt?source=app',  // AED 499
+  elite_lifetime: 'https://pay.ziina.com/pandaengine/7R5dOWfTe?source=app',  // AED 999
 };
 
-function pfGenPassword() { return 'Panda#' + Math.floor(1000 + Math.random() * 9000); }
+function pfGenPassword() { return 'Panda#' + crypto.randomBytes(4).toString('hex'); }
 
 // Send via old bot (@panda_engine_alerts_bot) for approved/existing users
 async function pfSendApproveBot(chatId, text) {
@@ -163,7 +164,7 @@ export default async function handler(req, res) {
       if (!req_row.telegram_chat_id) return res.status(400).json({ error: 'User has not connected Telegram yet' });
       const t = req_row.tier || 'pro';
       const payLink = PF_PAYMENT_LINKS[t] || PF_PAYMENT_LINKS.pro;
-      const price = t === 'elite' ? '$99/mo' : '$49/mo';
+      const price = t === 'elite' ? 'AED 99/mo' : 'AED 49/mo';
       const dm = [
         '🐼 <b>PANDA ENGINE — PAYMENT REMINDER</b>',
         '━━━━━━━━━━━━━━━━━━━━━━',

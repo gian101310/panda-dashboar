@@ -13,8 +13,8 @@ const PF_TIER_FEATURES = {
 };
 const PF_TIER_LABELS = {
   starter: { price: 'FREE (1 week trial)', color: '#445566' },
-  pro:     { price: '$49/mo or $499 lifetime', color: '#00ff9f' },
-  elite:   { price: '$99/mo or $999 lifetime', color: '#00b4ff' },
+  pro:     { price: 'AED 49/mo or AED 499 lifetime', color: '#00ff9f' },
+  elite:   { price: 'AED 99/mo or AED 999 lifetime', color: '#00b4ff' },
 };
 const PRIORITY_COLOR = {
   CRITICAL: '#ff4d6d',
@@ -248,8 +248,8 @@ export default function PfApprovalsPage() {
                 <label style={{ fontFamily: mono, fontSize: 9, letterSpacing: 2, color: '#445566' }}>TIER
                   <select value={pfApTier} onChange={e => setPfApTier(e.target.value)} style={{ display: 'block', width: '100%', marginTop: 4, background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '10px 12px', color: '#e8eaf0', fontFamily: mono, fontSize: 12, outline: 'none' }}>
                     <option value="starter">STARTER — FREE (1 week trial)</option>
-                    <option value="pro">PRO — $49/mo or $499 lifetime</option>
-                    <option value="elite">ELITE — $99/mo or $999 lifetime</option>
+                    <option value="pro">PRO — AED 49/mo or AED 499 lifetime</option>
+                    <option value="elite">ELITE — AED 99/mo or AED 999 lifetime</option>
                   </select>
                 </label>
                 <div style={{ marginTop: 10, background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '10px 12px' }}>

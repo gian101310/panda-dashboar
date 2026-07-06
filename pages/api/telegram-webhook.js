@@ -6,10 +6,10 @@ const ADMIN_CHAT_ID = process.env.PF_ADMIN_CHAT || '';
 const FREE_TABS = ['signals','calculator'];
 
 const PAYMENT_LINKS = {
-  pro:            'https://pay.ziina.com/pandaengine/-N_F9jwMf?source=app',  // $49/mo
-  elite:          'https://pay.ziina.com/pandaengine/_pOykTgTs?source=app',  // $99/mo
-  pro_lifetime:   'https://pay.ziina.com/pandaengine/gZMGfgrNt?source=app',  // $499
-  elite_lifetime: 'https://pay.ziina.com/pandaengine/7R5dOWfTe?source=app',  // $999
+  pro:            'https://pay.ziina.com/pandaengine/-N_F9jwMf?source=app',  // AED 49/mo
+  elite:          'https://pay.ziina.com/pandaengine/_pOykTgTs?source=app',  // AED 99/mo
+  pro_lifetime:   'https://pay.ziina.com/pandaengine/gZMGfgrNt?source=app',  // AED 499
+  elite_lifetime: 'https://pay.ziina.com/pandaengine/7R5dOWfTe?source=app',  // AED 999
 };
 
 // Set TG_WEBHOOK_SECRET in Vercel env vars, then re-register webhook with:
@@ -84,7 +84,7 @@ export default async function handler(req, res) {
 
         const tier = row.tier || 'pro';
         const payLink = PAYMENT_LINKS[tier] || PAYMENT_LINKS.pro;
-        const price = tier === 'elite' ? '$99/mo' : '$49/mo';
+        const price = tier === 'elite' ? 'AED 99/mo' : 'AED 49/mo';
         const dm = [
           '<b>PANDA ENGINE — REQUEST RECEIVED</b>',
           '━━━━━━━━━━━━━━━━━━━━━━',

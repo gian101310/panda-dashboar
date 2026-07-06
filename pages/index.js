@@ -24,8 +24,8 @@ const STEPS = [
 
 const TIERS = [
   { name:'STARTER', price:'0', period:'', sub:'FREE FOR 1 WEEK', color:'#445566', tag:null, features:['Live signals tab','Position calculator'], cta:'START FREE TRIAL', tier:'starter' },
-  { name:'PRO', price:'49', was:'99', period:'/mo', sub:'LAUNCH PRICE · or $499 lifetime (was $3,499)', color:'#00ff9f', tag:'MOST POPULAR', features:['Everything in Starter, plus:','Panel tab','Full data table','Valid setups tab','Panda AI assistant','Research tab'], cta:'GO PRO →', tier:'pro' },
-  { name:'ELITE', price:'99', was:'699', period:'/mo', sub:'LAUNCH PRICE · or $999 lifetime (was $4,999)', color:'#00b4ff', tag:'FULL ACCESS', features:['Everything in Pro, plus:','Overview tab','Signal logs tab','Valid pairs filter','Telegram signal alerts','Spike signal alerts','Private trading journal','Chart tab','MT4/MT5 Panda Indicators','Bias detection indicators'], cta:'GO ELITE →', tier:'elite' },
+  { name:'PRO', price:'49', was:'99', period:'/mo', sub:'LAUNCH PRICE · ≈ $13 USD · or AED 499 lifetime', color:'#00ff9f', tag:'MOST POPULAR', features:['Everything in Starter, plus:','Panel tab','Full data table','Valid setups tab','Panda AI assistant','Research tab'], cta:'GO PRO →', tier:'pro' },
+  { name:'ELITE', price:'99', was:'699', period:'/mo', sub:'LAUNCH PRICE · ≈ $27 USD · or AED 999 lifetime', color:'#00b4ff', tag:'FULL ACCESS', features:['Everything in Pro, plus:','Overview tab','Signal logs tab','Valid pairs filter','Telegram signal alerts','Spike signal alerts','Private trading journal','Chart tab','MT4/MT5 Panda Indicators','Bias detection indicators'], cta:'GO ELITE →', tier:'elite' },
 ];
 
 const TESTIMONIALS = [
@@ -515,7 +515,7 @@ export default function LandingPage() {
               {TIERS.map((t, i) => <div key={t.name} style={{ padding: '32px 28px', background: t.tag ? 'rgba(0,255,159,0.03)' : 'rgba(12,18,32,0.6)', border: `1px solid ${t.tag ? 'rgba(0,255,159,0.2)' : 'rgba(255,255,255,0.06)'}`, borderRadius: 14, position: 'relative', textAlign: 'center' }}>
                 {t.tag && <div style={{ position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)', fontFamily: mono, fontSize: 9, color: '#050810', background: t.color, padding: '4px 16px', borderRadius: 20, letterSpacing: 2, fontWeight: 700 }}>{t.tag}</div>}
                 <div style={{ fontFamily: orb, fontSize: 14, fontWeight: 700, letterSpacing: 3, color: t.color, marginBottom: 16 }}>{t.name}</div>
-                <div style={{ fontFamily: orb, fontSize: 48, fontWeight: 900, color: '#e8f0ff', lineHeight: 1 }}>${t.price}<span style={{ fontFamily: mono, fontSize: 14, color: '#4a5578' }}>{t.period}</span>{t.was && <span style={{ fontFamily: mono, fontSize: 16, color: '#4a5578', textDecoration: 'line-through', marginLeft: 8 }}>${t.was}</span>}</div>
+                <div style={{ fontFamily: orb, fontSize: 48, fontWeight: 900, color: '#e8f0ff', lineHeight: 1 }}><span style={{ fontFamily: mono, fontSize: 16, color: '#4a5578' }}>AED </span>{t.price}<span style={{ fontFamily: mono, fontSize: 14, color: '#4a5578' }}>{t.period}</span>{t.was && <span style={{ fontFamily: mono, fontSize: 16, color: '#4a5578', textDecoration: 'line-through', marginLeft: 8 }}>AED {t.was}</span>}</div>
                 {t.sub && <div style={{ fontFamily: mono, fontSize: 10, color: '#ffd166', letterSpacing: 1, marginTop: 8 }}>{t.sub}</div>}
                 <div style={{ margin: '24px 0', display: 'flex', flexDirection: 'column', gap: 10, textAlign: 'left' }}>
                   {t.features.map(f => <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: raj, fontSize: 14, color: '#8899bb' }}>
