@@ -522,6 +522,68 @@ def extract_panda_score(line):
     return strongest_pos, False
 
 
+def derive_score_tf(line):
+    """
+    Companion to extract_panda_score (which is LOCKED and unchanged).
+    Reports WHICH timeframe produced a currency's score, using the IDENTICAL
+    selection rule: strongest value by absolute magnitude across D1/H4/H1,
+    reading raw split values (e.g. '+2/-1') as separate candidates.
+    Display/reporting only — never feeds back into gap or scoring.
+
+    Returns a short label:
+      ""            -> no score / ambiguous / both directions present / ADV line
+      "D1"/"H4"/"H1"-> single dominant timeframe
+      "H4+H1" (etc) -> tie: multiple timeframes hold the winning value
+      "ALL"         -> every timeframe is extreme (|v|>=4) in the winning direction
+    Selection logic MUST stay in lock-step with extract_panda_score.
+    """
+    if line.strip().startswith("ADV"):
+        return ""
+
+    matches = re.findall(r"(D1|H4|H1)\s*:\s*([+-]?\d+)(?:/([+-]?\d+))?", line)
+    all_values = []            # list of (tf, value)
+    pos_sig = neg_sig = False
+    for tf, v1s, v2s in matches:
+        v1 = int(v1s)
+        all_values.append((tf, v1))
+        if v1 >= 4:  pos_sig = True
+        if v1 <= -4: neg_sig = True
+        if v2s:
+            v2 = int(v2s)
+            all_values.append((tf, v2))
+            if v2 >= 4:  pos_sig = True
+            if v2 <= -4: neg_sig = True
+
+    # Both significant directions present -> extract_panda_score returns 0 (invalid)
+    if pos_sig and neg_sig:
+        return ""
+    if not all_values:
+        return ""
+
+    vals = [v for _, v in all_values]
+    strongest_pos = max((v for v in vals if v > 0), default=0)
+    strongest_neg = min((v for v in vals if v < 0), default=0)
+    abs_pos, abs_neg = abs(strongest_pos), abs(strongest_neg)
+
+    if abs_pos == abs_neg and abs_pos != 0:   # equal-and-opposite -> score 0
+        return ""
+    winner = strongest_neg if abs_neg > abs_pos else strongest_pos
+    if winner == 0:
+        return ""
+
+    order = {"D1": 0, "H4": 1, "H1": 2}
+    winning_tfs = sorted({tf for tf, v in all_values if v == winner},
+                         key=lambda t: order.get(t, 9))
+
+    # ALL-extreme: every timeframe is extreme (|v|>=4) in the winning direction
+    sign = 1 if winner > 0 else -1
+    if all(any((v * sign) >= 4 for tf, v in all_values if tf == t)
+           for t in ("D1", "H4", "H1")):
+        return "ALL"
+
+    return "+".join(winning_tfs)
+
+
 def _build_currency_line(parsed, side):
     """
     Returns the RAW original line from the mt4 file for scoring.
@@ -1104,6 +1166,8 @@ def run_gap_once():
                 "confidence":       "INVALID",
                 "base_currency":    parsed["base_cur"],
                 "quote_currency":   parsed["quote_cur"],
+                "base_score_tf":    derive_score_tf(parsed.get("raw_base_line", "")),
+                "quote_score_tf":   derive_score_tf(parsed.get("raw_quote_line", "")),
                 "base_d1":          parsed["base_d1"],
                 "base_h4":          parsed["base_h4"],
                 "base_h1":          parsed["base_h1"],
@@ -1272,6 +1336,8 @@ def run_gap_once():
             "confidence":       confidence,
             "base_currency":    parsed["base_cur"],
             "quote_currency":   parsed["quote_cur"],
+            "base_score_tf":    derive_score_tf(parsed.get("raw_base_line", "")),
+            "quote_score_tf":   derive_score_tf(parsed.get("raw_quote_line", "")),
             "base_d1":          parsed["base_d1"],
             "base_h4":          parsed["base_h4"],
             "base_h1":          parsed["base_h1"],
