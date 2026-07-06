@@ -337,6 +337,21 @@ function PhaseLegend({ isMobile }) {
         <span style={{color:'#ffd166'}}> ~ WEAK SUPPORT</span> right direction, no conviction — neutral ·
         <span style={{color:'#ffaa44'}}> ✗ AGAINST</span> yesterday moved the other way — not a continuation; trend-turn attempt only with extra confirmation, smaller size, or skip.
       </div>
+      <div style={{fontFamily:monoF,fontSize:9,color:'var(--text-muted)',marginTop:6,lineHeight:1.6}}>
+        <span style={{color:'var(--text-secondary)',fontWeight:700,letterSpacing:1}}>TELEGRAM SNAPSHOT — ACTION WORDS: </span>
+        <span style={{color:'#00ff9f'}}>EXECUTE</span> gap 9+ & Panda Lines confirmed — market entry rule met ·
+        <span style={{color:'#00ff9f'}}> ENTER PB</span> price is in the pullback area right now ·
+        <span style={{color:'#ffd166'}}> PB WAIT</span> valid bias — wait for a 30-60% retrace or Panda Line tag ·
+        <span style={{color:'#ffaa44'}}> NO CHASE</span> too late, no new entries ·
+        <span style={{color:'#ff4d6d'}}> CLOSE?</span> trend at risk — protect open trades ·
+        <span style={{color:'#6b7280'}}> WAIT</span> no valid bias.
+      </div>
+      <div style={{fontFamily:monoF,fontSize:9,color:'var(--text-muted)',marginTop:4,lineHeight:1.6}}>
+        <span style={{color:'var(--text-secondary)',fontWeight:700,letterSpacing:1}}>SNAPSHOT PDR WORDS: </span>
+        <span style={{color:'#00ff9f'}}>SUPPORTS</span> yesterday moved WITH the bias and held — continuation backdrop ·
+        <span style={{color:'#ffd166'}}> WEAK SUP</span> right direction, no conviction ·
+        <span style={{color:'#ffaa44'}}> AGAINST</span> yesterday opposed the bias — trend-turn risk. On WAIT pairs the raw form shows instead (▲/▼ strength + S strong / w weak).
+      </div>
     </div>
   );
 }
