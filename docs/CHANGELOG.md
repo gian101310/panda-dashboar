@@ -4,6 +4,22 @@
 
 ---
 
+## Jul 8, 2026 — Mac work-anywhere setup + tooling overhaul (no product code changes)
+
+**Mac dev environment (session from Dubai, away from home):**
+- Repo had diverged from force-pushed remote — backed up local to `backup-mac-2026-07-08`, hard-reset to origin/main a2528c2
+- Regenerated node_modules + lockfile (fixed "Failed to patch lockfile" build error); added SUPABASE_ANON_KEY to .env.local (lib/supabase.js is env-based now)
+- GitHub CLI installed + authenticated (gian101310) — push works from Mac
+
+**Tooling (pushed b85a34d → 04914de + this session):**
+- check_dupes.py: cross-platform path fix (re-applied — force-push had reverted it)
+- NEW `map_code.py`: instant component→line index; run before any big-file edit (dashboard.js = 4,199 lines / ~90 components)
+- NEW auto-pull sync: Mac cron active; Windows autopull.bat + SETUP_AUTOPULL.md ready (one-time schtasks registration needed on home PC)
+- panda-engine-skill/SKILL.md fully regenerated: fresh component index (exact @ Jul 8), verified Supabase counts (tracker 11,249 / results 4,434 / ai_memory 111 / users 8; signal_snapshots purged to 0, gap_history trimmed ~25k), 14-tab structure, current API route list, token-saving workflow. Needs skill re-upload in Claude settings.
+- CLAUDE.md: current-state refresh + token-saving workflow section
+
+---
+
 ## Jul 4, 2026 — Trend Phase Indicator + Shadow Tracker
 
 **Data analysis session:** full factor analysis of 4,170 BB signals — edge concentrates at |gap|≥9 (peak-gap ≥9 trades: +3,566 net pips; <9: −1,696), TBG-aligned + LONDON positive, NEW_YORK negative, FADING momentum negative. April profitable, May–Jul negative (regime-dependent).
