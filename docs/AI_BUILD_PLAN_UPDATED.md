@@ -106,18 +106,20 @@ TableRecordsStatussignal_results326+session + box + pdr columns livemanual_trade
 
 ## REMAINING PHASE
 
-### Phase 8 — Signal Agent v2 on Tracker Data
+### Phase 8 — Signal Agent v2 on Tracker Data ✅ (Jul 9, 2026)
 
-**Status: WAITING — needs 30+ days of signal_tracker dataEarliest feasible: May 20, 2026**
+**Status: COMPLETE** — `/api/signal-agent-v2.js` (admin POST re-runs; wired into run-all-agents). 35 `tracker_lifecycle` memories seeded (factors `v2_*`); ai_memory type CHECK extended; ai-chat injects a SIGNAL LIFECYCLE section. Analyzed 11,121 BB + 132 INTRA closed trackers (Apr 19 – Jul 8).
 
-Questions to answer:
+Answers (gap-based; price_confirmed=0 table-wide — cTrader capture never worked):
 
-- How long do signals at each gap level sustain?
-- What kills signals most often? (close_reason distribution)
-- Does PDR strong correlate with signal longevity?
-- Does session correlate with signal quality?
-- Does box alignment at open correlate with outcome?
-- Does gap_delta (velocity) at open predict direction?
+1. **Gap sustain**: BB median lifetime ~5 min at EVERY gap level (5→12+); only 2.9% survive 6h. Higher gap ≠ longer life (gap 8–10 actually dies faster: 2–4% survive 1h vs 9–10% at gap 5–7). INTRA: median 5h, 55% survive 6h — the TBG gate creates durable signals, not gap size.
+2. **What kills**: BB — PL_FLIPPED 68% (avg 0.6h), GAP_BELOW_5 31% (avg 2.2h, lives 4x longer), TBG_FLIPPED 0.3% (avg 8.3h). INTRA — PL_FLIPPED 74%.
+3. **PDR strong**: NO longevity edge (avg 1.3h vs 1.1h, median identical; only 117 strong opens).
+4. **Session**: no meaningful BB difference (all medians ~5 min); OVERLAP/TOKYO longer but n<60.
+5. **Box H4 aligned**: NO longevity edge (0.9h vs 1.1h).
+6. **Gap velocity at open**: NOT measurable — pre-open gap_delta lived in signal_snapshots (purged); hourly_gaps too coarse (1h) vs 5-min median lifetime. Requires storing snapshot-level delta on tracker at open.
+
+**Meta-finding (biggest)**: tracker churn — BB re-opens the same symbol 30–77×/day (PL-zone flicker). Most tracker rows are noise, not fresh signals. The durable 6h+ subset (~325 BB) is the tradeable population. **Follow-up candidates**: (a) debounce tracker re-opens (e.g. ignore re-open within 60 min of PL_FLIPPED close), (b) store gap_delta_at_open on tracker, (c) treat PL flip as pause not kill.
 
 ---
 

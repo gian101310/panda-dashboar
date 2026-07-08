@@ -4,6 +4,17 @@
 
 ---
 
+## Jul 9, 2026 — PHASE 8 COMPLETE: Signal Agent v2 on tracker data
+
+- NEW `/api/signal-agent-v2.js` — lifecycle analysis on 11,253 closed signal_tracker rows; 8 factors (`v2_gap_sustain`, `v2_close_reason`, `v2_pdr_longevity`, `v2_session_longevity`, `v2_box_longevity`, `v2_survivors`, `v2_churn`, `v2_velocity_note`); idempotent delete+insert; wired into run-all-agents (4th agent)
+- ai_memory type CHECK extended with `tracker_lifecycle` (migration); 35 memories seeded via SQL (route re-run replaces)
+- ai-chat fetchMemoryContext: new SIGNAL LIFECYCLE section + med-life/6h-survival fields
+- KEY FINDINGS: BB median life 5 min at ALL gap levels, 2.9% survive 6h; PL_FLIPPED kills 68%; PDR/session/box = no longevity edge; INTRA (TBG-gated) 55% survive 6h; BB churn 30–77 re-opens/symbol/day = tracker flicker. Full answers in AI_BUILD_PLAN_UPDATED.md Phase 8.
+- Q6 velocity: unanswerable (snapshots purged, hourly too coarse) — needs gap_delta_at_open column
+- cTrader price capture: price_confirmed=0 on ALL 11k rows — Boss-G confirms API freezes; future price capture must not block on it
+
+---
+
 ## Jul 9, 2026 — Extreme TF badge fix (dashboard + engine)
 
 **Root cause:** live engine (Desktop ctrader_trend_scanner/app.py) never had `derive_score_tf` — dashboard.base_score_tf/quote_score_tf were stale leftovers, so EXTREME TF badges appeared inconsistently.
