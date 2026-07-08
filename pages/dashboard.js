@@ -1221,11 +1221,10 @@ function PlatformButtons({symbol}){
 // signed value. Non-extreme values (1/2/3) are ignored. A side with no extreme
 // timeframe (e.g. CAD) is omitted. Reads base_score_tf / quote_score_tf written
 // by the engine (derive_score_tf), format "D1+4 H4+5".
-function ScoreTfBadge({ row, showLabel = true, mt = 2 }) {
+function ScoreTfBadge({ row, showLabel = true, mt = 2, showEmpty = false }) {
   const mono = "'Share Tech Mono',monospace";
   const b = row?.base_score_tf || '';
   const q = row?.quote_score_tf || '';
-  if (!b && !q) return null;
   const bc = row?.base_currency || row?.symbol?.slice(0, 3) || 'BASE';
   const qc = row?.quote_currency || row?.symbol?.slice(3, 6) || 'QUOTE';
   const side = (cur, str, keyp) => {
@@ -1246,11 +1245,22 @@ function ScoreTfBadge({ row, showLabel = true, mt = 2 }) {
       </span>
     );
   };
+  const bEl = side(bc, b, 'b');
+  const qEl = side(qc, q, 'q');
+  if (!bEl && !qEl) {
+    if (!showEmpty) return null;
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: mt, flexWrap: 'wrap' }}>
+        {showLabel && <span style={{ fontFamily: mono, fontSize: 8, color: 'var(--text-secondary)', letterSpacing: 1, fontWeight: 600 }}>EXTREME TF</span>}
+        <span title="No timeframe on either currency has an extreme score (±4/5/6) right now — gap is built from moderate scores." style={{ fontFamily: mono, fontSize: 8, color: 'var(--text-muted)', border: '1px solid var(--border)', borderRadius: 3, padding: '1px 5px', cursor: 'help' }}>NONE</span>
+      </div>
+    );
+  }
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: mt, flexWrap: 'wrap' }}>
       {showLabel && <span style={{ fontFamily: mono, fontSize: 8, color: 'var(--text-secondary)', letterSpacing: 1, fontWeight: 600 }}>EXTREME TF</span>}
-      {side(bc, b, 'b')}
-      {side(qc, q, 'q')}
+      {bEl}
+      {qEl}
     </div>
   );
 }
@@ -1395,6 +1405,9 @@ function PairCardModal({ row, trend, cotBias, onClose, isMobile, confidence, mem
           {bc && <span style={{fontFamily:mono,fontSize:11,color:bc.color,background:bc.bg,border:`1px solid ${bc.border}`,borderRadius:6,padding:'4px 12px',fontWeight:700}}>{bc.label}</span>}
           {mu && <span style={{fontFamily:mono,fontSize:10,color:mu.color,background:mu.color+'12',border:`1px solid ${mu.color}30`,borderRadius:6,padding:'4px 12px'}}>{mu.label}</span>}
         </div>
+
+        {/* Extreme timeframe badge */}
+        <ScoreTfBadge row={row} mt={0} showEmpty/>
 
         {/* ADV Score Warning */}
         {(()=>{const adv=advScore(row);if(!adv)return null;return(
@@ -2339,7 +2352,7 @@ function SignalLogTab() {
         <table style={{width:'100%',borderCollapse:'collapse',fontFamily:mono,fontSize:10}}>
           <thead>
             <tr style={{background:'var(--bg-secondary)'}}>
-              {['TIME','PAIR','GAP','BIAS','CONF','EXEC','SCORE','MOMENTUM','STATE','STR','PL','VALID'].map(h=>(
+              {['TIME','PAIR','GAP','BIAS','CONF','EXEC','SCORE','EXTREME TF','MOMENTUM','STATE','STR','PL','VALID'].map(h=>(
                 <th key={h} style={{padding:'8px 6px',color:'var(--text-muted)',fontWeight:600,fontSize:9,letterSpacing:1,textAlign:'left',borderBottom:'1px solid var(--border)',whiteSpace:'nowrap'}}>{h}</th>
               ))}
             </tr>
@@ -2358,6 +2371,7 @@ function SignalLogTab() {
                   <td style={{padding:'6px',color:r.confidence==='HIGH'?'#00ff9f':r.confidence==='MEDIUM'?'#ffd166':'var(--text-muted)'}}>{r.confidence||'—'}</td>
                   <td style={{padding:'6px',color:r.execution==='MARKET'?'#00ff9f':r.execution==='PULLBACK'?'#ffd166':'var(--text-muted)'}}>{r.execution||'—'}</td>
                   <td style={{padding:'6px'}}>{(()=>{const cf=computeConfidence(r,null,null);if(!cf)return <span style={{color:'var(--text-muted)'}}>—</span>;const cs=confStyle(cf.confidence);return <span style={{fontSize:9,color:cs.color,fontWeight:700}}>{cf.confidence}</span>;})()}</td>
+                  <td style={{padding:'6px',whiteSpace:'nowrap'}}>{(r.base_score_tf||r.quote_score_tf)?<ScoreTfBadge row={r} mt={0} showLabel={false}/>:<span style={{color:'var(--text-muted)'}}>—</span>}</td>
                   <td style={{padding:'6px',color:r.momentum==='STRONG'?'#00ff9f':r.momentum==='BUILDING'?'#00b4ff':'var(--text-muted)'}}>{r.momentum||'—'}</td>
                   <td style={{padding:'6px',color:'var(--text-muted)'}}>{r.state||'—'}</td>
                   <td style={{padding:'6px',fontWeight:700,color:r.strength>=2?'#00ff9f':r.strength>=1?'#ffd166':'var(--text-muted)'}}>{Number(r.strength||0).toFixed(1)}</td>
@@ -2881,7 +2895,7 @@ function OvSignalCard({ pair, tier, onClick, delay }) {
       <span style={{fontFamily:mono,fontSize:9,color:OV_COLORS.textMuted,letterSpacing:1}}>{Math.abs(pair.gap)>=9&&pair.pl_zone!=='BETWEEN'?'INTRA':'BB'}</span>
       {pair.pdr_strong&&<span style={{fontFamily:mono,fontSize:9,color:OV_COLORS.buy,background:OV_COLORS.buyDim,border:`1px solid ${OV_COLORS.buy}25`,borderRadius:3,padding:'2px 6px'}}>PDR ✓</span>}
     </div>}
-    {!isL&&<div style={{marginBottom:8}}><ScoreTfBadge row={pair} mt={0}/></div>}
+    <div style={{marginBottom:isL?4:8}}><ScoreTfBadge row={pair} mt={0} showLabel={!isL} showEmpty={!isL}/></div>
     {(()=>{const isBuy=pair.bias==='BUY',isSell=pair.bias==='SELL';if(!isBuy&&!isSell)return null;const isJpy=pair.symbol?.includes('JPY');const dec=isJpy?3:5;const levels=isBuy?[{l:'PDL',v:pair.pdl},{l:'PWL',v:pair.pwl},{l:'PML',v:pair.pml},{l:'PYL',v:pair.pyl}].filter(x=>x.v!=null).sort((a,b)=>b.v-a.v):[{l:'PDH',v:pair.pdh},{l:'PWH',v:pair.pwh},{l:'PMH',v:pair.pmh},{l:'PYH',v:pair.pyh}].filter(x=>x.v!=null).sort((a,b)=>a.v-b.v);const top2=levels.slice(0,2);if(!top2.length)return null;const c1=isBuy?OV_COLORS.buy:OV_COLORS.sell;const c2='#00b4ff';return(<div style={{display:'flex',alignItems:'center',gap:isL?4:6,marginBottom:isL?4:8}}>
       <span style={{fontFamily:mono,fontSize:isL?7:8,color:OV_COLORS.textMuted,letterSpacing:2,fontWeight:600}}>PB ENTRY</span>
       {top2.map((lv,i)=><span key={lv.l} style={{fontFamily:mono,fontSize:isH?11:isL?9:10,color:i===0?c1:c2,background:(i===0?c1:c2)+'12',border:`1px solid ${(i===0?c1:c2)}28`,borderRadius:isL?3:4,padding:isL?'1px 5px':'2px 8px',fontWeight:700,letterSpacing:0.5}}>{lv.l} {Number(lv.v).toFixed(dec)}</span>)}
