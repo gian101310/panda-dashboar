@@ -4,6 +4,15 @@
 
 ---
 
+## Jul 9, 2026 — Phase 8 follow-ups: tracker debounce + velocity capture
+
+- Migration: `signal_tracker.gap_delta_at_open numeric` (signed dashboard.delta_short at open)
+- signal-tracker.js: (1) captures gap_delta_at_open on every new tracker; (2) REOPEN_DEBOUNCE_MIN=60 — skips re-open of same symbol+strategy within 60 min of a PL_FLIPPED close (kills the 30–77×/day flicker); debounce is best-effort, non-blocking on query error
+- signal-agent-v2.js: `v2_velocity` analysis (ACCEL/FLAT/DECEL, toward-signal threshold ±0.5) auto-activates at n≥20 rows with gap_delta_at_open; emits v2_velocity_note with live count until then
+- All tracker logic is API-side — engine app.py untouched
+
+---
+
 ## Jul 9, 2026 — PHASE 8 COMPLETE: Signal Agent v2 on tracker data
 
 - NEW `/api/signal-agent-v2.js` — lifecycle analysis on 11,253 closed signal_tracker rows; 8 factors (`v2_gap_sustain`, `v2_close_reason`, `v2_pdr_longevity`, `v2_session_longevity`, `v2_box_longevity`, `v2_survivors`, `v2_churn`, `v2_velocity_note`); idempotent delete+insert; wired into run-all-agents (4th agent)

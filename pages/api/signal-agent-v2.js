@@ -11,7 +11,7 @@ const MIN_SAMPLE = 20;
 const V2_FACTORS = [
   'v2_gap_sustain', 'v2_close_reason', 'v2_pdr_longevity',
   'v2_session_longevity', 'v2_box_longevity', 'v2_survivors', 'v2_churn',
-  'v2_velocity_note'
+  'v2_velocity', 'v2_velocity_note'
 ];
 
 function hoursBetween(a, b) {
@@ -218,16 +218,39 @@ function analyzeChurn(rows) {
   return memories;
 }
 
-// Q6: gap velocity at open — honest data-limitation note
-function velocityNote(rows) {
-  return [{
-    type: 'tracker_lifecycle', factor: 'v2_velocity_note', strategy: null,
-    win_rate: null, sample_size: rows.length,
-    metadata: {
-      measurable: false,
-      description: 'Gap velocity at open is NOT measurable from current data: pre-open gap_delta lived in signal_snapshots (purged) and hourly_gaps capture is too coarse (1h) versus median BB lifetime (~5 min). Needs snapshot-level delta stored on signal_tracker at open before this question can be answered.'
-    }
-  }];
+// Q6: gap velocity at open (gap_delta_at_open = signed dashboard.delta_short,
+// captured since Jul 9 2026). ACCEL = velocity in signal direction >= 0.5.
+function analyzeVelocity(rows) {
+  const withVel = rows.filter(r => r.gap_delta_at_open != null);
+  if (withVel.length < MIN_SAMPLE) {
+    return [{
+      type: 'tracker_lifecycle', factor: 'v2_velocity_note', strategy: null,
+      win_rate: null, sample_size: withVel.length,
+      metadata: {
+        measurable: false,
+        description: `Gap velocity at open: only ${withVel.length} trackers carry gap_delta_at_open so far (capture started Jul 9 2026); pre-Jul-9 deltas were lost with the purged snapshots. Analysis auto-activates at n>=${MIN_SAMPLE}.`
+      }
+    }];
+  }
+  const memories = [];
+  const groups = groupBy(withVel, r => {
+    const d = r.gap_delta_at_open;
+    const toward = r.direction === 'BUY' ? d : -d; // velocity toward signal direction
+    const tag = toward >= 0.5 ? 'ACCEL' : toward <= -0.5 ? 'DECEL' : 'FLAT';
+    return `${r.strategy}|${tag}`;
+  });
+  for (const [key, g] of Object.entries(groups)) {
+    const [strategy, velocity] = key.split('|');
+    const st = bucketStats(g);
+    if (st.n < MIN_SAMPLE) continue;
+    memories.push({
+      type: 'tracker_lifecycle', factor: 'v2_velocity', strategy,
+      win_rate: st.pct_survive_6h, sample_size: st.n,
+      metadata: { velocity, ...st,
+        description: `${strategy} lifespan by gap velocity at open (${velocity}) — does momentum into the signal predict durability` }
+    });
+  }
+  return memories;
 }
 
 // --- MAIN HANDLER ---
@@ -252,7 +275,7 @@ export default async function handler(req, res) {
   if (req.method === 'POST') {
     try {
       // 1. Fetch ALL closed trackers (paginated; hourly/price jsonb excluded — heavy + unused)
-      const SELECT = 'symbol, direction, strategy, gap_at_open, peak_gap, opened_at, closed_at, close_reason, session_at_open, pdr_strong_at_open, box_h1_at_open, box_h4_at_open';
+      const SELECT = 'symbol, direction, strategy, gap_at_open, gap_delta_at_open, peak_gap, opened_at, closed_at, close_reason, session_at_open, pdr_strong_at_open, box_h1_at_open, box_h4_at_open';
       const PAGE = 1000;
       let rows = [];
       let page = 0;
@@ -286,7 +309,7 @@ export default async function handler(req, res) {
         ...analyzeBoxLongevity(rows),     // Q5 box alignment vs outcome
         ...analyzeSurvivors(rows),        // durable-signal profile
         ...analyzeChurn(rows),            // flicker/noise metric
-        ...velocityNote(rows),            // Q6 data-limitation note
+        ...analyzeVelocity(rows),         // Q6 velocity at open (auto-activates with data)
       ];
 
       // 3. Log previous run summary before clearing
@@ -323,7 +346,7 @@ export default async function handler(req, res) {
           'v2_box_longevity — lifespan by H1/H4 box alignment (Q5)',
           'v2_survivors — profile of 6h+ durable signals',
           'v2_churn — same-symbol same-day re-opening flicker metric',
-          'v2_velocity_note — Q6 not measurable, documented why'
+          'v2_velocity — Q6 lifespan by gap velocity at open (auto-activates at n>=20; v2_velocity_note until then)'
         ],
         ran_at: new Date().toISOString()
       });
