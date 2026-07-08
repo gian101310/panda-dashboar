@@ -4,7 +4,20 @@
 
 ---
 
-## Jul 8, 2026 — Mac work-anywhere setup + tooling overhaul (no product code changes)
+## Jul 9, 2026 — Extreme TF badge fix (dashboard + engine)
+
+**Root cause:** live engine (Desktop ctrader_trend_scanner/app.py) never had `derive_score_tf` — dashboard.base_score_tf/quote_score_tf were stale leftovers, so EXTREME TF badges appeared inconsistently.
+
+**Engine (auto-reload picked it up; frozen uvicorn killed + watchdog restarted, PID cycle verified):**
+- Ported `derive_score_tf()` (before `_build_currency_line`); added `base_score_tf`/`quote_score_tf` to both dashboard payloads (valid + hard_invalid). signal_snapshots inherits via `dict(row)`.
+
+**Dashboard (commit 3263af1):**
+- ScoreTfBadge: new `showEmpty` prop → renders dim "NONE" (with tooltip) when a valid pair has no extreme TF, instead of vanishing; also fixed dangling-label case when tokens are legacy-format
+- PairCardModal (PANELS expanded): badge added under Box Confirm/Matchup row
+- OvSignalCard (OVERVIEW): badge now on ALL tiers (compact, no label on LOW), was hidden on LOW
+- SignalLogTab (LOGS/snapshots): new EXTREME TF column
+
+**Ops note:** engine loop had frozen at 20:50 UTC with port 8000 still LISTENING — watchdog only checks the port, so it never restarted. Consider a data-freshness watchdog (restart if dashboard.updated_at > 15 min old).
 
 **Mac dev environment (session from Dubai, away from home):**
 - Repo had diverged from force-pushed remote — backed up local to `backup-mac-2026-07-08`, hard-reset to origin/main a2528c2
