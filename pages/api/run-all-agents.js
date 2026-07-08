@@ -1,7 +1,8 @@
-// Run All Agents — calls Signal, Journal, and Pattern agent handlers directly (no HTTP round-trip)
+// Run All Agents — calls Signal, Journal, Pattern, and Signal v2 agent handlers directly (no HTTP round-trip)
 import signalHandler from './signal-agent';
 import journalHandler from './journal-agent';
 import patternHandler from './pattern-agent';
+import signalV2Handler from './signal-agent-v2';
 import { requireAdmin } from '../../lib/auth';
 
 // Vercel Pro: allow up to 60s for all 3 agents
@@ -50,6 +51,7 @@ export default async function handler(req, res) {
     runAgent('Signal Agent', signalHandler, cookies),
     runAgent('Journal Agent', journalHandler, cookies),
     runAgent('Pattern Agent', patternHandler, cookies),
+    runAgent('Signal Agent v2', signalV2Handler, cookies),
   ]);
 
   return res.status(200).json({

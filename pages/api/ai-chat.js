@@ -312,7 +312,7 @@ async function fetchMemoryContext() {
     .select('type, factor, pair, strategy, win_rate, sample_size, metadata, computed_at')
     .order('computed_at', { ascending: false }).limit(50);
   if (!data || data.length === 0) return '';
-  const sections = { signal_pattern: [], edge_analysis: [], confluence_validation: [], behavior: [] };
+  const sections = { signal_pattern: [], edge_analysis: [], confluence_validation: [], behavior: [], tracker_lifecycle: [] };
   for (const m of data) {
     const key = sections[m.type] ? m.type : 'signal_pattern';
     const desc = m.metadata?.description || m.factor;
@@ -322,7 +322,9 @@ async function fetchMemoryContext() {
     const flat = m.metadata?.flat_pct != null ? ` | flat:${m.metadata.flat_pct}%` : '';
     const sess = m.metadata?.session ? ` | sess:${m.metadata.session}` : '';
     const hold = m.metadata?.hold_bucket ? ` | hold:${m.metadata.hold_bucket}` : '';
-    sections[key].push(`${desc} (n=${m.sample_size}${wr}${pips}${avg}${flat}${sess}${hold})`);
+    const life = m.metadata?.median_hours != null ? ` | med-life:${m.metadata.median_hours}h` : '';
+    const surv = m.metadata?.pct_survive_6h != null ? ` | 6h-survival:${m.metadata.pct_survive_6h}%` : '';
+    sections[key].push(`${desc} (n=${m.sample_size}${wr}${pips}${avg}${flat}${sess}${hold}${life}${surv})`);
   }
   const latest = data.reduce((b, m) => m.computed_at > b ? m.computed_at : b, '');
   let ctx = `HISTORICAL ANALYSIS (n>=20 validated; entries marked LOW SAMPLE are logged but NOT statistically validated — always state the caveat):\nComputed: ${latest?.slice(0,10)} | ${data.length} memories\n`;
@@ -330,6 +332,7 @@ async function fetchMemoryContext() {
   if (sections.edge_analysis.length) ctx += '\nEDGE ANALYSIS:\n' + sections.edge_analysis.join('\n');
   if (sections.confluence_validation.length) ctx += '\nCONFLUENCE:\n' + sections.confluence_validation.join('\n');
   if (sections.behavior.length) ctx += '\nBEHAVIOR:\n' + sections.behavior.join('\n');
+  if (sections.tracker_lifecycle.length) ctx += '\nSIGNAL LIFECYCLE (Phase 8 — tracker-based, gap-derived, NOT price-verified):\n' + sections.tracker_lifecycle.join('\n');
   return ctx;
 }
 
