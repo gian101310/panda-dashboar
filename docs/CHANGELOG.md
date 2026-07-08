@@ -4,6 +4,15 @@
 
 ---
 
+## Jul 9, 2026 — Snapshot v9 (XTF line) + engine consolidation
+
+- **Telegram snapshot v9**: EXTREME TF line on every pair card ("XTF GBP D1+5 H4+5 | JPY H1-5" / "XTF NONE"); row_h 300→370. Test message sent + verified.
+- **Engine consolidation**: LIVE engine confirmed = `Projects\Panda Engine\app.py` (watchdog task → WATCH_PANDA.bat → START_PANDA.bat, imports app.py from CWD). Stale Desktop\ctrader_trend_scanner\app.py archived (archive\app_OLD_replaced_by_PandaEngine_folder_20260709.py); Desktop launcher bats (panda bats\START_PANDA, start_engine, PandaEngine_startup) now delegate to the live starter — no more restart-race regression risk.
+- Also fixed in the old copy pre-discovery (harmless, kept in archive): font full-path loading.
+- NOTE: earlier "Extreme TF badge fix" engine changes were applied to the archived copy; the live copy already had derive_score_tf — dashboard badge fixes (commit 3263af1) unaffected and correct.
+
+---
+
 ## Jul 9, 2026 — Phase 8 follow-ups: tracker debounce + velocity capture
 
 - Migration: `signal_tracker.gap_delta_at_open numeric` (signed dashboard.delta_short at open)
