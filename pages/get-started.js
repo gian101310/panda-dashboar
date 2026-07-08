@@ -1,32 +1,18 @@
 import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
+import { curSym, mapDbTiers, FALLBACK_TIERS } from '../lib/pricingClient';
 
 const mono = "'Share Tech Mono',monospace";
 const orb  = "'Orbitron',sans-serif";
 const raj  = "'Rajdhani',sans-serif";
 
-const TIERS = [
-  {
-    name: 'STARTER', price: '0', period: '', sub: 'FREE FOR 1 WEEK', color: '#445566', tag: null,
-    features: ['Live signals tab','Position calculator'],
-    cta: 'START FREE TRIAL', tier: 'starter',
-  },
-  {
-    name: 'PRO', price: '49', was: '99', period: '/mo', sub: 'LAUNCH PRICE · ≈ $13 USD · or AED 499 lifetime', color: '#00ff9f', tag: 'MOST POPULAR',
-    features: ['Everything in Starter, plus:','Panel tab','Full data table','Valid setups tab','Panda AI assistant','Research tab'],
-    cta: 'GO PRO →', tier: 'pro',
-  },
-  {
-    name: 'ELITE', price: '99', was: '699', period: '/mo', sub: 'LAUNCH PRICE · ≈ $27 USD · or AED 999 lifetime', color: '#00b4ff', tag: 'FULL ACCESS',
-    features: ['Everything in Pro, plus:','Overview tab','Signal logs tab','Valid pairs filter','Telegram signal alerts','Spike signal alerts','Private trading journal','Chart tab','MT4/MT5 Panda Indicators','Bias detection indicators'],
-    cta: 'GO ELITE →', tier: 'elite',
-  },
-];
+// Live tier pricing comes from /api/pricing (edited in /admin/pricing); FALLBACK_TIERS used if unreachable
 
 export default function FunnelPage() {
   const router = useRouter();
   const [vis, setVis] = useState(false);
+  const [TIERS, setTIERS] = useState(FALLBACK_TIERS);
   const [signals, setSignals] = useState([]);
   const [signalCount, setSignalCount] = useState(0);
 
@@ -41,6 +27,11 @@ export default function FunnelPage() {
   const [modalToken, setModalToken] = useState('');
 
   useEffect(() => { setVis(true); }, []);
+  useEffect(() => {
+    fetch('/api/pricing').then(r => r.json()).then(j => {
+      if (j?.tiers?.length) setTIERS(mapDbTiers(j.tiers));
+    }).catch(() => {});
+  }, []);
   useEffect(() => {
     fetch('/api/public-signals').then(r => r.json()).then(d => {
       if (d.signals) { setSignals(d.signals); setSignalCount(d.count); }
@@ -357,10 +348,10 @@ export default function FunnelPage() {
                   {t.tag && <div style={{ position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)', background: t.color, color: '#050810', fontFamily: orb, fontSize: 8, fontWeight: 700, letterSpacing: 2, padding: '4px 14px', borderRadius: 20 }}>{t.tag}</div>}
                   <div style={{ fontFamily: orb, fontSize: 12, fontWeight: 700, letterSpacing: 3, color: t.color, marginBottom: 20 }}>{t.name}</div>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 8 }}>
-                    <span style={{ fontFamily: mono, fontSize: 14, color: '#445566' }}>AED</span>
+                    <span style={{ fontFamily: mono, fontSize: 14, color: '#445566' }}>{curSym(t.cur)}</span>
                     <span style={{ fontFamily: orb, fontSize: 48, fontWeight: 900, color: '#e8eaf0' }}>{t.price}</span>
                     <span style={{ fontFamily: mono, fontSize: 12, color: '#445566' }}>{t.period}</span>
-                    {t.was && <span style={{ fontFamily: mono, fontSize: 15, color: '#445566', textDecoration: 'line-through', marginLeft: 8 }}>AED {t.was}</span>}
+                    {t.was && <span style={{ fontFamily: mono, fontSize: 15, color: '#445566', textDecoration: 'line-through', marginLeft: 8 }}>{curSym(t.cur)}{t.was}</span>}
                   </div>
                   {t.sub && <div style={{ fontFamily: mono, fontSize: 10, color: '#ffd166', letterSpacing: 1, marginBottom: 22 }}>{t.sub}</div>}
                   {!t.sub && <div style={{ marginBottom: 22 }} />}
