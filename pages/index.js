@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import { INDICATOR_PRODUCTS } from '../lib/indicatorProducts.mjs';
+import { PUBLIC_INDICATOR_PRODUCTS as INDICATOR_PRODUCTS } from '../lib/indicatorProducts.mjs';
 import { curSym, mapDbTiers, FALLBACK_TIERS } from '../lib/pricingClient';
 
 const mono = "'Share Tech Mono',monospace";
