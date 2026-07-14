@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Head from 'next/head';
 import { INDICATOR_PRODUCTS } from '../../lib/indicatorProducts.mjs';
+import { generateIndicatorToken } from '../../lib/indicatorTokenGenerator.mjs';
 
 const mono = "'Share Tech Mono', monospace";
 const orb = "'Orbitron', sans-serif";
@@ -36,6 +37,7 @@ export default function LicenseAdminPage() {
   const [creating, setCreating] = useState(false);
   const [tokenStatus, setTokenStatus] = useState({ configured: false, rotated_at: null });
   const [newToken, setNewToken] = useState('');
+  const [copyStatus, setCopyStatus] = useState('COPY TOKEN');
   const [rotatingToken, setRotatingToken] = useState(false);
   const [form, setForm] = useState({ customer_name: '', contact: '', telegram_username: '', mt4_account_id: '', trading_account_number: '', platform: 'MT4', product_code: INDICATOR_PRODUCTS[0].code, paid_confirmed: false, price_override: '', notes: '' });
 
@@ -114,8 +116,29 @@ export default function LicenseAdminPage() {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) setError(data.error || 'Token rotation failed');
-    else { setTokenStatus(data); setNewToken(''); }
+    else { setTokenStatus(data); setNewToken(''); setCopyStatus('COPY TOKEN'); }
     setRotatingToken(false);
+  }
+
+  function generateOperatorToken() {
+    try {
+      setNewToken(generateIndicatorToken());
+      setCopyStatus('COPY TOKEN');
+      setError('');
+    } catch {
+      setError('Secure token generation is unavailable in this browser');
+    }
+  }
+
+  async function copyOperatorToken() {
+    if (!newToken) return;
+    try {
+      await navigator.clipboard.writeText(newToken);
+      setCopyStatus('COPIED');
+      setTimeout(() => setCopyStatus('COPY TOKEN'), 1800);
+    } catch {
+      setError('Could not copy token. Select and copy it manually.');
+    }
   }
 
   const filtered = useMemo(() => filter === 'ALL' ? licenses : licenses.filter((license) => license.status === filter), [licenses, filter]);
@@ -161,7 +184,9 @@ export default function LicenseAdminPage() {
                   {tokenStatus.configured ? `CONFIGURED · ROTATED ${formatDate(tokenStatus.rotated_at)}` : 'NOT CONFIGURED'}
                 </div>
               </div>
-              <input type="password" autoComplete="new-password" value={newToken} onChange={(e) => setNewToken(e.target.value)} placeholder="Paste a new 32+ character token" style={{ ...input, minWidth: 300, flex: 1 }} />
+              <input type="password" autoComplete="new-password" value={newToken} onChange={(e) => { setNewToken(e.target.value); setCopyStatus('COPY TOKEN'); }} placeholder="Generate or paste a 32+ character token" style={{ ...input, minWidth: 300, flex: 1 }} />
+              <button type="button" onClick={generateOperatorToken} style={{ ...smallBtn('#ffd166'), padding: '8px 14px' }}>GENERATE TOKEN</button>
+              <button type="button" onClick={copyOperatorToken} disabled={!newToken} style={{ ...smallBtn('#00ff9f'), padding: '8px 14px', opacity: newToken ? 1 : 0.4 }}>{copyStatus}</button>
               <button type="submit" disabled={rotatingToken} style={{ ...smallBtn('#00b4ff'), padding: '8px 14px', opacity: rotatingToken ? 0.5 : 1 }}>{rotatingToken ? 'ROTATING...' : 'ROTATE TOKEN'}</button>
             </div>
             <div style={{ fontFamily: mono, fontSize: 8, color: '#2a3550', marginTop: 8 }}>The token is accepted once and stored only as a SHA-256 hash. Save the plaintext in your password manager before submitting.</div>
