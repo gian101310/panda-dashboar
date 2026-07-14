@@ -8,6 +8,10 @@ const orb = "'Orbitron', sans-serif";
 const raj = "'Rajdhani', sans-serif";
 const productMap = Object.fromEntries(INDICATOR_PRODUCTS.map((product) => [product.code, product]));
 
+function usesTradingAccount(platform, productCode) {
+  return platform === 'CTRADER' || platform === 'MT5' || String(productCode || '').endsWith('_dashboard_overlay');
+}
+
 function Badge({ label, color }) {
   return <span style={{ fontFamily: mono, fontSize: 8, letterSpacing: 1, color, background: color + '18', border: `1px solid ${color}44`, borderRadius: 4, padding: '3px 7px' }}>{label}</span>;
 }
@@ -87,7 +91,7 @@ export default function LicenseAdminPage() {
 
   async function createLicense(e) {
     e.preventDefault();
-    const account = form.platform === 'CTRADER' ? form.trading_account_number : form.mt4_account_id;
+    const account = usesTradingAccount(form.platform, form.product_code) ? form.trading_account_number : form.mt4_account_id;
     if (!form.customer_name || !account) { setError('Name and Account ID required'); return; }
     setCreating(true);
     setError('');
@@ -179,7 +183,7 @@ export default function LicenseAdminPage() {
           <form onSubmit={rotateOperatorToken} style={{ background: '#0e1525', border: '1px solid #1a2540', borderRadius: 10, padding: 16, marginBottom: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
               <div style={{ minWidth: 210 }}>
-                <div style={{ fontFamily: orb, fontSize: 10, letterSpacing: 2, color: '#00b4ff' }}>CTRADER PERSONAL TOKEN</div>
+                <div style={{ fontFamily: orb, fontSize: 10, letterSpacing: 2, color: '#00b4ff' }}>PERSONAL OVERLAY TOKEN</div>
                 <div style={{ fontFamily: mono, fontSize: 8, color: '#445566', marginTop: 4 }}>
                   {tokenStatus.configured ? `CONFIGURED · ROTATED ${formatDate(tokenStatus.rotated_at)}` : 'NOT CONFIGURED'}
                 </div>
@@ -189,7 +193,7 @@ export default function LicenseAdminPage() {
               <button type="button" onClick={copyOperatorToken} disabled={!newToken} style={{ ...smallBtn('#00ff9f'), padding: '8px 14px', opacity: newToken ? 1 : 0.4 }}>{copyStatus}</button>
               <button type="submit" disabled={rotatingToken} style={{ ...smallBtn('#00b4ff'), padding: '8px 14px', opacity: rotatingToken ? 0.5 : 1 }}>{rotatingToken ? 'ROTATING...' : 'ROTATE TOKEN'}</button>
             </div>
-            <div style={{ fontFamily: mono, fontSize: 8, color: '#2a3550', marginTop: 8 }}>The token is accepted once and stored only as a SHA-256 hash. Save the plaintext in your password manager before submitting.</div>
+            <div style={{ fontFamily: mono, fontSize: 8, color: '#2a3550', marginTop: 8 }}>One token serves cTrader, MT4 and MT5 Personal editions. Copy it before rotation; Panda Engine stores only its SHA-256 hash.</div>
           </form>
           <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
             {['ALL', 'PENDING', 'APPROVED', 'DISABLED', 'EXPIRED'].map((status) => (
@@ -216,8 +220,8 @@ export default function LicenseAdminPage() {
                   <input value={form.telegram_username} onChange={(e) => setForm({ ...form, telegram_username: e.target.value })} placeholder="@username" style={{ ...input, width: '100%' }} />
                 </div>
                 <div>
-                  <label style={{ fontFamily: mono, fontSize: 8, color: '#445566', letterSpacing: 1, display: 'block', marginBottom: 4 }}>{form.platform === 'CTRADER' ? 'CTRADER ACCOUNT NUMBER *' : 'MT4 ACCOUNT ID *'}</label>
-                  <input value={form.platform === 'CTRADER' ? form.trading_account_number : form.mt4_account_id} onChange={(e) => setForm(form.platform === 'CTRADER' ? { ...form, trading_account_number: e.target.value } : { ...form, mt4_account_id: e.target.value })} placeholder="e.g. 3242354235" style={{ ...input, width: '100%' }} required />
+                  <label style={{ fontFamily: mono, fontSize: 8, color: '#445566', letterSpacing: 1, display: 'block', marginBottom: 4 }}>{form.platform === 'CTRADER' ? 'CTRADER ACCOUNT NUMBER *' : form.platform === 'MT5' ? 'MT5 ACCOUNT NUMBER *' : form.product_code === 'mt4_dashboard_overlay' ? 'MT4 ACCOUNT NUMBER *' : 'MT4 ACCOUNT ID *'}</label>
+                  <input value={usesTradingAccount(form.platform, form.product_code) ? form.trading_account_number : form.mt4_account_id} onChange={(e) => setForm(usesTradingAccount(form.platform, form.product_code) ? { ...form, trading_account_number: e.target.value } : { ...form, mt4_account_id: e.target.value })} placeholder="e.g. 3242354235" style={{ ...input, width: '100%' }} required />
                 </div>
                 <div>
                   <label style={{ fontFamily: mono, fontSize: 8, color: '#445566', letterSpacing: 1, display: 'block', marginBottom: 4 }}>INDICATOR</label>

@@ -1,13 +1,9 @@
 import { supabase } from '../../../lib/supabase';
 import { requireAdmin } from '../../../lib/auth';
 import { getIndicatorProduct } from '../../../lib/indicatorProducts.mjs';
-import { normalizeMt4AccountId, normalizeProductCode, normalizeTradingAccountNumber } from '../../../lib/indicatorLicense.mjs';
+import { normalizeIndicatorPlatform, normalizeMt4AccountId, normalizeProductCode, normalizeTradingAccountNumber } from '../../../lib/indicatorLicense.mjs';
 
 const STATUSES = new Set(['PENDING', 'APPROVED', 'DISABLED', 'EXPIRED']);
-
-function normalizePlatform(value) {
-  return String(value || 'MT4').trim().toUpperCase() === 'CTRADER' ? 'CTRADER' : 'MT4';
-}
 
 export default async function handler(req, res) {
   const admin = await requireAdmin(req);
@@ -47,17 +43,19 @@ export default async function handler(req, res) {
     if (req.body.contact !== undefined) updates.contact = String(req.body.contact || '').trim();
     if (req.body.price_override !== undefined) updates.price_override = req.body.price_override ? String(req.body.price_override).trim() : null;
     if (req.body.mt4_account_id !== undefined) updates.mt4_account_id = normalizeMt4AccountId(req.body.mt4_account_id);
-    if (req.body.platform !== undefined) updates.platform = normalizePlatform(req.body.platform);
+    if (req.body.platform !== undefined) updates.platform = normalizeIndicatorPlatform(req.body.platform);
     if (req.body.trading_account_number !== undefined) {
       const account = normalizeTradingAccountNumber(req.body.trading_account_number);
       if (!account) return res.status(400).json({ error: 'invalid trading account number' });
       updates.trading_account_number = account;
-      if (normalizePlatform(req.body.platform || 'CTRADER') === 'CTRADER') updates.mt4_account_id = account;
+      updates.mt4_account_id = account;
     }
     if (req.body.product_code !== undefined) {
       const productCode = normalizeProductCode(req.body.product_code);
-      if (!getIndicatorProduct(productCode)) return res.status(400).json({ error: 'invalid product' });
+      const product = getIndicatorProduct(productCode);
+      if (!product) return res.status(400).json({ error: 'invalid product' });
       updates.product_code = productCode;
+      if (product.platform) updates.platform = product.platform;
     }
 
     const { error } = await supabase.from('indicator_licenses').update(updates).eq('id', id);
@@ -67,13 +65,14 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     const { customer_name, contact, telegram_username, mt4_account_id, trading_account_number, product_code, paid_confirmed, price_override, notes } = req.body || {};
-    const platform = normalizePlatform(req.body?.platform);
-    const account = platform === 'CTRADER'
+    const productCode = normalizeProductCode(product_code);
+    const product = getIndicatorProduct(productCode);
+    if (!product) return res.status(400).json({ error: 'invalid product' });
+    const platform = product.platform || normalizeIndicatorPlatform(req.body?.platform);
+    const account = productCode.endsWith('_dashboard_overlay')
       ? normalizeTradingAccountNumber(trading_account_number || mt4_account_id)
       : normalizeMt4AccountId(mt4_account_id);
-    if (!customer_name || !account || !product_code) return res.status(400).json({ error: 'name, account_id, product required' });
-    const productCode = normalizeProductCode(product_code);
-    if (!getIndicatorProduct(productCode)) return res.status(400).json({ error: 'invalid product' });
+    if (!customer_name || !account) return res.status(400).json({ error: 'name, account_id, product required' });
     const row = {
       customer_name: String(customer_name).trim(),
       contact: String(contact || '').trim() || null,
