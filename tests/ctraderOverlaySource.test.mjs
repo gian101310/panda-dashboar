@@ -49,6 +49,17 @@ test('panel is draggable, bottom-left by default, minimizable, and persisted', (
   }
 });
 
+test('local storage keys satisfy cTrader key restrictions', () => {
+  const core = read('PandaDashboardOverlay.Core.cs');
+  const keys = [...core.matchAll(/LocalStorage\.(?:GetString|SetString)\("([^"]+)"/g)]
+    .map((match) => match[1]);
+
+  assert.ok(keys.length > 0, 'expected persisted panel settings');
+  for (const key of keys) {
+    assert.match(key, /^[A-Za-z0-9](?:[A-Za-z0-9 ]*[A-Za-z0-9])?$/, `invalid cTrader LocalStorage key: ${key}`);
+  }
+});
+
 test('source contains no embedded credential', () => {
   const combined = ['PandaDashboardOverlay.Core.cs', 'PandaDashboardOverlay.Personal.cs', 'PandaDashboardOverlay.Licensed.cs']
     .map(read).join('\n');

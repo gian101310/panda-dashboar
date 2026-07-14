@@ -180,7 +180,7 @@ namespace cAlgo
         protected override void Initialize()
         {
             _symbol = PandaSymbolNormalizer.Normalize(SymbolName);
-            _minimized = LocalStorage.GetString("PandaOverlay.Minimized") == "1";
+            _minimized = LocalStorage.GetString("PandaOverlay Minimized") == "1";
             _draggable = Chart.Draggables.Add();
             _draggable.ShowGrip = true;
             _draggable.Child = BuildPanel();
@@ -225,8 +225,8 @@ namespace cAlgo
         {
             double x;
             double y;
-            var savedX = LocalStorage.GetString("PandaOverlay.X");
-            var savedY = LocalStorage.GetString("PandaOverlay.Y");
+            var savedX = LocalStorage.GetString("PandaOverlay X");
+            var savedY = LocalStorage.GetString("PandaOverlay Y");
             _draggable.X = double.TryParse(savedX, NumberStyles.Float, CultureInfo.InvariantCulture, out x) ? x : 12;
             _draggable.Y = double.TryParse(savedY, NumberStyles.Float, CultureInfo.InvariantCulture, out y)
                 ? y : Math.Max(12, Chart.Height - PanelHeight - 12);
@@ -234,8 +234,8 @@ namespace cAlgo
 
         private void OnLocationChanged(ChartDraggableLocationChangedEventArgs args)
         {
-            LocalStorage.SetString("PandaOverlay.X", args.Draggable.X.ToString(CultureInfo.InvariantCulture), LocalStorageScope.Instance);
-            LocalStorage.SetString("PandaOverlay.Y", args.Draggable.Y.ToString(CultureInfo.InvariantCulture), LocalStorageScope.Instance);
+            LocalStorage.SetString("PandaOverlay X", args.Draggable.X.ToString(CultureInfo.InvariantCulture), LocalStorageScope.Instance);
+            LocalStorage.SetString("PandaOverlay Y", args.Draggable.Y.ToString(CultureInfo.InvariantCulture), LocalStorageScope.Instance);
             LocalStorage.Flush(LocalStorageScope.Instance);
         }
 
@@ -295,7 +295,7 @@ namespace cAlgo
         private void Minimize(ButtonClickEventArgs args)
         {
             _minimized = !_minimized;
-            LocalStorage.SetString("PandaOverlay.Minimized", _minimized ? "1" : "0", LocalStorageScope.Instance);
+            LocalStorage.SetString("PandaOverlay Minimized", _minimized ? "1" : "0", LocalStorageScope.Instance);
             LocalStorage.Flush(LocalStorageScope.Instance);
             _draggable.Child = BuildPanel();
         }
