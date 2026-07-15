@@ -1,7 +1,10 @@
 import { supabase } from '../../lib/supabase';
 import { createCtraderOverlayHandler } from '../../lib/ctraderOverlayHandler.mjs';
+import { createIndicatorDeviceAccess } from '../../lib/indicatorDeviceAccess.mjs';
+import { CTRADER_OVERLAY_PRODUCT_CODE } from '../../lib/indicatorProducts.mjs';
 
 const requests = new Map();
+const DEVICE_TOUCH_MS = 5 * 60 * 1000;
 
 function allowRequest(key) {
   const now = Date.now();
@@ -18,6 +21,47 @@ function allowRequest(key) {
   return true;
 }
 
+const deviceAccess = createIndicatorDeviceAccess({
+  getEnforcement: async () => {
+    const { data, error } = await supabase
+      .from('indicator_device_enforcement')
+      .select('enabled')
+      .eq('product_code', CTRADER_OVERLAY_PRODUCT_CODE)
+      .maybeSingle();
+    if (error) throw error;
+    return data?.enabled === true;
+  },
+  getDevice: async ({ licenseId, deviceIdHash }) => {
+    const { data, error } = await supabase
+      .from('indicator_license_devices')
+      .select('id,status,device_token_hash,last_seen_at')
+      .eq('license_id', licenseId)
+      .eq('device_id_hash', deviceIdHash)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  },
+  registerDevice: async (device) => {
+    const { data, error } = await supabase.rpc('register_indicator_device', {
+      p_license_id: device.licenseId,
+      p_product_code: CTRADER_OVERLAY_PRODUCT_CODE,
+      p_platform: 'CTRADER',
+      p_device_id_hash: device.deviceIdHash,
+      p_device_token_hash: device.deviceTokenHash,
+      p_device_fingerprint: device.deviceFingerprint,
+    });
+    if (error) throw error;
+    return data;
+  },
+  touchDevice: async (device) => {
+    const lastSeen = device?.last_seen_at ? new Date(device.last_seen_at).getTime() : 0;
+    if (Date.now() - lastSeen < DEVICE_TOUCH_MS) return;
+    await supabase.from('indicator_license_devices').update({ last_seen_at: new Date().toISOString() }).eq('id', device.id);
+  },
+});
+
 const handler = createCtraderOverlayHandler({
   getTokenSetting: async () => {
     const { data, error } = await supabase
@@ -31,7 +75,7 @@ const handler = createCtraderOverlayHandler({
   getLicense: async (account, productCode) => {
     const { data, error } = await supabase
       .from('indicator_licenses')
-      .select('id,status,expires_at')
+      .select('id,status,expires_at,paid_confirmed,device_limit')
       .eq('platform', 'CTRADER')
       .eq('trading_account_number', account)
       .eq('product_code', productCode)
@@ -53,6 +97,7 @@ const handler = createCtraderOverlayHandler({
   touchLicense: async (id, timestamp) => {
     await supabase.from('indicator_licenses').update({ last_verified_at: timestamp }).eq('id', id);
   },
+  authorizeDevice: deviceAccess.authorize,
   rateLimiter: allowRequest,
 });
 

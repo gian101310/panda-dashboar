@@ -80,6 +80,41 @@ test('licensed lookup receives the route-fixed product and platform', async () =
   assert.equal(mt5.calls.touch, 1);
 });
 
+test('Licensed device authorization receives fixed route identity and returns first token once', async () => {
+  const calls = [];
+  const issuedToken = 'cd'.repeat(32);
+  const { handler } = make('MT5', 'mt5_dashboard_overlay', {
+    authorizeDevice: async (request) => {
+      calls.push(request);
+      return { ok: true, status: 'DEVICE_ACTIVATED', issuedToken };
+    },
+  });
+  const res = await invoke(handler, { headers: {
+    'x-panda-account-number': '12345678',
+    'x-panda-device-id': '9f17989d-0d75-4d4d-9337-63fc35dd5db2',
+  } });
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body.device_activation, { token: issuedToken });
+  assert.equal(calls[0].platform, 'MT5');
+  assert.equal(calls[0].productCode, 'mt5_dashboard_overlay');
+});
+
+test('MetaTrader device denials return no rows', async () => {
+  const { handler } = make('MT4', 'mt4_dashboard_overlay', {
+    authorizeDevice: async () => ({ ok: false, status: 'DEVICE_AUTH_ERROR' }),
+  });
+  const res = await invoke(handler, { headers: {
+    'x-panda-account-number': '12345678',
+    'x-panda-device-id': '9f17989d-0d75-4d4d-9337-63fc35dd5db2',
+    'x-panda-device-token': 'ef'.repeat(32),
+  } });
+
+  assert.equal(res.statusCode, 403);
+  assert.equal(res.body.status, 'DEVICE_AUTH_ERROR');
+  assert.equal(res.body.pairs, undefined);
+});
+
 test('denials contain no pair rows', async () => {
   const { handler } = make('MT4', 'mt4_dashboard_overlay');
   const wrongToken = await invoke(handler, { headers: {

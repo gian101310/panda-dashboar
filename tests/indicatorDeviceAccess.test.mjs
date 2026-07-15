@@ -93,7 +93,7 @@ test('authorizes a matching active device token and touches the device', async (
   const access = createIndicatorDeviceAccess({
     getEnforcement: async () => true,
     getDevice: async () => ({ id: 'device-1', status: 'ACTIVE', device_token_hash: hashDeviceValue(token) }),
-    touchDevice: async (id) => { touched = id === 'device-1'; },
+    touchDevice: async (device) => { touched = device.id === 'device-1'; },
   });
 
   const result = await access.authorize({

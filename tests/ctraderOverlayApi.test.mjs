@@ -97,6 +97,47 @@ test('authorizes approved account, touches verification, and caches dashboard sn
   assert.equal(calls.touch, 2);
 });
 
+test('returns an automatically issued device token only on first Licensed activation', async () => {
+  let authorization;
+  const issuedToken = 'ab'.repeat(32);
+  const { deps } = dependencies({
+    authorizeDevice: async (request) => {
+      authorization = request;
+      return { ok: true, status: 'DEVICE_ACTIVATED', issuedToken };
+    },
+  });
+  const res = await invoke(createCtraderOverlayHandler(deps), { headers: {
+    'x-panda-account-number': '12345678',
+    'x-panda-device-id': '9f17989d-0d75-4d4d-9337-63fc35dd5db2',
+  } });
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body.device_activation, { token: issuedToken });
+  assert.equal(authorization.productCode, 'ctrader_dashboard_overlay');
+  assert.equal(authorization.platform, 'CTRADER');
+  assert.equal(authorization.license.id, 'license-1');
+});
+
+test('device denials contain no pair rows and Personal credentials cannot mix device headers', async () => {
+  const { deps } = dependencies({
+    authorizeDevice: async () => ({ ok: false, status: 'DEVICE_LIMIT_REACHED' }),
+  });
+  const handler = createCtraderOverlayHandler(deps);
+  const denied = await invoke(handler, { headers: {
+    'x-panda-account-number': '12345678',
+    'x-panda-device-id': '9f17989d-0d75-4d4d-9337-63fc35dd5db2',
+  } });
+  const mixed = await invoke(handler, { headers: {
+    'x-panda-operator-token': 'operator-token-value-that-is-long-enough-123',
+    'x-panda-device-id': '9f17989d-0d75-4d4d-9337-63fc35dd5db2',
+  } });
+
+  assert.equal(denied.statusCode, 403);
+  assert.equal(denied.body.status, 'DEVICE_LIMIT_REACHED');
+  assert.equal(denied.body.pairs, undefined);
+  assert.equal(mixed.statusCode, 400);
+});
+
 test('rate limits abusive clients', async () => {
   const { deps } = dependencies({ rateLimiter: () => false });
   const res = await invoke(createCtraderOverlayHandler(deps), { headers: {
