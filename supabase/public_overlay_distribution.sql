@@ -55,6 +55,7 @@ grant usage, select on sequence public.indicator_feed_token_rotations_id_seq to 
 create or replace function public.log_indicator_feed_token_rotation()
 returns trigger
 language plpgsql
+set search_path = ''
 as $$
 begin
   insert into public.indicator_feed_token_rotations (

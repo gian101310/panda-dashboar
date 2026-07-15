@@ -31,6 +31,7 @@ test('migration locks new tables to the service role without privileged function
   assert.match(sql, /grant select, insert, update, delete on table public\.indicator_download_events to service_role/i);
   assert.match(sql, /grant select, insert, update, delete on table public\.indicator_feed_token_rotations to service_role/i);
   assert.doesNotMatch(sql, /security definer/i);
+  assert.match(sql, /set search_path = ''/i);
 });
 
 test('migration audits rotations with no recoverable inactive token value', () => {

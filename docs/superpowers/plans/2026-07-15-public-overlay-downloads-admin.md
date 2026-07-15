@@ -294,7 +294,7 @@ create policy "service_role_indicator_feed_token_rotations"
 revoke all on table public.indicator_feed_token_rotations from anon, authenticated;
 
 create or replace function public.log_indicator_feed_token_rotation()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql set search_path = '' as $$
 begin
   insert into public.indicator_feed_token_rotations (
     setting_key, rotated_at, rotated_by, token_fingerprint
