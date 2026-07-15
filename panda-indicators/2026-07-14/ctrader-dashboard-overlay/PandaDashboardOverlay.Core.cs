@@ -32,6 +32,7 @@ namespace cAlgo
         [JsonPropertyName("server_time")] public string ServerTime { get; set; }
         [JsonPropertyName("max_age_seconds")] public int MaxAgeSeconds { get; set; }
         [JsonPropertyName("status")] public string Status { get; set; }
+        [JsonPropertyName("device_activation")] public string DeviceActivation { get; set; }
         [JsonPropertyName("pairs")] public List<OverlayPair> Pairs { get; set; }
     }
 
@@ -42,6 +43,7 @@ namespace cAlgo
         public DateTime ReceivedAtUtc { get; set; }
         public int MaxAgeSeconds { get; set; }
         public Dictionary<string, OverlayPair> Pairs { get; set; }
+        public string DeviceActivation { get; set; }
     }
 
     internal static class PandaSymbolNormalizer
@@ -79,7 +81,8 @@ namespace cAlgo
                 Status = "LIVE",
                 ReceivedAtUtc = receivedAtUtc,
                 MaxAgeSeconds = response.MaxAgeSeconds > 0 ? response.MaxAgeSeconds : 600,
-                Pairs = pairs
+                Pairs = pairs,
+                DeviceActivation = response.DeviceActivation
             };
         }
     }
@@ -97,9 +100,10 @@ namespace cAlgo
         private static readonly object Gate = new object();
         private static readonly Dictionary<string, CacheEntry> Entries = new Dictionary<string, CacheEntry>();
         private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(60);
-        public static void Request(Http http, string endpoint, string headerName, string credential, Action<FeedResult> callback)
+        public static void Request(Http http, string endpoint, string headerName, string credential,
+            string deviceId, string deviceToken, Action<FeedResult> callback)
         {
-            var key = headerName + ":" + credential;
+            var key = headerName + ":" + credential + ":" + deviceId + ":" + deviceToken;
             CacheEntry entry;
             lock (Gate)
             {
@@ -123,6 +127,8 @@ namespace cAlgo
             request.Method = HttpMethod.Get;
             request.Timeout = TimeSpan.FromSeconds(12);
             request.Headers.Add(headerName, credential);
+            if (!string.IsNullOrWhiteSpace(deviceId)) request.Headers.Add("x-panda-device-id", deviceId);
+            if (!string.IsNullOrWhiteSpace(deviceToken)) request.Headers.Add("x-panda-device-token", deviceToken);
             http.SendAsync(request, response => Complete(key, response));
         }
 
@@ -176,6 +182,9 @@ namespace cAlgo
 
         protected abstract string CredentialHeader { get; }
         protected abstract string CredentialValue { get; }
+        protected virtual string DeviceId { get { return string.Empty; } }
+        protected virtual string DeviceToken { get { return string.Empty; } }
+        protected virtual void SaveDeviceActivation(string token) { }
 
         protected override void Initialize()
         {
@@ -213,8 +222,9 @@ namespace cAlgo
                 Render();
                 return;
             }
-            SharedOverlayFeed.Request(Http, FeedEndpoint, CredentialHeader, CredentialValue, result =>
+            SharedOverlayFeed.Request(Http, FeedEndpoint, CredentialHeader, CredentialValue, DeviceId, DeviceToken, result =>
                 BeginInvokeOnMainThread(() => {
+                    if (!string.IsNullOrWhiteSpace(result.DeviceActivation)) SaveDeviceActivation(result.DeviceActivation);
                     if (result.Success) { _lastGoodResult = result; _status = "LIVE"; }
                     else if (_lastGoodResult == null) _status = result.Status ?? "ERROR";
                     Render();

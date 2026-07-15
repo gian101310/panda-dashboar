@@ -12,6 +12,9 @@ private:
    string m_edition;
    string m_header_name;
    string m_credential;
+   string m_device_id;
+   string m_device_token;
+   string m_device_file;
    string m_symbol;
    string m_prefix;
    string m_cache_key;
@@ -189,6 +192,46 @@ private:
       return true;
    }
 
+   bool IsDeviceToken(const string value)
+   {
+      if(StringLen(value) != 64) return false;
+      for(int i = 0; i < 64; i++)
+      {
+         ushort ch = StringGetCharacter(value, i);
+         if(!((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f'))) return false;
+      }
+      return true;
+   }
+
+   void SaveDeviceCredentials()
+   {
+      int handle = FileOpen(m_device_file, FILE_WRITE|FILE_TXT|FILE_ANSI|FILE_COMMON);
+      if(handle == INVALID_HANDLE) return;
+      FileWriteString(handle, m_device_id + "\r\n" + m_device_token);
+      FileFlush(handle);
+      FileClose(handle);
+   }
+
+   void LoadDeviceCredentials()
+   {
+      int handle = FileOpen(m_device_file, FILE_READ|FILE_TXT|FILE_ANSI|FILE_COMMON);
+      if(handle != INVALID_HANDLE)
+      {
+         m_device_id = Trim(FileReadString(handle));
+         m_device_token = Trim(FileReadString(handle));
+         FileClose(handle);
+      }
+      if(StringLen(m_device_id) < 16)
+      {
+         MathSrand((int)(TimeLocal() + GetTickCount()));
+         m_device_id = "mt5-" + Digest(TerminalInfoString(TERMINAL_COMMONDATA_PATH) + IntegerToString((int)TimeLocal()) + IntegerToString(MathRand()))
+                       + "-" + Digest(IntegerToString((int)GetTickCount()) + IntegerToString(MathRand()));
+         m_device_token = "";
+         SaveDeviceCredentials();
+      }
+      if(!IsDeviceToken(m_device_token)) m_device_token = "";
+   }
+
    void ClearData()
    {
       m_has_data = false;
@@ -223,7 +266,14 @@ private:
       if(!AcquireLock(now_value)) return;
       GlobalVariableSet(m_attempt_key, now_value);
 
+      if(m_edition == "LICENSED") LoadDeviceCredentials();
+
       string headers = m_header_name + ": " + m_credential + "\r\nAccept: application/json\r\n";
+      if(m_edition == "LICENSED")
+      {
+         headers += "x-panda-device-id: " + m_device_id + "\r\n";
+         if(m_device_token != "") headers += "x-panda-device-token: " + m_device_token + "\r\n";
+      }
       char request_data[];
       char response_data[];
       string response_headers = "";
@@ -234,6 +284,12 @@ private:
 
       if(status_code == 200 && ParseSnapshot(body))
       {
+         string activation = JsonString(body, "device_activation");
+         if(IsDeviceToken(activation))
+         {
+            m_device_token = activation;
+            SaveDeviceCredentials();
+         }
          WriteCache(body);
          GlobalVariableSet(m_received_key, now_value);
          m_status = "LIVE";
@@ -355,6 +411,8 @@ public:
       m_cache_key = Digest("MT5|" + m_header_name + "|" + m_credential);
       m_cache_file = "PandaOverlay\\MT5-" + m_cache_key + ".json";
       FolderCreate("PandaOverlay", FILE_COMMON);
+      m_device_file = "PandaOverlay\\MT5-device-" + Digest(m_credential) + ".txt";
+      if(m_edition == "LICENSED") LoadDeviceCredentials();
       m_lock_key = "Panda.MT5.Lock." + m_cache_key;
       m_attempt_key = "Panda.MT5.Try." + m_cache_key;
       m_received_key = "Panda.MT5.Rx." + m_cache_key;
