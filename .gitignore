@@ -46,3 +46,4 @@ public/downloads/bias-detection.ex4
 .watchdog.heartbeat
 .watchdog.stop
 guardian-watchdog.log
+.env*
