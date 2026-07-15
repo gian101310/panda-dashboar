@@ -13,3 +13,16 @@ test('landing page exposes tracked Licensed downloads and platform activation', 
   assert.match(landing, /installed indicator will activate after approval/i);
   assert.doesNotMatch(landing, /send you the payment link and indicator file/i);
 });
+
+test('license admin exposes download telemetry and recoverable active-token controls', () => {
+  const admin = fs.readFileSync('pages/admin/license.js', 'utf8');
+  assert.match(admin, /fetch\('\/api\/admin\/indicator-downloads'\)/);
+  assert.match(admin, /DOWNLOADS RECORDED/);
+  assert.match(admin, /method: 'POST'/);
+  assert.match(admin, /action: 'reveal'/);
+  assert.match(admin, /navigator\.clipboard\.writeText\(data\.token\)/);
+  assert.match(admin, /RECOVERY REQUIRES ONE ROTATION/);
+  assert.match(admin, /TOKEN ROTATION HISTORY/);
+  assert.match(admin, /setTimeout/);
+  assert.match(admin, /60000/);
+});

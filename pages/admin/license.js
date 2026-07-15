@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Head from 'next/head';
 import { INDICATOR_PRODUCTS } from '../../lib/indicatorProducts.mjs';
 import { generateIndicatorToken } from '../../lib/indicatorTokenGenerator.mjs';
@@ -22,6 +22,12 @@ function formatDate(value) {
   catch { return '-'; }
 }
 
+function formatDateTime(value) {
+  if (!value) return '-';
+  try { return new Date(value).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }); }
+  catch { return '-'; }
+}
+
 function statusColor(status) {
   if (status === 'APPROVED') return '#00ff9f';
   if (status === 'PENDING') return '#ffd166';
@@ -39,10 +45,14 @@ export default function LicenseAdminPage() {
   const [error, setError] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [tokenStatus, setTokenStatus] = useState({ configured: false, rotated_at: null });
+  const [tokenStatus, setTokenStatus] = useState({ configured: false, recoverable: false, rotated_at: null, rotations: [] });
   const [newToken, setNewToken] = useState('');
   const [copyStatus, setCopyStatus] = useState('COPY TOKEN');
   const [rotatingToken, setRotatingToken] = useState(false);
+  const [downloadStats, setDownloadStats] = useState({ totals: [], recent: [] });
+  const [revealedToken, setRevealedToken] = useState('');
+  const [revealStatus, setRevealStatus] = useState('REVEAL & COPY ACTIVE TOKEN');
+  const revealTimerRef = useRef(null);
   const [form, setForm] = useState({ customer_name: '', contact: '', telegram_username: '', mt4_account_id: '', trading_account_number: '', platform: 'MT4', product_code: INDICATOR_PRODUCTS[0].code, paid_confirmed: false, price_override: '', notes: '' });
 
   const load = useCallback(async () => {
@@ -52,6 +62,14 @@ export default function LicenseAdminPage() {
     setLicenses(Array.isArray(data.licenses) ? data.licenses : []);
     const tokenRes = await fetch('/api/admin/indicator-feed-token');
     if (tokenRes.ok) setTokenStatus(await tokenRes.json());
+    const downloadRes = await fetch('/api/admin/indicator-downloads');
+    if (downloadRes.ok) {
+      const downloads = await downloadRes.json();
+      setDownloadStats({
+        totals: Array.isArray(downloads.totals) ? downloads.totals : [],
+        recent: Array.isArray(downloads.recent) ? downloads.recent : [],
+      });
+    }
   }, []);
 
   useEffect(() => {
@@ -62,6 +80,8 @@ export default function LicenseAdminPage() {
       load();
     }).catch(() => { window.location.href = '/login'; });
   }, [load]);
+
+  useEffect(() => () => clearTimeout(revealTimerRef.current), []);
 
   async function patch(id, body) {
     setSavingId(id);
@@ -120,7 +140,13 @@ export default function LicenseAdminPage() {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) setError(data.error || 'Token rotation failed');
-    else { setTokenStatus(data); setNewToken(''); setCopyStatus('COPY TOKEN'); }
+    else {
+      setNewToken('');
+      setRevealedToken('');
+      setCopyStatus('COPY TOKEN');
+      setRevealStatus('REVEAL & COPY ACTIVE TOKEN');
+      await load();
+    }
     setRotatingToken(false);
   }
 
@@ -143,6 +169,30 @@ export default function LicenseAdminPage() {
     } catch {
       setError('Could not copy token. Select and copy it manually.');
     }
+  }
+
+  async function revealAndCopyOperatorToken() {
+    setError('');
+    const res = await fetch('/api/admin/indicator-feed-token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'reveal' }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { setError(data.error || 'Token recovery failed'); return; }
+
+    setRevealedToken(data.token);
+    try {
+      await navigator.clipboard.writeText(data.token);
+      setRevealStatus('COPIED · CLEARS IN 60S');
+    } catch {
+      setRevealStatus('SELECT TOKEN MANUALLY · CLEARS IN 60S');
+    }
+    clearTimeout(revealTimerRef.current);
+    revealTimerRef.current = setTimeout(() => {
+      setRevealedToken('');
+      setRevealStatus('REVEAL & COPY ACTIVE TOKEN');
+    }, 60000);
   }
 
   const filtered = useMemo(() => filter === 'ALL' ? licenses : licenses.filter((license) => license.status === filter), [licenses, filter]);
@@ -187,14 +237,63 @@ export default function LicenseAdminPage() {
                 <div style={{ fontFamily: mono, fontSize: 8, color: '#445566', marginTop: 4 }}>
                   {tokenStatus.configured ? `CONFIGURED · ROTATED ${formatDate(tokenStatus.rotated_at)}` : 'NOT CONFIGURED'}
                 </div>
+                <div style={{ fontFamily: mono, fontSize: 8, color: tokenStatus.recoverable ? '#00ff9f' : '#ffd166', marginTop: 4 }}>
+                  {tokenStatus.recoverable ? 'ENCRYPTED RECOVERY READY' : tokenStatus.configured ? 'RECOVERY REQUIRES ONE ROTATION' : 'ROTATE ONCE TO CONFIGURE'}
+                </div>
               </div>
               <input type="password" autoComplete="new-password" value={newToken} onChange={(e) => { setNewToken(e.target.value); setCopyStatus('COPY TOKEN'); }} placeholder="Generate or paste a 32+ character token" style={{ ...input, minWidth: 300, flex: 1 }} />
               <button type="button" onClick={generateOperatorToken} style={{ ...smallBtn('#ffd166'), padding: '8px 14px' }}>GENERATE TOKEN</button>
               <button type="button" onClick={copyOperatorToken} disabled={!newToken} style={{ ...smallBtn('#00ff9f'), padding: '8px 14px', opacity: newToken ? 1 : 0.4 }}>{copyStatus}</button>
               <button type="submit" disabled={rotatingToken} style={{ ...smallBtn('#00b4ff'), padding: '8px 14px', opacity: rotatingToken ? 0.5 : 1 }}>{rotatingToken ? 'ROTATING...' : 'ROTATE TOKEN'}</button>
+              <button type="button" onClick={revealAndCopyOperatorToken} disabled={!tokenStatus.recoverable} style={{ ...smallBtn('#00ff9f'), padding: '8px 14px', opacity: tokenStatus.recoverable ? 1 : 0.4 }}>{revealStatus}</button>
             </div>
-            <div style={{ fontFamily: mono, fontSize: 8, color: '#2a3550', marginTop: 8 }}>One token serves cTrader, MT4 and MT5 Personal editions. Copy it before rotation; Panda Engine stores only its SHA-256 hash.</div>
+            {revealedToken && <input type="password" readOnly value={revealedToken} aria-label="Revealed active token" style={{ ...input, width: '100%', marginTop: 10 }} />}
+            <div style={{ fontFamily: mono, fontSize: 8, color: '#2a3550', marginTop: 8 }}>One token serves cTrader, MT4 and MT5 Personal editions. The active value is encrypted for admin-only recovery; rotating invalidates the previous token immediately.</div>
+            <div style={{ borderTop: '1px solid #1a2540', marginTop: 14, paddingTop: 12 }}>
+              <div style={{ fontFamily: orb, fontSize: 9, color: '#445566', letterSpacing: 2, marginBottom: 8 }}>TOKEN ROTATION HISTORY</div>
+              {Array.isArray(tokenStatus.rotations) && tokenStatus.rotations.length > 0 ? (
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {tokenStatus.rotations.map((rotation, index) => (
+                    <div key={`${rotation.rotated_at}-${index}`} style={{ fontFamily: mono, fontSize: 8, color: '#60708d', border: '1px solid #1a2540', borderRadius: 4, padding: '5px 8px' }}>
+                      {formatDateTime(rotation.rotated_at)} · {rotation.rotated_by} · {rotation.token_fingerprint}
+                    </div>
+                  ))}
+                </div>
+              ) : <div style={{ fontFamily: mono, fontSize: 8, color: '#2a3550' }}>NO RECORDED ROTATIONS</div>}
+            </div>
           </form>
+
+          <section style={{ background: '#0e1525', border: '1px solid #1a2540', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+            <div style={{ fontFamily: orb, fontSize: 10, color: '#ffd166', letterSpacing: 2, marginBottom: 12 }}>INDICATOR DOWNLOADS</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', gap: 10 }}>
+              {downloadStats.totals.map((stat) => (
+                <div key={stat.product_code} style={{ background: '#080c18', border: '1px solid #1a2540', borderRadius: 7, padding: 12 }}>
+                  <div style={{ fontFamily: mono, fontSize: 8, color: '#00b4ff', letterSpacing: 2 }}>{stat.platform}</div>
+                  <div style={{ fontFamily: orb, fontSize: 22, color: '#e8eaf0', marginTop: 6 }}>{stat.count}</div>
+                  <div style={{ fontFamily: mono, fontSize: 8, color: '#445566', marginTop: 4 }}>DOWNLOADS RECORDED</div>
+                  <div style={{ fontFamily: raj, fontSize: 11, color: '#60708d', marginTop: 5 }}>{productMap[stat.product_code]?.name || stat.product_code}</div>
+                </div>
+              ))}
+              {downloadStats.totals.length === 0 && <div style={{ fontFamily: mono, fontSize: 8, color: '#2a3550' }}>DOWNLOAD TELEMETRY NOT AVAILABLE</div>}
+            </div>
+            <div style={{ fontFamily: orb, fontSize: 9, color: '#445566', letterSpacing: 2, margin: '16px 0 8px' }}>RECENT DOWNLOAD ACTIVITY</div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 520 }}>
+                <thead><tr>{['INDICATOR', 'PLATFORM', 'TIME'].map((label) => <th key={label} style={hdr}>{label}</th>)}</tr></thead>
+                <tbody>
+                  {downloadStats.recent.slice(0, 20).map((event, index) => (
+                    <tr key={`${event.product_code}-${event.downloaded_at}-${index}`}>
+                      <td style={cell}>{productMap[event.product_code]?.name || event.product_code}</td>
+                      <td style={cell}><Badge label={event.platform} color={event.platform === 'CTRADER' ? '#00b4ff' : '#ffd166'} /></td>
+                      <td style={{ ...cell, fontFamily: mono, fontSize: 9 }}>{formatDateTime(event.downloaded_at)}</td>
+                    </tr>
+                  ))}
+                  {downloadStats.recent.length === 0 && <tr><td colSpan={3} style={{ ...cell, textAlign: 'center', color: '#2a3550' }}>NO RECORDED DOWNLOADS</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
           <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
             {['ALL', 'PENDING', 'APPROVED', 'DISABLED', 'EXPIRED'].map((status) => (
               <button key={status} onClick={() => setFilter(status)} style={{ ...smallBtn(filter === status ? '#00ff9f' : '#445566'), padding: '8px 14px' }}>
