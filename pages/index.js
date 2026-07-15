@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import { PUBLIC_INDICATOR_PRODUCTS as INDICATOR_PRODUCTS } from '../lib/indicatorProducts.mjs';
+import {
+  PUBLIC_DOWNLOAD_PRODUCTS,
+  PUBLIC_INDICATOR_PRODUCTS as LEGACY_INDICATOR_PRODUCTS,
+} from '../lib/indicatorProducts.mjs';
 import { curSym, mapDbTiers, FALLBACK_TIERS } from '../lib/pricingClient';
 
 const mono = "'Share Tech Mono',monospace";
@@ -96,7 +99,7 @@ export default function LandingPage() {
   const [liveSignals, setLiveSignals] = useState([]);
   const [pairCount, setPairCount] = useState(21);
   const [licenseModal, setLicenseModal] = useState(null);
-  const [licenseForm, setLicenseForm] = useState({ customer_name: '', contact: '', mt4_account_id: '', telegram_username: '' });
+  const [licenseForm, setLicenseForm] = useState({ customer_name: '', contact: '', trading_account_number: '', telegram_username: '' });
 
   useEffect(() => {
     fetch('/api/pricing').then(r => r.json()).then(j => {
@@ -131,7 +134,7 @@ export default function LandingPage() {
 
   function openLicenseRequest(product) {
     setLicenseModal(product);
-    setLicenseForm({ customer_name: '', contact: '', mt4_account_id: '', telegram_username: '' });
+    setLicenseForm({ customer_name: '', contact: '', trading_account_number: '', telegram_username: '' });
     setLicenseOk(false);
     setLicenseErr('');
   }
@@ -157,6 +160,11 @@ export default function LandingPage() {
     }
     setLicenseBusy(false);
   }
+
+  const requestPlatform = licenseModal?.platform || 'MT4';
+  const requestAccountLabel = requestPlatform === 'CTRADER'
+    ? 'cTrader account number'
+    : `${requestPlatform} account number`;
 
   return (
     <>
@@ -479,27 +487,40 @@ export default function LandingPage() {
           </div>
         </Section>
 
-        {/* ═══ PRICING ═══ */}
         {/* INDICATORS */}
         <Section id="indicators">
           <div style={{ maxWidth: 1100, margin: '0 auto', padding: '80px 24px 120px' }}>
             <div style={{ textAlign: 'center', marginBottom: 60 }}>
-              <span style={{ fontFamily: mono, fontSize: 10, color: '#ffd166', letterSpacing: 4, display: 'block', marginBottom: 16 }}>MT4 INDICATORS</span>
+              <span style={{ fontFamily: mono, fontSize: 10, color: '#ffd166', letterSpacing: 4, display: 'block', marginBottom: 16 }}>PANDA DASHBOARD OVERLAYS</span>
               <h2 style={{ fontFamily: orb, fontSize: 'clamp(22px,3.5vw,36px)', fontWeight: 900, letterSpacing: 3, margin: 0 }}>
-                REQUEST ACCESS.<br/><span style={{ color: '#00ff9f' }}>ACTIVATE AFTER APPROVAL.</span>
+                DOWNLOAD NOW.<br/><span style={{ color: '#00ff9f' }}>ACTIVATE AFTER APPROVAL.</span>
               </h2>
               <p style={{ fontFamily: raj, fontSize: 16, color: '#6b7fa8', maxWidth: 560, margin: '18px auto 0', lineHeight: 1.55 }}>
-                Submit your MT4 account ID below. Panda will confirm payment, approve your account, and send the indicator file directly.
+                Choose cTrader, MT4, or MT5. The Licensed file is available immediately and activates only after Panda approves your trading account number.
               </p>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 20 }}>
-              {INDICATOR_PRODUCTS.map((product) => (
+              {PUBLIC_DOWNLOAD_PRODUCTS.map((product) => (
                 <div key={product.code} style={{ padding: '30px 26px', background: 'rgba(12,18,32,0.6)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14 }}>
-                  <div style={{ fontFamily: orb, fontSize: 14, fontWeight: 800, letterSpacing: 2, color: product.code === 'panda_full_v3' ? '#00ff9f' : '#00b4ff', marginBottom: 10 }}>{product.name}</div>
+                  <div style={{ fontFamily: mono, fontSize: 9, color: '#ffd166', letterSpacing: 3, marginBottom: 10 }}>{product.platform}</div>
+                  <div style={{ fontFamily: orb, fontSize: 14, fontWeight: 800, letterSpacing: 2, color: '#00b4ff', marginBottom: 10 }}>{product.name}</div>
                   <div style={{ fontFamily: mono, fontSize: 10, color: '#ffd166', letterSpacing: 2, marginBottom: 18 }}>{product.priceLabel}</div>
                   <p style={{ fontFamily: raj, fontSize: 14, color: '#8899bb', lineHeight: 1.55, margin: '0 0 22px' }}>
-                    Licensed per MT4 account. The indicator only runs on approved accounts — request access to get started.
+                    {product.installNote}
                   </p>
+                  <div style={{ display: 'grid', gap: 9 }}>
+                    <a href={`/api/indicator-download?product=${encodeURIComponent(product.code)}`} style={{ display: 'block', textAlign: 'center', textDecoration: 'none', background: 'rgba(0,180,255,0.10)', border: '1px solid #00b4ff44', borderRadius: 7, color: '#00b4ff', fontFamily: mono, fontSize: 9, letterSpacing: 2, padding: '11px 12px' }}>DOWNLOAD LICENSED</a>
+                    <button onClick={() => openLicenseRequest(product)} style={{ width: '100%', background: 'rgba(0,255,159,0.10)', border: '1px solid #00ff9f44', borderRadius: 7, color: '#00ff9f', fontFamily: mono, fontSize: 9, letterSpacing: 2, padding: '11px 12px', cursor: 'pointer' }}>REQUEST ACTIVATION</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{ fontFamily: mono, fontSize: 9, color: '#445566', letterSpacing: 3, margin: '52px 0 18px', textAlign: 'center' }}>OTHER PANDA INDICATORS</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 20 }}>
+              {LEGACY_INDICATOR_PRODUCTS.map((product) => (
+                <div key={product.code} style={{ padding: '24px 22px', background: 'rgba(12,18,32,0.45)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 12 }}>
+                  <div style={{ fontFamily: orb, fontSize: 13, fontWeight: 800, letterSpacing: 2, color: product.code === 'panda_full_v3' ? '#00ff9f' : '#00b4ff', marginBottom: 10 }}>{product.name}</div>
+                  <div style={{ fontFamily: mono, fontSize: 10, color: '#ffd166', letterSpacing: 2, marginBottom: 18 }}>{product.priceLabel}</div>
                   <button onClick={() => openLicenseRequest(product)} style={{ width: '100%', background: 'rgba(0,255,159,0.10)', border: '1px solid #00ff9f44', borderRadius: 7, color: '#00ff9f', fontFamily: mono, fontSize: 9, letterSpacing: 2, padding: '11px 12px', cursor: 'pointer' }}>REQUEST ACCESS</button>
                 </div>
               ))}
@@ -634,7 +655,7 @@ export default function LandingPage() {
                   <div style={{ fontFamily: mono, fontSize: 10, letterSpacing: 4, color: '#00ff9f', marginBottom: 10 }}>REQUEST SENT</div>
                   <h3 style={{ fontFamily: orb, fontSize: 20, margin: '0 0 12px' }}>{licenseModal.name}</h3>
                   <p style={{ fontFamily: raj, fontSize: 14, color: '#8899bb', lineHeight: 1.55, marginBottom: 20 }}>
-                    Your request is pending. Panda will send you the payment link and indicator file via Telegram or email.
+                    Your request is pending. The installed indicator will activate after approval. Panda will contact you about payment when applicable.
                   </p>
                   <button onClick={() => setLicenseModal(null)} style={{ width: '100%', background: '#00ff9f', border: 'none', borderRadius: 8, color: '#050810', fontFamily: orb, fontSize: 11, fontWeight: 800, letterSpacing: 2, padding: 12, cursor: 'pointer' }}>CLOSE</button>
                 </div>
@@ -643,13 +664,13 @@ export default function LandingPage() {
                   <div style={{ fontFamily: mono, fontSize: 10, letterSpacing: 4, color: '#00b4ff', marginBottom: 8 }}>ACTIVATE INDICATOR</div>
                   <h3 style={{ fontFamily: orb, fontSize: 21, margin: '0 0 8px' }}>{licenseModal.name}</h3>
                   <p style={{ fontFamily: raj, fontSize: 13, color: '#6b7fa8', lineHeight: 1.5, marginBottom: 18 }}>
-                    Enter your MT4 account ID. Add your Telegram username to receive the payment link and indicator file directly via Telegram.
+                    Enter your {requestAccountLabel}. Add your Telegram username for faster activation updates.
                   </p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     <input value={licenseForm.customer_name} onChange={(e) => setLicenseForm((f) => ({ ...f, customer_name: e.target.value }))} placeholder="Your name" style={{ background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '12px 14px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, outline: 'none' }} />
                     <input value={licenseForm.contact} onChange={(e) => setLicenseForm((f) => ({ ...f, contact: e.target.value }))} placeholder="Email address" style={{ background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '12px 14px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, outline: 'none' }} />
                     <input value={licenseForm.telegram_username} onChange={(e) => setLicenseForm((f) => ({ ...f, telegram_username: e.target.value }))} placeholder="Telegram username (optional — for faster delivery)" style={{ background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '12px 14px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, outline: 'none' }} />
-                    <input value={licenseForm.mt4_account_id} onChange={(e) => setLicenseForm((f) => ({ ...f, mt4_account_id: e.target.value }))} placeholder="MT4 account ID, numbers only" style={{ background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '12px 14px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, outline: 'none' }} />
+                    <input value={licenseForm.trading_account_number} onChange={(e) => setLicenseForm((f) => ({ ...f, trading_account_number: e.target.value }))} placeholder={`${requestAccountLabel}, numbers only`} inputMode="numeric" style={{ background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '12px 14px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, outline: 'none' }} />
                   </div>
                   {licenseErr && <div style={{ fontFamily: mono, fontSize: 10, color: '#ff4d6d', marginTop: 12 }}>{licenseErr}</div>}
                   <button onClick={submitLicenseRequest} disabled={licenseBusy} style={{ width: '100%', background: '#00ff9f', border: 'none', borderRadius: 8, color: '#050810', fontFamily: orb, fontSize: 11, fontWeight: 800, letterSpacing: 2, padding: 13, marginTop: 16, cursor: licenseBusy ? 'not-allowed' : 'pointer', opacity: licenseBusy ? 0.65 : 1 }}>
