@@ -238,6 +238,7 @@ test('migration locks all new tables to the service role', () => {
   assert.match(sql, /alter table public\.indicator_feed_token_rotations enable row level security/i);
   assert.match(sql, /revoke all on table public\.indicator_download_events from anon, authenticated/i);
   assert.match(sql, /revoke all on table public\.indicator_feed_token_rotations from anon, authenticated/i);
+  assert.doesNotMatch(sql, /security definer/i);
 });
 ```
 
@@ -293,7 +294,7 @@ create policy "service_role_indicator_feed_token_rotations"
 revoke all on table public.indicator_feed_token_rotations from anon, authenticated;
 
 create or replace function public.log_indicator_feed_token_rotation()
-returns trigger language plpgsql security definer set search_path = public as $$
+returns trigger language plpgsql as $$
 begin
   insert into public.indicator_feed_token_rotations (
     setting_key, rotated_at, rotated_by, token_fingerprint
