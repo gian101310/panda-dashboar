@@ -7,6 +7,7 @@
 - Added authenticated Indicator Licensing admin totals and recent download activity per overlay.
 - Added AES-256-GCM recovery for the current Personal overlay token, admin-only reveal/copy, 60-second browser-memory clearing, and metadata-only rotation history.
 - Existing hash-only Personal tokens remain valid and require one intentional rotation before encrypted recovery becomes available.
+- Deployed and verified the cross-platform overlay distribution flow on `pandaengine.app`; the production build reached READY in 27 seconds and all three tracked downloads recorded successfully.
 
 ## 2026-07-14
 
