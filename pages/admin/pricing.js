@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
+import { PROTECTED_OVERLAY_CODES } from '../../lib/indicatorStore.mjs';
 
 const mono = "'Share Tech Mono',monospace";
 const orb = "'Orbitron',sans-serif";
@@ -56,7 +57,7 @@ export default function AdminPricing() {
   };
 
   const saveProduct = async (p) => {
-    const ok = await post({ action: 'update_product', id: p.id, name: p.name, description: p.description, currency: p.currency, price: Number(p.price) || 0, pay_link: p.pay_link || null, active: p.active });
+    const ok = await post({ action: 'update_product', id: p.id, name: p.name, description: p.description, currency: p.currency, price: Number(p.price) || 0, pay_link: p.pay_link || null, active: p.active, sort: Number(p.sort) || 0 });
     if (ok) { flash('✓ ' + p.name + ' saved'); load(); }
   };
 
@@ -135,17 +136,23 @@ export default function AdminPricing() {
           <div style={{ fontFamily: mono, fontSize: 10, letterSpacing: 4, color: '#ffd166', margin: '10px 0' }}>STORE PRODUCTS (INDICATORS)</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
             {products.map((p, i) => (
-              <div key={p.id} style={{ background: '#0a0e1a', border: '1px solid #1a2540', borderRadius: 10, padding: 14, display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 3fr auto auto', gap: 8, alignItems: 'end' }} className="prod-row">
-                <div><label style={lbl}>NAME</label><input style={inp} value={p.name} onChange={e => setP(i, 'name', e.target.value)} /></div>
+              <div key={p.id} style={{ background: '#0a0e1a', border: `1px solid ${PROTECTED_OVERLAY_CODES.has(p.code) ? '#00b4ff44' : '#1a2540'}`, borderRadius: 10, padding: 14 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 3fr 0.7fr auto auto', gap: 8, alignItems: 'end' }} className="prod-row">
+                <div><label style={lbl}>NAME {PROTECTED_OVERLAY_CODES.has(p.code) && <span style={{ color: '#00b4ff' }}>· SYSTEM INDICATOR</span>}</label><input style={inp} value={p.name} onChange={e => setP(i, 'name', e.target.value)} /></div>
                 <div><label style={lbl}>PRICE</label><input style={inp} type="number" value={p.price ?? ''} onChange={e => setP(i, 'price', e.target.value)} /></div>
                 <div><label style={lbl}>CUR</label>
                   <select value={p.currency} onChange={e => setP(i, 'currency', e.target.value)} style={inp}>
                     <option value="USD">USD</option><option value="AED">AED</option><option value="EUR">EUR</option>
                   </select>
                 </div>
-                <div><label style={lbl}>PAYMENT LINK</label><input style={inp} value={p.pay_link ?? ''} onChange={e => setP(i, 'pay_link', e.target.value)} /></div>
+                <div><label style={lbl}>PAYMENT LINK (HTTPS)</label><input style={inp} value={p.pay_link ?? ''} onChange={e => setP(i, 'pay_link', e.target.value)} placeholder="https://..." /></div>
+                <div><label style={lbl}>SORT</label><input style={inp} type="number" value={p.sort ?? 0} onChange={e => setP(i, 'sort', e.target.value)} /></div>
                 <button disabled={busy} onClick={() => saveProduct(p)} style={btn('#00ff9f')}>SAVE</button>
-                <button disabled={busy} onClick={() => delProduct(p)} style={btn('#ff4d6d')}>DEL</button>
+                {PROTECTED_OVERLAY_CODES.has(p.code) ? (
+                  <label style={{ fontFamily: mono, fontSize: 9, color: p.active ? '#00ff9f' : '#ff4d6d', display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', minHeight: 34 }}><input type="checkbox" checked={!!p.active} onChange={e => setP(i, 'active', e.target.checked)} /> LIVE</label>
+                ) : <button disabled={busy} onClick={() => delProduct(p)} style={btn('#ff4d6d')}>DEL</button>}
+                </div>
+                <div style={{ marginTop: 8 }}><label style={lbl}>DESCRIPTION · CODE: {p.code}</label><input style={inp} value={p.description ?? ''} onChange={e => setP(i, 'description', e.target.value)} /></div>
               </div>
             ))}
           </div>

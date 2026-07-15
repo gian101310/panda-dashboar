@@ -4,7 +4,7 @@ import { test } from 'node:test';
 
 test('landing page exposes tracked Licensed downloads and platform activation', () => {
   const landing = fs.readFileSync('pages/index.js', 'utf8');
-  assert.match(landing, /PUBLIC_DOWNLOAD_PRODUCTS/);
+  assert.match(landing, /mergePublicOverlayProducts/);
   assert.match(landing, /\/api\/indicator-download\?product=/);
   assert.match(landing, /DOWNLOAD LICENSED/);
   assert.match(landing, /REQUEST ACTIVATION/);
@@ -12,6 +12,17 @@ test('landing page exposes tracked Licensed downloads and platform activation', 
   assert.match(landing, /cTrader account number/);
   assert.match(landing, /installed indicator will activate after approval/i);
   assert.doesNotMatch(landing, /send you the payment link and indicator file/i);
+});
+
+test('pricing surfaces cTrader, MT4 and MT5 with tracked download and activation actions', () => {
+  const pricing = fs.readFileSync('pages/pricing.js', 'utf8');
+  const adminPricing = fs.readFileSync('pages/admin/pricing.js', 'utf8');
+  assert.match(pricing, /cTRADER \/ MT4 \/ MT5 INDICATORS/);
+  assert.match(pricing, /\/api\/indicator-download\?product=/);
+  assert.match(pricing, /REQUEST ACTIVATION/);
+  assert.match(pricing, /CONTACT FOR PRICE|priceLabel/);
+  assert.match(adminPricing, /SYSTEM INDICATOR/);
+  assert.match(adminPricing, /PAYMENT LINK \(HTTPS\)/);
 });
 
 test('license admin exposes download telemetry and recoverable active-token controls', () => {

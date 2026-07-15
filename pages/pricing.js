@@ -7,11 +7,12 @@ const orb = "'Orbitron',sans-serif";
 const raj = "'Rajdhani',sans-serif";
 
 import { curSym, mapDbTiers, FALLBACK_TIERS } from '../lib/pricingClient';
+import { mergePublicOverlayProducts } from '../lib/indicatorStore.mjs';
 export default function PricingPage() {
   const router = useRouter();
   const [visible, setVisible] = useState(false);
   const [tiers, setTiers] = useState(FALLBACK_TIERS);
-  const [products, setProducts] = useState([]);
+  const [products, setProducts] = useState(() => mergePublicOverlayProducts([]));
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [pfSignupOpen, setPfSignupOpen] = useState(false);
@@ -28,7 +29,7 @@ export default function PricingPage() {
     setVisible(true);
     fetch('/api/pricing').then(r => r.json()).then(j => {
       if (j?.tiers?.length) setTiers(mapDbTiers(j.tiers));
-      if (j?.products?.length) setProducts(j.products);
+      setProducts(mergePublicOverlayProducts(j?.products || []));
     }).catch(() => {});
   }, []);
 
@@ -122,19 +123,21 @@ export default function PricingPage() {
           <section style={{ position: 'relative', zIndex: 1, padding: '20px 24px 40px', maxWidth: 900, margin: '0 auto' }}>
             <div style={{ textAlign: 'center', marginBottom: 28 }}>
               <div style={{ fontFamily: mono, fontSize: 10, letterSpacing: 5, color: '#00b4ff', marginBottom: 10 }}>ONE-TIME PURCHASE</div>
-              <h3 style={{ fontFamily: orb, fontSize: 22, fontWeight: 700, margin: 0 }}>MT4/MT5 INDICATORS</h3>
-              <p style={{ fontFamily: raj, fontSize: 14, color: '#6b7d8e', marginTop: 8 }}>Licensed to your MetaTrader account ID. Yours forever.</p>
+              <h3 style={{ fontFamily: orb, fontSize: 22, fontWeight: 700, margin: 0 }}>cTRADER / MT4 / MT5 INDICATORS</h3>
+              <p style={{ fontFamily: raj, fontSize: 14, color: '#6b7d8e', marginTop: 8 }}>Download first, then request activation for your trading account number.</p>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 16 }}>
               {products.map((p) => (
-                <div key={p.id} style={{ background: 'linear-gradient(135deg,#0a0e1a,#0e1525)', border: '1px solid #1a2540', borderRadius: 12, padding: '26px 22px', display: 'flex', flexDirection: 'column' }}>
+                <div key={p.code} style={{ background: 'linear-gradient(135deg,#0a0e1a,#0e1525)', border: '1px solid #1a2540', borderRadius: 12, padding: '26px 22px', display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ fontFamily: mono, fontSize: 9, color: '#00b4ff', letterSpacing: 3, marginBottom: 7 }}>{p.platform}</div>
                   <div style={{ fontFamily: orb, fontSize: 13, fontWeight: 700, letterSpacing: 2, color: '#e8eaf0', marginBottom: 8 }}>{p.name}</div>
                   {p.description && <p style={{ fontFamily: raj, fontSize: 13, color: '#8899aa', lineHeight: 1.5, marginBottom: 14, flex: 1 }}>{p.description}</p>}
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 16 }}>
-                    <span style={{ fontFamily: mono, fontSize: 12, color: '#445566' }}>{curSym(p.currency)}</span>
-                    <span style={{ fontFamily: orb, fontSize: 30, fontWeight: 900, color: '#ffd166' }}>{Number(p.price).toLocaleString()}</span>
+                  <div style={{ fontFamily: orb, fontSize: p.price > 0 ? 25 : 14, fontWeight: 900, color: '#ffd166', marginBottom: 16 }}>{p.priceLabel}</div>
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    <a href={`/api/indicator-download?product=${encodeURIComponent(p.code)}`} style={{ width: '100%', textAlign: 'center', textDecoration: 'none', background: 'transparent', border: '1px solid #00b4ff', borderRadius: 8, color: '#00b4ff', fontFamily: orb, fontSize: 9, fontWeight: 700, letterSpacing: 2, padding: '12px' }}>DOWNLOAD LICENSED</a>
+                    {p.paymentLink && <button onClick={() => window.open(p.paymentLink, '_blank', 'noopener,noreferrer')} style={{ width: '100%', background: 'transparent', border: '1px solid #ffd166', borderRadius: 8, color: '#ffd166', fontFamily: orb, fontSize: 9, fontWeight: 700, letterSpacing: 2, padding: '12px', cursor: 'pointer' }} className="tier-btn">BUY NOW →</button>}
+                    <button onClick={() => router.push('/#indicators')} style={{ width: '100%', background: 'transparent', border: '1px solid #00ff9f', borderRadius: 8, color: '#00ff9f', fontFamily: orb, fontSize: 9, fontWeight: 700, letterSpacing: 2, padding: '12px', cursor: 'pointer' }} className="tier-btn">REQUEST ACTIVATION</button>
                   </div>
-                  <button onClick={() => p.pay_link ? window.open(p.pay_link, '_blank') : window.open('https://t.me/Panda_new_user_alert_bot', '_blank')} style={{ width: '100%', background: 'transparent', border: '1px solid #ffd166', borderRadius: 8, color: '#ffd166', fontFamily: orb, fontSize: 10, fontWeight: 700, letterSpacing: 2, padding: '12px', cursor: 'pointer' }} className="tier-btn">BUY NOW →</button>
                 </div>
               ))}
             </div>

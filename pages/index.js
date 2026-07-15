@@ -2,9 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import {
-  PUBLIC_DOWNLOAD_PRODUCTS,
   PUBLIC_INDICATOR_PRODUCTS as LEGACY_INDICATOR_PRODUCTS,
 } from '../lib/indicatorProducts.mjs';
+import { mergePublicOverlayProducts } from '../lib/indicatorStore.mjs';
 import { curSym, mapDbTiers, FALLBACK_TIERS } from '../lib/pricingClient';
 
 const mono = "'Share Tech Mono',monospace";
@@ -96,6 +96,7 @@ export default function LandingPage() {
   const router = useRouter();
   const [scrollY, setScrollY] = useState(0);
   const [TIERS, setTIERS] = useState(FALLBACK_TIERS);
+  const [overlayProducts, setOverlayProducts] = useState(() => mergePublicOverlayProducts([]));
   const [liveSignals, setLiveSignals] = useState([]);
   const [pairCount, setPairCount] = useState(21);
   const [licenseModal, setLicenseModal] = useState(null);
@@ -104,6 +105,7 @@ export default function LandingPage() {
   useEffect(() => {
     fetch('/api/pricing').then(r => r.json()).then(j => {
       if (j?.tiers?.length) setTIERS(mapDbTiers(j.tiers));
+      setOverlayProducts(mergePublicOverlayProducts(j?.products || []));
     }).catch(() => {});
   }, []);
   const [licenseBusy, setLicenseBusy] = useState(false);
@@ -500,7 +502,7 @@ export default function LandingPage() {
               </p>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 20 }}>
-              {PUBLIC_DOWNLOAD_PRODUCTS.map((product) => (
+              {overlayProducts.map((product) => (
                 <div key={product.code} style={{ padding: '30px 26px', background: 'rgba(12,18,32,0.6)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14 }}>
                   <div style={{ fontFamily: mono, fontSize: 9, color: '#ffd166', letterSpacing: 3, marginBottom: 10 }}>{product.platform}</div>
                   <div style={{ fontFamily: orb, fontSize: 14, fontWeight: 800, letterSpacing: 2, color: '#00b4ff', marginBottom: 10 }}>{product.name}</div>
@@ -510,6 +512,7 @@ export default function LandingPage() {
                   </p>
                   <div style={{ display: 'grid', gap: 9 }}>
                     <a href={`/api/indicator-download?product=${encodeURIComponent(product.code)}`} style={{ display: 'block', textAlign: 'center', textDecoration: 'none', background: 'rgba(0,180,255,0.10)', border: '1px solid #00b4ff44', borderRadius: 7, color: '#00b4ff', fontFamily: mono, fontSize: 9, letterSpacing: 2, padding: '11px 12px' }}>DOWNLOAD LICENSED</a>
+                    {product.paymentLink && <a href={product.paymentLink} target="_blank" rel="noopener noreferrer" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', background: 'rgba(255,209,102,0.10)', border: '1px solid #ffd16644', borderRadius: 7, color: '#ffd166', fontFamily: mono, fontSize: 9, letterSpacing: 2, padding: '11px 12px' }}>BUY NOW</a>}
                     <button onClick={() => openLicenseRequest(product)} style={{ width: '100%', background: 'rgba(0,255,159,0.10)', border: '1px solid #00ff9f44', borderRadius: 7, color: '#00ff9f', fontFamily: mono, fontSize: 9, letterSpacing: 2, padding: '11px 12px', cursor: 'pointer' }}>REQUEST ACTIVATION</button>
                   </div>
                 </div>
