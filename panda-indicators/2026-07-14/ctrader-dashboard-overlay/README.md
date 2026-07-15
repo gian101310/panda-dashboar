@@ -16,7 +16,7 @@ The panel refreshes the shared feed at most once every 60 seconds, remains idle 
 
 Build `PandaDashboardOverlay-Personal/PandaDashboardOverlay-Personal/PandaDashboardOverlay.Personal.csproj`. Enter the operator token in the indicator parameter after attaching it to a chart. The token is sent only in the HTTPS request header and is not embedded in the source.
 
-Rotate the token in **Admin → Indicator Licensing → Personal overlay token**. The server stores only its SHA-256 hash. Rotating it requires updating the parameter on charts using the personal edition.
+In **Admin → Indicator Licensing → Personal overlay token**, use **Generate, Activate & Copy** once, then paste the copied value into the indicator. The server verifies the saved hash before reporting success and stores an encrypted admin-recovery copy. Later, use **Reveal & Copy Active Token** instead of rotating or remembering it. Rotating still invalidates the previous token on every Personal platform.
 
 ### Licensed
 
@@ -30,6 +30,8 @@ Approve an account in **Admin → Indicator Licensing** with:
 - status: `APPROVED`
 
 Broker identity is not required. License states such as pending, disabled, and expired are returned by the feed without exposing dashboard data.
+
+The device-ready Licensed source creates a random installation ID and saves the one-time server-issued device credential in cTrader device-scoped local storage. The administrator controls the license limit from 1 to 100 and can revoke or reset installations without sending tokens to customers. Device enforcement must remain OFF until this source is compiled, published, and smoke-tested on cTrader.
 
 ## Build and install on cTrader Mac
 
@@ -46,6 +48,7 @@ The two projects intentionally have separate entry classes so the commercial edi
 - endpoint: `https://pandaengine.app/api/ctrader-overlay`
 - personal header: `x-panda-operator-token`
 - licensed header: `x-panda-account-number`
+- licensed device headers: `x-panda-device-id`, then `x-panda-device-token` after automatic activation
 - schema version: `1`
 - stale threshold: supplied by `max_age_seconds` (currently 10 minutes)
 

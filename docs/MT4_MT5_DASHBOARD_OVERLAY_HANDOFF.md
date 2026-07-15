@@ -1,6 +1,6 @@
 # cTrader, MT4, and MT5 Dashboard Overlay Handoff
 
-**Release date:** 2026-07-14
+**Updated:** 2026-07-15
 
 **Repository:** `gian101310/panda-dashboar`, branch `main`
 
@@ -30,10 +30,10 @@ The server route fixes the product code. A client cannot select another licensed
 
 One operator token serves cTrader, MT4, and MT5 Personal editions.
 
-1. In Admin → Indicator Licensing click **Generate Token**.
-2. Click **Copy Token** before submitting; rotation clears the new-token field.
-3. Click **Rotate Token**.
-4. Paste the same value into each Personal indicator's Operator Token input.
+1. In Admin → Indicator Licensing click **Generate, Activate & Copy**.
+2. Wait for the verified active state.
+3. Paste the same value into each Personal indicator's Operator Token input.
+4. Later use **Reveal & Copy Active Token**; no memorizing or regeneration is needed.
 
 Rotation invalidates the previous token immediately across all Personal platforms. Feed authorization continues to use `token_hash`. After the 2026-07-15 migration, the one active token is also stored with AES-256-GCM encryption so an authenticated admin can use **Reveal & Copy Active Token** later. The reveal value stays only in browser component memory and clears after 60 seconds. Rotation history contains only timestamp, administrator, and a 12-character fingerprint; old token values are not recoverable.
 
@@ -50,6 +50,22 @@ Create or edit a license in Admin → Indicator Licensing:
 
 MT4 and MT5 approvals are independent. The server enforces `PENDING`, `APPROVED`, `DISABLED`, `EXPIRED`, payment-pending, and unknown-account states. The compiled Licensed editions expose neither an Operator Token nor an editable account number.
 
+Set **Device Limit** from 1 to 100 on the license row. **Manage Devices** shows only a short fingerprint, platform, status, activation time, and last-seen time. Admin can revoke one installation or reset all installations. Device tokens are generated and stored automatically by the indicator; Boss-G never sends them to customers.
+
+## Device-enforcement rollout boundary
+
+The production schema, API, and admin controls are live, but all three `indicator_device_enforcement` rows intentionally remain `false`. The public `.algo`, `.ex4`, and `.ex5` downloads listed above are the previously verified account-only binaries and continue to work.
+
+Device-ready source is committed for cTrader, MT4, and MT5. Before enabling a platform:
+
+1. Compile the matching Licensed source on cTrader/MetaEditor for Windows with zero errors and warnings.
+2. Attach it to an approved account and confirm first-device activation and a second synchronized request.
+3. Replace only that platform's public Licensed artifact and update its checksum.
+4. Confirm the download returns the new artifact.
+5. Enable that platform under **Admin → Indicator Licensing → Device Enforcement**.
+
+Never enable a platform while its old binary is still public; old binaries do not send the new device headers.
+
 ## Public download and activation flow
 
 Only the three compiled Licensed overlays are public. Personal builds and sources are never placed in `public/downloads/`.
@@ -60,6 +76,8 @@ Only the three compiled Licensed overlays are public. Personal builds and source
 4. Panda Engine creates a `PENDING` license request and alerts Boss-G on Telegram with the correct platform/account label.
 5. Boss-G opens `/admin/license`, confirms payment when applicable, and approves the request.
 6. The installed indicator activates during its next synchronization.
+
+Price, currency, description, visibility, sort order, and HTTPS payment link are edited at `/admin/pricing`. A zero price appears publicly as **Contact for price**. System indicator products may be hidden but cannot be deleted.
 
 Admin download cards show **downloads recorded** per indicator plus recent platform/timestamp activity. These are download-button activations, not unique customers. Download telemetry stores no IP address, account number, contact detail, or token.
 

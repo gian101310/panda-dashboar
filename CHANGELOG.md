@@ -2,6 +2,10 @@
 
 ## 2026-07-15
 
+- Replaced the error-prone Personal token generate/copy/rotate sequence with one verified **Generate, Activate & Copy** action and retained admin-only encrypted recovery.
+- Added account-bound Licensed device management for cTrader, MT4, and MT5: automatic per-installation credentials, admin device limits from 1 to 100, device revoke/reset, and platform enforcement switches.
+- Restored all three dashboard overlays to Pricing admin and the public home/pricing pages with editable price, HTTPS payment link, tracked Licensed download, and activation-request actions.
+- Applied the production device-licensing migration with all enforcement switches OFF; current compiled downloads remain account-only until replacement Windows binaries pass compilation and smoke testing.
 - Added public, tracked downloads for the compiled Licensed cTrader, MT4, and MT5 Panda Dashboard Overlays; Personal artifacts remain private.
 - Added platform-aware public activation requests using the runtime trading account number, with product/platform duplicate protection and Telegram admin alerts.
 - Added authenticated Indicator Licensing admin totals and recent download activity per overlay.

@@ -27,12 +27,12 @@ Personal MT4, MT5, and cTrader use the same operator token.
 
 In Panda Engine Admin open **Indicator Licensing → Personal Overlay Token**:
 
-1. Click **Generate Token**.
-2. Click **Copy Token before rotating**.
-3. Click **Rotate Token** to activate that exact token.
-4. Paste it into the MetaTrader indicator's **Operator Token** input.
+1. Click **Generate, Activate & Copy**.
+2. Wait for the verified success state.
+3. Paste it into the MetaTrader indicator's **Operator Token** input.
+4. Later, use **Reveal & Copy Active Token** instead of remembering or rotating it.
 
-Generating or rotating another token invalidates the previous token on every Personal platform. Panda Engine stores only the SHA-256 hash; it cannot recover the plaintext later.
+Rotating another token invalidates the previous token on every Personal platform. Panda Engine stores the authorization hash plus an encrypted admin-recovery copy; the plaintext is never logged and the browser display clears after 60 seconds.
 
 ## Licensed editions
 
@@ -47,6 +47,8 @@ Create the customer in Panda Engine Admin with:
 - status `APPROVED`
 
 Broker name and server name are not required. MT4 and MT5 approvals are separate; an MT4 approval does not authorize the MT5 endpoint.
+
+The device-ready Licensed sources automatically create a random installation ID in `FILE_COMMON`, request a one-time device token after account approval, and persist it per platform/account. Customers never receive or paste a device token. Admin can set each license to 1–100 devices and revoke/reset installations. Keep platform device enforcement OFF until its replacement `.ex4` or `.ex5` has been compiled and smoke-tested on Windows.
 
 ## Status guide
 
@@ -74,6 +76,7 @@ Failed requests are also throttled for 60 seconds. Temporary network failures re
 - MT5 endpoint: `https://pandaengine.app/api/mt5-overlay`
 - Personal header: `x-panda-operator-token`
 - Licensed header: `x-panda-account-number`
+- Licensed device headers: `x-panda-device-id`, then `x-panda-device-token` after automatic activation
 - Schema version: `1`
 
 No token, Supabase credential, service key, or engine secret is embedded in the sources or compiled packages.
