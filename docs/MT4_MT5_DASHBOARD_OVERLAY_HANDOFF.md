@@ -1,4 +1,4 @@
-# MT4 and MT5 Dashboard Overlay Handoff
+# cTrader, MT4, and MT5 Dashboard Overlay Handoff
 
 **Release date:** 2026-07-14
 
@@ -31,11 +31,13 @@ The server route fixes the product code. A client cannot select another licensed
 One operator token serves cTrader, MT4, and MT5 Personal editions.
 
 1. In Admin → Indicator Licensing click **Generate Token**.
-2. Click **Copy Token** before submitting; rotation clears the plaintext field.
+2. Click **Copy Token** before submitting; rotation clears the new-token field.
 3. Click **Rotate Token**.
 4. Paste the same value into each Personal indicator's Operator Token input.
 
-Rotation invalidates the previous token immediately across all Personal platforms. The database stores only `token_hash` and rotation metadata.
+Rotation invalidates the previous token immediately across all Personal platforms. Feed authorization continues to use `token_hash`. After the 2026-07-15 migration, the one active token is also stored with AES-256-GCM encryption so an authenticated admin can use **Reveal & Copy Active Token** later. The reveal value stays only in browser component memory and clears after 60 seconds. Rotation history contains only timestamp, administrator, and a 12-character fingerprint; old token values are not recoverable.
+
+An existing hash-only token continues working. Admin displays **Recovery requires one rotation** until Boss-G intentionally rotates it; deployment never rotates the active token automatically.
 
 ## Licensed workflow
 
@@ -47,6 +49,19 @@ Create or edit a license in Admin → Indicator Licensing:
 4. Approve the license.
 
 MT4 and MT5 approvals are independent. The server enforces `PENDING`, `APPROVED`, `DISABLED`, `EXPIRED`, payment-pending, and unknown-account states. The compiled Licensed editions expose neither an Operator Token nor an editable account number.
+
+## Public download and activation flow
+
+Only the three compiled Licensed overlays are public. Personal builds and sources are never placed in `public/downloads/`.
+
+1. The customer visits the Panda Engine landing page and selects cTrader, MT4, or MT5.
+2. The customer clicks **Download Licensed** and installs or imports the matching compiled file.
+3. The customer clicks **Request Activation** and submits a name, contact method, platform-specific runtime trading account number, and optional Telegram username.
+4. Panda Engine creates a `PENDING` license request and alerts Boss-G on Telegram with the correct platform/account label.
+5. Boss-G opens `/admin/license`, confirms payment when applicable, and approves the request.
+6. The installed indicator activates during its next synchronization.
+
+Admin download cards show **downloads recorded** per indicator plus recent platform/timestamp activity. These are download-button activations, not unique customers. Download telemetry stores no IP address, account number, contact detail, or token.
 
 ## Installation requirement
 
