@@ -47,7 +47,6 @@ export default function LicenseAdminPage() {
   const [creating, setCreating] = useState(false);
   const [tokenStatus, setTokenStatus] = useState({ configured: false, recoverable: false, rotated_at: null, rotations: [] });
   const [newToken, setNewToken] = useState('');
-  const [copyStatus, setCopyStatus] = useState('COPY TOKEN');
   const [rotatingToken, setRotatingToken] = useState(false);
   const [downloadStats, setDownloadStats] = useState({ totals: [], recent: [] });
   const [revealedToken, setRevealedToken] = useState('');
@@ -128,47 +127,46 @@ export default function LicenseAdminPage() {
     await load();
   }
 
-  async function rotateOperatorToken(e) {
-    e.preventDefault();
-    if (newToken.trim().length < 32) { setError('Operator token must be at least 32 characters'); return; }
+  async function generateActivateAndCopyOperatorToken() {
+    if (!confirm('Activate a new Personal token? The previous token will stop working immediately.')) return;
+    let candidate;
+    try {
+      candidate = generateIndicatorToken();
+    } catch {
+      setError('Secure token generation is unavailable in this browser');
+      return;
+    }
+    setNewToken(candidate);
+    setRevealedToken('');
     setRotatingToken(true);
     setError('');
     const res = await fetch('/api/admin/indicator-feed-token', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: newToken.trim() }),
+      body: JSON.stringify({ token: candidate }),
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) setError(data.error || 'Token rotation failed');
-    else {
+    if (!res.ok || data.verified !== true) {
+      setError(data.error || 'Token was not activated');
+      setRotatingToken(false);
+      return;
+    }
+    setRevealedToken(candidate);
+    try {
+      await navigator.clipboard.writeText(candidate);
+      setRevealStatus('ACTIVE & COPIED · CLEARS IN 60S');
+    } catch {
+      setError('Token is active. Copy the visible value manually.');
+      setRevealStatus('ACTIVE · COPY MANUALLY · CLEARS IN 60S');
+    }
+    await load();
+    clearTimeout(revealTimerRef.current);
+    revealTimerRef.current = setTimeout(() => {
       setNewToken('');
       setRevealedToken('');
-      setCopyStatus('COPY TOKEN');
       setRevealStatus('REVEAL & COPY ACTIVE TOKEN');
-      await load();
-    }
+    }, 60000);
     setRotatingToken(false);
-  }
-
-  function generateOperatorToken() {
-    try {
-      setNewToken(generateIndicatorToken());
-      setCopyStatus('COPY TOKEN');
-      setError('');
-    } catch {
-      setError('Secure token generation is unavailable in this browser');
-    }
-  }
-
-  async function copyOperatorToken() {
-    if (!newToken) return;
-    try {
-      await navigator.clipboard.writeText(newToken);
-      setCopyStatus('COPIED');
-      setTimeout(() => setCopyStatus('COPY TOKEN'), 1800);
-    } catch {
-      setError('Could not copy token. Select and copy it manually.');
-    }
   }
 
   async function revealAndCopyOperatorToken() {
@@ -230,7 +228,7 @@ export default function LicenseAdminPage() {
         </header>
 
         <main style={{ padding: 24 }}>
-          <form onSubmit={rotateOperatorToken} style={{ background: '#0e1525', border: '1px solid #1a2540', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+          <section style={{ background: '#0e1525', border: '1px solid #1a2540', borderRadius: 10, padding: 16, marginBottom: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
               <div style={{ minWidth: 210 }}>
                 <div style={{ fontFamily: orb, fontSize: 10, letterSpacing: 2, color: '#00b4ff' }}>PERSONAL OVERLAY TOKEN</div>
@@ -241,13 +239,10 @@ export default function LicenseAdminPage() {
                   {tokenStatus.recoverable ? 'ENCRYPTED RECOVERY READY' : tokenStatus.configured ? 'RECOVERY REQUIRES ONE ROTATION' : 'ROTATE ONCE TO CONFIGURE'}
                 </div>
               </div>
-              <input type="password" autoComplete="new-password" value={newToken} onChange={(e) => { setNewToken(e.target.value); setCopyStatus('COPY TOKEN'); }} placeholder="Generate or paste a 32+ character token" style={{ ...input, minWidth: 300, flex: 1 }} />
-              <button type="button" onClick={generateOperatorToken} style={{ ...smallBtn('#ffd166'), padding: '8px 14px' }}>GENERATE TOKEN</button>
-              <button type="button" onClick={copyOperatorToken} disabled={!newToken} style={{ ...smallBtn('#00ff9f'), padding: '8px 14px', opacity: newToken ? 1 : 0.4 }}>{copyStatus}</button>
-              <button type="submit" disabled={rotatingToken} style={{ ...smallBtn('#00b4ff'), padding: '8px 14px', opacity: rotatingToken ? 0.5 : 1 }}>{rotatingToken ? 'ROTATING...' : 'ROTATE TOKEN'}</button>
+              <button type="button" onClick={generateActivateAndCopyOperatorToken} disabled={rotatingToken} style={{ ...smallBtn('#00b4ff'), padding: '8px 14px', opacity: rotatingToken ? 0.5 : 1 }}>{rotatingToken ? 'ACTIVATING...' : 'GENERATE, ACTIVATE & COPY'}</button>
               <button type="button" onClick={revealAndCopyOperatorToken} disabled={!tokenStatus.recoverable} style={{ ...smallBtn('#00ff9f'), padding: '8px 14px', opacity: tokenStatus.recoverable ? 1 : 0.4 }}>{revealStatus}</button>
             </div>
-            {revealedToken && <input type="password" readOnly value={revealedToken} aria-label="Revealed active token" style={{ ...input, width: '100%', marginTop: 10 }} />}
+            {(revealedToken || newToken) && <input type="password" readOnly value={revealedToken || newToken} aria-label="Revealed active token" style={{ ...input, width: '100%', marginTop: 10 }} />}
             <div style={{ fontFamily: mono, fontSize: 8, color: '#2a3550', marginTop: 8 }}>One token serves cTrader, MT4 and MT5 Personal editions. The active value is encrypted for admin-only recovery; rotating invalidates the previous token immediately.</div>
             <div style={{ borderTop: '1px solid #1a2540', marginTop: 14, paddingTop: 12 }}>
               <div style={{ fontFamily: orb, fontSize: 9, color: '#445566', letterSpacing: 2, marginBottom: 8 }}>TOKEN ROTATION HISTORY</div>
@@ -261,7 +256,7 @@ export default function LicenseAdminPage() {
                 </div>
               ) : <div style={{ fontFamily: mono, fontSize: 8, color: '#2a3550' }}>NO RECORDED ROTATIONS</div>}
             </div>
-          </form>
+          </section>
 
           <section style={{ background: '#0e1525', border: '1px solid #1a2540', borderRadius: 10, padding: 16, marginBottom: 16 }}>
             <div style={{ fontFamily: orb, fontSize: 10, color: '#ffd166', letterSpacing: 2, marginBottom: 12 }}>INDICATOR DOWNLOADS</div>

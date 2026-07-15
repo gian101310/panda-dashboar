@@ -93,7 +93,7 @@ test('stores only a SHA-256 hash and never echoes plaintext or hash', async () =
   const token = 'new-private-operator-token-value-1234567890';
   const handler = createIndicatorFeedAdminHandler({
     requireAdmin: async () => ({ username: 'Boss-G' }),
-    getSetting: async () => null,
+    getSetting: async () => stored,
     saveSetting: async (value) => { stored = value; },
     encryptToken: async () => ({
       token_ciphertext: 'encrypted-value',
@@ -108,9 +108,27 @@ test('stores only a SHA-256 hash and never echoes plaintext or hash', async () =
   assert.equal(stored.token_hash.includes(token), false);
   assert.equal(stored.token_ciphertext, 'encrypted-value');
   assert.equal(stored.rotated_by, 'Boss-G');
-  assert.deepEqual(res.body, { ok: true, configured: true, recoverable: true, rotated_at: '2026-07-14T11:00:00.000Z' });
+  assert.deepEqual(res.body, { ok: true, configured: true, recoverable: true, verified: true, rotated_at: '2026-07-14T11:00:00.000Z' });
   assert.equal(JSON.stringify(res.body).includes(token), false);
   assert.equal(JSON.stringify(res.body).includes(stored.token_hash), false);
+});
+
+test('does not report activation when the persisted token hash cannot be verified', async () => {
+  const handler = createIndicatorFeedAdminHandler({
+    requireAdmin: async () => ({ username: 'Boss-G' }),
+    getSetting: async () => ({ token_hash: '0'.repeat(64) }),
+    saveSetting: async () => {},
+    encryptToken: async () => ({
+      token_ciphertext: 'encrypted-value',
+      token_iv: 'random-iv',
+      token_auth_tag: 'auth-tag',
+    }),
+  });
+
+  const res = await invoke(handler, { method: 'PUT', body: { token: 'x'.repeat(64) } });
+
+  assert.equal(res.statusCode, 503);
+  assert.match(res.body.error, /not be verified/i);
 });
 
 test('reveals only a recoverable active token to an authenticated admin with no-store', async () => {

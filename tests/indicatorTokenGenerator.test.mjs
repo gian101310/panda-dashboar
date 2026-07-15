@@ -24,14 +24,15 @@ test('fails closed when a secure random generator is unavailable', () => {
   );
 });
 
-test('admin token card generates and copies without submitting rotation', () => {
+test('admin token card generates, activates, verifies, and only then copies', () => {
   const source = fs.readFileSync('pages/admin/license.js', 'utf8');
 
   assert.match(source, /import \{ generateIndicatorToken \}/);
-  assert.match(source, /setNewToken\(generateIndicatorToken\(\)\)/);
-  assert.match(source, /navigator\.clipboard\.writeText\(newToken\)/);
-  assert.match(source, />GENERATE TOKEN</);
-  assert.match(source, /\{copyStatus\}/);
-  assert.match(source, /disabled=\{!newToken\}/);
-  assert.match(source, /type="button"/);
+  assert.match(source, /generateActivateAndCopyOperatorToken/);
+  assert.match(source, /candidate = generateIndicatorToken\(\)/);
+  assert.match(source, /method: 'PUT'/);
+  assert.match(source, /data\.verified !== true/);
+  assert.match(source, /navigator\.clipboard\.writeText\(candidate\)/);
+  assert.match(source, /GENERATE, ACTIVATE & COPY/);
+  assert.doesNotMatch(source, />GENERATE TOKEN</);
 });

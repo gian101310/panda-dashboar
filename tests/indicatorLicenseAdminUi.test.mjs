@@ -23,6 +23,8 @@ test('license admin exposes download telemetry and recoverable active-token cont
   assert.match(admin, /navigator\.clipboard\.writeText\(data\.token\)/);
   assert.match(admin, /RECOVERY REQUIRES ONE ROTATION/);
   assert.match(admin, /TOKEN ROTATION HISTORY/);
+  assert.match(admin, /GENERATE, ACTIVATE & COPY/);
+  assert.match(admin, /Token is active\. Copy the visible value manually/);
   assert.match(admin, /setTimeout/);
   assert.match(admin, /60000/);
 });
