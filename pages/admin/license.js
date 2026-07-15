@@ -49,6 +49,10 @@ export default function LicenseAdminPage() {
   const [newToken, setNewToken] = useState('');
   const [rotatingToken, setRotatingToken] = useState(false);
   const [downloadStats, setDownloadStats] = useState({ totals: [], recent: [] });
+  const [devicePolicies, setDevicePolicies] = useState([]);
+  const [selectedLicense, setSelectedLicense] = useState(null);
+  const [licenseDevices, setLicenseDevices] = useState([]);
+  const [deviceBusy, setDeviceBusy] = useState(false);
   const [revealedToken, setRevealedToken] = useState('');
   const [revealStatus, setRevealStatus] = useState('REVEAL & COPY ACTIVE TOKEN');
   const revealTimerRef = useRef(null);
@@ -68,6 +72,11 @@ export default function LicenseAdminPage() {
         totals: Array.isArray(downloads.totals) ? downloads.totals : [],
         recent: Array.isArray(downloads.recent) ? downloads.recent : [],
       });
+    }
+    const deviceRes = await fetch('/api/admin/indicator-license-devices');
+    if (deviceRes.ok) {
+      const devices = await deviceRes.json();
+      setDevicePolicies(Array.isArray(devices.policies) ? devices.policies : []);
     }
   }, []);
 
@@ -193,6 +202,59 @@ export default function LicenseAdminPage() {
     }, 60000);
   }
 
+  async function deviceRequest(method, body) {
+    setDeviceBusy(true);
+    setError('');
+    const res = await fetch('/api/admin/indicator-license-devices', {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    setDeviceBusy(false);
+    if (!res.ok) {
+      setError(data.error || 'Device operation failed');
+      return null;
+    }
+    return data;
+  }
+
+  async function openDeviceManager(license) {
+    setDeviceBusy(true);
+    setError('');
+    const res = await fetch(`/api/admin/indicator-license-devices?license_id=${encodeURIComponent(license.id)}`);
+    const data = await res.json().catch(() => ({}));
+    setDeviceBusy(false);
+    if (!res.ok) { setError(data.error || 'Could not load devices'); return; }
+    setSelectedLicense(license);
+    setLicenseDevices(Array.isArray(data.devices) ? data.devices : []);
+    if (Array.isArray(data.policies)) setDevicePolicies(data.policies);
+  }
+
+  async function updateDeviceLimit(license) {
+    const deviceLimit = Number(license.device_limit);
+    const data = await deviceRequest('PATCH', { action: 'set_limit', license_id: license.id, device_limit: deviceLimit });
+    if (data) await load();
+  }
+
+  async function setDeviceEnforcement(productCode, enabled) {
+    if (enabled && !confirm('Enable device enforcement only after the replacement indicator binary is live. Continue?')) return;
+    const data = await deviceRequest('PATCH', { action: 'set_enforcement', product_code: productCode, enabled });
+    if (data) await load();
+  }
+
+  async function revokeDevice(deviceId) {
+    if (!confirm('Revoke this device? It will need to activate again.')) return;
+    const data = await deviceRequest('POST', { action: 'revoke', device_id: deviceId });
+    if (data && selectedLicense) await openDeviceManager(selectedLicense);
+  }
+
+  async function resetDevices() {
+    if (!selectedLicense || !confirm(`Reset every device for ${selectedLicense.customer_name}?`)) return;
+    const data = await deviceRequest('POST', { action: 'reset', license_id: selectedLicense.id });
+    if (data) await openDeviceManager(selectedLicense);
+  }
+
   const filtered = useMemo(() => filter === 'ALL' ? licenses : licenses.filter((license) => license.status === filter), [licenses, filter]);
   const counts = useMemo(() => ({
     ALL: licenses.length,
@@ -289,6 +351,25 @@ export default function LicenseAdminPage() {
             </div>
           </section>
 
+          <section style={{ background: '#0e1525', border: '1px solid #1a2540', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+            <div style={{ fontFamily: orb, fontSize: 10, color: '#ff9944', letterSpacing: 2 }}>DEVICE ENFORCEMENT</div>
+            <div style={{ fontFamily: mono, fontSize: 8, color: '#445566', margin: '6px 0 12px' }}>Keep OFF until the matching replacement binary is compiled, tested, and published. Existing account-number licensing remains active while OFF.</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(210px,1fr))', gap: 10 }}>
+              {INDICATOR_PRODUCTS.filter((product) => product.code.endsWith('_dashboard_overlay')).map((product) => {
+                const policy = devicePolicies.find((item) => item.product_code === product.code);
+                return (
+                  <label key={product.code} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, background: '#080c18', border: `1px solid ${policy?.enabled ? '#00ff9f55' : '#1a2540'}`, borderRadius: 7, padding: 12 }}>
+                    <span>
+                      <span style={{ display: 'block', fontFamily: orb, fontSize: 9, color: '#e8eaf0' }}>{product.platform}</span>
+                      <span style={{ display: 'block', fontFamily: mono, fontSize: 8, color: policy?.enabled ? '#00ff9f' : '#60708d', marginTop: 4 }}>{policy?.enabled ? 'ENFORCED' : 'ACCOUNT ONLY'}</span>
+                    </span>
+                    <input type="checkbox" checked={policy?.enabled === true} disabled={deviceBusy} onChange={(e) => setDeviceEnforcement(product.code, e.target.checked)} aria-label={`${product.platform} device enforcement`} />
+                  </label>
+                );
+              })}
+            </div>
+          </section>
+
           <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
             {['ALL', 'PENDING', 'APPROVED', 'DISABLED', 'EXPIRED'].map((status) => (
               <button key={status} onClick={() => setFilter(status)} style={{ ...smallBtn(filter === status ? '#00ff9f' : '#445566'), padding: '8px 14px' }}>
@@ -352,12 +433,12 @@ export default function LicenseAdminPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1120 }}>
               <thead>
                 <tr style={{ background: '#0e1525' }}>
-                  {['NAME', 'CONTACT', 'TELEGRAM', 'PLATFORM', 'ACCOUNT ID', 'INDICATOR', 'PRICE', 'PAID', 'EXPIRY', 'STATUS', 'LAST VERIFIED', 'NOTES', 'ACTIONS'].map((h) => <th key={h} style={hdr}>{h}</th>)}
+                  {['NAME', 'CONTACT', 'TELEGRAM', 'PLATFORM', 'ACCOUNT ID', 'INDICATOR', 'PRICE', 'PAID', 'EXPIRY', 'STATUS', 'DEVICE LIMIT', 'LAST VERIFIED', 'NOTES', 'ACTIONS'].map((h) => <th key={h} style={hdr}>{h}</th>)}
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
-                  <tr><td colSpan={13} style={{ ...cell, textAlign: 'center', padding: 40, fontFamily: mono, color: '#2a3550' }}>NO LICENSE REQUESTS</td></tr>
+                  <tr><td colSpan={14} style={{ ...cell, textAlign: 'center', padding: 40, fontFamily: mono, color: '#2a3550' }}>NO LICENSE REQUESTS</td></tr>
                 ) : filtered.map((license) => {
                   const product = productMap[license.product_code] || { name: license.product_code, priceLabel: '-' };
                   const busy = savingId === license.id;
@@ -384,6 +465,12 @@ export default function LicenseAdminPage() {
                         <input type="date" value={license.expires_at ? new Date(license.expires_at).toISOString().split('T')[0] : ''} onChange={(e) => patch(license.id, { expires_at: e.target.value || null })} style={input} />
                       </td>
                       <td style={cell}><Badge label={license.status} color={statusColor(license.status)} /></td>
+                      <td style={{ ...cell, minWidth: 135 }}>
+                        <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap' }}>
+                          <input type="number" min="1" max="100" value={license.device_limit || 1} onChange={(e) => setLicenses((prev) => prev.map((item) => item.id === license.id ? { ...item, device_limit: e.target.value } : item))} onBlur={() => updateDeviceLimit(license)} aria-label={`${license.customer_name} device limit`} style={{ ...input, width: 55 }} />
+                          <button type="button" onClick={() => openDeviceManager(license)} style={smallBtn('#00b4ff')}>MANAGE DEVICES</button>
+                        </div>
+                      </td>
                       <td style={{ ...cell, fontFamily: mono, fontSize: 9, color: '#445566' }}>{formatDate(license.last_verified_at)}</td>
                       <td style={{ ...cell, minWidth: 150 }}>
                         <input value={license.notes || ''} onChange={(e) => setLicenses((prev) => prev.map((item) => item.id === license.id ? { ...item, notes: e.target.value } : item))} onBlur={(e) => patch(license.id, { notes: e.target.value })} style={{ ...input, width: '100%' }} />
@@ -403,6 +490,41 @@ export default function LicenseAdminPage() {
               </tbody>
             </table>
           </div>
+
+          {selectedLicense && (
+            <div role="dialog" aria-modal="true" aria-label="Active devices" style={{ position: 'fixed', inset: 0, background: 'rgba(2,5,12,0.86)', zIndex: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+              <div style={{ width: 'min(760px,100%)', maxHeight: '85vh', overflowY: 'auto', background: '#0e1525', border: '1px solid #1a2540', borderRadius: 10, padding: 18 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                  <div>
+                    <div style={{ fontFamily: orb, fontSize: 11, color: '#00b4ff', letterSpacing: 2 }}>ACTIVE DEVICES</div>
+                    <div style={{ fontFamily: mono, fontSize: 8, color: '#60708d', marginTop: 4 }}>{selectedLicense.customer_name} · LIMIT {selectedLicense.device_limit || 1}</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 7 }}>
+                    <button type="button" disabled={deviceBusy} onClick={resetDevices} style={smallBtn('#ff9944')}>RESET DEVICES</button>
+                    <button type="button" onClick={() => { setSelectedLicense(null); setLicenseDevices([]); }} style={smallBtn('#60708d')}>CLOSE</button>
+                  </div>
+                </div>
+                <div style={{ overflowX: 'auto', marginTop: 14 }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 600 }}>
+                    <thead><tr>{['FINGERPRINT', 'PLATFORM', 'STATUS', 'ACTIVATED', 'LAST SEEN', 'ACTION'].map((label) => <th key={label} style={hdr}>{label}</th>)}</tr></thead>
+                    <tbody>
+                      {licenseDevices.map((device) => (
+                        <tr key={device.id}>
+                          <td style={{ ...cell, fontFamily: mono, color: '#00b4ff' }}>{device.device_fingerprint}</td>
+                          <td style={cell}>{device.platform}</td>
+                          <td style={cell}><Badge label={device.status} color={device.status === 'ACTIVE' ? '#00ff9f' : '#60708d'} /></td>
+                          <td style={{ ...cell, fontFamily: mono, fontSize: 8 }}>{formatDateTime(device.activated_at)}</td>
+                          <td style={{ ...cell, fontFamily: mono, fontSize: 8 }}>{formatDateTime(device.last_seen_at)}</td>
+                          <td style={cell}>{device.status === 'ACTIVE' && <button type="button" disabled={deviceBusy} onClick={() => revokeDevice(device.id)} style={smallBtn('#ff4d6d')}>REVOKE</button>}</td>
+                        </tr>
+                      ))}
+                      {licenseDevices.length === 0 && <tr><td colSpan={6} style={{ ...cell, textAlign: 'center', color: '#445566' }}>NO ACTIVATED DEVICES</td></tr>}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
         </main>
       </div>
     </>
