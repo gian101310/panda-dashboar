@@ -24,7 +24,7 @@ BUY/SELL/WAIT bias confirmation and is explicitly not financial advice.
 - Web app: Next.js 14.
 - Database/auth: Supabase.
 - Payments: Ziina payment links with admin-editable pricing.
-- Main dashboard: `pages/dashboard.js` (4,213 lines on 2026-07-16).
+- Main dashboard: `pages/dashboard.js` (4,211 lines on 2026-07-16).
 - AI chat: `pages/api/ai-chat.js`.
 - Signal tracker: `pages/api/signal-tracker.js`.
 - Shared Supabase client: `lib/supabase.js`.
@@ -59,32 +59,45 @@ const raj  = "'Rajdhani',sans-serif";
 
 Colors: BUY `#00ff9f` · SELL `#ff4d6d` · accent `#00b4ff` · warning `#ffd166` · AI `#7C3AED`.
 
-## VERIFIED STATE — 2026-07-16
+## VERIFIED STATE — 2026-07-16 (evening, post-Codex cleanup)
 
-- `signal_results`: BB 4,562 (481 W / 608 L / 3,471 flat), decisive WR 44.2%.
-- `signal_results`: INTRA 145 (57 W / 60 L / 28 flat), decisive WR 48.7%.
-- BB gap 7 with Panda Lines: 87 W / 111 L, decisive WR 43.9% (n=198 decisive).
-- BB gap 7 without Panda Lines: 38 W / 63 L, decisive WR 37.6% (n=101 decisive).
+- HEAD `c9253cc add-claude-windows-indicator-handoff`; production READY (~30s build).
+- Hermes runtime, DB helpers/table, and handoff docs REMOVED (`f65952b`). Do not restore.
+- Guardian/account-guardian pages, APIs, agent, launcher, watchdog, and Guardian-only tables REMOVED. Do not restore.
+- `lib/accountGuardian.mjs` and `lib/tradeExecutor.mjs` intentionally PRESERVED — active execution risk gates import them.
+- EA result ingestion is an atomic ticket upsert (`752aa0f`) via the shared server client.
+- Supabase hardened: backend-only tables RLS-locked (advisor shows only INFO "no policy" = deny-all by design; zero ERROR/WARN).
+- JS tests: 197/197 pass. `check_dupes.py` passes.
+- Device licensing mode is `OFF` for all three platforms (`indicator_device_enforcement`: OFF/SHADOW/ENFORCED per product).
+- Published Licensed binaries were compiled BEFORE `622cbcb` device-credential source changes — device-ready source exists, binaries must be rebuilt on Windows before SHADOW/ENFORCED.
+- Public downloads (4, all hash-verified vs dist SHA256SUMS): 3 Licensed overlays + `panda-vip.ex4`. No Personal artifacts or tokens are public.
+- Edge revalidation (`e2ece07`), engine stall alerts (`3b395d9`), shadow mode (`cc18a97`), GitHub scheduler for safety jobs (`28f3ff2`) are shipped.
+- `signal_results`: BB 4,562 (481 W / 608 L / 3,471 flat), decisive WR 44.2%; INTRA 145 (57 W / 60 L / 28 flat), decisive WR 48.7%.
 - `signal_tracker`: 11,647 total, 11,637 closed; price-confirmed rows remain 0.
-- `ai_memory`: 144 rows; Signal Agent v2 is complete and producing memory.
-- Old 91%/0% `admin_brain` edge claims are stale and must not be presented as current.
-- cTrader/MT4/MT5 device enforcement is OFF. Replacement Windows binaries are not yet compiled and smoke-tested.
-- Personal operator token recovery is configured; old hash-only tokens require one intentional rotation before recovery.
-- Licensing admin already includes downloads, device policies, revocations, and approved-account history.
+- `ai_memory`: 144 rows; Signal Agent v2 complete. Old 91%/0% `admin_brain` edge claims are stale — never present as current.
+- Personal operator token recovery configured; old hash-only tokens require one intentional rotation before recovery.
 
 ## CURRENT PRIORITIES
 
-1. Automatically recompute and flag decayed statistical edges.
-2. Alert the operator if the Windows engine heartbeat stalls for 15 minutes, plus recovery alerting.
-3. Add report-only device licensing shadow mode while keeping enforcement OFF.
-4. Compile and smoke-test replacement cTrader/MT4/MT5 Windows binaries before enforcement.
-5. Add per-user AI analysis for Pro/Elite.
-6. Capture signal-tracker prices from cTrader so price-based validation becomes possible.
+1. WINDOWS: rebuild + smoke-test the six overlay binaries, replace the 3 public Licensed downloads, then per-platform OFF → SHADOW → ENFORCED. Follow `docs/CLAUDE_WINDOWS_INDICATOR_HANDOFF_2026-07-16.md` exactly.
+2. Add per-user AI analysis for Pro/Elite.
+3. Capture signal-tracker prices from cTrader so price-based validation becomes possible.
+4. Decide on deleting the inactive `hermes-mission-control` Vercel project (external destructive action — needs Boss-G's specific final confirmation).
+
+## WORKING FROM MAC VS WINDOWS
+
+- Mac: dashboard/API/docs edits, tests, builds, pushes. Cannot compile .algo/.ex4/.ex5 or run the engine.
+- Windows: engine (`START_PANDA.bat` only), MetaEditor/cTrader Algo compilation, platform smoke tests, binary publication.
+- Both machines auto-pull `origin main` every 5 min when online (`SETUP_AUTOPULL.md`). Always `git pull --ff-only origin main` before editing anyway.
+- Handoffs: read `CODEX_HANDOFF.md` (latest first) at session start; write significant sessions to `CHANGELOG.md`.
+- After updating the skill source in `docs/`, re-upload it in Claude Settings > Capabilities so both locations load the same context.
 
 ## REFERENCE FILES
 
 - `AGENTS.md` — locked operating rules.
-- `SKILL.md` — project component map and playbooks (line numbers may be stale).
+- `CODEX_HANDOFF.md` — latest cross-agent handoff (read first each session).
+- `docs/CLAUDE_WINDOWS_INDICATOR_HANDOFF_2026-07-16.md` — source of truth for the Windows indicator release.
+- `docs/SKILL_PANDA_ENGINE.md` — current skill source; re-upload to Claude Settings after edits.
 - `docs/AI_BUILD_PLAN_UPDATED.md` — AI architecture and phase history.
-- `PENDING_OPTIMIZATIONS_v2.md` — roadmap.
+- `docs/PENDING_OPTIMIZATIONS_v2.md` — roadmap.
 - `CHANGELOG.md` — release history.

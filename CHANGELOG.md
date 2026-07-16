@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-07-16 (Mac verification session)
+
+- Audited the repo after the Codex security cleanup: confirmed `c9253cc` at HEAD, clean tree in sync with origin, production READY, and no Hermes or Guardian references remaining outside the intentionally preserved risk-gate libraries and removal-assertion tests.
+- Verified all six device-ready overlay sources are complete and consistent: Personal editions authenticate only via the `x-panda-operator-token` input parameter, Licensed editions read the account number automatically and carry device ID/token logic in the shared cores, and no secrets are embedded in any indicator source.
+- Verified the three public Licensed downloads byte-match their `dist` artifacts and SHA256SUMS entries, and that no Personal binaries or tokens are publicly exposed.
+- Confirmed `indicator_device_enforcement` is `OFF` for cTrader, MT4, and MT5, and that the Supabase security advisor reports only intentional deny-all RLS notices.
+- Re-verified 197/197 JavaScript tests and `check_dupes.py` on Mac.
+- Refreshed `CLAUDE.md` (post-cleanup verified state, remaining priorities, Mac-vs-Windows workflow) and added `docs/SKILL_PANDA_ENGINE.md` as the committed skill source for re-upload in Claude Settings, so remote and home sessions load identical context.
+
 ## 2026-07-16
 
 - Moved safety-job scheduling to secured GitHub Actions after Vercel rejected the five-minute cron on the current plan; route authentication remains fail-closed with a shared rotated secret.
