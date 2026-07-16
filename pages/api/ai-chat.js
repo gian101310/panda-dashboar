@@ -231,12 +231,10 @@ PROVEN_EDGE: n>=50 + win_rate>=70% + resolution_rate>=25%.
 DEAD_ZONE: n>=50 + win_rate<=30%. DEVELOPING: n=20-49.
 Conflict flag: real-time confidence>=70 AND historical win_rate<=50 on proven pattern.
 
-=== KEY CONFIRMED FINDINGS ===
-BB gap 7 + Panda Lines confirmed: 91% win rate (n=27). BB gap 7 no PL: 0% win rate (n=53).
-BB overall: 78.4% resolved win rate, 25.8% resolution rate. Execution gap: 22.9pts.
-Asian session: +1582 pips. London session: -272 pips. New York: +489 pips.
-4-12h holds: +2614 pips. Under 1h: -238 pips. Over 12h: diminishing.
-Alpha pairs: NZDCAD, NZDUSD, AUDJPY, GBPAUD. Leak pairs: GBPJPY, GBPCAD, GBPUSD, EURUSD.
+=== STATISTICAL DATA POLICY ===
+Historical performance changes as samples grow. Use live query tools or the newest ai_memory records for every win rate, sample size, pair ranking, session result, hold result, or execution statistic.
+The weekly_edge_revalidation memory overrides historical edge claims. If a stored note conflicts with fresh analysis, identify the older claim as retired and report the current sample instead.
+Never present admin_brain best_edge or dead_zone notes as current evidence.
 
 === PDR (Previous Day Rally) ===
 pdr_strength = body/ATR (strong>=0.5). retracement = (range-body)/range (clean<=0.25). Both must pass for STRONG.
@@ -257,8 +255,8 @@ Pattern Agent (14 memories): cross-reference → alpha/leak pairs, session edge,
 Master Agent: injects all 57 memories into every response. Re-run when signal_results grows 50+.
 
 === ARCHITECTURE ===
-Engine: app.py (~1676 lines) local PC → future VPS. Dashboard: dashboard.js (~2759 lines) on Vercel.
-Supabase: 20 tables. 21 pairs. 5-min engine cycles.`;
+Engine: app.py on the local Windows PC. Dashboard: Next.js on Vercel.
+Supabase persistence. 21 pairs. 5-minute engine cycles.`;
 
 // ─── BRAIN CONTEXT (admin only) ───────────────────────────────────────────────
 async function fetchBrainContext() {
@@ -271,6 +269,7 @@ async function fetchBrainContext() {
     let ctx = '\n=== BOSS-G PERSONAL BRAIN (your persistent memory) ===\n';
     const groups = {};
     for (const r of data) {
+      if (r.key === 'best_edge' || r.key === 'dead_zone') continue;
       if (!groups[r.category]) groups[r.category] = [];
       groups[r.category].push(`  [${r.key}]: ${r.value}`);
     }

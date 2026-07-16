@@ -2,6 +2,8 @@
 
 ## 2026-07-16
 
+- Added report-only weekly edge revalidation with an admin manual endpoint, authenticated Vercel Cron, fresh `ai_memory` output, and one-time Telegram decay alerting.
+- Retired the obsolete BB gap-7 91%/0% claims from Panda AI and public portfolio copy; fresh sampled results now override historical notes.
 - Added an **Approved Accounts** tab and exact counter to Panda approvals, with a compact account history and guarded approval revocation.
 - Kept indicator download totals visible while collapsing detailed download activity by default behind a Show/Hide control and bounded scroll area.
 

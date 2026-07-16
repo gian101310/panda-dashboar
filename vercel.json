@@ -3,5 +3,11 @@
   "buildCommand": "next build",
   "outputDirectory": ".next",
   "installCommand": "npm install",
-  "ignoreCommand": "[ ! -f lib/accountGuardian.mjs ]"
+  "ignoreCommand": "[ ! -f lib/accountGuardian.mjs ]",
+  "crons": [
+    {
+      "path": "/api/cron/edge-revalidation",
+      "schedule": "0 2 * * 1"
+    }
+  ]
 }
