@@ -40,7 +40,6 @@ description: Complete project context for the Panda Engine forex intelligence pl
 | `pages/dashboard.js` (4,199 lines) | Main dashboard — 14 tabs, ~90 components, all inline styles |
 | `pages/index.js` | Landing page (Dark Matter design) |
 | `pages/pricing.js`, `pages/get-started.js` | Pricing (Ziina links, Pro $49/Elite $99, 7-day trial), signup funnel |
-| `pages/guardian.js`, `pages/account-guardian.js` | Admin account guardian (added Jun 2026) |
 | `pages/journal.js`, `pages/portfolio.js`, `pages/strength.js`, `pages/stream.js`, `pages/legal.js`, `pages/pending.js`, `pages/admin/` | Other pages |
 | `lib/supabase.js` | **Env-based since Jun 2026**: SUPABASE_SERVICE_KEY \|\| SUPABASE_ANON_KEY (Vercel has service key; Mac .env.local has anon key) |
 | `lib/auth.js` | requireAdmin + auth helpers |
@@ -165,11 +164,11 @@ Core: data · gap-chart · heatmap · spikes · calendar · cot · currency-stre
 Auth/user: login · logout · me · pf-me · pf-signup · pf-log-event · alert-prefs · strategies · notify-telegram · telegram-webhook
 AI agents: ai-chat (3 modes) · signal-agent · journal-agent · pattern-agent · run-all-agents · ai-memory · admin-brain
 Business: pricing · waitlist · public-signals · indicator-license · indicator-license-request
-EA/system: ea-data · ea-result (use process.env.SUPABASE_SERVICE_KEY directly — the exception) · heartbeat · watchdog · maintenance · admin-maintenance-access · guardian-execute · account-guardian · shadow-log · run-command · page-visibility · upcoming-news
+EA/system: ea-data · ea-result · heartbeat · maintenance · admin-maintenance-access · shadow-log · page-visibility · upcoming-news
 Journal: journal · journal-upload
 Admin: admin/index · admin/license · admin/pf-approvals · admin/pricing
 
-Rule: import supabase from `../../lib/supabase` (except ea-* routes).
+Rule: import supabase from `../../lib/supabase`.
 
 ---
 

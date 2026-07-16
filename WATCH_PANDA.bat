@@ -10,7 +10,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$starter = '%STARTER%';" ^
   "$log = '%LOG%';" ^
   "$stamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss';" ^
-  "$procs = Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'uvicorn app:app|START_PANDA\.bat' -and $_.CommandLine -notmatch 'hermes' };" ^
+  "$procs = Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'uvicorn app:app|START_PANDA\.bat' };" ^
   "$healthy = $false;" ^
   "try { $r = Invoke-RestMethod -Uri 'http://127.0.0.1:8000/status' -TimeoutSec 8; $healthy = ($r.status -eq 'ACTIVE') } catch { $healthy = $false };" ^
   "if ($healthy -or $procs) { Add-Content -LiteralPath $log -Value \"$stamp OK healthy=$healthy procs=$($procs.Count)\"; exit 0 };" ^
