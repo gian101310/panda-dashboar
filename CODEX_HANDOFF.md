@@ -2,6 +2,34 @@
 
 Latest entries first. Keep this short so Claude can read it before work.
 
+## 2026-07-16 - Security Cleanup And Windows Indicator Release
+
+- Commits already deployed: `f65952b remove-unused-hermes-guardian-and-harden-security`, `752aa0f fix-ea-result-idempotency`
+- Repo: `gian101310/panda-dashboar`, branch `main`
+- Vercel deployment: `dpl_C7nUowKgBZ2VzNt9KzZ216HsuEND`
+- Production status: `READY` on `pandaengine.app` and `www.pandaengine.app`
+- Build duration: about 30.2 seconds
+
+Completed:
+
+- Removed the unused Hermes runtime integration, Hermes database table/helpers, and obsolete Hermes handoff documents.
+- Removed the Guardian/account-guardian pages, APIs, autonomous agent/launcher, watchdog batch file, and Guardian-only database tables.
+- Preserved `lib/accountGuardian.mjs` and `lib/tradeExecutor.mjs` because active order-execution tools still use their risk gates; these are not the deleted Guardian product UI.
+- Hardened `pf_waitlist` and `shadow_tracker` with RLS and removed anonymous/authenticated access from backend-only tables and RPCs.
+- Changed EA result ingestion to a shared server client plus atomic ticket upsert, removing the historical duplicate-ticket error loop.
+- Verified 197/197 JavaScript tests, `check_dupes.py`, Python compilation, Next build, production routes, and the live Supabase security state.
+
+Important remaining Windows release:
+
+- The July 14 cTrader/MT4/MT5 Licensed downloads were compiled **before** commit `622cbcb add-automatic-device-credential-sources`.
+- Device-ready source exists, but replacement `.algo`, `.ex4`, and `.ex5` files must be rebuilt and smoke-tested on Windows before device enforcement is enabled.
+- Production device mode remains `OFF` for all three platforms. Do not jump directly to `ENFORCED`.
+- Full Windows procedure, source/output matrix, rollout order, and acceptance checks: `docs/CLAUDE_WINDOWS_INDICATOR_HANDOFF_2026-07-16.md`.
+
+Infrastructure note:
+
+- Panda no longer calls Hermes. The separate inactive Vercel project named `hermes-mission-control` was not deleted as part of the code cleanup; deleting that external project is a separate destructive infrastructure action.
+
 ## 2026-06-17 - Login And Security Alert Routing
 
 - Commit: `48cfc1b fix-login-security-alert-routing`
@@ -61,4 +89,3 @@ Use this for future Codex entries:
 - Not staged / not pushed:
 - Blockers:
 ```
-
