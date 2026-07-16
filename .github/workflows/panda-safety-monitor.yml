@@ -1,0 +1,37 @@
+name: Panda Safety Monitors
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+    - cron: '0 2 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  engine-stall:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '*/5 * * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Check Panda Engine heartbeat
+        env:
+          PANDA_CRON_SECRET: ${{ secrets.PANDA_CRON_SECRET }}
+        run: |
+          curl --silent --show-error --fail-with-body --retry 2 --max-time 25 \
+            --header "Authorization: Bearer ${PANDA_CRON_SECRET}" \
+            https://www.pandaengine.app/api/cron/engine-stall
+
+  edge-revalidation:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 2 * * 1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Revalidate Panda statistical edges
+        env:
+          PANDA_CRON_SECRET: ${{ secrets.PANDA_CRON_SECRET }}
+        run: |
+          curl --silent --show-error --fail-with-body --retry 2 --max-time 55 \
+            --header "Authorization: Bearer ${PANDA_CRON_SECRET}" \
+            https://www.pandaengine.app/api/cron/edge-revalidation

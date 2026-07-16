@@ -2,6 +2,7 @@
 
 ## 2026-07-16
 
+- Moved safety-job scheduling to secured GitHub Actions after Vercel rejected the five-minute cron on the current plan; route authentication remains fail-closed with a shared rotated secret.
 - Added OFF/SHADOW/ENFORCED per-platform licensing modes with throttled, credential-free dry-run telemetry and admin would-block counters; production remains OFF for cTrader, MT4, and MT5.
 - Added a service-role-only engine heartbeat monitor with one-time 15-minute stall alerts, repeat suppression, and recovery notifications through an authenticated five-minute Vercel Cron.
 - Added report-only weekly edge revalidation with an admin manual endpoint, authenticated Vercel Cron, fresh `ai_memory` output, and one-time Telegram decay alerting.

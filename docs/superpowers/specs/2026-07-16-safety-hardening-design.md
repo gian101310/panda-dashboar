@@ -26,11 +26,11 @@ it cannot create trades, change thresholds, or write to dashboard scoring tables
 - Store one replaceable `ai_memory` report and notify the admin when an old claim has decayed.
 - Remove hardcoded stale performance claims from AI and public marketing copy.
 - Keep historical `admin_brain` records, but label them retired instead of deleting evidence.
-- Support an authenticated weekly Vercel Cron run and an admin-only manual run.
+- Support an authenticated weekly scheduled run and an admin-only manual run.
 
 ## 3. Engine stall alerts
 
-An authenticated Vercel Cron checks `engine_heartbeat` every five minutes.
+An authenticated GitHub Actions schedule checks `engine_heartbeat` every five minutes.
 
 - A heartbeat age of 15 minutes changes the monitor to `STALE` and sends one Telegram alert.
 - Continued staleness does not repeat the alert.
@@ -58,7 +58,7 @@ but no automatic mode switch is permitted.
 ## Security and failure behavior
 
 - Admin routes use server-side session authorization.
-- Cron routes require `Authorization: Bearer <CRON_SECRET>`.
+- Scheduled routes require `Authorization: Bearer <CRON_SECRET>`; the matching value is stored as a sensitive Vercel environment variable and a GitHub Actions secret.
 - Missing configuration fails closed for cron execution, not for indicator downloads.
 - Telegram failures are reported by the route and retried on the next monitor transition check.
 - All schema objects enable RLS and grant access only to `service_role`.

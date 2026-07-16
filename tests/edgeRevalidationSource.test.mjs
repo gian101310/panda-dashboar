@@ -14,8 +14,14 @@ test('AI prompt and public portfolio do not present retired 91/0 claims as curre
   assert.match(aiChat, /weekly_edge_revalidation/);
 });
 
-test('weekly cron is configured without modifying the repository guardrail', async () => {
-  const config = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
+test('weekly edge job uses the secured GitHub scheduler without modifying the repository guardrail', async () => {
+  const [config, workflow] = await Promise.all([
+    readFile(new URL('../vercel.json', import.meta.url), 'utf8').then(JSON.parse),
+    readFile(new URL('../.github/workflows/panda-safety-monitor.yml', import.meta.url), 'utf8'),
+  ]);
   assert.equal(config.ignoreCommand, '[ ! -f lib/accountGuardian.mjs ]');
-  assert.ok(config.crons.some((cron) => cron.path === '/api/cron/edge-revalidation' && cron.schedule === '0 2 * * 1'));
+  assert.equal(config.crons, undefined);
+  assert.match(workflow, /cron: ['"]0 2 \* \* 1['"]/);
+  assert.match(workflow, /\/api\/cron\/edge-revalidation/);
+  assert.match(workflow, /secrets\.PANDA_CRON_SECRET/);
 });

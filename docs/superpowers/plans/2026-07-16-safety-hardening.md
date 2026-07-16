@@ -27,7 +27,7 @@
 - Add failing tests for healthy, first-stale, repeated-stale, recovery, and Telegram-failure cases.
 - Add a pure transition decision helper and dependency-injected monitor service.
 - Add the `engine_monitor_state` migration with service-role-only access.
-- Add the authenticated cron route and five-minute Vercel schedule.
+- Add the authenticated cron route and five-minute production schedule.
 - Apply the migration, run tests/checks/build, and commit as `add-engine-stall-alerts`.
 
 ## Task 4: Licensing shadow mode
@@ -48,3 +48,10 @@
 - Verify the Vercel deployment reaches READY and the build duration exceeds 20 seconds.
 - Smoke-test the public site, admin routes, and cron endpoints' unauthorized behavior.
 - Report migrations, commits, deployment, tests, and the intentionally deferred Windows binaries.
+
+## Deployment adaptation
+
+Vercel rejected the five-minute cron schedule because the project plan only permits daily cron jobs.
+The authenticated routes are therefore invoked by a public-repository GitHub Actions schedule instead.
+This preserves the five-minute engine check and weekly edge run without a paid plan change; `vercel.json`
+retains only the locked repository guardrail and normal build settings.

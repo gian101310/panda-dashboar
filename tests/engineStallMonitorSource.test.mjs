@@ -12,10 +12,16 @@ test('engine monitor migration is service-role-only and stores transition state'
   assert.match(sql, /last_recovery_at timestamptz/i);
 });
 
-test('five-minute engine monitor cron is configured and guardrail is unchanged', async () => {
-  const config = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
+test('five-minute engine monitor uses the secured GitHub scheduler and guardrail is unchanged', async () => {
+  const [config, workflow] = await Promise.all([
+    readFile(new URL('../vercel.json', import.meta.url), 'utf8').then(JSON.parse),
+    readFile(new URL('../.github/workflows/panda-safety-monitor.yml', import.meta.url), 'utf8'),
+  ]);
   assert.equal(config.ignoreCommand, '[ ! -f lib/accountGuardian.mjs ]');
-  assert.ok(config.crons.some((cron) => cron.path === '/api/cron/engine-stall' && cron.schedule === '*/5 * * * *'));
+  assert.equal(config.crons, undefined);
+  assert.match(workflow, /cron: ['"]\*\/5 \* \* \* \*['"]/);
+  assert.match(workflow, /\/api\/cron\/engine-stall/);
+  assert.match(workflow, /secrets\.PANDA_CRON_SECRET/);
 });
 
 test('engine stall cron fails closed with shared CRON_SECRET authorization', async () => {
