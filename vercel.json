@@ -8,6 +8,10 @@
     {
       "path": "/api/cron/edge-revalidation",
       "schedule": "0 2 * * 1"
+    },
+    {
+      "path": "/api/cron/engine-stall",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

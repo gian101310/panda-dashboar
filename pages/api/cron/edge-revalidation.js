@@ -1,4 +1,4 @@
-import { isCronAuthorized } from '../../../lib/edgeRevalidation.mjs';
+import { isCronAuthorized } from '../../../lib/cronAuth.mjs';
 import { createEdgeRevalidationRuntime } from '../../../lib/edgeRevalidationRuntime.mjs';
 import { supabase } from '../../../lib/supabase';
 
