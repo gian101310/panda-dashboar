@@ -49,6 +49,7 @@ export default function LicenseAdminPage() {
   const [newToken, setNewToken] = useState('');
   const [rotatingToken, setRotatingToken] = useState(false);
   const [downloadStats, setDownloadStats] = useState({ totals: [], recent: [] });
+  const [showDownloadActivity, setShowDownloadActivity] = useState(false);
   const [devicePolicies, setDevicePolicies] = useState([]);
   const [selectedLicense, setSelectedLicense] = useState(null);
   const [licenseDevices, setLicenseDevices] = useState([]);
@@ -333,22 +334,29 @@ export default function LicenseAdminPage() {
               ))}
               {downloadStats.totals.length === 0 && <div style={{ fontFamily: mono, fontSize: 8, color: '#2a3550' }}>DOWNLOAD TELEMETRY NOT AVAILABLE</div>}
             </div>
-            <div style={{ fontFamily: orb, fontSize: 9, color: '#445566', letterSpacing: 2, margin: '16px 0 8px' }}>RECENT DOWNLOAD ACTIVITY</div>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 520 }}>
-                <thead><tr>{['INDICATOR', 'PLATFORM', 'TIME'].map((label) => <th key={label} style={hdr}>{label}</th>)}</tr></thead>
-                <tbody>
-                  {downloadStats.recent.slice(0, 20).map((event, index) => (
-                    <tr key={`${event.product_code}-${event.downloaded_at}-${index}`}>
-                      <td style={cell}>{productMap[event.product_code]?.name || event.product_code}</td>
-                      <td style={cell}><Badge label={event.platform} color={event.platform === 'CTRADER' ? '#00b4ff' : '#ffd166'} /></td>
-                      <td style={{ ...cell, fontFamily: mono, fontSize: 9 }}>{formatDateTime(event.downloaded_at)}</td>
-                    </tr>
-                  ))}
-                  {downloadStats.recent.length === 0 && <tr><td colSpan={3} style={{ ...cell, textAlign: 'center', color: '#2a3550' }}>NO RECORDED DOWNLOADS</td></tr>}
-                </tbody>
-              </table>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, margin: '16px 0 8px', flexWrap: 'wrap' }}>
+              <div style={{ fontFamily: orb, fontSize: 9, color: '#445566', letterSpacing: 2 }}>RECENT DOWNLOAD ACTIVITY · {downloadStats.recent.length}</div>
+              <button type="button" onClick={() => setShowDownloadActivity((current) => !current)} style={smallBtn('#00b4ff')}>
+                {showDownloadActivity ? 'HIDE ACTIVITY' : 'SHOW ACTIVITY'}
+              </button>
             </div>
+            {showDownloadActivity && (
+              <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 320 }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 520 }}>
+                  <thead><tr>{['INDICATOR', 'PLATFORM', 'TIME'].map((label) => <th key={label} style={hdr}>{label}</th>)}</tr></thead>
+                  <tbody>
+                    {downloadStats.recent.slice(0, 20).map((event, index) => (
+                      <tr key={`${event.product_code}-${event.downloaded_at}-${index}`}>
+                        <td style={cell}>{productMap[event.product_code]?.name || event.product_code}</td>
+                        <td style={cell}><Badge label={event.platform} color={event.platform === 'CTRADER' ? '#00b4ff' : '#ffd166'} /></td>
+                        <td style={{ ...cell, fontFamily: mono, fontSize: 9 }}>{formatDateTime(event.downloaded_at)}</td>
+                      </tr>
+                    ))}
+                    {downloadStats.recent.length === 0 && <tr><td colSpan={3} style={{ ...cell, textAlign: 'center', color: '#2a3550' }}>NO RECORDED DOWNLOADS</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </section>
 
           <section style={{ background: '#0e1525', border: '1px solid #1a2540', borderRadius: 10, padding: 16, marginBottom: 16 }}>

@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-07-16
+
+- Added an **Approved Accounts** tab and exact counter to Panda approvals, with a compact account history and guarded approval revocation.
+- Kept indicator download totals visible while collapsing detailed download activity by default behind a Show/Hide control and bounded scroll area.
+
 ## 2026-07-15
 
 - Replaced the error-prone Personal token generate/copy/rotate sequence with one verified **Generate, Activate & Copy** action and retained admin-only encrypted recovery.

@@ -87,10 +87,22 @@ export default async function handler(req, res) {
     const { data: pendingUsers } = await supabase
       .from('panda_users').select('id, username, role, pf_tier, pf_approved, created_at, is_active')
       .eq('pf_approved', false).order('created_at', { ascending: false }).limit(100);
+    const { data: approvedUsers, count: approvedCount } = await supabase
+      .from('panda_users')
+      .select('id, username, role, pf_tier, pf_approved, created_at, is_active, max_devices', { count: 'exact' })
+      .eq('pf_approved', true)
+      .order('created_at', { ascending: false })
+      .limit(500);
     const { data: events } = await supabase
       .from('pf_security_events').select('*')
       .order('created_at', { ascending: false }).limit(50);
-    return res.status(200).json({ signups: signups || [], pending_users: pendingUsers || [], events: events || [] });
+    return res.status(200).json({
+      signups: signups || [],
+      pending_users: pendingUsers || [],
+      approved_users: approvedUsers || [],
+      counts: { approved_users: approvedCount || 0 },
+      events: events || [],
+    });
   }
 
   if (req.method !== 'POST') return res.status(405).end();

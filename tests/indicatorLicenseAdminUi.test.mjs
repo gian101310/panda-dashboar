@@ -38,6 +38,11 @@ test('license admin exposes download telemetry and recoverable active-token cont
   assert.match(admin, /Token is active\. Copy the visible value manually/);
   assert.match(admin, /setTimeout/);
   assert.match(admin, /60000/);
+  assert.match(admin, /showDownloadActivity/);
+  assert.match(admin, /SHOW ACTIVITY/);
+  assert.match(admin, /HIDE ACTIVITY/);
+  assert.match(admin, /maxHeight: 320/);
+  assert.match(admin, /overflowY: 'auto'/);
 });
 
 test('license admin exposes safe device-limit and enforcement controls', () => {

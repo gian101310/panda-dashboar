@@ -35,6 +35,8 @@ export default function PfApprovalsPage() {
   const [pfLoading, setPfLoading] = useState(true);
   const [pfSignups, setPfSignups] = useState([]);
   const [pfPendingUsers, setPfPendingUsers] = useState([]);
+  const [pfApprovedUsers, setPfApprovedUsers] = useState([]);
+  const [pfCounts, setPfCounts] = useState({ approved_users: 0 });
   const [pfEvents, setPfEvents] = useState([]);
   const [pfTab, setPfTab] = useState('signups');
   const [pfApproveOpen, setPfApproveOpen] = useState(null);
@@ -53,6 +55,8 @@ export default function PfApprovalsPage() {
       const d = await r.json();
       setPfSignups(d.signups || []);
       setPfPendingUsers(d.pending_users || []);
+      setPfApprovedUsers(d.approved_users || []);
+      setPfCounts(d.counts || { approved_users: (d.approved_users || []).length });
       setPfEvents(d.events || []);
     } catch {}
     setPfLoading(false);
@@ -107,6 +111,10 @@ export default function PfApprovalsPage() {
     });
     pfLoad();
   };
+  const pfRevokeApproved = async (user) => {
+    if (!confirm(`Revoke dashboard approval for ${user.username}?`)) return;
+    await pfToggleApproved(user.id);
+  };
   if (pfLoading) return <div style={{ background: '#050810', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#445566', fontFamily: mono, fontSize: 11, letterSpacing: 3 }}>LOADING APPROVALS...</div>;
 
   return (
@@ -137,10 +145,11 @@ export default function PfApprovalsPage() {
           </div>
 
           {/* TABS */}
-          <div style={{ display: 'flex', gap: 6, marginBottom: 20, borderBottom: '1px solid #1a2540' }}>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 20, borderBottom: '1px solid #1a2540', flexWrap: 'wrap' }}>
             {[
               { k: 'signups', label: `SIGNUP REQUESTS (${pfSignups.length})` },
               { k: 'users',   label: `PENDING USERS (${pfPendingUsers.length})` },
+              { k: 'approved', label: `APPROVED ACCOUNTS (${pfCounts.approved_users || 0})` },
               { k: 'events',  label: `SECURITY EVENTS (${pfEvents.length})` },
             ].map(t => (
               <button key={t.k} onClick={() => setPfTab(t.k)}
@@ -201,6 +210,44 @@ export default function PfApprovalsPage() {
                       <button onClick={() => pfToggleApproved(u.id)} style={{ background: '#00ff9f', border: 'none', borderRadius: 6, color: '#050810', fontFamily: orb, fontSize: 10, fontWeight: 700, letterSpacing: 2, padding: '8px 16px', cursor: 'pointer' }}>APPROVE</button>
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+          )}
+          {/* APPROVED ACCOUNTS TAB */}
+          {pfTab === 'approved' && (
+            <div>
+              {pfApprovedUsers.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '60px 20px', color: '#445566', fontFamily: mono, fontSize: 12, letterSpacing: 2 }}>NO APPROVED ACCOUNTS</div>
+              ) : (
+                <div style={{ overflowX: 'auto', border: '1px solid #1a2540', borderRadius: 8, background: '#0a0e1a' }}>
+                  <table style={{ width: '100%', minWidth: 780, borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#0e1525' }}>
+                        {['ACCOUNT', 'TIER', 'ROLE', 'STATUS', 'MAX DEVICES', 'APPROVED / CREATED', 'ACTION'].map(label => (
+                          <th key={label} style={{ padding: '10px 14px', borderBottom: '1px solid #1a2540', color: '#445566', fontFamily: mono, fontSize: 9, fontWeight: 400, letterSpacing: 2, textAlign: 'left' }}>{label}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pfApprovedUsers.map(u => {
+                        const tier = PF_TIER_LABELS[u.pf_tier] || PF_TIER_LABELS.starter;
+                        return (
+                          <tr key={u.id}>
+                            <td style={{ padding: '12px 14px', borderBottom: '1px solid #101827', color: '#00ff9f', fontFamily: orb, fontSize: 11, fontWeight: 700 }}>{u.username}</td>
+                            <td style={{ padding: '12px 14px', borderBottom: '1px solid #101827', color: tier.color, fontFamily: mono, fontSize: 10 }}>{(u.pf_tier || 'starter').toUpperCase()}</td>
+                            <td style={{ padding: '12px 14px', borderBottom: '1px solid #101827', color: '#8899aa', fontFamily: mono, fontSize: 10 }}>{(u.role || 'user').toUpperCase()}</td>
+                            <td style={{ padding: '12px 14px', borderBottom: '1px solid #101827', color: u.is_active ? '#00ff9f' : '#ff4d6d', fontFamily: mono, fontSize: 10 }}>{u.is_active ? 'ACTIVE' : 'DISABLED'}</td>
+                            <td style={{ padding: '12px 14px', borderBottom: '1px solid #101827', color: '#00b4ff', fontFamily: mono, fontSize: 10 }}>{u.max_devices || 1}</td>
+                            <td style={{ padding: '12px 14px', borderBottom: '1px solid #101827', color: '#6b7d8e', fontFamily: mono, fontSize: 10 }}>{pfFormatTime(u.created_at)}</td>
+                            <td style={{ padding: '12px 14px', borderBottom: '1px solid #101827' }}>
+                              <button onClick={() => pfRevokeApproved(u)} style={{ background: 'transparent', border: '1px solid #ff4d6d55', borderRadius: 6, color: '#ff4d6d', fontFamily: orb, fontSize: 9, fontWeight: 700, letterSpacing: 2, padding: '7px 12px', cursor: 'pointer' }}>REVOKE</button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>
