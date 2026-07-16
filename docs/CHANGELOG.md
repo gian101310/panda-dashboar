@@ -4,6 +4,16 @@
 
 ---
 
+## Jul 16, 2026 — Retired Hermes/Guardian + Supabase hardening + EA idempotency
+
+- Removed the unused Hermes feed, learning table/RPCs, and active handoff documents.
+- Removed the unused Guardian pages, snapshot APIs/agent, local command/watchdog routes, autonomous-loop launcher, and Guardian database tables. The reusable execution risk gates remain because live order tools depend on them.
+- Enabled RLS on `pf_waitlist` and `shadow_tracker`; revoked `anon`/`authenticated` access to internal engine/signal/config tables; removed permissive public write policies; restricted remaining `SECURITY DEFINER` RPCs to `service_role` and pinned their search paths.
+- Changed `/api/ea-result` from check-then-insert to a single atomic upsert on `ticket`, eliminating retry races and duplicate-key error churn.
+- Added source regression tests for removed systems, security migration coverage, EA idempotency, and corrected the stale missing-SL hedge expectation.
+
+---
+
 ## Jul 9, 2026 — Snapshot v9 (XTF line) + engine consolidation
 
 - **Telegram snapshot v9**: EXTREME TF line on every pair card ("XTF GBP D1+5 H4+5 | JPY H1-5" / "XTF NONE"); row_h 300→370. Test message sent + verified.
