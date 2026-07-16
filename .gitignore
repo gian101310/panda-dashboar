@@ -47,3 +47,6 @@ public/downloads/bias-detection.ex4
 .watchdog.stop
 guardian-watchdog.log
 .env*
+
+# Local agent runtime state
+.superpowers/
