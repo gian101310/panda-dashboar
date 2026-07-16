@@ -28,7 +28,11 @@ function dependencies(overrides = {}) {
     calls,
     handler: createIndicatorDeviceAdminHandler({
       requireAdmin: async () => ({ username: 'Boss-G' }),
-      listPolicies: async () => [{ product_code: 'mt5_dashboard_overlay', enabled: false }],
+      listPolicies: async () => [{ product_code: 'mt5_dashboard_overlay', mode: 'SHADOW', enabled: false }],
+      listShadowStats: async () => ({
+        summary: [{ product_code: 'mt5_dashboard_overlay', would_status: 'DEVICE_ID_REQUIRED', event_count: 7 }],
+        recent: [{ license_id: licenseId, product_code: 'mt5_dashboard_overlay', platform: 'MT5', would_status: 'DEVICE_ID_REQUIRED', event_count: 7 }],
+      }),
       listDevices: async () => [{
         id: deviceId,
         license_id: licenseId,
@@ -44,6 +48,7 @@ function dependencies(overrides = {}) {
       getActiveDeviceCount: async () => 2,
       setLicenseLimit: async (...args) => { calls.push(['limit', ...args]); },
       setEnforcement: async (...args) => { calls.push(['enforcement', ...args]); },
+      setMode: async (...args) => { calls.push(['mode', ...args]); },
       revokeDevice: async (...args) => { calls.push(['revoke', ...args]); },
       resetDevices: async (...args) => { calls.push(['reset', ...args]); },
       ...overrides,
@@ -65,6 +70,9 @@ test('lists policies and sanitized device metadata without credential hashes', a
   assert.equal(res.body.devices[0].device_id_hash, undefined);
   assert.equal(res.body.devices[0].device_token_hash, undefined);
   assert.equal(res.body.policies[0].enabled, false);
+  assert.equal(res.body.policies[0].mode, 'SHADOW');
+  assert.equal(res.body.shadow_summary[0].event_count, 7);
+  assert.equal(res.body.shadow_recent[0].would_status, 'DEVICE_ID_REQUIRED');
 });
 
 test('validates device limit and refuses to lower it below active usage', async () => {
@@ -85,6 +93,17 @@ test('updates a valid limit and a fixed product enforcement policy', async () =>
     ['limit', licenseId, 3],
     ['enforcement', 'mt5_dashboard_overlay', true, 'Boss-G'],
   ]);
+});
+
+test('sets only OFF, SHADOW, or ENFORCED device modes', async () => {
+  const { handler, calls } = dependencies();
+  const shadow = await invoke(handler, { method: 'PATCH', body: { action: 'set_mode', product_code: 'mt5_dashboard_overlay', mode: 'SHADOW' } });
+  const invalid = await invoke(handler, { method: 'PATCH', body: { action: 'set_mode', product_code: 'mt5_dashboard_overlay', mode: 'MAYBE' } });
+
+  assert.equal(shadow.statusCode, 200);
+  assert.equal(shadow.body.mode, 'SHADOW');
+  assert.equal(invalid.statusCode, 400);
+  assert.deepEqual(calls, [['mode', 'mt5_dashboard_overlay', 'SHADOW', 'Boss-G']]);
 });
 
 test('rejects unknown enforcement products', async () => {

@@ -1,10 +1,25 @@
 import { supabase } from '../../lib/supabase';
 import { createCtraderOverlayHandler } from '../../lib/ctraderOverlayHandler.mjs';
 import { createIndicatorDeviceAccess } from '../../lib/indicatorDeviceAccess.mjs';
+import { createIndicatorDeviceShadowRecorder } from '../../lib/indicatorDeviceShadowRecorder.mjs';
 import { CTRADER_OVERLAY_PRODUCT_CODE } from '../../lib/indicatorProducts.mjs';
 
 const requests = new Map();
 const DEVICE_TOUCH_MS = 5 * 60 * 1000;
+
+const recordShadowEvent = createIndicatorDeviceShadowRecorder({
+  writeEvent: async (event) => {
+    const { error } = await supabase.rpc('record_indicator_device_shadow_event', {
+      p_license_id: event.licenseId,
+      p_product_code: event.productCode,
+      p_platform: event.platform,
+      p_would_status: event.wouldStatus,
+      p_installation_present: event.installationPresent,
+      p_token_present: event.tokenPresent,
+    });
+    if (error) throw error;
+  },
+});
 
 function allowRequest(key) {
   const now = Date.now();
@@ -25,11 +40,11 @@ const deviceAccess = createIndicatorDeviceAccess({
   getEnforcement: async () => {
     const { data, error } = await supabase
       .from('indicator_device_enforcement')
-      .select('enabled')
+      .select('mode,enabled')
       .eq('product_code', CTRADER_OVERLAY_PRODUCT_CODE)
       .maybeSingle();
     if (error) throw error;
-    return data?.enabled === true;
+    return data || { mode: 'OFF', enabled: false };
   },
   getDevice: async ({ licenseId, deviceIdHash }) => {
     const { data, error } = await supabase
@@ -60,6 +75,7 @@ const deviceAccess = createIndicatorDeviceAccess({
     if (Date.now() - lastSeen < DEVICE_TOUCH_MS) return;
     await supabase.from('indicator_license_devices').update({ last_seen_at: new Date().toISOString() }).eq('id', device.id);
   },
+  recordShadowEvent,
 });
 
 const handler = createCtraderOverlayHandler({

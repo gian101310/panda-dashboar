@@ -7,10 +7,23 @@ const handler = createIndicatorDeviceAdminHandler({
   listPolicies: async () => {
     const { data, error } = await supabase
       .from('indicator_device_enforcement')
-      .select('product_code,enabled,updated_at,updated_by')
+      .select('product_code,mode,enabled,updated_at,updated_by')
       .order('product_code');
     if (error) throw error;
     return data || [];
+  },
+  listShadowStats: async () => {
+    const [summaryResult, recentResult] = await Promise.all([
+      supabase.rpc('get_indicator_device_shadow_summary'),
+      supabase
+        .from('indicator_device_shadow_events')
+        .select('license_id,product_code,platform,would_status,installation_present,token_present,event_count,last_seen_at')
+        .order('last_seen_at', { ascending: false })
+        .limit(20),
+    ]);
+    if (summaryResult.error) throw summaryResult.error;
+    if (recentResult.error) throw recentResult.error;
+    return { summary: summaryResult.data || [], recent: recentResult.data || [] };
   },
   listDevices: async (licenseId) => {
     const { data, error } = await supabase
@@ -40,7 +53,13 @@ const handler = createIndicatorDeviceAdminHandler({
   setEnforcement: async (productCode, enabled, username) => {
     const { error } = await supabase
       .from('indicator_device_enforcement')
-      .upsert({ product_code: productCode, enabled, updated_by: username, updated_at: new Date().toISOString() }, { onConflict: 'product_code' });
+      .upsert({ product_code: productCode, mode: enabled ? 'ENFORCED' : 'OFF', enabled, updated_by: username, updated_at: new Date().toISOString() }, { onConflict: 'product_code' });
+    if (error) throw error;
+  },
+  setMode: async (productCode, mode, username) => {
+    const { error } = await supabase
+      .from('indicator_device_enforcement')
+      .upsert({ product_code: productCode, mode, enabled: mode === 'ENFORCED', updated_by: username, updated_at: new Date().toISOString() }, { onConflict: 'product_code' });
     if (error) throw error;
   },
   revokeDevice: async (deviceId, timestamp) => {

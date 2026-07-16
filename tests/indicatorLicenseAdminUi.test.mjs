@@ -45,7 +45,7 @@ test('license admin exposes download telemetry and recoverable active-token cont
   assert.match(admin, /overflowY: 'auto'/);
 });
 
-test('license admin exposes safe device-limit and enforcement controls', () => {
+test('license admin exposes safe device-limit and OFF/SHADOW/ENFORCED controls', () => {
   const admin = fs.readFileSync('pages/admin/license.js', 'utf8');
   assert.match(admin, /fetch\('\/api\/admin\/indicator-license-devices'/);
   assert.match(admin, /DEVICE LIMIT/);
@@ -54,7 +54,10 @@ test('license admin exposes safe device-limit and enforcement controls', () => {
   assert.match(admin, /ACTIVE DEVICES/);
   assert.match(admin, /DEVICE ENFORCEMENT/);
   assert.match(admin, /action: 'set_limit'/);
-  assert.match(admin, /action: 'set_enforcement'/);
+  assert.match(admin, /action: 'set_mode'/);
+  assert.match(admin, /SHADOW/);
+  assert.match(admin, /ENFORCED/);
+  assert.match(admin, /shadow_summary/);
   assert.match(admin, /action: 'revoke'/);
   assert.match(admin, /action: 'reset'/);
   assert.doesNotMatch(admin, /device_token_hash|device_id_hash/);

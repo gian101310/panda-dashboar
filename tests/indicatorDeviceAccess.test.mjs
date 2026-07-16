@@ -25,6 +25,73 @@ test('allows legacy account access only while enforcement is disabled', async ()
   assert.deepEqual(result, { ok: true, status: 'LEGACY_APPROVED' });
 });
 
+test('accepts OFF policy objects for backward-compatible account-only access', async () => {
+  const access = createIndicatorDeviceAccess({
+    getEnforcement: async () => ({ mode: 'OFF', enabled: false }),
+  });
+  assert.deepEqual(await access.authorize({ license, productCode: 'mt5_dashboard_overlay', platform: 'MT5' }), {
+    ok: true,
+    status: 'LEGACY_APPROVED',
+  });
+});
+
+test('shadow mode records a would-block decision but still approves indicator data', async () => {
+  const events = [];
+  const access = createIndicatorDeviceAccess({
+    getEnforcement: async () => ({ mode: 'SHADOW', enabled: false }),
+    recordShadowEvent: async (event) => events.push(event),
+  });
+
+  const result = await access.authorize({
+    license,
+    productCode: 'mt5_dashboard_overlay',
+    platform: 'MT5',
+    deviceId: '',
+    deviceToken: '',
+  });
+
+  assert.deepEqual(result, { ok: true, status: 'SHADOW_APPROVED', shadowStatus: 'DEVICE_ID_REQUIRED' });
+  assert.deepEqual(events[0], {
+    licenseId: license.id,
+    productCode: 'mt5_dashboard_overlay',
+    platform: 'MT5',
+    wouldStatus: 'DEVICE_ID_REQUIRED',
+    installationPresent: false,
+    tokenPresent: false,
+  });
+  assert.equal('deviceId' in events[0], false);
+  assert.equal('deviceToken' in events[0], false);
+});
+
+test('shadow mode returns activation token but bypasses a device-limit denial', async () => {
+  const statuses = [];
+  const activationAccess = createIndicatorDeviceAccess({
+    getEnforcement: async () => 'SHADOW',
+    registerDevice: async () => 'DEVICE_ACTIVATED',
+    recordShadowEvent: async ({ wouldStatus }) => statuses.push(wouldStatus),
+    randomBytesImpl: () => Buffer.alloc(32, 9),
+  });
+  const activated = await activationAccess.authorize({
+    license, productCode: 'mt5_dashboard_overlay', platform: 'MT5', deviceId, deviceToken: '',
+  });
+  assert.equal(activated.ok, true);
+  assert.equal(activated.status, 'SHADOW_APPROVED');
+  assert.equal(activated.shadowStatus, 'DEVICE_ACTIVATED');
+  assert.equal(activated.issuedToken, '09'.repeat(32));
+
+  const deniedAccess = createIndicatorDeviceAccess({
+    getEnforcement: async () => 'SHADOW',
+    registerDevice: async () => 'DEVICE_LIMIT_REACHED',
+    recordShadowEvent: async ({ wouldStatus }) => statuses.push(wouldStatus),
+    randomBytesImpl: () => Buffer.alloc(32, 10),
+  });
+  const bypassed = await deniedAccess.authorize({
+    license, productCode: 'mt5_dashboard_overlay', platform: 'MT5', deviceId, deviceToken: '',
+  });
+  assert.deepEqual(bypassed, { ok: true, status: 'SHADOW_APPROVED', shadowStatus: 'DEVICE_LIMIT_REACHED' });
+  assert.deepEqual(statuses, ['DEVICE_ACTIVATED', 'DEVICE_LIMIT_REACHED']);
+});
+
 test('requires a valid random installation id when enforcement is enabled', async () => {
   const access = createIndicatorDeviceAccess({
     getEnforcement: async () => true,

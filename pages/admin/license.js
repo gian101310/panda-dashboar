@@ -51,6 +51,7 @@ export default function LicenseAdminPage() {
   const [downloadStats, setDownloadStats] = useState({ totals: [], recent: [] });
   const [showDownloadActivity, setShowDownloadActivity] = useState(false);
   const [devicePolicies, setDevicePolicies] = useState([]);
+  const [deviceShadowStats, setDeviceShadowStats] = useState([]);
   const [selectedLicense, setSelectedLicense] = useState(null);
   const [licenseDevices, setLicenseDevices] = useState([]);
   const [deviceBusy, setDeviceBusy] = useState(false);
@@ -78,6 +79,7 @@ export default function LicenseAdminPage() {
     if (deviceRes.ok) {
       const devices = await deviceRes.json();
       setDevicePolicies(Array.isArray(devices.policies) ? devices.policies : []);
+      setDeviceShadowStats(Array.isArray(devices.shadow_summary) ? devices.shadow_summary : []);
     }
   }, []);
 
@@ -230,6 +232,7 @@ export default function LicenseAdminPage() {
     setSelectedLicense(license);
     setLicenseDevices(Array.isArray(data.devices) ? data.devices : []);
     if (Array.isArray(data.policies)) setDevicePolicies(data.policies);
+    if (Array.isArray(data.shadow_summary)) setDeviceShadowStats(data.shadow_summary);
   }
 
   async function updateDeviceLimit(license) {
@@ -238,9 +241,9 @@ export default function LicenseAdminPage() {
     if (data) await load();
   }
 
-  async function setDeviceEnforcement(productCode, enabled) {
-    if (enabled && !confirm('Enable device enforcement only after the replacement indicator binary is live. Continue?')) return;
-    const data = await deviceRequest('PATCH', { action: 'set_enforcement', product_code: productCode, enabled });
+  async function setDeviceMode(productCode, mode) {
+    if (mode === 'ENFORCED' && !confirm('ENFORCED can block current indicator files. Continue only after the replacement binary is compiled, smoke-tested, and published.')) return;
+    const data = await deviceRequest('PATCH', { action: 'set_mode', product_code: productCode, mode });
     if (data) await load();
   }
 
@@ -360,19 +363,28 @@ export default function LicenseAdminPage() {
           </section>
 
           <section style={{ background: '#0e1525', border: '1px solid #1a2540', borderRadius: 10, padding: 16, marginBottom: 16 }}>
-            <div style={{ fontFamily: orb, fontSize: 10, color: '#ff9944', letterSpacing: 2 }}>DEVICE ENFORCEMENT</div>
-            <div style={{ fontFamily: mono, fontSize: 8, color: '#445566', margin: '6px 0 12px' }}>Keep OFF until the matching replacement binary is compiled, tested, and published. Existing account-number licensing remains active while OFF.</div>
+            <div style={{ fontFamily: orb, fontSize: 10, color: '#ff9944', letterSpacing: 2 }}>DEVICE ENFORCEMENT · SAFE MODES</div>
+            <div style={{ fontFamily: mono, fontSize: 8, color: '#445566', margin: '6px 0 12px' }}>OFF keeps account-number licensing. SHADOW records would-block outcomes but never blocks data. ENFORCED must stay unused until the matching replacement binary is compiled, smoke-tested, and published.</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(210px,1fr))', gap: 10 }}>
               {INDICATOR_PRODUCTS.filter((product) => product.code.endsWith('_dashboard_overlay')).map((product) => {
                 const policy = devicePolicies.find((item) => item.product_code === product.code);
+                const mode = policy?.mode || (policy?.enabled ? 'ENFORCED' : 'OFF');
+                const shadowCount = deviceShadowStats.filter((item) => item.product_code === product.code).reduce((sum, item) => sum + (Number(item.event_count) || 0), 0);
+                const modeColor = mode === 'ENFORCED' ? '#ff4d6d' : mode === 'SHADOW' ? '#ffd166' : '#60708d';
                 return (
-                  <label key={product.code} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, background: '#080c18', border: `1px solid ${policy?.enabled ? '#00ff9f55' : '#1a2540'}`, borderRadius: 7, padding: 12 }}>
+                  <div key={product.code} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, background: '#080c18', border: `1px solid ${modeColor}55`, borderRadius: 7, padding: 12 }}>
                     <span>
                       <span style={{ display: 'block', fontFamily: orb, fontSize: 9, color: '#e8eaf0' }}>{product.platform}</span>
-                      <span style={{ display: 'block', fontFamily: mono, fontSize: 8, color: policy?.enabled ? '#00ff9f' : '#60708d', marginTop: 4 }}>{policy?.enabled ? 'ENFORCED' : 'ACCOUNT ONLY'}</span>
+                      <span style={{ display: 'block', fontFamily: mono, fontSize: 8, color: modeColor, marginTop: 4 }}>
+                        {mode === 'SHADOW' ? `SHADOW · ${shadowCount} LOGGED` : mode === 'ENFORCED' ? 'ENFORCED · BLOCKING' : 'OFF · ACCOUNT ONLY'}
+                      </span>
                     </span>
-                    <input type="checkbox" checked={policy?.enabled === true} disabled={deviceBusy} onChange={(e) => setDeviceEnforcement(product.code, e.target.checked)} aria-label={`${product.platform} device enforcement`} />
-                  </label>
+                    <select value={mode} disabled={deviceBusy} onChange={(e) => setDeviceMode(product.code, e.target.value)} aria-label={`${product.platform} device enforcement mode`} style={{ ...input, width: 105, color: modeColor }}>
+                      <option value="OFF">OFF</option>
+                      <option value="SHADOW">SHADOW</option>
+                      <option value="ENFORCED">ENFORCED</option>
+                    </select>
+                  </div>
                 );
               })}
             </div>
