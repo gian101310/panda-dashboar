@@ -34,11 +34,26 @@ test('MT4 shared core is throttled, cached, movable, and informational', () => {
   assert.match(core, /GlobalVariableSetOnCondition/);
   assert.match(core, /CHARTEVENT_OBJECT_DRAG/);
   assert.match(core, /CHARTEVENT_OBJECT_CLICK/);
-  assert.match(core, /CORNER_LEFT_LOWER/);
+  assert.match(core, /CORNER_LEFT_UPPER/);
+  assert.match(core, /MQL_PROGRAM_TYPE/);
+  assert.match(core, /PANDA_PANEL_CORNER/);
   for (const label of ['SCORE', 'BIAS', 'BOX H4', 'BOX H1', 'PANDA LINES', 'XTF']) {
     assert.ok(core.includes(label), `missing MT4 panel label ${label}`);
   }
   assert.doesNotMatch(core, /OrderSend|OrderClose|OrderModify/);
+});
+
+test('MT4 feed expert advisors exist and only feed', () => {
+  const personal = read('mt4', 'PandaDashboardFeedMT4-Personal.mq4');
+  const licensed = read('mt4', 'PandaDashboardFeedMT4-Licensed.mq4');
+  assert.match(personal, /input string OperatorToken/);
+  assert.doesNotMatch(licensed, /OperatorToken/);
+  assert.match(licensed, /AccountNumber\s*\(\s*\)/);
+  for (const source of [personal, licensed]) {
+    assert.doesNotMatch(source, /#property indicator_chart_window/);
+    assert.match(source, /EventSetTimer\s*\(\s*1\s*\)/);
+    assert.doesNotMatch(source, /OrderSend|OrderClose|OrderModify/);
+  }
 });
 
 test('MT5 Personal and Licensed editions have fixed credential boundaries', () => {
@@ -69,11 +84,26 @@ test('MT5 shared core is throttled, cached, movable, and informational', () => {
   assert.match(core, /GlobalVariableSetOnCondition/);
   assert.match(core, /CHARTEVENT_OBJECT_DRAG/);
   assert.match(core, /CHARTEVENT_OBJECT_CLICK/);
-  assert.match(core, /CORNER_LEFT_LOWER/);
+  assert.match(core, /CORNER_LEFT_UPPER/);
+  assert.match(core, /MQL_PROGRAM_TYPE/);
+  assert.match(core, /PANDA_PANEL_CORNER/);
   for (const label of ['SCORE', 'BIAS', 'BOX H4', 'BOX H1', 'PANDA LINES', 'XTF']) {
     assert.ok(core.includes(label), `missing MT5 panel label ${label}`);
   }
   assert.doesNotMatch(core, /OrderSend|PositionOpen|CTrade/);
+});
+
+test('MT5 feed expert advisors exist and only feed', () => {
+  const personal = read('mt5', 'PandaDashboardFeedMT5-Personal.mq5');
+  const licensed = read('mt5', 'PandaDashboardFeedMT5-Licensed.mq5');
+  assert.match(personal, /input string OperatorToken/);
+  assert.doesNotMatch(licensed, /OperatorToken/);
+  assert.match(licensed, /AccountInfoInteger\s*\(\s*ACCOUNT_LOGIN\s*\)/);
+  for (const source of [personal, licensed]) {
+    assert.doesNotMatch(source, /#property indicator_chart_window/);
+    assert.match(source, /EventSetTimer\s*\(\s*1\s*\)/);
+    assert.doesNotMatch(source, /OrderSend|PositionOpen|CTrade/);
+  }
 });
 
 test('both platform cores propagate authorization denial and create shared cache storage', () => {

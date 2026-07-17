@@ -4,13 +4,14 @@
 #include "PandaDashboardOverlayMT5.Core.mqh"
 
 input string OperatorToken = "";
+input PANDA_PANEL_CORNER PanelCorner = PANEL_BOTTOM_LEFT; // Panel position
 
 PandaOverlayMT5 Overlay;
 
 int OnInit()
 {
    EventSetTimer(1);
-   return Overlay.Initialize("PERSONAL", "x-panda-operator-token", OperatorToken) ? INIT_SUCCEEDED : INIT_FAILED;
+   return Overlay.Initialize("PERSONAL", "x-panda-operator-token", OperatorToken, PanelCorner) ? INIT_SUCCEEDED : INIT_FAILED;
 }
 
 void OnDeinit(const int reason)

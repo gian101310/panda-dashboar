@@ -4,7 +4,19 @@
 const string PANDA_MT5_ENDPOINT = "https://pandaengine.app/api/mt5-overlay";
 const int PANDA_REFRESH_SECONDS = 60;
 const int PANDA_LOCK_TIMEOUT_SECONDS = 15;
-const ENUM_BASE_CORNER PANDA_DEFAULT_CORNER = CORNER_LEFT_LOWER;
+const ENUM_BASE_CORNER PANDA_DEFAULT_CORNER = CORNER_LEFT_UPPER;
+const int PANDA_PANEL_WIDTH = 280;
+const int PANDA_PANEL_HEIGHT = 184;
+const int PANDA_PANEL_HEIGHT_MIN = 32;
+const int PANDA_PANEL_MARGIN = 12;
+
+enum PANDA_PANEL_CORNER
+{
+   PANEL_TOP_LEFT = 0,     // Top left
+   PANEL_TOP_RIGHT = 1,    // Top right
+   PANEL_BOTTOM_LEFT = 2,  // Bottom left
+   PANEL_BOTTOM_RIGHT = 3  // Bottom right
+};
 
 class PandaOverlayMT5
 {
@@ -36,6 +48,9 @@ private:
    int m_y;
    bool m_minimized;
    bool m_has_data;
+   bool m_can_http;
+   int m_corner;
+   bool m_custom;
 
    string Trim(string value)
    {
@@ -260,6 +275,13 @@ private:
 
    void RefreshFromNetwork()
    {
+      // MetaTrader prohibits WebRequest() inside indicators (error 4014/4060).
+      // Indicator instances display the shared snapshot; a Feed EA refreshes it.
+      if(!m_can_http)
+      {
+         if(!m_has_data && m_status == "CONNECTING") m_status = "ATTACH FEED EA";
+         return;
+      }
       double now_value = (double)TimeLocal();
       double last_attempt = GlobalVariableCheck(m_attempt_key) ? GlobalVariableGet(m_attempt_key) : 0.0;
       if(now_value - last_attempt < PANDA_REFRESH_SECONDS) return;
@@ -358,7 +380,7 @@ private:
       string name = m_prefix + suffix;
       if(ObjectFind(0, name) < 0) ObjectCreate(0, name, OBJ_LABEL, 0, 0, 0);
       SetCommon(name, x, y);
-      ObjectSetInteger(0, name, OBJPROP_ANCHOR, ANCHOR_LEFT_LOWER);
+      ObjectSetInteger(0, name, OBJPROP_ANCHOR, ANCHOR_LEFT_UPPER);
       ObjectSetInteger(0, name, OBJPROP_COLOR, value_color);
       ObjectSetInteger(0, name, OBJPROP_FONTSIZE, size);
       ObjectSetInteger(0, name, OBJPROP_SELECTABLE, selectable);
@@ -372,14 +394,19 @@ private:
       Label(suffix + "Value", value == "" ? "—" : value, m_x + 104, row_y, value_color, value_size);
    }
 
-   void DeleteObjects()
+   void DeleteByPrefix(const string prefix)
    {
       int total = ObjectsTotal(0, 0, -1);
       for(int i = total - 1; i >= 0; i--)
       {
          string name = ObjectName(0, i, 0, -1);
-         if(StringFind(name, m_prefix) == 0) ObjectDelete(0, name);
+         if(StringFind(name, prefix) == 0) ObjectDelete(0, name);
       }
+   }
+
+   void DeleteObjects()
+   {
+      DeleteByPrefix(m_prefix);
    }
 
    void SavePosition()
@@ -387,6 +414,8 @@ private:
       GlobalVariableSet(m_position_key + ".X", m_x);
       GlobalVariableSet(m_position_key + ".Y", m_y);
       GlobalVariableSet(m_position_key + ".M", m_minimized ? 1.0 : 0.0);
+      GlobalVariableSet(m_position_key + ".C", m_corner);
+      GlobalVariableSet(m_position_key + ".U", m_custom ? 1.0 : 0.0);
    }
 
 public:
@@ -397,17 +426,24 @@ public:
       m_y = 12;
       m_minimized = false;
       m_has_data = false;
+      m_can_http = false;
+      m_corner = PANEL_BOTTOM_LEFT;
+      m_custom = false;
       m_status = "CONNECTING";
       ClearData();
    }
 
-   bool Initialize(const string edition, const string header_name, const string credential)
+   bool Initialize(const string edition, const string header_name, const string credential, const int corner = PANEL_BOTTOM_LEFT)
    {
       m_edition = edition;
+      m_corner = corner;
       m_header_name = header_name;
       m_credential = Trim(credential);
+      int program_type = (int)MQLInfoInteger(MQL_PROGRAM_TYPE);
+      m_can_http = program_type == PROGRAM_EXPERT || program_type == PROGRAM_SCRIPT;
       m_symbol = CanonicalSymbol(Symbol());
-      m_prefix = "PandaMT5." + IntegerToString((int)ChartID()) + ".";
+      m_prefix = "PandaMT5." + IntegerToString((int)ChartID()) + (m_can_http ? ".F." : ".I.");
+      DeleteByPrefix("PandaMT5.");
       m_cache_key = Digest("MT5|" + m_header_name + "|" + m_credential);
       m_cache_file = "PandaOverlay\\MT5-" + m_cache_key + ".json";
       FolderCreate("PandaOverlay", FILE_COMMON);
@@ -416,9 +452,13 @@ public:
       m_lock_key = "Panda.MT5.Lock." + m_cache_key;
       m_attempt_key = "Panda.MT5.Try." + m_cache_key;
       m_received_key = "Panda.MT5.Rx." + m_cache_key;
-      m_position_key = "Panda.MT5.Pos." + edition + "." + IntegerToString((int)ChartID());
-      if(GlobalVariableCheck(m_position_key + ".X")) m_x = (int)GlobalVariableGet(m_position_key + ".X");
-      if(GlobalVariableCheck(m_position_key + ".Y")) m_y = (int)GlobalVariableGet(m_position_key + ".Y");
+      m_position_key = "Panda.MT5.Pos." + edition + (m_can_http ? ".F." : ".I.") + IntegerToString((int)ChartID());
+      if(GlobalVariableCheck(m_position_key + ".C") && (int)GlobalVariableGet(m_position_key + ".C") == m_corner)
+      {
+         if(GlobalVariableCheck(m_position_key + ".U")) m_custom = GlobalVariableGet(m_position_key + ".U") > 0.5;
+         if(m_custom && GlobalVariableCheck(m_position_key + ".X")) m_x = (int)GlobalVariableGet(m_position_key + ".X");
+         if(m_custom && GlobalVariableCheck(m_position_key + ".Y")) m_y = (int)GlobalVariableGet(m_position_key + ".Y");
+      }
       if(GlobalVariableCheck(m_position_key + ".M")) m_minimized = GlobalVariableGet(m_position_key + ".M") > 0.5;
       if(m_symbol == "") m_status = "UNSUPPORTED SYMBOL";
       else if(m_credential == "") m_status = "AUTH REQUIRED";
@@ -469,10 +509,15 @@ public:
       if(id == CHARTEVENT_OBJECT_DRAG && sparam == m_prefix + "Header")
       {
          m_x = (int)ObjectGetInteger(0, sparam, OBJPROP_XDISTANCE) - 4;
-         m_y = (int)ObjectGetInteger(0, sparam, OBJPROP_YDISTANCE) - (m_minimized ? 4 : 150);
+         m_y = (int)ObjectGetInteger(0, sparam, OBJPROP_YDISTANCE) - 4;
          if(m_x < 0) m_x = 0;
          if(m_y < 0) m_y = 0;
+         m_custom = true;
          SavePosition();
+         Render();
+      }
+      if(id == CHARTEVENT_CHART_CHANGE)
+      {
          Render();
       }
       if(id == CHARTEVENT_OBJECT_CLICK && sparam == m_prefix + "Minimize")
@@ -489,28 +534,64 @@ public:
       return rates_total;
    }
 
+   void RenderFeedBadge()
+   {
+      int bw = 200;
+      int bh = 22;
+      int chart_w = (int)ChartGetInteger(0, CHART_WIDTH_IN_PIXELS, 0);
+      int chart_h = (int)ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS, 0);
+      bool right_side = m_corner == PANEL_TOP_RIGHT || m_corner == PANEL_BOTTOM_RIGHT;
+      bool bottom_side = m_corner == PANEL_BOTTOM_LEFT || m_corner == PANEL_BOTTOM_RIGHT;
+      int bx = right_side ? chart_w - bw - 4 : 4;
+      int by = bottom_side ? 4 : chart_h - bh - 4;
+      if(bx < 0) bx = 0;
+      if(by < 0) by = 0;
+      Rect("Background", bx, by, bw, bh, C'9,15,25', C'26,37,64', false);
+      Label("Title", "PANDA FEED", bx + 8, by + 5, clrWhite, 8);
+      Label("Status", m_status, bx + 92, by + 5, StatusColor(), 8);
+      ChartRedraw(0);
+   }
+
    void Render()
    {
-      int height = m_minimized ? 48 : 178;
-      Rect("Background", m_x, m_y, 260, height, C'9,15,25', C'26,37,64', false);
-      Rect("Header", m_x + 4, m_y + height - 28, 252, 24, C'14,21,37', C'0,180,255', true);
-      Label("Title", (m_symbol == "" ? Symbol() : m_symbol) + " · PANDA", m_x + 10, m_y + height - 20, clrWhite, 9);
-      Label("Status", m_status, m_x + 132, m_y + height - 20, StatusColor(), 8);
-      Label("Minimize", m_minimized ? "[+]" : "[-]", m_x + 228, m_y + height - 20, C'0,180,255', 9, true);
+      if(m_can_http)
+      {
+         RenderFeedBadge();
+         return;
+      }
+      int width = PANDA_PANEL_WIDTH;
+      int height = m_minimized ? PANDA_PANEL_HEIGHT_MIN : PANDA_PANEL_HEIGHT;
+      if(!m_custom)
+      {
+         int chart_w = (int)ChartGetInteger(0, CHART_WIDTH_IN_PIXELS, 0);
+         int chart_h = (int)ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS, 0);
+         bool right_side = m_corner == PANEL_TOP_RIGHT || m_corner == PANEL_BOTTOM_RIGHT;
+         bool bottom_side = m_corner == PANEL_BOTTOM_LEFT || m_corner == PANEL_BOTTOM_RIGHT;
+         m_x = right_side ? chart_w - width - PANDA_PANEL_MARGIN : PANDA_PANEL_MARGIN;
+         m_y = bottom_side ? chart_h - height - PANDA_PANEL_MARGIN : PANDA_PANEL_MARGIN;
+         if(m_x < 0) m_x = 0;
+         if(m_y < 0) m_y = 0;
+      }
+
+      Rect("Background", m_x, m_y, width, height, C'9,15,25', C'26,37,64', false);
+      Rect("Header", m_x + 4, m_y + 4, width - 8, 24, C'14,21,37', C'0,180,255', true);
+      Label("Title", (m_symbol == "" ? Symbol() : m_symbol) + " · PANDA", m_x + 10, m_y + 9, clrWhite, 9);
+      Label("Minimize", m_minimized ? "[+]" : "[-]", m_x + width - 24, m_y + 9, C'0,180,255', 9, true);
 
       if(m_minimized)
       {
-         Label("Compact", m_score + "  " + m_bias, m_x + 10, m_y + 8, BiasColor(), 11);
+         Label("Status", m_score + "  " + m_bias, m_x + 120, m_y + 10, BiasColor(), 9);
       }
       else
       {
-         Row("Score", "SCORE", m_score, m_y + 130, BiasColor(), 16);
-         Row("Bias", "BIAS", m_bias, m_y + 108, BiasColor(), 10);
-         Row("BoxH4", "BOX H4", m_box_h4, m_y + 88, clrWhite, 9);
-         Row("BoxH1", "BOX H1", m_box_h1, m_y + 68, clrWhite, 9);
-         Row("PandaLines", "PANDA LINES", m_panda_lines, m_y + 48, m_panda_lines == "CONFIRMED" ? C'0,255,159' : C'255,209,102', 9);
-         Row("Xtf", "XTF", m_xtf, m_y + 28, C'120,200,255', 8);
-         Label("Footer", "Dashboard sync · " + (m_updated_at == "" ? "—" : m_updated_at), m_x + 10, m_y + 8, StatusColor(), 7);
+         Label("Status", m_status, m_x + 120, m_y + 10, StatusColor(), 8);
+         Row("Score", "SCORE", m_score, m_y + 36, BiasColor(), 16);
+         Row("Bias", "BIAS", m_bias, m_y + 66, BiasColor(), 10);
+         Row("BoxH4", "BOX H4", m_box_h4, m_y + 86, clrWhite, 9);
+         Row("BoxH1", "BOX H1", m_box_h1, m_y + 106, clrWhite, 9);
+         Row("PandaLines", "PANDA LINES", m_panda_lines, m_y + 126, m_panda_lines == "CONFIRMED" ? C'0,255,159' : C'255,209,102', 9);
+         Row("Xtf", "XTF", m_xtf, m_y + 146, C'120,200,255', 8);
+         Label("Footer", "Dashboard sync · " + (m_updated_at == "" ? "—" : m_updated_at), m_x + 10, m_y + height - 18, StatusColor(), 7);
       }
       ChartRedraw(0);
    }

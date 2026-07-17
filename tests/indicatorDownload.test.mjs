@@ -46,7 +46,7 @@ test('public download records the allowlisted product and redirects with no-stor
     platform: 'MT4',
   });
   assert.equal(res.statusCode, 302);
-  assert.equal(res.redirectTo, '/downloads/panda-dashboard-overlay-mt4-licensed.ex4');
+  assert.equal(res.redirectTo, '/downloads/panda-dashboard-overlay-mt4-licensed.zip');
   assert.equal(res.headers['Cache-Control'], 'no-store');
 });
 
