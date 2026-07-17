@@ -59,9 +59,15 @@ const raj  = "'Rajdhani',sans-serif";
 
 Colors: BUY `#00ff9f` · SELL `#ff4d6d` · accent `#00b4ff` · warning `#ffd166` · AI `#7C3AED`.
 
-## VERIFIED STATE — 2026-07-16 (evening, post-Codex cleanup)
+## VERIFIED STATE — 2026-07-17 (after Windows indicator session + parser fix)
 
-- HEAD `c9253cc add-claude-windows-indicator-handoff`; production READY (~30s build).
+- HEAD `31e0d76 fix-overlay-device-activation-token-parsing`; production READY.
+- MT4/MT5 ARCHITECTURE CHANGE: MetaTrader forbids WebRequest inside indicators, so the overlay indicator now displays only from the shared common-files cache and a new feed EA (`PandaDashboardFeed{MT4,MT5}-{Personal,Licensed}`, same Core, one chart per terminal, no trading) does the fetching. Overlay shows `ATTACH FEED EA` without it. cTrader unaffected (single .algo).
+- MT4/MT5 Licensed public downloads are now ZIPs (overlay + feed EA + INSTALL txt); legacy raw .ex4/.ex5 refreshed; product copy updated.
+- Device-activation token parser fixed on all three platforms (`device_activation.token` nested object); regression-tested; private `dist/` rebuilt (2 cTrader + 8 MT artifacts, zero warnings, checksums verify).
+- PUBLIC Licensed downloads were intentionally NOT replaced with the parser-fixed builds — pending the per-platform Windows verify sequence in `docs/CODEX_MAC_HANDOFF_2026-07-17.md` (OFF install LIVE → SHADOW one `DEVICE_ACTIVATED` → restart shows `DEVICE_APPROVED` not `DEVICE_REISSUED` → then replace download).
+- Windows machines: MT4 Personal overlay+feed LIVE verified (IC Markets Global); MT5 feed EA attach pending (must avoid the chart running PandaEngine_EA_MT5_WRITEBACK). Old clone `C:\...\Documents\Claude\Projects\Panda Engine` is DIVERGED (79 behind / 8 ahead, local app.py edits) — pushes now come from clean `C:\Users\Admin\panda-dashboard`; divergence resolution is Boss-G's call, do not force anything.
+- Prior state (2026-07-16, still true):
 - Hermes runtime, DB helpers/table, and handoff docs REMOVED (`f65952b`). Do not restore.
 - Guardian/account-guardian pages, APIs, agent, launcher, watchdog, and Guardian-only tables REMOVED. Do not restore.
 - `lib/accountGuardian.mjs` and `lib/tradeExecutor.mjs` intentionally PRESERVED — active execution risk gates import them.
@@ -69,8 +75,7 @@ Colors: BUY `#00ff9f` · SELL `#ff4d6d` · accent `#00b4ff` · warning `#ffd166`
 - Supabase hardened: backend-only tables RLS-locked (advisor shows only INFO "no policy" = deny-all by design; zero ERROR/WARN).
 - JS tests: 197/197 pass. `check_dupes.py` passes.
 - Device licensing mode is `OFF` for all three platforms (`indicator_device_enforcement`: OFF/SHADOW/ENFORCED per product).
-- Published Licensed binaries were compiled BEFORE `622cbcb` device-credential source changes — device-ready source exists, binaries must be rebuilt on Windows before SHADOW/ENFORCED.
-- Public downloads (4, all hash-verified vs dist SHA256SUMS): 3 Licensed overlays + `panda-vip.ex4`. No Personal artifacts or tokens are public.
+- No Personal artifacts or tokens are public.
 - Edge revalidation (`e2ece07`), engine stall alerts (`3b395d9`), shadow mode (`cc18a97`), GitHub scheduler for safety jobs (`28f3ff2`) are shipped.
 - `signal_results`: BB 4,562 (481 W / 608 L / 3,471 flat), decisive WR 44.2%; INTRA 145 (57 W / 60 L / 28 flat), decisive WR 48.7%.
 - `signal_tracker`: 11,647 total, 11,637 closed; price-confirmed rows remain 0.
@@ -79,7 +84,8 @@ Colors: BUY `#00ff9f` · SELL `#ff4d6d` · accent `#00b4ff` · warning `#ffd166`
 
 ## CURRENT PRIORITIES
 
-1. WINDOWS: rebuild + smoke-test the six overlay binaries, replace the 3 public Licensed downloads, then per-platform OFF → SHADOW → ENFORCED. Follow `docs/CLAUDE_WINDOWS_INDICATOR_HANDOFF_2026-07-16.md` exactly.
+1. WINDOWS: install the parser-fixed Licensed `dist/` artifacts and run the 4-step verify sequence per platform (`docs/CODEX_MAC_HANDOFF_2026-07-17.md`), then replace that platform's public Licensed download, then separate OFF → SHADOW → ENFORCED rollout. `docs/CLAUDE_WINDOWS_INDICATOR_HANDOFF_2026-07-16.md` still governs the overall release; the 07-17 doc supersedes it on MT4/MT5 architecture and the verify sequence.
+1b. MT5: attach the feed EA on a chart WITHOUT the writeback EA. Decide how to resolve the diverged old Windows clone.
 2. Add per-user AI analysis for Pro/Elite.
 3. Capture signal-tracker prices from cTrader so price-based validation becomes possible.
 4. Decide on deleting the inactive `hermes-mission-control` Vercel project (external destructive action — needs Boss-G's specific final confirmation).
@@ -96,7 +102,8 @@ Colors: BUY `#00ff9f` · SELL `#ff4d6d` · accent `#00b4ff` · warning `#ffd166`
 
 - `AGENTS.md` — locked operating rules.
 - `CODEX_HANDOFF.md` — latest cross-agent handoff (read first each session).
-- `docs/CLAUDE_WINDOWS_INDICATOR_HANDOFF_2026-07-16.md` — source of truth for the Windows indicator release.
+- `docs/CODEX_MAC_HANDOFF_2026-07-17.md` — MT4/MT5 feed-EA architecture + device-token verify sequence (read this before indicator work).
+- `docs/CLAUDE_WINDOWS_INDICATOR_HANDOFF_2026-07-16.md` — overall Windows release procedure (superseded by the 07-17 doc where they conflict).
 - `docs/SKILL_PANDA_ENGINE.md` — current skill source; re-upload to Claude Settings after edits.
 - `docs/AI_BUILD_PLAN_UPDATED.md` — AI architecture and phase history.
 - `docs/PENDING_OPTIMIZATIONS_v2.md` — roadmap.

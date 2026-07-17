@@ -17,8 +17,8 @@ description: >
 > **Purpose**: Eliminate redundant file scanning. Jump straight to the correct
 > line and edit.
 >
-> **Last audited**: 2026-07-16 (Mac session — full repo audit after Codex
-> Hermes/Guardian removal and security hardening; HEAD `c9253cc`)
+> **Last audited**: 2026-07-17 (Mac session — after Windows indicator session:
+> MT4/MT5 feed-EA architecture + device-token parser fix; HEAD `31e0d76`)
 
 ---
 
@@ -128,30 +128,53 @@ Supabase advisor INFO "RLS Enabled No Policy" on these tables is expected.
 
 ---
 
-## 5. INDICATOR / OVERLAY DISTRIBUTION (Jul 2026)
+## 5. INDICATOR / OVERLAY DISTRIBUTION (updated 2026-07-17)
 
-Six editions under `panda-indicators/2026-07-14/`:
+Sources under `panda-indicators/2026-07-14/`.
 
-| Platform | Personal (private, operator token param) | Licensed (public, account number + device credentials) |
+### Architecture (CRITICAL — changed 2026-07-17)
+- **MetaTrader forbids `WebRequest()` inside custom indicators** (error
+  4014/4060). MT4/MT5 overlay indicators therefore display ONLY from the
+  shared common-files snapshot cache (`MQL_PROGRAM_TYPE` guard in Core).
+- Fetching is done by **feed EAs**: `PandaDashboardFeed{MT4,MT5}-{Personal,
+  Licensed}` — same Core, same credentials, attach to ONE chart per terminal,
+  refresh cache every 60s, place no orders. Overlay shows `ATTACH FEED EA`
+  when the cache is absent.
+- cTrader is unaffected: single `.algo`, indicator fetches directly.
+- Object prefixes include program type (`.I.` / `.F.`); `PanelCorner` input
+  on all MT4/MT5 entries (4 corners, default bottom left).
+
+### Editions & auth
+| Platform | Personal (private) | Licensed (public) |
 |---|---|---|
-| cTrader | `PandaDashboardOverlay.Personal.csproj` | `PandaDashboardOverlay.Licensed.csproj` |
-| MT4 | `PandaDashboardOverlayMT4-Personal.mq4` | `PandaDashboardOverlayMT4-Licensed.mq4` |
-| MT5 | `PandaDashboardOverlayMT5-Personal.mq5` | `PandaDashboardOverlayMT5-Licensed.mq5` |
+| cTrader | Overlay .algo | Overlay .algo |
+| MT4 | Overlay .ex4 + Feed EA .ex4 | zip: overlay + feed EA + INSTALL |
+| MT5 | Overlay .ex5 + Feed EA .ex5 | zip: overlay + feed EA + INSTALL |
 
-- Shared cores: `PandaDashboardOverlay.Core.cs`, `PandaDashboardOverlayMT*.Core.mqh`
-  (device headers `x-panda-device-id` / `x-panda-device-token` live in the cores).
-- Personal auth: `x-panda-operator-token` as an input parameter — never embedded.
+- Personal auth: `x-panda-operator-token` input parameter — never embedded.
 - Licensed auth: `x-panda-account-number` read automatically; device ID/token
   persisted (cTrader LocalStorage device scope; MT4/MT5 FILE_COMMON).
+- Device credential response is NESTED: extract `device_activation.token`
+  (string-parsing bug fixed `31e0d76` on all three platforms — regression
+  tests in `tests/metatraderOverlaySource.test.mjs` + cTrader model).
 - Feed endpoints: `/api/ctrader-overlay`, `/api/mt4-overlay`, `/api/mt5-overlay`.
-- Public downloads (only these 4): 3 Licensed overlays + `panda-vip.ex4`.
-  Personal binaries are NEVER public.
-- **Current published Licensed binaries predate commit `622cbcb`** (device
-  credential sources). Rebuild on Windows before any SHADOW/ENFORCED switch.
-- Release procedure, smoke matrix, rollout order:
-  `docs/CLAUDE_WINDOWS_INDICATOR_HANDOFF_2026-07-16.md` (source of truth).
-- Rollout is per-platform and staged: OFF → SHADOW (verify would-block counters,
-  device activation, revoke/reset) → ENFORCED. Never OFF → ENFORCED directly.
+- Public downloads: cTrader .algo, MT4/MT5 Licensed zips (+ refreshed legacy
+  raw .ex4/.ex5), `panda-vip.ex4`. Personal binaries are NEVER public.
+
+### Release state & procedure
+- Parser-fixed builds exist in private `dist/` (checksums verify) but the
+  PUBLIC Licensed downloads were intentionally NOT replaced yet.
+- Per-platform verify sequence before replacing a public download
+  (`docs/CODEX_MAC_HANDOFF_2026-07-17.md`, supersedes the 07-16 handoff on
+  MT4/MT5): OFF + install → LIVE; SHADOW → one `DEVICE_ACTIVATED`; full
+  restart (reattach feed EA) → LIVE + `DEVICE_APPROVED` (NOT
+  `DEVICE_REISSUED`); any failure → back to OFF.
+- Enforcement rollout stays per-platform and staged: OFF → SHADOW → ENFORCED.
+  Never OFF → ENFORCED directly.
+- Windows note: MT5 feed EA must go on a chart WITHOUT
+  `PandaEngine_EA_MT5_WRITEBACK`. Old Windows clone
+  `C:\...\Documents\Claude\Projects\Panda Engine` is diverged — clean clone
+  is `C:\Users\Admin\panda-dashboard`; divergence resolution is Boss-G's call.
 
 ---
 
@@ -226,12 +249,16 @@ SHA256SUMS → verify hashes → staged SHADOW → ENFORCED per platform.
 
 ---
 
-## 9. CURRENT PRIORITIES (2026-07-16)
+## 9. CURRENT PRIORITIES (2026-07-17)
 
-1. Windows indicator rebuild + smoke test + staged device-licensing rollout.
-2. Per-user AI analysis for Pro/Elite.
-3. Signal-tracker price capture from cTrader (price-confirmed rows still 0).
-4. Decision pending: delete inactive `hermes-mission-control` Vercel project
+1. Windows: install parser-fixed Licensed `dist/` artifacts, run the 4-step
+   verify sequence per platform, replace that platform's public download,
+   then staged OFF → SHADOW → ENFORCED rollout.
+2. MT5: attach feed EA (chart without the writeback EA); resolve the diverged
+   old Windows clone (Boss-G's call).
+3. Per-user AI analysis for Pro/Elite.
+4. Signal-tracker price capture from cTrader (price-confirmed rows still 0).
+5. Decision pending: delete inactive `hermes-mission-control` Vercel project
    (needs Boss-G's specific final confirmation).
 
 ---
