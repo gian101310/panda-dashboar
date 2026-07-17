@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-07-17 (Windows indicator session)
+
+- Discovered the MT4/MT5 Dashboard Overlay could never sync: MetaTrader prohibits `WebRequest()` inside custom indicators (error 4014/4060), which the Core mapped to a permanent `ALLOW WEBREQUEST` banner. cTrader unaffected.
+- Split fetch from display: new `PandaDashboardFeed{MT4,MT5}-{Personal,Licensed}` expert advisors (same Core, one per terminal, no trading) refresh the shared common-files snapshot; indicators now display from cache only via an `MQL_PROGRAM_TYPE` guard and show `ATTACH FEED EA` when the feed is absent.
+- Rebuilt the MT4/MT5 panel UI: new `PanelCorner` input (4 corners), opaque top-down layout replacing the off-screen lower-corner background math, fixed XTF/footer overlap, per-program object prefixes plus init-time sweep of stale objects from prior sessions.
+- Packaged MT4/MT5 Licensed downloads as zips (overlay + feed EA + INSTALL instructions) in `public/downloads/`, updated `lib/indicatorProducts.mjs` paths and install notes, refreshed legacy raw binaries and `dist/` (8 artifacts, zero-warning compile logs, SHA256SUMS).
+- Extended overlay source-contract tests (feed EA boundaries, program-type guard, corner enum) and updated the download redirect test; smoke-tested Personal LIVE on MT4 IC Markets Global.
+- Added `docs/CODEX_MAC_HANDOFF_2026-07-17.md`.
+
 ## 2026-07-16 (Mac verification session)
 
 - Audited the repo after the Codex security cleanup: confirmed `c9253cc` at HEAD, clean tree in sync with origin, production READY, and no Hermes or Guardian references remaining outside the intentionally preserved risk-gate libraries and removal-assertion tests.
