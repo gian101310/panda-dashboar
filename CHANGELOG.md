@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-07-17 (TradingView XTF BOS personal overlay)
+
+- Added the separate private Pine v6 `Panda Engine Personal TV XTF BOS` indicator. It keeps the verified personal scoring, Boxes, Panda Lines, flips, and confirmed BOS, then gates a visible READY state through the user-selected H1/H4 Box and emits one final BUY or SELL trigger only when matching confirmed BOS occurs.
+- Kept the non-selected Box informational (`ALIGNED`, `RANGING`, `COUNTER`, or `UNKNOWN`), added compact XTF/signal panel rows and event-only BUY/SELL markers, and introduced the two explicit final trigger alert events without connecting them to Panda Engine, Telegram, APIs, licensing, or trading execution.
+
 ## 2026-07-17 (TradingView personal overlay)
 
 - Added the private Pine v6 `Panda Engine Personal TV` overlay with the exact 21-pair non-CHF structural currency scoring contract, three offset Panda Boxes, H1/H4 Box structure, SuperTrend/BB Follow Line status and confirmed flips, pivot BOS, four stable alert events, and a compact corner-selectable panel.
