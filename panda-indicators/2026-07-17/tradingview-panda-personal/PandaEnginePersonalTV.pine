@@ -1,0 +1,279 @@
+//@version=6
+indicator("Panda Engine Personal TV", shorttitle = "PANDA TV", overlay = true,
+  dynamic_requests = true, max_boxes_count = 10, max_lines_count = 20, max_labels_count = 50)
+
+// Personal TradingView port. It calculates from TradingView market data only.
+// It contains no Panda API credential and never places or manages trades.
+
+const int PANDA_GAP_THRESHOLD = 5
+const int PANDA_SIGNIFICANT = 4
+const int SNAPSHOT_BARS = 3500
+
+string GROUP_DISPLAY = "Display"
+bool showPanel = input.bool(true, "Show panel", group = GROUP_DISPLAY)
+bool showBoxes = input.bool(true, "Show Panda Boxes", group = GROUP_DISPLAY)
+string panelPositionInput = input.string("Bottom Left", "Panel position",
+  options = ["Top Left", "Top Right", "Bottom Left", "Bottom Right"], group = GROUP_DISPLAY)
+
+color PANDA_BUY = #00ff9f
+color PANDA_SELL = #ff4d6d
+color PANDA_WARN = #ffd166
+color PANDA_ACCENT = #00b4ff
+color PANDA_NEUTRAL = #9aa4b2
+color PANDA_BG = #111722
+
+var array<string> PANDA_PAIRS = array.from(
+  "AUDCAD", "AUDJPY", "AUDNZD", "AUDUSD", "CADJPY",
+  "EURAUD", "EURCAD", "EURGBP", "EURJPY", "EURNZD", "EURUSD",
+  "GBPAUD", "GBPCAD", "GBPJPY", "GBPNZD", "GBPUSD",
+  "NZDCAD", "NZDJPY", "NZDUSD", "USDCAD", "USDJPY")
+
+var array<string> PANDA_CURRENCIES = array.from("AUD", "CAD", "EUR", "GBP", "JPY", "NZD", "USD")
+
+type PairSnapshot
+    float price
+    float shortHigh
+    float shortLow
+    int shortStart
+    int shortEnd
+    float mediumHigh
+    float mediumLow
+    int mediumStart
+    int mediumEnd
+    float longHigh
+    float longLow
+    int longStart
+    int longEnd
+
+f_snapshot() =>
+    var float dayHigh = na
+    var float dayLow = na
+    var int dayStart = na
+    var float d1High = na
+    var float d1Low = na
+    var int d1Start = na
+    var float d2High = na
+    var float d2Low = na
+    var int d2Start = na
+    var float d3High = na
+    var float d3Low = na
+    var int d3Start = na
+    if na(dayHigh)
+        dayHigh := high
+        dayLow := low
+        dayStart := time
+    else if timeframe.change("1D")
+        d3High := d2High
+        d3Low := d2Low
+        d3Start := d2Start
+        d2High := d1High
+        d2Low := d1Low
+        d2Start := d1Start
+        d1High := dayHigh
+        d1Low := dayLow
+        d1Start := dayStart
+        dayHigh := high
+        dayLow := low
+        dayStart := time
+    else
+        dayHigh := math.max(dayHigh, high)
+        dayLow := math.min(dayLow, low)
+
+    var float weekHigh = na
+    var float weekLow = na
+    var int weekStart = na
+    var float w1High = na
+    var float w1Low = na
+    var int w1Start = na
+    var float w2High = na
+    var float w2Low = na
+    var int w2Start = na
+    var float w3High = na
+    var float w3Low = na
+    var int w3Start = na
+    if na(weekHigh)
+        weekHigh := high
+        weekLow := low
+        weekStart := time
+    else if timeframe.change("1W")
+        w3High := w2High
+        w3Low := w2Low
+        w3Start := w2Start
+        w2High := w1High
+        w2Low := w1Low
+        w2Start := w1Start
+        w1High := weekHigh
+        w1Low := weekLow
+        w1Start := weekStart
+        weekHigh := high
+        weekLow := low
+        weekStart := time
+    else
+        weekHigh := math.max(weekHigh, high)
+        weekLow := math.min(weekLow, low)
+
+    var float monthHigh = na
+    var float monthLow = na
+    var int monthStart = na
+    var float m1High = na
+    var float m1Low = na
+    var int m1Start = na
+    var float m2High = na
+    var float m2Low = na
+    var int m2Start = na
+    var float m3High = na
+    var float m3Low = na
+    var int m3Start = na
+    if na(monthHigh)
+        monthHigh := high
+        monthLow := low
+        monthStart := time
+    else if timeframe.change("1M")
+        m3High := m2High
+        m3Low := m2Low
+        m3Start := m2Start
+        m2High := m1High
+        m2Low := m1Low
+        m2Start := m1Start
+        m1High := monthHigh
+        m1Low := monthLow
+        m1Start := monthStart
+        monthHigh := high
+        monthLow := low
+        monthStart := time
+    else
+        monthHigh := math.max(monthHigh, high)
+        monthLow := math.min(monthLow, low)
+
+    PairSnapshot.new(close,
+      math.max(d2High, d3High), math.min(d2Low, d3Low), d3Start, d1Start,
+      math.max(w2High, w3High), math.min(w2Low, w3Low), w3Start, w1Start,
+      math.max(m2High, m3High), math.min(m2Low, m3Low), m3Start, m1Start)
+
+f_currency_index(string currency) =>
+    switch currency
+        "AUD" => 0
+        "CAD" => 1
+        "EUR" => 2
+        "GBP" => 3
+        "JPY" => 4
+        "NZD" => 5
+        "USD" => 6
+        => -1
+
+f_canonical_pair() =>
+    string metadataPair = str.upper(syminfo.basecurrency + syminfo.currency)
+    if array.includes(PANDA_PAIRS, metadataPair)
+        metadataPair
+    else
+        string tickerText = str.upper(syminfo.ticker)
+        string matched = ""
+        int matchCount = 0
+        for candidate in PANDA_PAIRS
+            if str.contains(tickerText, candidate)
+                matched := candidate
+                matchCount += 1
+        matchCount == 1 ? matched : ""
+
+f_vote(float priceValue, float boxHigh, float boxLow) =>
+    na(priceValue) or na(boxHigh) or na(boxLow) ? 0 : priceValue > boxHigh ? 1 : priceValue < boxLow ? -1 : 0
+
+f_add_vote(array<int> target, string currency, int vote) =>
+    int index = f_currency_index(currency)
+    if index >= 0
+        array.set(target, index, array.get(target, index) + vote)
+
+f_add_pair_vote(array<int> target, string pair, int vote) =>
+    string base = str.substring(pair, 0, 3)
+    string quote = str.substring(pair, 3, 6)
+    f_add_vote(target, base, vote)
+    f_add_vote(target, quote, -vote)
+
+f_strongest(int d1, int h4, int h1) =>
+    int positive = math.max(0, math.max(d1, math.max(h4, h1)))
+    int negative = math.min(0, math.min(d1, math.min(h4, h1)))
+    math.abs(positive) == math.abs(negative) ? 0 : math.abs(negative) > math.abs(positive) ? negative : positive
+
+f_conflicted(array<int> dailyScores, array<int> weeklyScores, array<int> monthlyScores, int index) =>
+    int d1 = array.get(monthlyScores, index)
+    int h4 = array.get(weeklyScores, index)
+    int h1 = array.get(dailyScores, index)
+    bool hasPositive = d1 >= PANDA_SIGNIFICANT or h4 >= PANDA_SIGNIFICANT or h1 >= PANDA_SIGNIFICANT
+    bool hasNegative = d1 <= -PANDA_SIGNIFICANT or h4 <= -PANDA_SIGNIFICANT or h1 <= -PANDA_SIGNIFICANT
+    hasPositive and hasNegative
+
+f_box_trend(float formerHigh, float formerLow, float latterHigh, float latterLow) =>
+    if na(formerHigh) or na(formerLow) or na(latterHigh) or na(latterLow)
+        "UNKNOWN"
+    else
+        float latterMidpoint = (latterHigh + latterLow) / 2.0
+        latterMidpoint >= formerHigh ? "UPTREND" : latterMidpoint <= formerLow ? "DOWNTREND" : "RANGING"
+
+f_score(array<int> target, int index) =>
+    array.get(target, index)
+
+string chartPair = f_canonical_pair()
+bool supportedPair = chartPair != ""
+
+var array<int> scoresH1 = array.new_int(7, 0)
+var array<int> scoresH4 = array.new_int(7, 0)
+var array<int> scoresD1 = array.new_int(7, 0)
+array.fill(scoresH1, 0)
+array.fill(scoresH4, 0)
+array.fill(scoresD1, 0)
+
+PairSnapshot activeSnapshot = na
+int readySnapshots = 0
+
+for pair in PANDA_PAIRS
+    PairSnapshot snapshot = request.security("OANDA:" + pair, "60", f_snapshot(),
+      ignore_invalid_symbol = true, calc_bars_count = 3500)
+    bool snapshotReady = not na(snapshot) and not na(snapshot.price)
+      and not na(snapshot.shortHigh) and not na(snapshot.shortLow)
+      and not na(snapshot.mediumHigh) and not na(snapshot.mediumLow)
+      and not na(snapshot.longHigh) and not na(snapshot.longLow)
+    if snapshotReady
+        readySnapshots += 1
+        f_add_pair_vote(scoresH1, pair, f_vote(snapshot.price, snapshot.shortHigh, snapshot.shortLow))
+        f_add_pair_vote(scoresH4, pair, f_vote(snapshot.price, snapshot.mediumHigh, snapshot.mediumLow))
+        f_add_pair_vote(scoresD1, pair, f_vote(snapshot.price, snapshot.longHigh, snapshot.longLow))
+    if pair == chartPair
+        activeSnapshot := snapshot
+
+bool scoreReady = supportedPair and readySnapshots == array.size(PANDA_PAIRS) and not na(activeSnapshot)
+int baseIndex = supportedPair ? f_currency_index(str.substring(chartPair, 0, 3)) : -1
+int quoteIndex = supportedPair ? f_currency_index(str.substring(chartPair, 3, 6)) : -1
+
+int baseStrong = scoreReady ? f_strongest(f_score(scoresD1, baseIndex), f_score(scoresH4, baseIndex), f_score(scoresH1, baseIndex)) : 0
+int quoteStrong = scoreReady ? f_strongest(f_score(scoresD1, quoteIndex), f_score(scoresH4, quoteIndex), f_score(scoresH1, quoteIndex)) : 0
+bool baseConflict = scoreReady and f_conflicted(scoresH1, scoresH4, scoresD1, baseIndex)
+bool quoteConflict = scoreReady and f_conflicted(scoresH1, scoresH4, scoresD1, quoteIndex)
+bool neutralMatchup = scoreReady and math.abs(baseStrong) < PANDA_SIGNIFICANT and math.abs(quoteStrong) < PANDA_SIGNIFICANT
+bool hardInvalid = scoreReady and (baseConflict or quoteConflict or neutralMatchup)
+int pandaGap = scoreReady and not hardInvalid ? baseStrong - quoteStrong : 0
+string pandaBias = not supportedPair ? "UNSUPPORTED SYMBOL" : not scoreReady ? "DATA UNAVAILABLE" : hardInvalid ? "HARD_INVALID" : pandaGap >= PANDA_GAP_THRESHOLD ? "BUY" : pandaGap <= -PANDA_GAP_THRESHOLD ? "SELL" : "WAIT"
+
+string boxH1Trend = scoreReady ? f_box_trend(activeSnapshot.mediumHigh, activeSnapshot.mediumLow, activeSnapshot.shortHigh, activeSnapshot.shortLow) : "UNKNOWN"
+string boxH4Trend = scoreReady ? f_box_trend(activeSnapshot.longHigh, activeSnapshot.longLow, activeSnapshot.mediumHigh, activeSnapshot.mediumLow) : "UNKNOWN"
+
+var box shortBox = box.new(na, na, na, na, xloc = xloc.bar_time)
+var box mediumBox = box.new(na, na, na, na, xloc = xloc.bar_time)
+var box longBox = box.new(na, na, na, na, xloc = xloc.bar_time)
+
+f_update_box(box id, bool visible, int left, float top, int right, float bottom, color boxColor) =>
+    color border = visible ? boxColor : na
+    color fill = visible ? color.new(boxColor, 90) : na
+    box.set_border_color(id, border)
+    box.set_bgcolor(id, fill)
+    if visible
+        box.set_lefttop(id, left, top)
+        box.set_rightbottom(id, right, bottom)
+
+bool boxesReady = scoreReady and not na(activeSnapshot.shortStart) and not na(activeSnapshot.shortEnd)
+  and not na(activeSnapshot.mediumStart) and not na(activeSnapshot.mediumEnd)
+  and not na(activeSnapshot.longStart) and not na(activeSnapshot.longEnd)
+f_update_box(shortBox, showBoxes and boxesReady, activeSnapshot.shortStart, activeSnapshot.shortHigh, activeSnapshot.shortEnd, activeSnapshot.shortLow, color.orange)
+f_update_box(mediumBox, showBoxes and boxesReady, activeSnapshot.mediumStart, activeSnapshot.mediumHigh, activeSnapshot.mediumEnd, activeSnapshot.mediumLow, #00c878)
+f_update_box(longBox, showBoxes and boxesReady, activeSnapshot.longStart, activeSnapshot.longHigh, activeSnapshot.longEnd, activeSnapshot.longLow, #4678ff)
+
+// Task 3 adds Panda Lines, confirmed flips, BOS, alerts, and the panel.
