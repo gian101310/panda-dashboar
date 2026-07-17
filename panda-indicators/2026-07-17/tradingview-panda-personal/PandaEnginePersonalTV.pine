@@ -225,6 +225,21 @@ f_box_trend(float formerHigh, float formerLow, float latterHigh, float latterLow
 f_score(array<int> target, int index) =>
     array.get(target, index)
 
+f_signed_score(int value) =>
+    value > 0 ? "+" + str.tostring(value) : str.tostring(value)
+
+// Mirrors the dashboard's base_score_tf / quote_score_tf display rule:
+// retain every D1, H4, or H1 value whose absolute score is at least 4.
+f_currency_extremes(string currency, int d1, int h4, int h1) =>
+    string values = ""
+    if math.abs(d1) >= PANDA_SIGNIFICANT
+        values := "D1 " + f_signed_score(d1)
+    if math.abs(h4) >= PANDA_SIGNIFICANT
+        values := values == "" ? "H4 " + f_signed_score(h4) : values + " · H4 " + f_signed_score(h4)
+    if math.abs(h1) >= PANDA_SIGNIFICANT
+        values := values == "" ? "H1 " + f_signed_score(h1) : values + " · H1 " + f_signed_score(h1)
+    currency + ": " + (values == "" ? "NONE" : values)
+
 string chartPair = f_canonical_pair()
 bool supportedPair = chartPair != ""
 
@@ -256,9 +271,13 @@ for pair in PANDA_PAIRS
 bool scoreReady = supportedPair and readySnapshots == array.size(PANDA_PAIRS) and not na(activeSnapshot)
 int baseIndex = supportedPair ? f_currency_index(str.substring(chartPair, 0, 3)) : -1
 int quoteIndex = supportedPair ? f_currency_index(str.substring(chartPair, 3, 6)) : -1
+string baseCurrency = supportedPair ? str.substring(chartPair, 0, 3) : "BASE"
+string quoteCurrency = supportedPair ? str.substring(chartPair, 3, 6) : "QUOTE"
 
 int baseStrong = scoreReady ? f_strongest(f_score(scoresD1, baseIndex), f_score(scoresH4, baseIndex), f_score(scoresH1, baseIndex)) : 0
 int quoteStrong = scoreReady ? f_strongest(f_score(scoresD1, quoteIndex), f_score(scoresH4, quoteIndex), f_score(scoresH1, quoteIndex)) : 0
+string baseXtf = scoreReady ? f_currency_extremes(baseCurrency, f_score(scoresD1, baseIndex), f_score(scoresH4, baseIndex), f_score(scoresH1, baseIndex)) : "—"
+string quoteXtf = scoreReady ? f_currency_extremes(quoteCurrency, f_score(scoresD1, quoteIndex), f_score(scoresH4, quoteIndex), f_score(scoresH1, quoteIndex)) : "—"
 bool baseConflict = scoreReady and f_conflicted(scoresH1, scoresH4, scoresD1, baseIndex)
 bool quoteConflict = scoreReady and f_conflicted(scoresH1, scoresH4, scoresD1, quoteIndex)
 bool neutralMatchup = scoreReady and math.abs(baseStrong) < PANDA_SIGNIFICANT and math.abs(quoteStrong) < PANDA_SIGNIFICANT
@@ -430,7 +449,7 @@ f_panel_row(table id, int row, string label, string value) =>
     table.cell(id, 1, row, value, bgcolor = PANDA_BG, text_color = f_status_color(value),
       text_halign = text.align_right, text_size = size.small)
 
-var table panel = table.new(f_panel_position(panelPositionInput), 2, 9,
+var table panel = table.new(f_panel_position(panelPositionInput), 2, 11,
   bgcolor = PANDA_BG, frame_color = color.new(PANDA_ACCENT, 35), frame_width = 1,
   border_color = color.new(PANDA_NEUTRAL, 75), border_width = 1)
 
@@ -443,14 +462,16 @@ if barstate.islast
           text_halign = text.align_right, text_size = size.small)
         f_panel_row(panel, 1, "BIAS", pandaBias)
         f_panel_row(panel, 2, "GAP", f_signed_gap(pandaGap))
-        f_panel_row(panel, 3, "BOX H1", boxH1Trend)
-        f_panel_row(panel, 4, "BOX H4", boxH4Trend)
-        f_panel_row(panel, 5, "PANDA LINES", pandaLineStatus)
-        f_panel_row(panel, 6, "FLIP", latestFlip)
-        f_panel_row(panel, 7, "BOS", latestBos)
-        table.cell(panel, 0, 8, " ", bgcolor = color.new(PANDA_BG, 100),
+        f_panel_row(panel, 3, "BASE XTF", baseXtf)
+        f_panel_row(panel, 4, "QUOTE XTF", quoteXtf)
+        f_panel_row(panel, 5, "BOX H1", boxH1Trend)
+        f_panel_row(panel, 6, "BOX H4", boxH4Trend)
+        f_panel_row(panel, 7, "PANDA LINES", pandaLineStatus)
+        f_panel_row(panel, 8, "FLIP", latestFlip)
+        f_panel_row(panel, 9, "BOS", latestBos)
+        table.cell(panel, 0, 10, " ", bgcolor = color.new(PANDA_BG, 100),
           text_color = color.new(PANDA_BG, 100), text_size = size.small)
-        table.cell(panel, 1, 8, " ", bgcolor = color.new(PANDA_BG, 100),
+        table.cell(panel, 1, 10, " ", bgcolor = color.new(PANDA_BG, 100),
           text_color = color.new(PANDA_BG, 100), text_size = size.small)
     else
-        table.clear(panel, 0, 0, 1, 8)
+        table.clear(panel, 0, 0, 1, 10)

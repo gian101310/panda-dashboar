@@ -20,6 +20,9 @@ The verified private script is already saved in TradingView as
 
 - `BIAS`: `BUY`, `SELL`, `WAIT`, `HARD_INVALID`, or a data/symbol warning.
 - `GAP`: the signed base-minus-quote Panda score.
+- `BASE XTF` / `QUOTE XTF`: every individual D1, H4, and H1 score for the
+  base or quote currency whose absolute value is at least 4. For example,
+  `GBP: H4 +5 · H1 +4` or `JPY: D1 -6`; `NONE` means no timeframe is extreme.
 - `BOX H1`: short Box midpoint versus the medium Box range.
 - `BOX H4`: medium Box midpoint versus the long Box range.
 - `PANDA LINES`: price `ABOVE`, `BELOW`, or `BETWEEN` SuperTrend 10/3 and

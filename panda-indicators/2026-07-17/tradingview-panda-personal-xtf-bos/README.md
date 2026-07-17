@@ -16,6 +16,11 @@ The indicator calculates from TradingView's 21 OANDA H1 feeds only. It needs
 no Panda token, account approval, website API, Supabase, Windows engine, or
 trade permissions.
 
+Both `BASE XTF` and `QUOTE XTF` panel rows list every individual D1, H4, and
+H1 currency score whose absolute value is at least 4. For example,
+`GBP: H4 +5 · H1 +4` or `JPY: D1 -6`; `NONE` means no timeframe is extreme.
+This is display-only and does not alter the XTF Box gate or trigger logic.
+
 ## Signal flow
 
 The selected XTF Box is the required structure gate:

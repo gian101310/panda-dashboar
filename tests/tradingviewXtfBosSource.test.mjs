@@ -21,7 +21,20 @@ test('XTF BOS Pine source gates confirmed triggers through its selected Box', ()
     assert.match(source, new RegExp(event));
   assert.match(source, /alertcondition\(buyTrigger/);
   assert.match(source, /alertcondition\(sellTrigger/);
-  assert.match(source, /table\.new\(f_panel_position\(panelPositionInput\),\s*2,\s*13/);
+  assert.match(source, /table\.new\(f_panel_position\(panelPositionInput\),\s*2,\s*15/);
   assert.doesNotMatch(source, /\n\s+or value ==/);
   assert.doesNotMatch(source, /strategy\(|supabase|engine\.secret|operator\.token/i);
+});
+
+test('XTF BOS Pine source exposes every engine-style extreme base and quote timeframe', () => {
+  const source = fs.readFileSync(path, 'utf8');
+
+  assert.match(source, /f_currency_extremes\(string currency, int d1, int h4, int h1\)/);
+  assert.match(source, /math\.abs\(d1\)\s*>=\s*PANDA_SIGNIFICANT/);
+  assert.match(source, /math\.abs\(h4\)\s*>=\s*PANDA_SIGNIFICANT/);
+  assert.match(source, /math\.abs\(h1\)\s*>=\s*PANDA_SIGNIFICANT/);
+  assert.match(source, /f_currency_extremes\(baseCurrency, f_score\(scoresD1, baseIndex\), f_score\(scoresH4, baseIndex\), f_score\(scoresH1, baseIndex\)\)/);
+  assert.match(source, /f_currency_extremes\(quoteCurrency, f_score\(scoresD1, quoteIndex\), f_score\(scoresH4, quoteIndex\), f_score\(scoresH1, quoteIndex\)\)/);
+  assert.match(source, /"BASE XTF"/);
+  assert.match(source, /"QUOTE XTF"/);
 });

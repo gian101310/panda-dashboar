@@ -36,9 +36,22 @@ test('Pine source contains confirmed Panda Lines, BOS, panel, and alert contract
     assert.match(source, new RegExp(event));
   for (const label of ['BIAS', 'GAP', 'BOX H1', 'BOX H4', 'PANDA LINES', 'FLIP', 'BOS'])
     assert.match(source, new RegExp(label));
-  assert.match(source, /table\.new\(f_panel_position\(panelPositionInput\),\s*2,\s*9/);
-  assert.match(source, /table\.cell\(panel,\s*0,\s*8,\s*" "/);
+  assert.match(source, /table\.new\(f_panel_position\(panelPositionInput\),\s*2,\s*11/);
+  assert.match(source, /table\.cell\(panel,\s*0,\s*10,\s*" "/);
   assert.match(source, /ta\.pivothigh|ta\.pivotlow/);
   assert.match(source, /alertcondition/);
   assert.doesNotMatch(source, /strategy\(|strategy\.(entry|exit|order)/);
+});
+
+test('Pine source exposes every engine-style extreme base and quote timeframe', () => {
+  const source = fs.readFileSync(path, 'utf8');
+
+  assert.match(source, /f_currency_extremes\(string currency, int d1, int h4, int h1\)/);
+  assert.match(source, /math\.abs\(d1\)\s*>=\s*PANDA_SIGNIFICANT/);
+  assert.match(source, /math\.abs\(h4\)\s*>=\s*PANDA_SIGNIFICANT/);
+  assert.match(source, /math\.abs\(h1\)\s*>=\s*PANDA_SIGNIFICANT/);
+  assert.match(source, /f_currency_extremes\(baseCurrency, f_score\(scoresD1, baseIndex\), f_score\(scoresH4, baseIndex\), f_score\(scoresH1, baseIndex\)\)/);
+  assert.match(source, /f_currency_extremes\(quoteCurrency, f_score\(scoresD1, quoteIndex\), f_score\(scoresH4, quoteIndex\), f_score\(scoresH1, quoteIndex\)\)/);
+  assert.match(source, /"BASE XTF"/);
+  assert.match(source, /"QUOTE XTF"/);
 });
