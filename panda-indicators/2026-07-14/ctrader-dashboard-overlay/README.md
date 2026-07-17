@@ -31,7 +31,7 @@ Approve an account in **Admin → Indicator Licensing** with:
 
 Broker identity is not required. License states such as pending, disabled, and expired are returned by the feed without exposing dashboard data.
 
-The device-ready Licensed source creates a random installation ID and saves the one-time server-issued device credential in cTrader device-scoped local storage. The administrator controls the license limit from 1 to 100 and can revoke or reset installations without sending tokens to customers. Device enforcement must remain OFF until this source is compiled, published, and smoke-tested on cTrader.
+The device-ready Licensed source creates a random installation ID and saves the one-time server-issued device credential in cTrader device-scoped local storage. The administrator controls the license limit from 1 to 100 and can revoke or reset installations without sending tokens to customers. The replacement build in `dist/` parses `device_activation.token`; device enforcement must remain OFF until that Licensed build is published and passes a Windows first-activation plus restart smoke test.
 
 ## Build and install on cTrader Mac
 

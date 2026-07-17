@@ -11,6 +11,9 @@ test('cTrader Licensed source persists automatic per-device credentials', () => 
   assert.match(core, /x-panda-device-id/);
   assert.match(core, /x-panda-device-token/);
   assert.match(core, /device_activation/);
+  assert.match(core, /DeviceActivationEnvelope/);
+  assert.match(core, /DeviceActivation\s*=\s*response\.DeviceActivation\?\.Token/);
+  assert.doesNotMatch(core, /JsonPropertyName\("device_activation"\)\]\s*public string DeviceActivation/);
   assert.match(licensed, /LocalStorageScope\.Device/);
   assert.match(licensed, /Guid\.NewGuid/);
   assert.doesNotMatch(personal, /DeviceId|DeviceToken|device_activation/);
@@ -25,6 +28,9 @@ for (const platform of ['mt4', 'mt5']) {
     assert.match(core, /x-panda-device-id/);
     assert.match(core, /x-panda-device-token/);
     assert.match(core, /device_activation/);
+    assert.match(core, /JsonObject\(body,\s*"device_activation"\)/);
+    assert.match(core, /JsonString\(activation_object,\s*"token"\)/);
+    assert.doesNotMatch(core, /JsonString\(body,\s*"device_activation"\)/);
     assert.match(core, /FILE_COMMON/);
     assert.match(licensed, /"LICENSED"/);
     assert.match(personal, /"PERSONAL"/);

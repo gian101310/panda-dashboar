@@ -2,6 +2,7 @@
 
 ## 2026-07-17 (Windows indicator session)
 
+- Fixed cTrader, MT4, and MT5 Licensed clients to extract the automatic device token from the API's nested `device_activation.token` response instead of treating `device_activation` as a string. Added regression assertions, rebuilt both cTrader editions and all eight MT4/MT5 overlay/feed binaries with zero errors and zero warnings, and refreshed private `dist/` checksums. Public downloads remain unchanged until the replacement Licensed builds pass a Windows restart smoke test; device enforcement remains OFF.
 - Discovered the MT4/MT5 Dashboard Overlay could never sync: MetaTrader prohibits `WebRequest()` inside custom indicators (error 4014/4060), which the Core mapped to a permanent `ALLOW WEBREQUEST` banner. cTrader unaffected.
 - Split fetch from display: new `PandaDashboardFeed{MT4,MT5}-{Personal,Licensed}` expert advisors (same Core, one per terminal, no trading) refresh the shared common-files snapshot; indicators now display from cache only via an `MQL_PROGRAM_TYPE` guard and show `ATTACH FEED EA` when the feed is absent.
 - Rebuilt the MT4/MT5 panel UI: new `PanelCorner` input (4 corners), opaque top-down layout replacing the off-screen lower-corner background math, fixed XTF/footer overlap, per-program object prefixes plus init-time sweep of stale objects from prior sessions.

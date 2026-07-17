@@ -138,6 +138,44 @@ private:
       return Trim(StringSubstr(json, start, finish - start));
    }
 
+   string JsonObject(const string json, const string key)
+   {
+      int key_pos = StringFind(json, "\"" + key + "\"");
+      if(key_pos < 0) return "";
+      int colon = StringFind(json, ":", key_pos + StringLen(key) + 2);
+      if(colon < 0) return "";
+      int begin = StringFind(json, "{", colon + 1);
+      if(begin < 0) return "";
+
+      int depth = 0;
+      bool in_string = false;
+      bool escaped = false;
+      int length = StringLen(json);
+      for(int i = begin; i < length; i++)
+      {
+         ushort ch = StringGetCharacter(json, i);
+         if(in_string)
+         {
+            if(escaped) escaped = false;
+            else if(ch == '\\') escaped = true;
+            else if(ch == '"') in_string = false;
+            continue;
+         }
+         if(ch == '"')
+         {
+            in_string = true;
+            continue;
+         }
+         if(ch == '{') depth++;
+         else if(ch == '}')
+         {
+            depth--;
+            if(depth == 0) return StringSubstr(json, begin, i - begin + 1);
+         }
+      }
+      return "";
+   }
+
    string PairObject(const string json)
    {
       string needle = "\"symbol\":\"" + m_symbol + "\"";
@@ -306,7 +344,8 @@ private:
 
       if(status_code == 200 && ParseSnapshot(body))
       {
-         string activation = JsonString(body, "device_activation");
+         string activation_object = JsonObject(body, "device_activation");
+         string activation = JsonString(activation_object, "token");
          if(IsDeviceToken(activation))
          {
             m_device_token = activation;

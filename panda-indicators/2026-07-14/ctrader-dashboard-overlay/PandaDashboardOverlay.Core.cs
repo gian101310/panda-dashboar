@@ -26,13 +26,18 @@ namespace cAlgo
         [JsonPropertyName("updated_at")] public string UpdatedAt { get; set; }
     }
 
+    internal sealed class DeviceActivationEnvelope
+    {
+        [JsonPropertyName("token")] public string Token { get; set; }
+    }
+
     internal sealed class OverlayResponse
     {
         [JsonPropertyName("schema_version")] public int SchemaVersion { get; set; }
         [JsonPropertyName("server_time")] public string ServerTime { get; set; }
         [JsonPropertyName("max_age_seconds")] public int MaxAgeSeconds { get; set; }
         [JsonPropertyName("status")] public string Status { get; set; }
-        [JsonPropertyName("device_activation")] public string DeviceActivation { get; set; }
+        [JsonPropertyName("device_activation")] public DeviceActivationEnvelope DeviceActivation { get; set; }
         [JsonPropertyName("pairs")] public List<OverlayPair> Pairs { get; set; }
     }
 
@@ -82,7 +87,7 @@ namespace cAlgo
                 ReceivedAtUtc = receivedAtUtc,
                 MaxAgeSeconds = response.MaxAgeSeconds > 0 ? response.MaxAgeSeconds : 600,
                 Pairs = pairs,
-                DeviceActivation = response.DeviceActivation
+                DeviceActivation = response.DeviceActivation?.Token
             };
         }
     }

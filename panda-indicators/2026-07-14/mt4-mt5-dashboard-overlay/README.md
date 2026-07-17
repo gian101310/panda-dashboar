@@ -83,7 +83,7 @@ No token, Supabase credential, service key, or engine secret is embedded in the 
 
 ## Build verification
 
-The four binaries in `dist/` were compiled with the installed platform MetaEditor. The matching compile logs report zero errors and zero warnings. Verify release integrity from `dist/` with:
+The eight overlay/feed binaries in `dist/` were compiled with the installed platform MetaEditor. The matching compile logs report zero errors and zero warnings. These replacement builds parse `device_activation.token`; keep public downloads and device enforcement unchanged until the Licensed packages pass a Windows first-activation plus terminal-restart smoke test. Verify candidate integrity from `dist/` with:
 
 ```bash
 shasum -a 256 -c SHA256SUMS

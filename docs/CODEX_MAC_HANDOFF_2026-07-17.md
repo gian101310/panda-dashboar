@@ -81,3 +81,31 @@ Full suite + `check_dupes.py` + `npx next build` passed before push.
   is diverged (79 behind / 8 ahead, local app.py edits). This push was made
   from the clean `C:\Users\Admin\panda-dashboard` clone. Divergence resolution
   is Boss-G's call — do not force anything.
+
+## Follow-up: device activation parser fix (Codex Mac, 2026-07-17)
+
+The API returns a newly issued credential as a nested object:
+`device_activation: { token: "..." }`. The cTrader response model and both
+MetaTrader cores previously treated `device_activation` as a string. That made
+the first request appear LIVE but prevented the token from being saved, so a
+restart generated `DEVICE_REISSUED` instead of authenticating the same device.
+
+The source now extracts `device_activation.token` on cTrader, MT4, and MT5.
+The regression test covers all three parsers. Both cTrader editions and all
+eight MT4/MT5 overlay/feed artifacts in their private `dist/` folders were
+rebuilt on Mac: cTrader reported zero warnings/errors, all eight MetaEditor logs
+report zero errors/warnings, and both checksum manifests verify.
+
+The website files in `public/downloads/` were intentionally not replaced.
+Before publishing, install the new Licensed `dist/` artifacts on Windows and
+verify this sequence independently for cTrader, MT4, and MT5:
+
+1. Leave the platform mode OFF, install the replacement Licensed package, and
+   confirm the overlay/feed is LIVE.
+2. Set only that platform to SHADOW, wait for one refresh, and confirm one
+   `DEVICE_ACTIVATED` event.
+3. Fully restart the platform, reattach the MT4/MT5 feed EA where applicable,
+   and confirm LIVE plus `DEVICE_APPROVED` (not `DEVICE_REISSUED`).
+4. Return the platform to OFF if any check fails. Only after all checks pass,
+   replace its public Licensed download and consider a separate enforcement
+   rollout.
