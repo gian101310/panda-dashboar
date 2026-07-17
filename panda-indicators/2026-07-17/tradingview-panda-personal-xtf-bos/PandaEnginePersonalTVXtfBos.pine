@@ -1,0 +1,491 @@
+//@version=6
+indicator("Panda Engine Personal TV XTF BOS", shorttitle = "PANDA XTF", overlay = true,
+  dynamic_requests = true, calc_bars_count = 1800,
+  max_boxes_count = 10, max_lines_count = 20, max_labels_count = 50)
+
+// Personal TradingView port. It calculates from TradingView market data only.
+// It contains no Panda API credential and never places or manages trades.
+
+const int PANDA_GAP_THRESHOLD = 5
+const int PANDA_SIGNIFICANT = 4
+
+string GROUP_DISPLAY = "Display"
+bool showPanel = input.bool(true, "Show panel", group = GROUP_DISPLAY)
+bool showBoxes = input.bool(true, "Show Panda Boxes", group = GROUP_DISPLAY)
+string panelPositionInput = input.string("Bottom Left", "Panel position",
+  options = ["Top Left", "Top Right", "Bottom Left", "Bottom Right"], group = GROUP_DISPLAY)
+
+string GROUP_LINES = "Panda Lines"
+bool showPandaLines = input.bool(true, "Show Panda Lines", group = GROUP_LINES)
+bool showFlipMarkers = input.bool(true, "Show flip markers", group = GROUP_LINES)
+const int BB_PERIOD = 21
+const float BB_DEVIATION = 1.0
+const int FOLLOW_ATR_PERIOD = 5
+
+string GROUP_STRUCTURE = "Break of Structure"
+int swingLength = input.int(5, "Swing length", minval = 2, maxval = 20, group = GROUP_STRUCTURE)
+bool showBosLevels = input.bool(true, "Show active swing levels", group = GROUP_STRUCTURE)
+bool showBosMarkers = input.bool(true, "Show BOS markers", group = GROUP_STRUCTURE)
+
+string GROUP_XTF_SIGNAL = "XTF BOS Signal"
+string xtfStructure = input.string("H1", "XTF structure", options = ["H1", "H4"], group = GROUP_XTF_SIGNAL)
+bool showXtfTriggerMarkers = input.bool(true, "Show BUY/SELL trigger markers", group = GROUP_XTF_SIGNAL)
+
+string GROUP_ALERTS = "Alerts"
+bool enableDynamicAlerts = input.bool(false, "Enable dynamic alert() calls", group = GROUP_ALERTS)
+
+color PANDA_BUY = #00ff9f
+color PANDA_SELL = #ff4d6d
+color PANDA_WARN = #ffd166
+color PANDA_ACCENT = #00b4ff
+color PANDA_NEUTRAL = #9aa4b2
+color PANDA_BG = #111722
+
+var array<string> PANDA_PAIRS = array.from(
+  "AUDCAD", "AUDJPY", "AUDNZD", "AUDUSD", "CADJPY",
+  "EURAUD", "EURCAD", "EURGBP", "EURJPY", "EURNZD", "EURUSD",
+  "GBPAUD", "GBPCAD", "GBPJPY", "GBPNZD", "GBPUSD",
+  "NZDCAD", "NZDJPY", "NZDUSD", "USDCAD", "USDJPY")
+
+type PairSnapshot
+    float price
+    float shortHigh
+    float shortLow
+    int shortStart
+    int shortEnd
+    float mediumHigh
+    float mediumLow
+    int mediumStart
+    int mediumEnd
+    float longHigh
+    float longLow
+    int longStart
+    int longEnd
+
+f_snapshot() =>
+    var float dayHigh = na
+    var float dayLow = na
+    var int dayStart = na
+    var float d1High = na
+    var float d1Low = na
+    var int d1Start = na
+    var float d2High = na
+    var float d2Low = na
+    var int d2Start = na
+    var float d3High = na
+    var float d3Low = na
+    var int d3Start = na
+    if na(dayHigh)
+        dayHigh := high
+        dayLow := low
+        dayStart := time
+    else if timeframe.change("1D")
+        d3High := d2High
+        d3Low := d2Low
+        d3Start := d2Start
+        d2High := d1High
+        d2Low := d1Low
+        d2Start := d1Start
+        d1High := dayHigh
+        d1Low := dayLow
+        d1Start := dayStart
+        dayHigh := high
+        dayLow := low
+        dayStart := time
+    else
+        dayHigh := math.max(dayHigh, high)
+        dayLow := math.min(dayLow, low)
+
+    var float weekHigh = na
+    var float weekLow = na
+    var int weekStart = na
+    var float w1High = na
+    var float w1Low = na
+    var int w1Start = na
+    var float w2High = na
+    var float w2Low = na
+    var int w2Start = na
+    var float w3High = na
+    var float w3Low = na
+    var int w3Start = na
+    if na(weekHigh)
+        weekHigh := high
+        weekLow := low
+        weekStart := time
+    else if timeframe.change("1W")
+        w3High := w2High
+        w3Low := w2Low
+        w3Start := w2Start
+        w2High := w1High
+        w2Low := w1Low
+        w2Start := w1Start
+        w1High := weekHigh
+        w1Low := weekLow
+        w1Start := weekStart
+        weekHigh := high
+        weekLow := low
+        weekStart := time
+    else
+        weekHigh := math.max(weekHigh, high)
+        weekLow := math.min(weekLow, low)
+
+    var float monthHigh = na
+    var float monthLow = na
+    var int monthStart = na
+    var float m1High = na
+    var float m1Low = na
+    var int m1Start = na
+    var float m2High = na
+    var float m2Low = na
+    var int m2Start = na
+    var float m3High = na
+    var float m3Low = na
+    var int m3Start = na
+    if na(monthHigh)
+        monthHigh := high
+        monthLow := low
+        monthStart := time
+    else if timeframe.change("1M")
+        m3High := m2High
+        m3Low := m2Low
+        m3Start := m2Start
+        m2High := m1High
+        m2Low := m1Low
+        m2Start := m1Start
+        m1High := monthHigh
+        m1Low := monthLow
+        m1Start := monthStart
+        monthHigh := high
+        monthLow := low
+        monthStart := time
+    else
+        monthHigh := math.max(monthHigh, high)
+        monthLow := math.min(monthLow, low)
+
+    PairSnapshot.new(close,
+      math.max(d2High, d3High), math.min(d2Low, d3Low), d3Start, d1Start,
+      math.max(w2High, w3High), math.min(w2Low, w3Low), w3Start, w1Start,
+      math.max(m2High, m3High), math.min(m2Low, m3Low), m3Start, m1Start)
+
+f_currency_index(string currency) =>
+    switch currency
+        "AUD" => 0
+        "CAD" => 1
+        "EUR" => 2
+        "GBP" => 3
+        "JPY" => 4
+        "NZD" => 5
+        "USD" => 6
+        => -1
+
+f_canonical_pair() =>
+    string metadataPair = str.upper(syminfo.basecurrency + syminfo.currency)
+    if array.includes(PANDA_PAIRS, metadataPair)
+        metadataPair
+    else
+        string tickerText = str.upper(syminfo.ticker)
+        string matched = ""
+        int matchCount = 0
+        for candidate in PANDA_PAIRS
+            if str.contains(tickerText, candidate)
+                matched := candidate
+                matchCount += 1
+        matchCount == 1 ? matched : ""
+
+f_vote(float priceValue, float boxHigh, float boxLow) =>
+    na(priceValue) or na(boxHigh) or na(boxLow) ? 0 : priceValue > boxHigh ? 1 : priceValue < boxLow ? -1 : 0
+
+f_add_vote(array<int> target, string currency, int vote) =>
+    int index = f_currency_index(currency)
+    if index >= 0
+        array.set(target, index, array.get(target, index) + vote)
+
+f_add_pair_vote(array<int> target, string pair, int vote) =>
+    string base = str.substring(pair, 0, 3)
+    string quote = str.substring(pair, 3, 6)
+    f_add_vote(target, base, vote)
+    f_add_vote(target, quote, -vote)
+
+f_strongest(int d1, int h4, int h1) =>
+    int positive = math.max(0, math.max(d1, math.max(h4, h1)))
+    int negative = math.min(0, math.min(d1, math.min(h4, h1)))
+    math.abs(positive) == math.abs(negative) ? 0 : math.abs(negative) > math.abs(positive) ? negative : positive
+
+f_conflicted(array<int> dailyScores, array<int> weeklyScores, array<int> monthlyScores, int index) =>
+    int d1 = array.get(monthlyScores, index)
+    int h4 = array.get(weeklyScores, index)
+    int h1 = array.get(dailyScores, index)
+    bool hasPositive = d1 >= PANDA_SIGNIFICANT or h4 >= PANDA_SIGNIFICANT or h1 >= PANDA_SIGNIFICANT
+    bool hasNegative = d1 <= -PANDA_SIGNIFICANT or h4 <= -PANDA_SIGNIFICANT or h1 <= -PANDA_SIGNIFICANT
+    hasPositive and hasNegative
+
+f_box_trend(float formerHigh, float formerLow, float latterHigh, float latterLow) =>
+    if na(formerHigh) or na(formerLow) or na(latterHigh) or na(latterLow)
+        "UNKNOWN"
+    else
+        float latterMidpoint = (latterHigh + latterLow) / 2.0
+        latterMidpoint >= formerHigh ? "UPTREND" : latterMidpoint <= formerLow ? "DOWNTREND" : "RANGING"
+
+f_score(array<int> target, int index) =>
+    array.get(target, index)
+
+string chartPair = f_canonical_pair()
+bool supportedPair = chartPair != ""
+
+var array<int> scoresH1 = array.new_int(7, 0)
+var array<int> scoresH4 = array.new_int(7, 0)
+var array<int> scoresD1 = array.new_int(7, 0)
+array.fill(scoresH1, 0)
+array.fill(scoresH4, 0)
+array.fill(scoresD1, 0)
+
+PairSnapshot activeSnapshot = na
+int readySnapshots = 0
+
+for pair in PANDA_PAIRS
+    PairSnapshot snapshot = request.security("OANDA:" + pair, "60", f_snapshot(),
+      ignore_invalid_symbol = true, calc_bars_count = 1800)
+    bool snapshotReady = not na(snapshot) and not na(snapshot.price)
+      and not na(snapshot.shortHigh) and not na(snapshot.shortLow)
+      and not na(snapshot.mediumHigh) and not na(snapshot.mediumLow)
+      and not na(snapshot.longHigh) and not na(snapshot.longLow)
+    if snapshotReady
+        readySnapshots += 1
+        f_add_pair_vote(scoresH1, pair, f_vote(snapshot.price, snapshot.shortHigh, snapshot.shortLow))
+        f_add_pair_vote(scoresH4, pair, f_vote(snapshot.price, snapshot.mediumHigh, snapshot.mediumLow))
+        f_add_pair_vote(scoresD1, pair, f_vote(snapshot.price, snapshot.longHigh, snapshot.longLow))
+    if pair == chartPair
+        activeSnapshot := snapshot
+
+bool scoreReady = supportedPair and readySnapshots == array.size(PANDA_PAIRS) and not na(activeSnapshot)
+int baseIndex = supportedPair ? f_currency_index(str.substring(chartPair, 0, 3)) : -1
+int quoteIndex = supportedPair ? f_currency_index(str.substring(chartPair, 3, 6)) : -1
+
+int baseStrong = scoreReady ? f_strongest(f_score(scoresD1, baseIndex), f_score(scoresH4, baseIndex), f_score(scoresH1, baseIndex)) : 0
+int quoteStrong = scoreReady ? f_strongest(f_score(scoresD1, quoteIndex), f_score(scoresH4, quoteIndex), f_score(scoresH1, quoteIndex)) : 0
+bool baseConflict = scoreReady and f_conflicted(scoresH1, scoresH4, scoresD1, baseIndex)
+bool quoteConflict = scoreReady and f_conflicted(scoresH1, scoresH4, scoresD1, quoteIndex)
+bool neutralMatchup = scoreReady and math.abs(baseStrong) < PANDA_SIGNIFICANT and math.abs(quoteStrong) < PANDA_SIGNIFICANT
+bool hardInvalid = scoreReady and (baseConflict or quoteConflict or neutralMatchup)
+int pandaGap = scoreReady and not hardInvalid ? baseStrong - quoteStrong : 0
+string pandaBias = not supportedPair ? "UNSUPPORTED SYMBOL" : not scoreReady ? "DATA UNAVAILABLE" : hardInvalid ? "HARD_INVALID" : pandaGap >= PANDA_GAP_THRESHOLD ? "BUY" : pandaGap <= -PANDA_GAP_THRESHOLD ? "SELL" : "WAIT"
+
+string boxH1Trend = scoreReady ? f_box_trend(activeSnapshot.mediumHigh, activeSnapshot.mediumLow, activeSnapshot.shortHigh, activeSnapshot.shortLow) : "UNKNOWN"
+string boxH4Trend = scoreReady ? f_box_trend(activeSnapshot.longHigh, activeSnapshot.longLow, activeSnapshot.mediumHigh, activeSnapshot.mediumLow) : "UNKNOWN"
+
+var box shortBox = box.new(na, na, na, na, xloc = xloc.bar_time)
+var box mediumBox = box.new(na, na, na, na, xloc = xloc.bar_time)
+var box longBox = box.new(na, na, na, na, xloc = xloc.bar_time)
+
+f_update_box(box id, bool visible, int left, float top, int right, float bottom, color boxColor) =>
+    color border = visible ? boxColor : na
+    color fill = visible ? color.new(boxColor, 90) : na
+    box.set_border_color(id, border)
+    box.set_bgcolor(id, fill)
+    if visible
+        box.set_lefttop(id, left, top)
+        box.set_rightbottom(id, right, bottom)
+
+bool boxesReady = scoreReady and not na(activeSnapshot.shortStart) and not na(activeSnapshot.shortEnd)
+  and not na(activeSnapshot.mediumStart) and not na(activeSnapshot.mediumEnd)
+  and not na(activeSnapshot.longStart) and not na(activeSnapshot.longEnd)
+f_update_box(shortBox, showBoxes and boxesReady, activeSnapshot.shortStart, activeSnapshot.shortHigh, activeSnapshot.shortEnd, activeSnapshot.shortLow, color.orange)
+f_update_box(mediumBox, showBoxes and boxesReady, activeSnapshot.mediumStart, activeSnapshot.mediumHigh, activeSnapshot.mediumEnd, activeSnapshot.mediumLow, #00c878)
+f_update_box(longBox, showBoxes and boxesReady, activeSnapshot.longStart, activeSnapshot.longHigh, activeSnapshot.longEnd, activeSnapshot.longLow, #4678ff)
+
+// Panda Lines: chart-native SuperTrend plus the existing previous-bar BB/ATR Follow Line.
+[supertrend, supertrendDirection] = ta.supertrend(3.0, 10)
+float bbBasis = ta.sma(close, BB_PERIOD)
+float bbDeviationValue = ta.stdev(close, BB_PERIOD) * BB_DEVIATION
+float bbUpper = bbBasis + bbDeviationValue
+float bbLower = bbBasis - bbDeviationValue
+float followAtr = ta.sma(ta.tr(true), FOLLOW_ATR_PERIOD)
+var float followLine = na
+int bbSignal = close[1] > bbUpper[1] ? 1 : close[1] < bbLower[1] ? -1 : 0
+float previousFollow = na(followLine[1]) ? close : followLine[1]
+if bbSignal == 1
+    followLine := math.max(low - followAtr, previousFollow)
+else if bbSignal == -1
+    followLine := math.min(high + followAtr, previousFollow)
+else
+    followLine := previousFollow
+
+bool pandaLinesReady = supportedPair and not na(supertrend) and not na(followLine)
+string pandaLineStatus = not pandaLinesReady ? "UNKNOWN" : close > math.max(supertrend, followLine) ? "ABOVE" : close < math.min(supertrend, followLine) ? "BELOW" : "BETWEEN"
+
+var int lastDirectionalSide = 0
+bool plBullishFlip = barstate.isconfirmed and pandaLineStatus == "ABOVE" and lastDirectionalSide == -1
+bool plBearishFlip = barstate.isconfirmed and pandaLineStatus == "BELOW" and lastDirectionalSide == 1
+if barstate.isconfirmed and (pandaLineStatus == "ABOVE" or pandaLineStatus == "BELOW")
+    lastDirectionalSide := pandaLineStatus == "ABOVE" ? 1 : -1
+
+var string latestFlip = "NONE"
+if plBullishFlip
+    latestFlip := "BULLISH"
+else if plBearishFlip
+    latestFlip := "BEARISH"
+
+plot(showPandaLines and supportedPair ? supertrend : na, "Panda SuperTrend",
+  color = supertrendDirection < 0 ? PANDA_BUY : PANDA_SELL, linewidth = 2, style = plot.style_linebr)
+plot(showPandaLines and supportedPair ? followLine : na, "Panda Follow Line",
+  color = followLine >= followLine[1] ? PANDA_ACCENT : PANDA_SELL, linewidth = 2, style = plot.style_linebr)
+plotshape(showFlipMarkers and plBullishFlip, title = "Panda Lines Bullish Flip",
+  style = shape.triangleup, location = location.belowbar, color = PANDA_BUY,
+  size = size.tiny, text = "PL+")
+plotshape(showFlipMarkers and plBearishFlip, title = "Panda Lines Bearish Flip",
+  style = shape.triangledown, location = location.abovebar, color = PANDA_SELL,
+  size = size.tiny, text = "PL-")
+
+// Confirmed, one-shot Break of Structure on the visible chart timeframe.
+float pivotHigh = ta.pivothigh(high, swingLength, swingLength)
+float pivotLow = ta.pivotlow(low, swingLength, swingLength)
+var float lastSwingHigh = na
+var float lastSwingLow = na
+var int lastSwingHighIndex = na
+var int lastSwingLowIndex = na
+var bool swingHighBroken = false
+var bool swingLowBroken = false
+if not na(pivotHigh)
+    lastSwingHigh := pivotHigh
+    lastSwingHighIndex := bar_index - swingLength
+    swingHighBroken := false
+if not na(pivotLow)
+    lastSwingLow := pivotLow
+    lastSwingLowIndex := bar_index - swingLength
+    swingLowBroken := false
+
+bool bosBullish = supportedPair and barstate.isconfirmed and not swingHighBroken and not na(lastSwingHigh) and close > lastSwingHigh
+bool bosBearish = supportedPair and barstate.isconfirmed and not swingLowBroken and not na(lastSwingLow) and close < lastSwingLow
+if bosBullish
+    swingHighBroken := true
+if bosBearish
+    swingLowBroken := true
+
+// The selected XTF Box is mandatory; the other Box remains useful context only.
+string xtfBoxTrend = xtfStructure == "H4" ? boxH4Trend : boxH1Trend
+string otherBoxTrend = xtfStructure == "H4" ? boxH1Trend : boxH4Trend
+string expectedBoxTrend = pandaBias == "BUY" ? "UPTREND" : pandaBias == "SELL" ? "DOWNTREND" : "UNKNOWN"
+string otherBoxContext = pandaBias != "BUY" and pandaBias != "SELL" ? "UNKNOWN" : otherBoxTrend == "UNKNOWN" ? "UNKNOWN" : otherBoxTrend == expectedBoxTrend ? "ALIGNED" : otherBoxTrend == "RANGING" ? "RANGING" : "COUNTER"
+bool buyReady = pandaBias == "BUY" and pandaLineStatus == "ABOVE" and xtfBoxTrend == "UPTREND"
+bool sellReady = pandaBias == "SELL" and pandaLineStatus == "BELOW" and xtfBoxTrend == "DOWNTREND"
+bool buyTrigger = buyReady and bosBullish
+bool sellTrigger = sellReady and bosBearish
+string signalStatus = buyTrigger ? "BUY TRIGGER" : sellTrigger ? "SELL TRIGGER" : buyReady ? "BUY READY — WAIT BULLISH BOS" : sellReady ? "SELL READY — WAIT BEARISH BOS" : "NO SETUP"
+
+var string latestBos = "NONE"
+if bosBullish
+    latestBos := "BULLISH"
+else if bosBearish
+    latestBos := "BEARISH"
+
+var line swingHighLine = line.new(na, na, na, na, extend = extend.none)
+var line swingLowLine = line.new(na, na, na, na, extend = extend.none)
+if not na(lastSwingHigh) and not na(lastSwingHighIndex)
+    line.set_xy1(swingHighLine, lastSwingHighIndex, lastSwingHigh)
+    line.set_xy2(swingHighLine, bar_index, lastSwingHigh)
+if not na(lastSwingLow) and not na(lastSwingLowIndex)
+    line.set_xy1(swingLowLine, lastSwingLowIndex, lastSwingLow)
+    line.set_xy2(swingLowLine, bar_index, lastSwingLow)
+line.set_color(swingHighLine, showBosLevels and supportedPair ? color.new(PANDA_SELL, swingHighBroken ? 75 : 25) : na)
+line.set_style(swingHighLine, line.style_dashed)
+line.set_color(swingLowLine, showBosLevels and supportedPair ? color.new(PANDA_BUY, swingLowBroken ? 75 : 25) : na)
+line.set_style(swingLowLine, line.style_dashed)
+
+plotshape(showBosMarkers and bosBullish, title = "Bullish BOS",
+  style = shape.labelup, location = location.belowbar, color = PANDA_BUY,
+  size = size.tiny, text = "BOS+")
+plotshape(showBosMarkers and bosBearish, title = "Bearish BOS",
+  style = shape.labeldown, location = location.abovebar, color = PANDA_SELL,
+  size = size.tiny, text = "BOS-")
+plotshape(showXtfTriggerMarkers and buyTrigger, title = "XTF BOS BUY Trigger",
+  style = shape.labelup, location = location.belowbar, color = PANDA_BUY,
+  size = size.small, text = "BUY")
+plotshape(showXtfTriggerMarkers and sellTrigger, title = "XTF BOS SELL Trigger",
+  style = shape.labeldown, location = location.abovebar, color = PANDA_SELL,
+  size = size.small, text = "SELL")
+
+// Stable event names are reserved for later Panda Engine and Telegram wiring.
+const string PL_BULLISH_FLIP = "PL_BULLISH_FLIP"
+const string PL_BEARISH_FLIP = "PL_BEARISH_FLIP"
+const string BOS_BULLISH = "BOS_BULLISH"
+const string BOS_BEARISH = "BOS_BEARISH"
+const string XTF_BOS_BUY_TRIGGER = "XTF_BOS_BUY_TRIGGER"
+const string XTF_BOS_SELL_TRIGGER = "XTF_BOS_SELL_TRIGGER"
+
+alertcondition(plBullishFlip, "Panda Lines Bullish Flip", "PANDA_TV|PL_BULLISH_FLIP|{{ticker}}|{{interval}}|{{close}}")
+alertcondition(plBearishFlip, "Panda Lines Bearish Flip", "PANDA_TV|PL_BEARISH_FLIP|{{ticker}}|{{interval}}|{{close}}")
+alertcondition(bosBullish, "Panda Bullish BOS", "PANDA_TV|BOS_BULLISH|{{ticker}}|{{interval}}|{{close}}")
+alertcondition(bosBearish, "Panda Bearish BOS", "PANDA_TV|BOS_BEARISH|{{ticker}}|{{interval}}|{{close}}")
+alertcondition(buyTrigger, "Panda XTF BOS BUY Trigger", "PANDA_TV|XTF_BOS_BUY_TRIGGER|{{ticker}}|{{interval}}|{{close}}")
+alertcondition(sellTrigger, "Panda XTF BOS SELL Trigger", "PANDA_TV|XTF_BOS_SELL_TRIGGER|{{ticker}}|{{interval}}|{{close}}")
+
+f_alert_payload(string eventName) =>
+    "{\"source\":\"PANDA_TV\",\"event\":\"" + eventName
+      + "\",\"symbol\":\"" + chartPair + "\",\"timeframe\":\"" + timeframe.period
+      + "\",\"price\":" + str.tostring(close, format.mintick)
+      + ",\"bar_time\":" + str.tostring(time) + "}"
+
+if enableDynamicAlerts and plBullishFlip
+    alert(f_alert_payload(PL_BULLISH_FLIP), alert.freq_once_per_bar_close)
+if enableDynamicAlerts and plBearishFlip
+    alert(f_alert_payload(PL_BEARISH_FLIP), alert.freq_once_per_bar_close)
+if enableDynamicAlerts and bosBullish
+    alert(f_alert_payload(BOS_BULLISH), alert.freq_once_per_bar_close)
+if enableDynamicAlerts and bosBearish
+    alert(f_alert_payload(BOS_BEARISH), alert.freq_once_per_bar_close)
+if enableDynamicAlerts and buyTrigger
+    alert(f_alert_payload(XTF_BOS_BUY_TRIGGER), alert.freq_once_per_bar_close)
+if enableDynamicAlerts and sellTrigger
+    alert(f_alert_payload(XTF_BOS_SELL_TRIGGER), alert.freq_once_per_bar_close)
+
+f_panel_position(string selected) =>
+    switch selected
+        "Top Left" => position.top_left
+        "Top Right" => position.top_right
+        "Bottom Right" => position.bottom_right
+        => position.bottom_left
+
+f_status_color(string value) =>
+    value == "BUY" or value == "UPTREND" or value == "ABOVE" or value == "BULLISH" or value == "ALIGNED"
+      or value == "BUY TRIGGER" or value == "BUY READY — WAIT BULLISH BOS" ? PANDA_BUY
+      : value == "SELL" or value == "DOWNTREND" or value == "BELOW" or value == "BEARISH"
+        or value == "SELL TRIGGER" or value == "SELL READY — WAIT BEARISH BOS" ? PANDA_SELL
+      : value == "WAIT" or value == "BETWEEN" or value == "RANGING" or value == "COUNTER" ? PANDA_WARN : PANDA_NEUTRAL
+
+f_signed_gap(int value) =>
+    not scoreReady ? "—" : value > 0 ? "+" + str.tostring(value) : str.tostring(value)
+
+f_panel_row(table id, int row, string label, string value) =>
+    table.cell(id, 0, row, label, bgcolor = PANDA_BG, text_color = PANDA_NEUTRAL,
+      text_halign = text.align_left, text_size = size.small)
+    table.cell(id, 1, row, value, bgcolor = PANDA_BG, text_color = f_status_color(value),
+      text_halign = text.align_right, text_size = size.small)
+
+var table panel = table.new(f_panel_position(panelPositionInput), 2, 13,
+  bgcolor = PANDA_BG, frame_color = color.new(PANDA_ACCENT, 35), frame_width = 1,
+  border_color = color.new(PANDA_NEUTRAL, 75), border_width = 1)
+
+if barstate.islast
+    if showPanel
+        table.cell(panel, 0, 0, "PANDA XTF", bgcolor = color.new(PANDA_ACCENT, 75),
+          text_color = color.white, text_halign = text.align_left, text_size = size.small)
+        table.cell(panel, 1, 0, supportedPair ? chartPair : "UNSUPPORTED",
+          bgcolor = color.new(PANDA_ACCENT, 75), text_color = supportedPair ? color.white : PANDA_WARN,
+          text_halign = text.align_right, text_size = size.small)
+        f_panel_row(panel, 1, "BIAS", pandaBias)
+        f_panel_row(panel, 2, "GAP", f_signed_gap(pandaGap))
+        f_panel_row(panel, 3, "XTF", xtfStructure)
+        f_panel_row(panel, 4, "XTF BOX", xtfBoxTrend)
+        f_panel_row(panel, 5, "OTHER BOX", otherBoxContext)
+        f_panel_row(panel, 6, "SIGNAL", signalStatus)
+        f_panel_row(panel, 7, "BOX H1", boxH1Trend)
+        f_panel_row(panel, 8, "BOX H4", boxH4Trend)
+        f_panel_row(panel, 9, "PANDA LINES", pandaLineStatus)
+        f_panel_row(panel, 10, "FLIP", latestFlip)
+        f_panel_row(panel, 11, "BOS", latestBos)
+        table.cell(panel, 0, 12, " ", bgcolor = color.new(PANDA_BG, 100),
+          text_color = color.new(PANDA_BG, 100), text_size = size.small)
+        table.cell(panel, 1, 12, " ", bgcolor = color.new(PANDA_BG, 100),
+          text_color = color.new(PANDA_BG, 100), text_size = size.small)
+    else
+        table.clear(panel, 0, 0, 1, 12)
