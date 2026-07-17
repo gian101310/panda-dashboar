@@ -52,3 +52,20 @@ export function detectBos({ close, swingHigh, swingLow, highBroken, lowBroken, c
     return { event: 'BOS_BEARISH', highBroken, lowBroken: true };
   return { event: null, highBroken, lowBroken };
 }
+
+export function classifyXtfBosSignal({ xtf, bias, pandaLines, boxH1, boxH4, bosEvent }) {
+  const activeBox = xtf === 'H4' ? boxH4 : boxH1;
+  const otherBox = xtf === 'H4' ? boxH1 : boxH4;
+  const expectedBox = bias === 'BUY' ? 'UPTREND' : bias === 'SELL' ? 'DOWNTREND' : 'UNKNOWN';
+  const otherContext = otherBox === 'UNKNOWN' ? 'UNKNOWN'
+    : otherBox === expectedBox ? 'ALIGNED' : otherBox === 'RANGING' ? 'RANGING' : 'COUNTER';
+  const ready = bias === 'BUY' ? pandaLines === 'ABOVE' && activeBox === 'UPTREND'
+    : bias === 'SELL' ? pandaLines === 'BELOW' && activeBox === 'DOWNTREND' : false;
+  const event = ready && bias === 'BUY' && bosEvent === 'BOS_BULLISH' ? 'XTF_BOS_BUY_TRIGGER'
+    : ready && bias === 'SELL' && bosEvent === 'BOS_BEARISH' ? 'XTF_BOS_SELL_TRIGGER' : null;
+  const status = event === 'XTF_BOS_BUY_TRIGGER' ? 'BUY TRIGGER'
+    : event === 'XTF_BOS_SELL_TRIGGER' ? 'SELL TRIGGER'
+      : ready && bias === 'BUY' ? 'BUY READY — WAIT BULLISH BOS'
+        : ready && bias === 'SELL' ? 'SELL READY — WAIT BEARISH BOS' : 'NO SETUP';
+  return { activeBox, otherBox, otherContext, ready, status, event };
+}

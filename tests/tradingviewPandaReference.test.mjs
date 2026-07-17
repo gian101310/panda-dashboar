@@ -7,6 +7,7 @@ import {
   classifyPandaLineStatus,
   advancePandaSide,
   detectBos,
+  classifyXtfBosSignal,
 } from './helpers/tradingviewPandaReference.mjs';
 
 test('selects the strongest signed currency score and resolves equal opposition to zero', () => {
@@ -52,4 +53,32 @@ test('emits one confirmed BOS per swing and ignores intrabar crossings', () => {
     { event: 'BOS_BULLISH', highBroken: true, lowBroken: false });
   assert.deepEqual(detectBos({ close: 102, swingHigh: 100, swingLow: 90, highBroken: true, lowBroken: false, confirmed: true }),
     { event: null, highBroken: true, lowBroken: false });
+});
+
+test('requires only the selected XTF Box and gates BOS triggers', () => {
+  assert.deepEqual(classifyXtfBosSignal({
+    xtf: 'H4', bias: 'BUY', pandaLines: 'ABOVE',
+    boxH1: 'DOWNTREND', boxH4: 'UPTREND', bosEvent: null,
+  }), {
+    activeBox: 'UPTREND', otherBox: 'DOWNTREND', otherContext: 'COUNTER',
+    ready: true, status: 'BUY READY — WAIT BULLISH BOS', event: null,
+  });
+  assert.deepEqual(classifyXtfBosSignal({
+    xtf: 'H4', bias: 'BUY', pandaLines: 'ABOVE',
+    boxH1: 'DOWNTREND', boxH4: 'UPTREND', bosEvent: 'BOS_BULLISH',
+  }), {
+    activeBox: 'UPTREND', otherBox: 'DOWNTREND', otherContext: 'COUNTER',
+    ready: true, status: 'BUY TRIGGER', event: 'XTF_BOS_BUY_TRIGGER',
+  });
+  assert.deepEqual(classifyXtfBosSignal({
+    xtf: 'H1', bias: 'SELL', pandaLines: 'BELOW',
+    boxH1: 'DOWNTREND', boxH4: 'UPTREND', bosEvent: 'BOS_BEARISH',
+  }), {
+    activeBox: 'DOWNTREND', otherBox: 'UPTREND', otherContext: 'COUNTER',
+    ready: true, status: 'SELL TRIGGER', event: 'XTF_BOS_SELL_TRIGGER',
+  });
+  assert.equal(classifyXtfBosSignal({
+    xtf: 'H1', bias: 'BUY', pandaLines: 'ABOVE',
+    boxH1: 'RANGING', boxH4: 'UPTREND', bosEvent: 'BOS_BULLISH',
+  }).status, 'NO SETUP');
 });
