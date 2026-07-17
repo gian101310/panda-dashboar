@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-07-18 (cTrader Panda XTF BOS personal indicator)
+
+- Added `panda-indicators/2026-07-18/ctrader-panda-xtf-bos/`: a brand-new private cTrader indicator (`Panda Engine Personal XTF BOS`) porting the TradingView XTF BOS script's full local calculation — 21-pair H1 day/week/month Panda Boxes drawn on chart, the 7-currency vote scoring with strongest/conflict/HARD_INVALID/gap/bias contract (thresholds 5 and 4), SuperTrend(10, 3) + BB(21, 1.0)/SMA-TR(5) Follow Line with confirmed PL flips, swing-pivot one-shot BOS with active levels, the H1/H4 Box-gated BUY/SELL triggers, and the full 13-row draggable panel including BASE/QUOTE XTF.
+- Sandbox: `AccessRights.None`, broker market data only, no network, no credentials, no licensing, no trading, personal-only distribution. Compiled zero-error/zero-warning via dotnet; `.algo` + SHA256SUMS in the new `dist/`. Documented broker-feed/UTC-boundary differences vs the OANDA-based TV original; alerts not ported in v1.
+- Added `tests/ctraderXtfBosSource.test.mjs` source contracts (216/216 passing). Existing overlays, engine, APIs, and licensing untouched. MT4/MT5 ports are the agreed next step after chart verification.
+
 ## 2026-07-17 (BASE/QUOTE XTF rows ported to MT4/MT5/cTrader overlays)
 
 - Ported the TradingView currency-extremes display enhancement into the MT4, MT5, and cTrader Dashboard Overlays (Personal and Licensed share each platform's core, so all six editions gain it). Two compact rows directly below the SCORE (gap) row — `BASE XTF` and `QUOTE XTF` — list every D1/H4/H1 currency score with absolute value ≥ 4 in D1→H4→H1 order with signed values (e.g. `GBP: H4 +5 · H1 +4`, `JPY: D1 -6`, `GBP: NONE`), formatted from the feed's existing `base_score_tf`/`quote_score_tf` fields. Display-only: no scoring, bias, box, Panda Lines, BOS, signal, alert, licensing, or feed/API changes; account/device approval flow untouched.
