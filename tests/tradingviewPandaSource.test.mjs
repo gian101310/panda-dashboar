@@ -22,3 +22,19 @@ test('Pine source contains the fixed personal scoring and Box contract', () => {
   assert.match(source, /HARD_INVALID|DATA UNAVAILABLE|UNSUPPORTED SYMBOL/);
   assert.match(source, /boxH1Trend|boxH4Trend/);
 });
+
+test('Pine source contains confirmed Panda Lines, BOS, panel, and alert contracts', () => {
+  const source = fs.readFileSync(path, 'utf8');
+  assert.match(source, /ta\.supertrend\(3\.0,\s*10\)/);
+  assert.match(source, /BB_PERIOD\s*=\s*21/);
+  assert.match(source, /BB_DEVIATION\s*=\s*1\.0/);
+  assert.match(source, /FOLLOW_ATR_PERIOD\s*=\s*5/);
+  assert.match(source, /barstate\.isconfirmed/);
+  for (const event of ['PL_BULLISH_FLIP', 'PL_BEARISH_FLIP', 'BOS_BULLISH', 'BOS_BEARISH'])
+    assert.match(source, new RegExp(event));
+  for (const label of ['BIAS', 'GAP', 'BOX H1', 'BOX H4', 'PANDA LINES', 'FLIP', 'BOS'])
+    assert.match(source, new RegExp(label));
+  assert.match(source, /ta\.pivothigh|ta\.pivotlow/);
+  assert.match(source, /alertcondition/);
+  assert.doesNotMatch(source, /strategy\(|strategy\.(entry|exit|order)/);
+});
