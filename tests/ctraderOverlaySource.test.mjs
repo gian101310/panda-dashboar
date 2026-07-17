@@ -60,6 +60,17 @@ test('local storage keys satisfy cTrader key restrictions', () => {
   }
 });
 
+test('core exposes the BASE XTF and QUOTE XTF currency extremes rows', () => {
+  const core = read('PandaDashboardOverlay.Core.cs');
+  assert.match(core, /FormatCurrencyExtremes\(string currency, string tokens\)/);
+  assert.match(core, /FormatCurrencyExtremes\(pair\.BaseCurrency, pair\.BaseScoreTf\)/);
+  assert.match(core, /FormatCurrencyExtremes\(pair\.QuoteCurrency, pair\.QuoteScoreTf\)/);
+  assert.ok(core.includes('"BASE XTF"'), 'missing BASE XTF panel row');
+  assert.ok(core.includes('"QUOTE XTF"'), 'missing QUOTE XTF panel row');
+  assert.ok(core.includes(': NONE'), 'missing NONE fallback');
+  assert.ok(core.includes(' · '), 'missing dot separator between extremes');
+});
+
 test('source contains no embedded credential', () => {
   const combined = ['PandaDashboardOverlay.Core.cs', 'PandaDashboardOverlay.Personal.cs', 'PandaDashboardOverlay.Licensed.cs']
     .map(read).join('\n');

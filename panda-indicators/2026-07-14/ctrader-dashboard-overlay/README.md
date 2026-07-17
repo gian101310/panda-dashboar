@@ -3,10 +3,17 @@
 This folder contains two lightweight, informational cTrader indicators that display Panda Engine dashboard data for the chart symbol:
 
 - score (dashboard gap)
+- BASE XTF and QUOTE XTF currency extremes (directly below the score)
 - bias
 - Box H4 and Box H1 trends
 - Panda Lines state
 - XTF base/quote timeframes
+
+The `BASE XTF` and `QUOTE XTF` rows list every individual D1, H4, and H1
+currency score whose absolute value is at least 4, in D1 → H4 → H1 order with
+signed values — for example `GBP: H4 +5 · H1 +4` or `JPY: D1 -6`; `NONE` means
+no timeframe is extreme. This mirrors the TradingView overlays, reads only the
+existing dashboard feed fields, and is display-only.
 
 The panel refreshes the shared feed at most once every 60 seconds, remains idle in `Calculate`, starts in the bottom-left corner, can be dragged, remembers its location, and can be minimized.
 

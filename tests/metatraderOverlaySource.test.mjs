@@ -118,6 +118,22 @@ test('both platform cores propagate authorization denial and create shared cache
   }
 });
 
+test('MetaTrader cores expose the BASE XTF and QUOTE XTF currency extremes rows', () => {
+  for (const [platform, file] of [
+    ['MT4', ['mt4', 'PandaDashboardOverlayMT4.Core.mqh']],
+    ['MT5', ['mt5', 'PandaDashboardOverlayMT5.Core.mqh']],
+  ]) {
+    const core = read(...file);
+    assert.match(core, /FormatCurrencyExtremes\(const string currency, const string tokens\)/, `${platform} missing extremes formatter`);
+    assert.match(core, /FormatCurrencyExtremes\(base_currency, base_tf\)/, `${platform} must format base extremes from feed data`);
+    assert.match(core, /FormatCurrencyExtremes\(quote_currency, quote_tf\)/, `${platform} must format quote extremes from feed data`);
+    assert.ok(core.includes('"BASE XTF"'), `${platform} missing BASE XTF panel row`);
+    assert.ok(core.includes('"QUOTE XTF"'), `${platform} missing QUOTE XTF panel row`);
+    assert.ok(core.includes(': NONE'), `${platform} missing NONE fallback`);
+    assert.ok(core.includes(' · '), `${platform} missing dot separator between extremes`);
+  }
+});
+
 test('MetaTrader overlay sources contain no embedded server credential', () => {
   const sources = fs.existsSync(root)
     ? fs.readdirSync(root, { recursive: true })

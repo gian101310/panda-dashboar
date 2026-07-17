@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-07-17 (BASE/QUOTE XTF rows ported to MT4/MT5/cTrader overlays)
+
+- Ported the TradingView currency-extremes display enhancement into the MT4, MT5, and cTrader Dashboard Overlays (Personal and Licensed share each platform's core, so all six editions gain it). Two compact rows directly below the SCORE (gap) row — `BASE XTF` and `QUOTE XTF` — list every D1/H4/H1 currency score with absolute value ≥ 4 in D1→H4→H1 order with signed values (e.g. `GBP: H4 +5 · H1 +4`, `JPY: D1 -6`, `GBP: NONE`), formatted from the feed's existing `base_score_tf`/`quote_score_tf` fields. Display-only: no scoring, bias, box, Panda Lines, BOS, signal, alert, licensing, or feed/API changes; account/device approval flow untouched.
+- Rebuilt both cTrader editions on the Mac with zero errors/warnings and refreshed the cTrader `dist/` `.algo` files and SHA256SUMS. MT4/MT5 `.ex4`/`.ex5` binaries in `dist/` still correspond to the previous source and need a Windows MetaEditor recompile (overlay indicators only; feed EAs unchanged). Public Licensed downloads intentionally untouched pending the staged Windows verify sequence.
+- Extended the MetaTrader and cTrader source-contract tests with BASE XTF/QUOTE XTF formatter and panel-row assertions (212/212 passing) and documented the new rows in both platform READMEs.
+
 ## 2026-07-17 (TradingView XTF BOS personal overlay)
 
 - Added the separate private Pine v6 `Panda Engine Personal TV XTF BOS` indicator. It keeps the verified personal scoring, Boxes, Panda Lines, flips, and confirmed BOS, then gates a visible READY state through the user-selected H1/H4 Box and emits one final BUY or SELL trigger only when matching confirmed BOS occurs.

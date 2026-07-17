@@ -9,7 +9,14 @@ Each platform has two fixed editions:
 - `PandaDashboardOverlayMT5-Personal.ex5`
 - `PandaDashboardOverlayMT5-Licensed.ex5`
 
-The panel shows Score, Bias, Box H4, Box H1, Panda Lines, XTF, dashboard update time, and connection state. It starts in the bottom-left, can be moved by dragging its header, and can be minimized.
+The panel shows Score, BASE XTF, QUOTE XTF, Bias, Box H4, Box H1, Panda Lines, XTF, dashboard update time, and connection state. It starts in the bottom-left, can be moved by dragging its header, and can be minimized.
+
+The `BASE XTF` and `QUOTE XTF` rows sit directly below the score and list every
+individual D1, H4, and H1 currency score whose absolute value is at least 4, in
+D1 → H4 → H1 order with signed values — for example `GBP: H4 +5 · H1 +4` or
+`JPY: D1 -6`; `NONE` means no timeframe is extreme. This mirrors the
+TradingView overlays, reads only the existing dashboard feed fields, and is
+display-only.
 
 ## Installation
 

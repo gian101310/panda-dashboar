@@ -175,7 +175,7 @@ namespace cAlgo
     public abstract class PandaDashboardOverlayBase : Indicator
     {
         protected const string FeedEndpoint = "https://pandaengine.app/api/ctrader-overlay";
-        protected const double PanelHeight = 170;
+        protected const double PanelHeight = 210;
         private const double PanelWidth = 260;
 
         private ChartDraggable _draggable;
@@ -278,6 +278,8 @@ namespace cAlgo
         {
             var pair = CurrentPair();
             panel.AddChild(Row("SCORE", pair?.Gap.HasValue == true ? pair.Gap.Value.ToString("+0.0;-0.0;0.0") : "—", BiasColor(pair?.Bias), 22));
+            panel.AddChild(Row("BASE XTF", pair == null ? "—" : FormatCurrencyExtremes(pair.BaseCurrency, pair.BaseScoreTf), Color.LightBlue, 10));
+            panel.AddChild(Row("QUOTE XTF", pair == null ? "—" : FormatCurrencyExtremes(pair.QuoteCurrency, pair.QuoteScoreTf), Color.LightBlue, 10));
             panel.AddChild(Row("BIAS", Safe(pair?.Bias), BiasColor(pair?.Bias), 13));
             panel.AddChild(Row("BOX H4", Safe(pair?.BoxH4Trend), TrendColor(pair?.BoxH4Trend), 11));
             panel.AddChild(Row("BOX H1", Safe(pair?.BoxH1Trend), TrendColor(pair?.BoxH1Trend), 11));
@@ -342,6 +344,22 @@ namespace cAlgo
             DateTime updated;
             var time = pair != null && DateTime.TryParse(pair.UpdatedAt, out updated) ? updated.ToLocalTime().ToString("HH:mm:ss") : "—";
             return "Dashboard sync · " + time + " · " + _status;
+        }
+
+        // Display-only port of the TradingView BASE XTF / QUOTE XTF rows.
+        // Formats the dashboard's base_score_tf / quote_score_tf extreme lists
+        // (tokens like "D1+4 H4+5", |score| >= 4 only, D1→H4→H1 order preserved)
+        // into "GBP: H4 +5 · H1 +4" or "GBP: NONE". Never feeds back into scoring.
+        private static string FormatCurrencyExtremes(string currency, string tokens)
+        {
+            var label = string.IsNullOrWhiteSpace(currency) ? "—" : currency.Trim();
+            if (string.IsNullOrWhiteSpace(tokens)) return label + ": NONE";
+            var parts = tokens.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)
+                .Where(token => token.Length >= 3)
+                .Select(token => token.Substring(0, 2) + " " + token.Substring(2).TrimStart(':'))
+                .Where(token => token.Length > 3)
+                .ToArray();
+            return parts.Length == 0 ? label + ": NONE" : label + ": " + string.Join(" · ", parts);
         }
 
         private static string FormatXtf(OverlayPair pair)

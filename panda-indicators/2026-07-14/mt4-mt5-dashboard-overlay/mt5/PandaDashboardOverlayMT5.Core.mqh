@@ -6,7 +6,7 @@ const int PANDA_REFRESH_SECONDS = 60;
 const int PANDA_LOCK_TIMEOUT_SECONDS = 15;
 const ENUM_BASE_CORNER PANDA_DEFAULT_CORNER = CORNER_LEFT_UPPER;
 const int PANDA_PANEL_WIDTH = 280;
-const int PANDA_PANEL_HEIGHT = 184;
+const int PANDA_PANEL_HEIGHT = 216;
 const int PANDA_PANEL_HEIGHT_MIN = 32;
 const int PANDA_PANEL_MARGIN = 12;
 
@@ -42,6 +42,8 @@ private:
    string m_box_h1;
    string m_panda_lines;
    string m_xtf;
+   string m_base_xtf;
+   string m_quote_xtf;
    string m_updated_at;
    int m_max_age;
    int m_x;
@@ -196,6 +198,32 @@ private:
       return DoubleToString(value, 1);
    }
 
+   // Display-only port of the TradingView BASE XTF / QUOTE XTF rows.
+   // Formats the dashboard's base_score_tf / quote_score_tf extreme lists
+   // (tokens like "D1+4 H4+5", |score| >= 4 only, D1→H4→H1 order preserved)
+   // into "GBP: H4 +5 · H1 +4" or "GBP: NONE". Never feeds back into scoring.
+   string FormatCurrencyExtremes(const string currency, const string tokens)
+   {
+      string label = currency == "" ? "—" : currency;
+      string cleaned = Trim(tokens);
+      if(cleaned == "" || cleaned == "null") return label + ": NONE";
+      string parts[];
+      int count = StringSplit(cleaned, ' ', parts);
+      string values = "";
+      for(int i = 0; i < count; i++)
+      {
+         string token = Trim(parts[i]);
+         if(StringLen(token) < 3) continue;
+         string tf = StringSubstr(token, 0, 2);
+         string score = StringSubstr(token, 2);
+         if(StringSubstr(score, 0, 1) == ":") score = StringSubstr(score, 1);
+         if(score == "") continue;
+         string spaced = tf + " " + score;
+         values = values == "" ? spaced : values + " · " + spaced;
+      }
+      return values == "" ? label + ": NONE" : label + ": " + values;
+   }
+
    bool ParseSnapshot(const string json)
    {
       if(JsonScalar(json, "schema_version") != "1") return false;
@@ -214,6 +242,8 @@ private:
       string quote_tf = JsonString(pair, "quote_score_tf");
       m_xtf = (base_tf == "" ? "NONE" : base_currency + " " + base_tf)
               + " | " + (quote_tf == "" ? "NONE" : quote_currency + " " + quote_tf);
+      m_base_xtf = FormatCurrencyExtremes(base_currency, base_tf);
+      m_quote_xtf = FormatCurrencyExtremes(quote_currency, quote_tf);
       m_updated_at = JsonString(pair, "updated_at");
       m_max_age = (int)StringToInteger(JsonScalar(json, "max_age_seconds"));
       if(m_max_age <= 0) m_max_age = 600;
@@ -294,6 +324,8 @@ private:
       m_box_h1 = "—";
       m_panda_lines = "—";
       m_xtf = "—";
+      m_base_xtf = "—";
+      m_quote_xtf = "—";
       m_updated_at = "—";
    }
 
@@ -625,11 +657,13 @@ public:
       {
          Label("Status", m_status, m_x + 120, m_y + 10, StatusColor(), 8);
          Row("Score", "SCORE", m_score, m_y + 36, BiasColor(), 16);
-         Row("Bias", "BIAS", m_bias, m_y + 66, BiasColor(), 10);
-         Row("BoxH4", "BOX H4", m_box_h4, m_y + 86, clrWhite, 9);
-         Row("BoxH1", "BOX H1", m_box_h1, m_y + 106, clrWhite, 9);
-         Row("PandaLines", "PANDA LINES", m_panda_lines, m_y + 126, m_panda_lines == "CONFIRMED" ? C'0,255,159' : C'255,209,102', 9);
-         Row("Xtf", "XTF", m_xtf, m_y + 146, C'120,200,255', 8);
+         Row("BaseXtf", "BASE XTF", m_base_xtf, m_y + 64, C'120,200,255', 8);
+         Row("QuoteXtf", "QUOTE XTF", m_quote_xtf, m_y + 80, C'120,200,255', 8);
+         Row("Bias", "BIAS", m_bias, m_y + 98, BiasColor(), 10);
+         Row("BoxH4", "BOX H4", m_box_h4, m_y + 118, clrWhite, 9);
+         Row("BoxH1", "BOX H1", m_box_h1, m_y + 138, clrWhite, 9);
+         Row("PandaLines", "PANDA LINES", m_panda_lines, m_y + 158, m_panda_lines == "CONFIRMED" ? C'0,255,159' : C'255,209,102', 9);
+         Row("Xtf", "XTF", m_xtf, m_y + 178, C'120,200,255', 8);
          Label("Footer", "Dashboard sync · " + (m_updated_at == "" ? "—" : m_updated_at), m_x + 10, m_y + height - 18, StatusColor(), 7);
       }
       ChartRedraw(0);
