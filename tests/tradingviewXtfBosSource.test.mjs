@@ -22,5 +22,6 @@ test('XTF BOS Pine source gates confirmed triggers through its selected Box', ()
   assert.match(source, /alertcondition\(buyTrigger/);
   assert.match(source, /alertcondition\(sellTrigger/);
   assert.match(source, /table\.new\(f_panel_position\(panelPositionInput\),\s*2,\s*13/);
+  assert.doesNotMatch(source, /\n\s+or value ==/);
   assert.doesNotMatch(source, /strategy\(|supabase|engine\.secret|operator\.token/i);
 });

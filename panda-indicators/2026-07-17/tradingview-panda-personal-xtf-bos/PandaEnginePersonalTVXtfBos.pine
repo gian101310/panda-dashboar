@@ -446,11 +446,7 @@ f_panel_position(string selected) =>
         => position.bottom_left
 
 f_status_color(string value) =>
-    value == "BUY" or value == "UPTREND" or value == "ABOVE" or value == "BULLISH" or value == "ALIGNED"
-      or value == "BUY TRIGGER" or value == "BUY READY — WAIT BULLISH BOS" ? PANDA_BUY
-      : value == "SELL" or value == "DOWNTREND" or value == "BELOW" or value == "BEARISH"
-        or value == "SELL TRIGGER" or value == "SELL READY — WAIT BEARISH BOS" ? PANDA_SELL
-      : value == "WAIT" or value == "BETWEEN" or value == "RANGING" or value == "COUNTER" ? PANDA_WARN : PANDA_NEUTRAL
+    value == "BUY" or value == "UPTREND" or value == "ABOVE" or value == "BULLISH" or value == "ALIGNED" or value == "BUY TRIGGER" or value == "BUY READY — WAIT BULLISH BOS" ? PANDA_BUY : value == "SELL" or value == "DOWNTREND" or value == "BELOW" or value == "BEARISH" or value == "SELL TRIGGER" or value == "SELL READY — WAIT BEARISH BOS" ? PANDA_SELL : value == "WAIT" or value == "BETWEEN" or value == "RANGING" or value == "COUNTER" ? PANDA_WARN : PANDA_NEUTRAL
 
 f_signed_gap(int value) =>
     not scoreReady ? "—" : value > 0 ? "+" + str.tostring(value) : str.tostring(value)
