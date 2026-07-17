@@ -14,9 +14,11 @@ test('Pine source contains the fixed personal scoring and Box contract', () => {
     'GBPNZD', 'GBPUSD', 'NZDCAD', 'NZDJPY', 'NZDUSD', 'USDCAD', 'USDJPY',
   ]) assert.match(source, new RegExp(`"${pair}"`));
   assert.doesNotMatch(source, /USDCHF|CHFJPY|operator.token|account.number|supabase|engine.secret/i);
+  const declaration = source.match(/indicator\([\s\S]*?\)\n/)?.[0] ?? '';
+  assert.match(declaration, /calc_bars_count\s*=\s*1800/);
   assert.match(source, /"OANDA:"\s*\+\s*pair/);
   assert.match(source, /request\.security\([\s\S]*?"60"/);
-  assert.match(source, /calc_bars_count\s*=\s*3500/);
+  assert.match(source, /calc_bars_count\s*=\s*1800/);
   assert.match(source, /PANDA_GAP_THRESHOLD\s*=\s*5/);
   assert.match(source, /PANDA_SIGNIFICANT\s*=\s*4/);
   assert.match(source, /HARD_INVALID|DATA UNAVAILABLE|UNSUPPORTED SYMBOL/);
@@ -34,6 +36,8 @@ test('Pine source contains confirmed Panda Lines, BOS, panel, and alert contract
     assert.match(source, new RegExp(event));
   for (const label of ['BIAS', 'GAP', 'BOX H1', 'BOX H4', 'PANDA LINES', 'FLIP', 'BOS'])
     assert.match(source, new RegExp(label));
+  assert.match(source, /table\.new\(f_panel_position\(panelPositionInput\),\s*2,\s*9/);
+  assert.match(source, /table\.cell\(panel,\s*0,\s*8,\s*" "/);
   assert.match(source, /ta\.pivothigh|ta\.pivotlow/);
   assert.match(source, /alertcondition/);
   assert.doesNotMatch(source, /strategy\(|strategy\.(entry|exit|order)/);

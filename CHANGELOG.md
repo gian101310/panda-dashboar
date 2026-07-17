@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-07-17 (TradingView personal overlay)
+
+- Added the private Pine v6 `Panda Engine Personal TV` overlay with the exact 21-pair non-CHF structural currency scoring contract, three offset Panda Boxes, H1/H4 Box structure, SuperTrend/BB Follow Line status and confirmed flips, pivot BOS, four stable alert events, and a compact corner-selectable panel.
+- Kept the TradingView edition completely local to TradingView market data with no licensing, token, dashboard API, Supabase, or Windows engine dependency; the locked Python scoring functions remain untouched.
+- Bounded the 21 OANDA H1 dynamic requests and main calculation history to 1,800 bars after a real TradingView runtime smoke test exposed the heavier initial history window, and added a transparent spacer so the bottom-left BOS row remains visible above the TradingView watermark.
+- Added deterministic reference/source-contract tests and installation/status/alert documentation. The final private script compiled, ran without a chart runtime error, displayed live on USDJPY H1, and was saved in TradingView as `Panda Engine Personal TV`.
+
 ## 2026-07-17 (Windows indicator session)
 
 - Fixed cTrader, MT4, and MT5 Licensed clients to extract the automatic device token from the API's nested `device_activation.token` response instead of treating `device_activation` as a string. Added regression assertions, rebuilt both cTrader editions and all eight MT4/MT5 overlay/feed binaries with zero errors and zero warnings, and refreshed private `dist/` checksums. Public downloads remain unchanged until the replacement Licensed builds pass a Windows restart smoke test; device enforcement remains OFF.

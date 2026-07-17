@@ -1,6 +1,7 @@
 //@version=6
 indicator("Panda Engine Personal TV", shorttitle = "PANDA TV", overlay = true,
-  dynamic_requests = true, max_boxes_count = 10, max_lines_count = 20, max_labels_count = 50)
+  dynamic_requests = true, calc_bars_count = 1800,
+  max_boxes_count = 10, max_lines_count = 20, max_labels_count = 50)
 
 // Personal TradingView port. It calculates from TradingView market data only.
 // It contains no Panda API credential and never places or manages trades.
@@ -239,7 +240,7 @@ int readySnapshots = 0
 
 for pair in PANDA_PAIRS
     PairSnapshot snapshot = request.security("OANDA:" + pair, "60", f_snapshot(),
-      ignore_invalid_symbol = true, calc_bars_count = 3500)
+      ignore_invalid_symbol = true, calc_bars_count = 1800)
     bool snapshotReady = not na(snapshot) and not na(snapshot.price)
       and not na(snapshot.shortHigh) and not na(snapshot.shortLow)
       and not na(snapshot.mediumHigh) and not na(snapshot.mediumLow)
@@ -429,7 +430,7 @@ f_panel_row(table id, int row, string label, string value) =>
     table.cell(id, 1, row, value, bgcolor = PANDA_BG, text_color = f_status_color(value),
       text_halign = text.align_right, text_size = size.small)
 
-var table panel = table.new(f_panel_position(panelPositionInput), 2, 8,
+var table panel = table.new(f_panel_position(panelPositionInput), 2, 9,
   bgcolor = PANDA_BG, frame_color = color.new(PANDA_ACCENT, 35), frame_width = 1,
   border_color = color.new(PANDA_NEUTRAL, 75), border_width = 1)
 
@@ -447,5 +448,9 @@ if barstate.islast
         f_panel_row(panel, 5, "PANDA LINES", pandaLineStatus)
         f_panel_row(panel, 6, "FLIP", latestFlip)
         f_panel_row(panel, 7, "BOS", latestBos)
+        table.cell(panel, 0, 8, " ", bgcolor = color.new(PANDA_BG, 100),
+          text_color = color.new(PANDA_BG, 100), text_size = size.small)
+        table.cell(panel, 1, 8, " ", bgcolor = color.new(PANDA_BG, 100),
+          text_color = color.new(PANDA_BG, 100), text_size = size.small)
     else
-        table.clear(panel, 0, 0, 1, 7)
+        table.clear(panel, 0, 0, 1, 8)
