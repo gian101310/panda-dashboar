@@ -114,6 +114,7 @@ namespace cAlgo
         private string _boxH4Trend = "UNKNOWN";
         private string _baseXtfText = "—";
         private string _quoteXtfText = "—";
+        private string _xtfSummaryText = "—";
 
         private IndicatorDataSeries _tr;
         private IndicatorDataSeries _atr;
@@ -383,6 +384,29 @@ namespace cAlgo
             return value > 0 ? "+" + value.ToString(CultureInfo.InvariantCulture) : value.ToString(CultureInfo.InvariantCulture);
         }
 
+        // XTF summary row: the single strongest extreme timeframe per currency
+        // (|score| >= 4, D1 -> H4 -> H1 order wins ties), e.g. "GBP D1 +5".
+        private static string StrongestExtremeLabel(string currency, int d1, int h4, int h1)
+        {
+            var best = "";
+            var bestValue = 0;
+            if (Math.Abs(d1) >= PandaSignificant)
+            {
+                best = "D1 " + SignedScore(d1);
+                bestValue = Math.Abs(d1);
+            }
+            if (Math.Abs(h4) >= PandaSignificant && Math.Abs(h4) > bestValue)
+            {
+                best = "H4 " + SignedScore(h4);
+                bestValue = Math.Abs(h4);
+            }
+            if (Math.Abs(h1) >= PandaSignificant && Math.Abs(h1) > bestValue)
+            {
+                best = "H1 " + SignedScore(h1);
+            }
+            return best == "" ? currency + " NONE" : currency + " " + best;
+        }
+
         private static string CurrencyExtremes(string currency, int d1, int h4, int h1)
         {
             var values = "";
@@ -419,6 +443,7 @@ namespace cAlgo
                 _boxH4Trend = "UNKNOWN";
                 _baseXtfText = "—";
                 _quoteXtfText = "—";
+                _xtfSummaryText = "—";
                 return;
             }
 
@@ -434,6 +459,8 @@ namespace cAlgo
             _boxH4Trend = BoxTrend(_activeSlot.LongHigh, _activeSlot.LongLow, _activeSlot.MediumHigh, _activeSlot.MediumLow);
             _baseXtfText = CurrencyExtremes(_chartPair.Substring(0, 3), _scoresD1[_baseIndex], _scoresH4[_baseIndex], _scoresH1[_baseIndex]);
             _quoteXtfText = CurrencyExtremes(_chartPair.Substring(3, 3), _scoresD1[_quoteIndex], _scoresH4[_quoteIndex], _scoresH1[_quoteIndex]);
+            _xtfSummaryText = StrongestExtremeLabel(_chartPair.Substring(0, 3), _scoresD1[_baseIndex], _scoresH4[_baseIndex], _scoresH1[_baseIndex])
+                + " / " + StrongestExtremeLabel(_chartPair.Substring(3, 3), _scoresD1[_quoteIndex], _scoresH4[_quoteIndex], _scoresH1[_quoteIndex]);
         }
 
         public override void Calculate(int index)
@@ -753,8 +780,8 @@ namespace cAlgo
             panel.AddChild(Row("GAP", GapText(), 15));
             panel.AddChild(Row("BASE XTF", _baseXtfText, 10));
             panel.AddChild(Row("QUOTE XTF", _quoteXtfText, 10));
-            panel.AddChild(Row("XTF", XtfStructure == PandaXtfStructure.H4 ? "H4" : "H1", 11));
-            panel.AddChild(Row("XTF BOX", XtfStructure == PandaXtfStructure.H4 ? _boxH4Trend : _boxH1Trend, 11));
+            panel.AddChild(Row("XTF", _xtfSummaryText, 10));
+            panel.AddChild(Row(XtfStructure == PandaXtfStructure.H4 ? "XTF BOX H4" : "XTF BOX H1", XtfStructure == PandaXtfStructure.H4 ? _boxH4Trend : _boxH1Trend, 11));
             panel.AddChild(Row("OTHER BOX", OtherBoxContext(), 11));
             panel.AddChild(Row("SIGNAL", SignalStatus(), 10));
             panel.AddChild(Row("BOX H1", _boxH1Trend, 11));
