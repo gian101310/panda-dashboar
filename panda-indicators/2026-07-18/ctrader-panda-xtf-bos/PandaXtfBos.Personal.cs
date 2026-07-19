@@ -21,11 +21,6 @@ namespace cAlgo
     {
         private const int PandaGapThreshold = 5;
         private const int PandaSignificant = 4;
-        private const int BbPeriod = 21;
-        private const double BbDeviation = 1.0;
-        private const int FollowAtrPeriod = 5;
-        private const int SuperTrendPeriod = 10;
-        private const double SuperTrendFactor = 3.0;
         private const int MinPairBars = 2500;
         private const double PanelHeightEstimate = 340;
 
@@ -45,8 +40,50 @@ namespace cAlgo
         [Parameter("Show Panda Boxes", DefaultValue = true)]
         public bool ShowBoxes { get; set; }
 
-        [Parameter("Show Panda Lines", DefaultValue = true)]
+        [Parameter("Show Panda Lines", DefaultValue = true, Group = "Panda Lines")]
         public bool ShowPandaLines { get; set; }
+
+        [Parameter("Show SuperTrend", DefaultValue = true, Group = "Panda Lines")]
+        public bool ShowSuperTrend { get; set; }
+
+        [Parameter("SuperTrend period", DefaultValue = 10, MinValue = 2, MaxValue = 200, Group = "Panda Lines")]
+        public int SuperTrendPeriod { get; set; }
+
+        [Parameter("SuperTrend multiplier", DefaultValue = 3.0, MinValue = 0.1, MaxValue = 20.0, Step = 0.1, Group = "Panda Lines")]
+        public double SuperTrendFactor { get; set; }
+
+        [Parameter("SuperTrend use ATR", DefaultValue = true, Group = "Panda Lines")]
+        public bool SuperTrendUseAtr { get; set; }
+
+        [Parameter("Show Follow Line", DefaultValue = true, Group = "Panda Lines")]
+        public bool ShowFollowLine { get; set; }
+
+        [Parameter("Follow BB period", DefaultValue = 21, MinValue = 2, MaxValue = 200, Group = "Panda Lines")]
+        public int FollowBbPeriod { get; set; }
+
+        [Parameter("Follow BB deviation", DefaultValue = 1.0, MinValue = 0.1, MaxValue = 10.0, Step = 0.1, Group = "Panda Lines")]
+        public double FollowBbDeviation { get; set; }
+
+        [Parameter("Follow use ATR", DefaultValue = true, Group = "Panda Lines")]
+        public bool FollowUseAtr { get; set; }
+
+        [Parameter("Follow ATR period", DefaultValue = 5, MinValue = 1, MaxValue = 200, Group = "Panda Lines")]
+        public int FollowAtrPeriod { get; set; }
+
+        [Parameter("Show previous day high / low", DefaultValue = true, Group = "Previous Levels")]
+        public bool ShowPreviousDayLevels { get; set; }
+
+        [Parameter("Show previous week high / low", DefaultValue = false, Group = "Previous Levels")]
+        public bool ShowPreviousWeekLevels { get; set; }
+
+        [Parameter("Show previous month high / low", DefaultValue = false, Group = "Previous Levels")]
+        public bool ShowPreviousMonthLevels { get; set; }
+
+        [Parameter("Show previous year high / low", DefaultValue = false, Group = "Previous Levels")]
+        public bool ShowPreviousYearLevels { get; set; }
+
+        [Parameter("Previous-level zone width (%)", DefaultValue = 0.01, MinValue = 0.0, MaxValue = 5.0, Step = 0.01, Group = "Previous Levels")]
+        public double PreviousLevelZoneWidth { get; set; }
 
         [Parameter("Show flip markers", DefaultValue = true)]
         public bool ShowFlipMarkers { get; set; }
@@ -127,6 +164,9 @@ namespace cAlgo
         private IndicatorDataSeries _followAtr;
         private IndicatorDataSeries _follow;
         private IndicatorDataSeries _followTrend;
+        private Bars _dailyLevels;
+        private Bars _weeklyLevels;
+        private Bars _monthlyLevels;
 
         private int _lastClosedProcessed = -1;
         private double _lastSwingHigh = double.NaN;
@@ -164,6 +204,9 @@ namespace cAlgo
             _followAtr = CreateDataSeries();
             _follow = CreateDataSeries();
             _followTrend = CreateDataSeries();
+            _dailyLevels = MarketData.GetBars(TimeFrame.Daily);
+            _weeklyLevels = MarketData.GetBars(TimeFrame.Weekly);
+            _monthlyLevels = MarketData.GetBars(TimeFrame.Monthly);
 
             _chartPair = CanonicalPair(SymbolName);
             _baseIndex = _chartPair == "" ? -1 : CurrencyIndex(_chartPair.Substring(0, 3));
@@ -336,6 +379,7 @@ namespace cAlgo
             if (IsLastBar || (DateTime.UtcNow - _lastPanelRefreshUtc).TotalSeconds >= 1)
             {
                 DrawBoxes();
+                DrawPreviousLevels();
                 DrawSwingLines();
                 UpdatePanel();
             }
@@ -473,6 +517,7 @@ namespace cAlgo
             if (IsLastBar)
             {
                 DrawBoxes();
+                DrawPreviousLevels();
                 DrawSwingLines();
                 UpdatePanel();
             }
@@ -480,7 +525,7 @@ namespace cAlgo
 
         // Chart-timeframe Panda Lines preserve the proven legacy cTrader behaviour:
         // simple-ATR SuperTrend evaluated from the prior closed bar, plus the
-        // previous-bar BB(21, 1.0) / SMA-TR(5) Follow Line.
+        // configurable previous-bar Bollinger / ATR Follow Line.
         private void ComputeChartBar(int i)
         {
             var high = Bars.HighPrices[i];
@@ -503,11 +548,12 @@ namespace cAlgo
                 _atr[i] = sum / SuperTrendPeriod;
             }
 
-            if (!double.IsNaN(_atr[i]))
+            var superTrendAtr = SuperTrendUseAtr ? _atr[i] : SimpleTrueRangeAverage(i, SuperTrendPeriod);
+            if (!double.IsNaN(superTrendAtr))
             {
                 var mid = (high + low) / 2.0;
-                var basicLower = mid - SuperTrendFactor * _atr[i];
-                var basicUpper = mid + SuperTrendFactor * _atr[i];
+                var basicLower = mid - SuperTrendFactor * superTrendAtr;
+                var basicUpper = mid + SuperTrendFactor * superTrendAtr;
                 var previousLower = i > 0 && !double.IsNaN(_lowBand[i - 1]) ? _lowBand[i - 1] : basicLower;
                 var previousUpper = i > 0 && !double.IsNaN(_upBand[i - 1]) ? _upBand[i - 1] : basicUpper;
                 var currentLower = previousClose > previousLower ? Math.Max(basicLower, previousLower) : basicLower;
@@ -522,18 +568,18 @@ namespace cAlgo
                 _st[i] = trend == 1.0 ? currentLower : currentUpper;
             }
 
-            if (i >= BbPeriod - 1)
+            if (i >= FollowBbPeriod - 1)
             {
                 double sum = 0;
-                for (int k = i - BbPeriod + 1; k <= i; k++) sum += Bars.ClosePrices[k];
-                var mean = sum / BbPeriod;
+                for (int k = i - FollowBbPeriod + 1; k <= i; k++) sum += Bars.ClosePrices[k];
+                var mean = sum / FollowBbPeriod;
                 double variance = 0;
-                for (int k = i - BbPeriod + 1; k <= i; k++)
+                for (int k = i - FollowBbPeriod + 1; k <= i; k++)
                 {
                     var deviation = Bars.ClosePrices[k] - mean;
                     variance += deviation * deviation;
                 }
-                var stdev = Math.Sqrt(variance / BbPeriod) * BbDeviation;
+                var stdev = Math.Sqrt(variance / FollowBbPeriod) * FollowBbDeviation;
                 _bbUpper[i] = mean + stdev;
                 _bbLower[i] = mean - stdev;
             }
@@ -548,8 +594,8 @@ namespace cAlgo
             var previousFollow = i > 0 && !double.IsNaN(_follow[i - 1]) ? _follow[i - 1] : closeValue;
             var bbSignal = 0;
             if (i > 0 && !double.IsNaN(_bbUpper[i - 1])) bbSignal = previousClose > _bbUpper[i - 1] ? 1 : previousClose < _bbLower[i - 1] ? -1 : 0;
-            if (bbSignal == 1 && !double.IsNaN(_followAtr[i])) _follow[i] = Math.Max(low - _followAtr[i], previousFollow);
-            else if (bbSignal == -1 && !double.IsNaN(_followAtr[i])) _follow[i] = Math.Min(high + _followAtr[i], previousFollow);
+            if (bbSignal == 1) _follow[i] = Math.Max(FollowUseAtr && !double.IsNaN(_followAtr[i]) ? low - _followAtr[i] : low, previousFollow);
+            else if (bbSignal == -1) _follow[i] = Math.Min(FollowUseAtr && !double.IsNaN(_followAtr[i]) ? high + _followAtr[i] : high, previousFollow);
             else _follow[i] = previousFollow;
 
             var previousFollowTrend = i > 0 && !double.IsNaN(_followTrend[i - 1]) ? _followTrend[i - 1] : 0.0;
@@ -569,7 +615,7 @@ namespace cAlgo
                 return;
             }
 
-            if (!double.IsNaN(_st[i]) && _stTrend[i] == 1.0)
+            if (ShowSuperTrend && !double.IsNaN(_st[i]) && _stTrend[i] == 1.0)
             {
                 SuperTrendUp[i] = _st[i];
                 SuperTrendDown[i] = double.NaN;
@@ -577,12 +623,12 @@ namespace cAlgo
             }
             else
             {
-                SuperTrendDown[i] = double.IsNaN(_st[i]) ? double.NaN : _st[i];
+                SuperTrendDown[i] = ShowSuperTrend && !double.IsNaN(_st[i]) ? _st[i] : double.NaN;
                 SuperTrendUp[i] = double.NaN;
-                if (i > 0 && _stTrend[i - 1] == 1.0) SuperTrendDown[i - 1] = _st[i - 1];
+                if (ShowSuperTrend && i > 0 && _stTrend[i - 1] == 1.0) SuperTrendDown[i - 1] = _st[i - 1];
             }
 
-            if (!double.IsNaN(_follow[i]) && _followTrend[i] > 0.0)
+            if (ShowFollowLine && !double.IsNaN(_follow[i]) && _followTrend[i] > 0.0)
             {
                 FollowLineUp[i] = _follow[i];
                 FollowLineDown[i] = double.NaN;
@@ -590,10 +636,24 @@ namespace cAlgo
             }
             else
             {
-                FollowLineDown[i] = double.IsNaN(_follow[i]) ? double.NaN : _follow[i];
+                FollowLineDown[i] = ShowFollowLine && !double.IsNaN(_follow[i]) ? _follow[i] : double.NaN;
                 FollowLineUp[i] = double.NaN;
-                if (i > 0 && _followTrend[i - 1] > 0.0) FollowLineDown[i - 1] = _follow[i - 1];
+                if (ShowFollowLine && i > 0 && _followTrend[i - 1] > 0.0) FollowLineDown[i - 1] = _follow[i - 1];
             }
+        }
+
+        // Matches the legacy fallback used when the SuperTrend ATR toggle is off.
+        private double SimpleTrueRangeAverage(int index, int period)
+        {
+            if (index < period - 1) return double.NaN;
+            double sum = 0;
+            for (int offset = 0; offset < period; offset++)
+            {
+                var i = index - offset;
+                if (i < 1) break;
+                sum += _tr[i];
+            }
+            return sum / period;
         }
 
         private string PandaLineStatusAt(int i)
@@ -716,6 +776,77 @@ namespace cAlgo
             fill.IsFilled = true;
             var border = Chart.DrawRectangle(borderName, extent.Item1, extent.Item2, extent.Item3, extent.Item4, color);
             border.IsFilled = false;
+        }
+
+        // Same prior-period support/resistance treatment as the established
+        // Panda Lines cTrader indicator. Daily levels are enabled by default;
+        // higher periods are opt-in so the XTF/BOS chart stays readable.
+        private void DrawPreviousLevels()
+        {
+            var supported = _chartPair != "" && Bars.Count > 1;
+            DrawPreviousRange("PD", supported && ShowPreviousDayLevels, _dailyLevels, Color.Orange);
+            DrawPreviousRange("PW", supported && ShowPreviousWeekLevels, _weeklyLevels, Color.DodgerBlue);
+            DrawPreviousRange("PM", supported && ShowPreviousMonthLevels, _monthlyLevels, Color.DarkViolet);
+
+            double previousYearHigh, previousYearLow;
+            var hasPreviousYear = TryPreviousYearRange(out previousYearHigh, out previousYearLow);
+            DrawPreviousLevel("PYH", supported && ShowPreviousYearLevels && hasPreviousYear, previousYearHigh, Color.Crimson);
+            DrawPreviousLevel("PYL", supported && ShowPreviousYearLevels && hasPreviousYear, previousYearLow, Color.Crimson);
+        }
+
+        private void DrawPreviousRange(string prefix, bool visible, Bars source, Color color)
+        {
+            var previous = source != null && source.Count >= 2 ? source.Count - 2 : -1;
+            DrawPreviousLevel(prefix + "H", visible && previous >= 0, previous >= 0 ? source.HighPrices[previous] : 0, color);
+            DrawPreviousLevel(prefix + "L", visible && previous >= 0, previous >= 0 ? source.LowPrices[previous] : 0, color);
+        }
+
+        private void DrawPreviousLevel(string label, bool visible, double level, Color color)
+        {
+            var prefix = "PandaXtf.Level." + label;
+            if (!visible || level <= 0 || Bars.Count < 2)
+            {
+                Chart.RemoveObject(prefix + ".Zone");
+                Chart.RemoveObject(prefix + ".Line");
+                Chart.RemoveObject(prefix + ".Text");
+                return;
+            }
+
+            var barSeconds = (Bars.OpenTimes[Bars.Count - 1] - Bars.OpenTimes[Bars.Count - 2]).TotalSeconds;
+            if (barSeconds <= 0) barSeconds = 60;
+            var timeLeft = Bars.OpenTimes[0];
+            var timeRight = Bars.OpenTimes[Bars.Count - 1].AddSeconds(barSeconds * Math.Max(Bars.Count, 50));
+            var halfWidth = level * PreviousLevelZoneWidth / 100.0;
+            var border = Color.FromArgb(180, color.R, color.G, color.B);
+            var zone = Chart.DrawRectangle(prefix + ".Zone", timeLeft, level + halfWidth, timeRight, level - halfWidth,
+                Color.FromArgb(30, color.R, color.G, color.B));
+            zone.IsFilled = true;
+            var line = Chart.DrawTrendLine(prefix + ".Line", timeLeft, level, timeRight, level, border);
+            line.LineStyle = LineStyle.Dots;
+            line.Thickness = 1;
+            var text = Chart.DrawText(prefix + ".Text", label + "  " + level.ToString("F" + Symbol.Digits), timeRight, level, color);
+            text.HorizontalAlignment = HorizontalAlignment.Right;
+        }
+
+        private bool TryPreviousYearRange(out double high, out double low)
+        {
+            high = 0;
+            low = double.MaxValue;
+            if (_monthlyLevels == null) return false;
+            var previousYear = Server.Time.Year - 1;
+            for (int i = 0; i < _monthlyLevels.Count; i++)
+            {
+                if (_monthlyLevels.OpenTimes[i].Year != previousYear) continue;
+                high = Math.Max(high, _monthlyLevels.HighPrices[i]);
+                low = Math.Min(low, _monthlyLevels.LowPrices[i]);
+            }
+            if (low == double.MaxValue)
+            {
+                high = 0;
+                low = 0;
+                return false;
+            }
+            return true;
         }
 
         private void DrawSwingLines()

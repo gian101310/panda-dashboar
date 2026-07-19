@@ -13,7 +13,12 @@ never publish this binary.
   chart with the TradingView colors (orange / green / blue).
 - Panda Lines: the proven legacy cTrader simple-ATR SuperTrend (10, factor 3,
   evaluated from the prior closed bar) and previous-bar BB(21, 1.0) /
-  SMA-TR(5) Follow Line, with confirmed `PL+` / `PL-` flip markers.
+  SMA-TR(5) Follow Line, with confirmed `PL+` / `PL-` flip markers. Each is
+  split into bullish/bearish output colours exactly as in the old Panda Lines
+  overlay, but it is still one SuperTrend and one Follow Line.
+- Previous-day high/low levels are shown by default, using the old Panda Lines
+  dotted-line and light-zone style. Previous week, month, and year levels are
+  optional.
 - Confirmed one-shot Break of Structure from swing pivots (default length 5),
   with dashed active swing levels and `BOS+` / `BOS-` markers.
 - The XTF BOS signal: the selected H1/H4 Box gates a READY state, and a
@@ -42,16 +47,20 @@ D1 -> H4 -> H1 order.
 - The panel needs all 21 pairs loaded; the footer shows `n/21 pairs` while
   history loads (BIAS shows DATA UNAVAILABLE until ready).
 
+## Panda Lines inputs
+
+The `Panda Lines` group exposes independent visibility toggles plus the legacy
+SuperTrend period/multiplier/ATR setting and Follow Line BB period, deviation,
+ATR toggle, and ATR period. The `Previous Levels` group lets you independently
+show or hide the prior day, week, month, and year high/low levels and adjust
+their zone width. Defaults reproduce the old Panda Lines defaults while keeping
+only prior-day levels enabled to avoid crowding the XTF/BOS chart.
+
 ## Build and install
 
 Build `PandaXtfBos-Personal/PandaXtfBos-Personal/PandaXtfBos.Personal.csproj`
 with `dotnet build -c Release` (cTrader.Automate package). The `.algo` lands
-in `bin/Release/net6.0/` and, when built on a machine with cTrader, is also
-installed to `~/cAlgo/Sources/Indicators` automatically. `dist/` holds the
-released binary and its SHA256SUMS. In cTrader, attach
+in `bin/Release/net6.0/` and, when built on a Mac or Windows machine with
+cTrader, is also installed to `~/cAlgo/Sources/Indicators` automatically.
+`dist/` holds the released binary and its SHA256SUMS. In cTrader, attach
 `Panda Engine Personal XTF BOS` to a supported pair chart (H1 recommended).
-
-> **Build required after the July 19 Panda Lines correction:** the repository
-> source now matches the legacy cTrader Panda Lines behaviour, but the checked-in
-> `dist/PandaXtfBos-Personal.algo` predates that correction. Rebuild this project
-> on Windows/cTrader before installing or distributing the corrected binary.

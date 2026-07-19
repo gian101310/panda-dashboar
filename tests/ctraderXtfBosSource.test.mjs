@@ -29,10 +29,26 @@ test('cTrader XTF BOS port renders the TradingView panel rows and gates', () => 
   assert.match(source, /BUY READY — WAIT BULLISH BOS/);
   assert.match(source, /SELL READY — WAIT BEARISH BOS/);
   assert.match(source, /CurrencyExtremes\(string currency, int d1, int h4, int h1\)/);
-  assert.match(source, /SuperTrendPeriod\s*=\s*10/);
-  assert.match(source, /SuperTrendFactor\s*=\s*3\.0/);
-  assert.match(source, /BbPeriod\s*=\s*21/);
-  assert.match(source, /FollowAtrPeriod\s*=\s*5/);
+  assert.match(source, /\[Parameter\("SuperTrend period", DefaultValue = 10/);
+  assert.match(source, /\[Parameter\("SuperTrend multiplier", DefaultValue = 3\.0/);
+  assert.match(source, /\[Parameter\("Follow BB period", DefaultValue = 21/);
+  assert.match(source, /\[Parameter\("Follow ATR period", DefaultValue = 5/);
+});
+
+test('cTrader XTF BOS exposes the legacy Panda Lines controls and previous levels', () => {
+  for (const parameter of [
+    'Show SuperTrend', 'SuperTrend use ATR', 'Show Follow Line', 'Follow use ATR',
+    'Show previous day high / low', 'Show previous week high / low',
+    'Show previous month high / low', 'Show previous year high / low',
+    'Previous-level zone width (%)'
+  ]) assert.ok(source.includes(`"${parameter}"`), `missing ${parameter} control`);
+
+  for (const prefix of ['PD', 'PW', 'PM'])
+    assert.match(source, new RegExp(`DrawPreviousRange\\(\\"${prefix}\\"`));
+  for (const label of ['PYH', 'PYL'])
+    assert.ok(source.includes(`"${label}"`), `missing ${label} previous-period level`);
+  assert.match(source, /Chart\.DrawTrendLine\(prefix \+ "\.Line"/);
+  assert.match(source, /line\.LineStyle = LineStyle\.Dots/);
 });
 
 test('cTrader XTF BOS renders Panda Lines with the proven legacy cTrader calculation', () => {
