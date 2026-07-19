@@ -35,6 +35,25 @@ test('cTrader XTF BOS port renders the TradingView panel rows and gates', () => 
   assert.match(source, /FollowAtrPeriod\s*=\s*5/);
 });
 
+test('cTrader XTF BOS renders Panda Lines with the proven legacy cTrader calculation', () => {
+  for (const output of [
+    'Panda SuperTrend Up',
+    'Panda SuperTrend Down',
+    'Panda Follow Line Up',
+    'Panda Follow Line Down'
+  ]) {
+    assert.match(source, new RegExp(`\\[Output\\("${output}",[^\\]]*PlotType\\s*=\\s*PlotType\\.DiscontinuousLine`, 's'));
+  }
+
+  assert.match(source, /private IndicatorDataSeries _followTrend;/);
+  assert.match(source, /var previousTrend = i > 0 && !double\.IsNaN\(_stTrend\[i - 1\]\) \? _stTrend\[i - 1\] : 1\.0;/);
+  assert.match(source, /previousTrend == -1\.0 && previousClose > previousUpper/);
+  assert.match(source, /previousTrend == 1\.0 && previousClose < previousLower/);
+  assert.match(source, /SuperTrendUp\[i - 1\] = _st\[i - 1\];/);
+  assert.match(source, /FollowLineUp\[i - 1\] = _follow\[i - 1\];/);
+  assert.doesNotMatch(source, /_atr\[i\] = \(_atr\[i - 1\] \* \(SuperTrendPeriod - 1\) \+ _tr\[i\]\) \/ SuperTrendPeriod;/);
+});
+
 test('cTrader XTF BOS local storage keys satisfy cTrader restrictions', () => {
   const keys = [...source.matchAll(/LocalStorage\.(?:GetString|SetString)\("([^"]+)"/g)].map((match) => match[1]);
   assert.ok(keys.length > 0, 'expected persisted panel settings');

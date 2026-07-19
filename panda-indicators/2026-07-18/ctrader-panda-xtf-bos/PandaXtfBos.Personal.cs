@@ -66,16 +66,16 @@ namespace cAlgo
         [Parameter("Show BUY/SELL trigger markers", DefaultValue = true)]
         public bool ShowTriggerMarkers { get; set; }
 
-        [Output("Panda SuperTrend Up", LineColor = "Lime", Thickness = 2)]
+        [Output("Panda SuperTrend Up", LineColor = "Lime", PlotType = PlotType.DiscontinuousLine, Thickness = 2)]
         public IndicatorDataSeries SuperTrendUp { get; set; }
 
-        [Output("Panda SuperTrend Down", LineColor = "Red", Thickness = 2)]
+        [Output("Panda SuperTrend Down", LineColor = "Red", PlotType = PlotType.DiscontinuousLine, Thickness = 2)]
         public IndicatorDataSeries SuperTrendDown { get; set; }
 
-        [Output("Panda Follow Line Up", LineColor = "DeepSkyBlue", Thickness = 2)]
+        [Output("Panda Follow Line Up", LineColor = "DeepSkyBlue", PlotType = PlotType.DiscontinuousLine, Thickness = 2)]
         public IndicatorDataSeries FollowLineUp { get; set; }
 
-        [Output("Panda Follow Line Down", LineColor = "Red", Thickness = 2)]
+        [Output("Panda Follow Line Down", LineColor = "Red", PlotType = PlotType.DiscontinuousLine, Thickness = 2)]
         public IndicatorDataSeries FollowLineDown { get; set; }
 
         private sealed class PeriodRange
@@ -126,6 +126,7 @@ namespace cAlgo
         private IndicatorDataSeries _bbLower;
         private IndicatorDataSeries _followAtr;
         private IndicatorDataSeries _follow;
+        private IndicatorDataSeries _followTrend;
 
         private int _lastClosedProcessed = -1;
         private double _lastSwingHigh = double.NaN;
@@ -162,6 +163,7 @@ namespace cAlgo
             _bbLower = CreateDataSeries();
             _followAtr = CreateDataSeries();
             _follow = CreateDataSeries();
+            _followTrend = CreateDataSeries();
 
             _chartPair = CanonicalPair(SymbolName);
             _baseIndex = _chartPair == "" ? -1 : CurrencyIndex(_chartPair.Substring(0, 3));
@@ -476,8 +478,9 @@ namespace cAlgo
             }
         }
 
-        // Chart-timeframe SuperTrend (RMA ATR 10, factor 3) and the previous-bar
-        // BB(21, 1.0) / SMA-TR(5) Follow Line, both matching the Pine definitions.
+        // Chart-timeframe Panda Lines preserve the proven legacy cTrader behaviour:
+        // simple-ATR SuperTrend evaluated from the prior closed bar, plus the
+        // previous-bar BB(21, 1.0) / SMA-TR(5) Follow Line.
         private void ComputeChartBar(int i)
         {
             var high = Bars.HighPrices[i];
@@ -495,24 +498,28 @@ namespace cAlgo
             }
             else if (i >= SuperTrendPeriod)
             {
-                _atr[i] = (_atr[i - 1] * (SuperTrendPeriod - 1) + _tr[i]) / SuperTrendPeriod;
+                double sum = 0;
+                for (int k = i - SuperTrendPeriod + 1; k <= i; k++) sum += _tr[k];
+                _atr[i] = sum / SuperTrendPeriod;
             }
 
             if (!double.IsNaN(_atr[i]))
             {
                 var mid = (high + low) / 2.0;
-                var basicUpper = mid + SuperTrendFactor * _atr[i];
                 var basicLower = mid - SuperTrendFactor * _atr[i];
-                var previousUpper = i > 0 && !double.IsNaN(_upBand[i - 1]) ? _upBand[i - 1] : basicUpper;
+                var basicUpper = mid + SuperTrendFactor * _atr[i];
                 var previousLower = i > 0 && !double.IsNaN(_lowBand[i - 1]) ? _lowBand[i - 1] : basicLower;
-                _upBand[i] = basicUpper < previousUpper || previousClose > previousUpper ? basicUpper : previousUpper;
-                _lowBand[i] = basicLower > previousLower || previousClose < previousLower ? basicLower : previousLower;
+                var previousUpper = i > 0 && !double.IsNaN(_upBand[i - 1]) ? _upBand[i - 1] : basicUpper;
+                var currentLower = previousClose > previousLower ? Math.Max(basicLower, previousLower) : basicLower;
+                var currentUpper = previousClose < previousUpper ? Math.Min(basicUpper, previousUpper) : basicUpper;
+                _lowBand[i] = currentLower;
+                _upBand[i] = currentUpper;
                 var previousTrend = i > 0 && !double.IsNaN(_stTrend[i - 1]) ? _stTrend[i - 1] : 1.0;
-                double trend;
-                if (previousTrend > 0) trend = closeValue > _upBand[i] ? -1.0 : 1.0;
-                else trend = closeValue < _lowBand[i] ? 1.0 : -1.0;
+                var trend = previousTrend;
+                if (previousTrend == -1.0 && previousClose > previousUpper) trend = 1.0;
+                else if (previousTrend == 1.0 && previousClose < previousLower) trend = -1.0;
                 _stTrend[i] = trend;
-                _st[i] = trend > 0 ? _upBand[i] : _lowBand[i];
+                _st[i] = trend == 1.0 ? currentLower : currentUpper;
             }
 
             if (i >= BbPeriod - 1)
@@ -545,13 +552,48 @@ namespace cAlgo
             else if (bbSignal == -1 && !double.IsNaN(_followAtr[i])) _follow[i] = Math.Min(high + _followAtr[i], previousFollow);
             else _follow[i] = previousFollow;
 
+            var previousFollowTrend = i > 0 && !double.IsNaN(_followTrend[i - 1]) ? _followTrend[i - 1] : 0.0;
+            var followTrend = previousFollowTrend;
+            if (_follow[i] > previousFollow) followTrend = 1.0;
+            else if (_follow[i] < previousFollow) followTrend = -1.0;
+            _followTrend[i] = followTrend;
+
             var supported = _chartPair != "";
             var showLines = ShowPandaLines && supported;
-            SuperTrendUp[i] = showLines && !double.IsNaN(_st[i]) && _stTrend[i] < 0 ? _st[i] : double.NaN;
-            SuperTrendDown[i] = showLines && !double.IsNaN(_st[i]) && _stTrend[i] > 0 ? _st[i] : double.NaN;
-            var followRising = i == 0 || double.IsNaN(_follow[i - 1]) || _follow[i] >= _follow[i - 1];
-            FollowLineUp[i] = showLines && !double.IsNaN(_follow[i]) && followRising ? _follow[i] : double.NaN;
-            FollowLineDown[i] = showLines && !double.IsNaN(_follow[i]) && !followRising ? _follow[i] : double.NaN;
+            if (!showLines)
+            {
+                SuperTrendUp[i] = double.NaN;
+                SuperTrendDown[i] = double.NaN;
+                FollowLineUp[i] = double.NaN;
+                FollowLineDown[i] = double.NaN;
+                return;
+            }
+
+            if (!double.IsNaN(_st[i]) && _stTrend[i] == 1.0)
+            {
+                SuperTrendUp[i] = _st[i];
+                SuperTrendDown[i] = double.NaN;
+                if (i > 0 && _stTrend[i - 1] == -1.0) SuperTrendUp[i - 1] = _st[i - 1];
+            }
+            else
+            {
+                SuperTrendDown[i] = double.IsNaN(_st[i]) ? double.NaN : _st[i];
+                SuperTrendUp[i] = double.NaN;
+                if (i > 0 && _stTrend[i - 1] == 1.0) SuperTrendDown[i - 1] = _st[i - 1];
+            }
+
+            if (!double.IsNaN(_follow[i]) && _followTrend[i] > 0.0)
+            {
+                FollowLineUp[i] = _follow[i];
+                FollowLineDown[i] = double.NaN;
+                if (i > 0 && _followTrend[i - 1] <= 0.0) FollowLineUp[i - 1] = _follow[i - 1];
+            }
+            else
+            {
+                FollowLineDown[i] = double.IsNaN(_follow[i]) ? double.NaN : _follow[i];
+                FollowLineUp[i] = double.NaN;
+                if (i > 0 && _followTrend[i - 1] > 0.0) FollowLineDown[i - 1] = _follow[i - 1];
+            }
         }
 
         private string PandaLineStatusAt(int i)

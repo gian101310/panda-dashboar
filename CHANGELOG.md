@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-07-19 (cTrader XTF BOS Panda Lines compatibility)
+
+- Corrected the private cTrader XTF/BOS source to use the same proven legacy
+  cTrader Panda Lines calculation: simple ATR(10), prior-closed-bar SuperTrend
+  switching, and retained Follow-Line direction on flat values. All four output
+  buffers now use discontinuous plotting with bridge points at colour flips,
+  preventing incorrect line connections. XTF scoring, boxes, BOS, triggers,
+  panel, licensing, APIs, and trading behaviour remain untouched.
+- Added a regression source contract for the legacy Panda Lines renderer. The
+  source requires a Windows/cTrader rebuild before a replacement `.algo` can be
+  distributed; the existing `dist` binary intentionally remains unchanged.
+
 ## 2026-07-18 (cTrader Panda XTF BOS personal indicator)
 
 - Added `panda-indicators/2026-07-18/ctrader-panda-xtf-bos/`: a brand-new private cTrader indicator (`Panda Engine Personal XTF BOS`) porting the TradingView XTF BOS script's full local calculation — 21-pair H1 day/week/month Panda Boxes drawn on chart, the 7-currency vote scoring with strongest/conflict/HARD_INVALID/gap/bias contract (thresholds 5 and 4), SuperTrend(10, 3) + BB(21, 1.0)/SMA-TR(5) Follow Line with confirmed PL flips, swing-pivot one-shot BOS with active levels, the H1/H4 Box-gated BUY/SELL triggers, and the full 13-row draggable panel including BASE/QUOTE XTF.

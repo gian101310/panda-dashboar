@@ -11,9 +11,9 @@ never publish this binary.
 - The three offset Panda Boxes (short = completed days 2-3, medium = completed
   weeks 2-3, long = completed months 2-3) built from H1 data, drawn on the
   chart with the TradingView colors (orange / green / blue).
-- Panda Lines: chart-timeframe SuperTrend (ATR 10, factor 3) and the
-  previous-bar BB(21, 1.0) / SMA-TR(5) Follow Line, with confirmed `PL+` /
-  `PL-` flip markers.
+- Panda Lines: the proven legacy cTrader simple-ATR SuperTrend (10, factor 3,
+  evaluated from the prior closed bar) and previous-bar BB(21, 1.0) /
+  SMA-TR(5) Follow Line, with confirmed `PL+` / `PL-` flip markers.
 - Confirmed one-shot Break of Structure from swing pivots (default length 5),
   with dashed active swing levels and `BOS+` / `BOS-` markers.
 - The XTF BOS signal: the selected H1/H4 Box gates a READY state, and a
@@ -50,3 +50,8 @@ in `bin/Release/net6.0/` and, when built on a machine with cTrader, is also
 installed to `~/cAlgo/Sources/Indicators` automatically. `dist/` holds the
 released binary and its SHA256SUMS. In cTrader, attach
 `Panda Engine Personal XTF BOS` to a supported pair chart (H1 recommended).
+
+> **Build required after the July 19 Panda Lines correction:** the repository
+> source now matches the legacy cTrader Panda Lines behaviour, but the checked-in
+> `dist/PandaXtfBos-Personal.algo` predates that correction. Rebuild this project
+> on Windows/cTrader before installing or distributing the corrected binary.
