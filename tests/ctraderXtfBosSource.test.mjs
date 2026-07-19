@@ -23,8 +23,9 @@ test('cTrader XTF BOS port keeps the TradingView scoring contract', () => {
 });
 
 test('cTrader XTF BOS port renders the TradingView panel rows and gates', () => {
-  for (const label of ['BIAS', 'GAP', 'BASE XTF', 'QUOTE XTF', 'XTF BOX', 'OTHER BOX', 'SIGNAL', 'BOX H1', 'BOX H4', 'PANDA LINES', 'FLIP', 'BOS'])
+  for (const label of ['BIAS', 'GAP', 'BASE XTF', 'QUOTE XTF', 'XTF BOX H1', 'XTF BOX H4', 'OTHER BOX', 'SIGNAL', 'BOX H1', 'BOX H4', 'PANDA LINES', 'FLIP', 'BOS'])
     assert.ok(source.includes(`"${label}"`), `missing panel row ${label}`);
+  assert.match(source, /StrongestExtremeLabel\(string currency, int d1, int h4, int h1\)/);
   assert.match(source, /BUY READY — WAIT BULLISH BOS/);
   assert.match(source, /SELL READY — WAIT BEARISH BOS/);
   assert.match(source, /CurrencyExtremes\(string currency, int d1, int h4, int h1\)/);
