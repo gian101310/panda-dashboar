@@ -33,7 +33,7 @@ enum PANEL_CORNER
 // ===== SCORING INPUTS =====
 input int             GapThreshold   = 5;
 input ENUM_TIMEFRAMES BoxCalcTF      = PERIOD_H1;
-input int             Box3Days       = 5;   // short box span in TRADING days (weekends skipped)
+input int             Box3Days       = 2;   // short box span in TRADING days (weekends skipped)
 input int             Box3Offset     = 1;   // short box offset in TRADING days
 input int             Box1Weeks      = 2;   // medium (weekly) box span
 input int             Box1Offset     = 1;
@@ -72,7 +72,7 @@ input int          Panel_Width  = 320;                 // panel width (px)
 input int          Panel_FontSize  = 9;
 input color        Panel_BgColor   = C'12,17,28';      // panel background
 input color        Panel_BorderColor = C'0,180,255';   // panel border
-input bool         ShowScoreGrid   = false;            // show all 7-currency D1/H4/H1 grid
+input bool         ShowScoreGrid   = true;             // show all 7-currency D1/H4/H1 grid
 input color Panel_TitleColor= C'0,180,255';
 input color Panel_BuyColor  = C'0,255,159';
 input color Panel_SellColor = C'255,77,109';
