@@ -69,6 +69,7 @@ input int          Panel_Width  = 320;                 // panel width (px)
 input int          Panel_FontSize  = 9;
 input color        Panel_BgColor   = C'12,17,28';      // panel background
 input color        Panel_BorderColor = C'0,180,255';   // panel border
+input bool         ShowScoreGrid   = false;            // show all 7-currency D1/H4/H1 grid
 input color Panel_TitleColor= C'0,180,255';
 input color Panel_BuyColor  = C'0,255,159';
 input color Panel_SellColor = C'255,77,109';
@@ -744,6 +745,15 @@ color StatusColor(const string v)
    return(Panel_TextColor);
 }
 
+color CellColor(const int v)
+{
+   if(v >= 4)  return(Panel_BuyColor);
+   if(v <= -4) return(Panel_SellColor);
+   if(v > 0)   return(C'0,150,90');
+   if(v < 0)   return(C'150,60,80');
+   return(Panel_LabelColor);
+}
+
 void PanelLabel(const string nm, const int x, const int y, const string txt, const color clr)
 {
    if(ObjectFind(0, nm) < 0) ObjectCreate(0, nm, OBJ_LABEL, 0, 0, 0);
@@ -790,6 +800,7 @@ void DrawPanel()
    if(!Panel_Show) { ObjectsDeleteAll(0, PANEL); return; }
 
    int N = 13;
+   if(ShowScoreGrid) N += 9;   // spacer + header + 7 currencies
    _rowH = Panel_FontSize + 8;
    int H  = N * _rowH + 12;
    int cw = (int)ChartGetInteger(0, CHART_WIDTH_IN_PIXELS, 0);
@@ -820,6 +831,24 @@ void DrawPanel()
    PanelRow(r++, "PANDA LINES", PLZone,       StatusColor(PLZone));
    PanelRow(r++, "FLIP",        LatestFlip,   StatusColor(LatestFlip));
    PanelRow(r++, "BOS",         LatestBos,    StatusColor(LatestBos));
+
+   if(ShowScoreGrid)
+   {
+      r++;  // spacer row
+      int hy = _pTop + 6 + r * _rowH; r++;
+      PanelLabel(PANEL + "gh0", _pLeft + 8,   hy, "CURRENCY", Panel_TitleColor);
+      PanelLabel(PANEL + "gh1", _pLeft + 130, hy, "D1", Panel_TitleColor);
+      PanelLabel(PANEL + "gh2", _pLeft + 190, hy, "H4", Panel_TitleColor);
+      PanelLabel(PANEL + "gh3", _pLeft + 250, hy, "H1", Panel_TitleColor);
+      for(int ci = 0; ci < 7; ci++)
+      {
+         int gy = _pTop + 6 + r * _rowH; r++;
+         PanelLabel(PANEL + "gc" + IntegerToString(ci), _pLeft + 8,   gy, Currencies[ci],       Panel_TextColor);
+         PanelLabel(PANEL + "gd" + IntegerToString(ci), _pLeft + 130, gy, SignedInt(ScoresD1[ci]), CellColor(ScoresD1[ci]));
+         PanelLabel(PANEL + "ge" + IntegerToString(ci), _pLeft + 190, gy, SignedInt(ScoresH4[ci]), CellColor(ScoresH4[ci]));
+         PanelLabel(PANEL + "gf" + IntegerToString(ci), _pLeft + 250, gy, SignedInt(ScoresH1[ci]), CellColor(ScoresH1[ci]));
+      }
+   }
 }
 
 //+------------------------------------------------------------------+
