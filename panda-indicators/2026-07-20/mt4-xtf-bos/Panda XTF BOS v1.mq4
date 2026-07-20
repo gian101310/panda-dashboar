@@ -19,6 +19,13 @@
 #property indicator_width4 2
 
 enum ENUM_XTF { XTF_H1 = 0, XTF_H4 = 1 };
+enum PANEL_CORNER
+{
+   PANEL_BOTTOM_LEFT  = 0,  // Bottom left
+   PANEL_BOTTOM_RIGHT = 1,  // Bottom right
+   PANEL_TOP_LEFT     = 2,  // Top left
+   PANEL_TOP_RIGHT    = 3   // Top right
+};
 
 // ===== SCORING INPUTS =====
 input int             GapThreshold   = 5;
@@ -54,10 +61,14 @@ input bool   AlertPopup   = true;
 input bool   AlertSound   = true;
 
 // ===== PANEL INPUTS =====
-input bool  Panel_Show      = true;
-input int   Panel_X         = 16;
-input int   Panel_Y         = 16;
-input int   Panel_FontSize  = 9;
+input bool         Panel_Show   = true;
+input PANEL_CORNER PanelCorner  = PANEL_BOTTOM_LEFT;   // panel position
+input int          Panel_X      = 16;                  // margin from corner (px)
+input int          Panel_Y      = 16;                  // margin from corner (px)
+input int          Panel_Width  = 320;                 // panel width (px)
+input int          Panel_FontSize  = 9;
+input color        Panel_BgColor   = C'12,17,28';      // panel background
+input color        Panel_BorderColor = C'0,180,255';   // panel border
 input color Panel_TitleColor= C'0,180,255';
 input color Panel_BuyColor  = C'0,255,159';
 input color Panel_SellColor = C'255,77,109';
@@ -131,6 +142,9 @@ string SignalStatus  = "NO SETUP";
 
 string OBJ   = "PXB1_";
 string PANEL = "PXB1p_";
+int    _pLeft = 0;
+int    _pTop  = 0;
+int    _rowH  = 17;
 
 //+------------------------------------------------------------------+
 //| Init / Deinit                                                     |
@@ -730,51 +744,82 @@ color StatusColor(const string v)
    return(Panel_TextColor);
 }
 
-void PanelLine(const int row, const string label, const string value, const color valClr)
+void PanelLabel(const string nm, const int x, const int y, const string txt, const color clr)
 {
-   int y = Panel_Y + row * (Panel_FontSize + 7);
-   string ln1 = PANEL + "l" + IntegerToString(row);
-   string ln2 = PANEL + "v" + IntegerToString(row);
-   if(ObjectFind(0, ln1) < 0) ObjectCreate(0, ln1, OBJ_LABEL, 0, 0, 0);
-   ObjectSetInteger(0, ln1, OBJPROP_CORNER, CORNER_LEFT_LOWER);
-   ObjectSetInteger(0, ln1, OBJPROP_ANCHOR, ANCHOR_LEFT_LOWER);
-   ObjectSetInteger(0, ln1, OBJPROP_XDISTANCE, Panel_X);
-   ObjectSetInteger(0, ln1, OBJPROP_YDISTANCE, y);
-   ObjectSetInteger(0, ln1, OBJPROP_COLOR, Panel_LabelColor);
-   ObjectSetInteger(0, ln1, OBJPROP_FONTSIZE, Panel_FontSize);
-   ObjectSetString(0, ln1, OBJPROP_FONT, "Consolas");
-   ObjectSetString(0, ln1, OBJPROP_TEXT, label);
-   if(ObjectFind(0, ln2) < 0) ObjectCreate(0, ln2, OBJ_LABEL, 0, 0, 0);
-   ObjectSetInteger(0, ln2, OBJPROP_CORNER, CORNER_LEFT_LOWER);
-   ObjectSetInteger(0, ln2, OBJPROP_ANCHOR, ANCHOR_LEFT_LOWER);
-   ObjectSetInteger(0, ln2, OBJPROP_XDISTANCE, Panel_X + 118);
-   ObjectSetInteger(0, ln2, OBJPROP_YDISTANCE, y);
-   ObjectSetInteger(0, ln2, OBJPROP_COLOR, valClr);
-   ObjectSetInteger(0, ln2, OBJPROP_FONTSIZE, Panel_FontSize);
-   ObjectSetString(0, ln2, OBJPROP_FONT, "Consolas");
-   ObjectSetString(0, ln2, OBJPROP_TEXT, value);
+   if(ObjectFind(0, nm) < 0) ObjectCreate(0, nm, OBJ_LABEL, 0, 0, 0);
+   ObjectSetInteger(0, nm, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   ObjectSetInteger(0, nm, OBJPROP_ANCHOR, ANCHOR_LEFT_UPPER);
+   ObjectSetInteger(0, nm, OBJPROP_XDISTANCE, x);
+   ObjectSetInteger(0, nm, OBJPROP_YDISTANCE, y);
+   ObjectSetInteger(0, nm, OBJPROP_COLOR, clr);
+   ObjectSetInteger(0, nm, OBJPROP_FONTSIZE, Panel_FontSize);
+   ObjectSetInteger(0, nm, OBJPROP_BACK, false);
+   ObjectSetInteger(0, nm, OBJPROP_SELECTABLE, false);
+   ObjectSetString(0, nm, OBJPROP_FONT, "Consolas");
+   ObjectSetString(0, nm, OBJPROP_TEXT, txt);
+}
+
+// One panel row (label + value), positioned from the computed panel origin.
+void PanelRow(const int r, const string label, const string value, const color clr)
+{
+   int y = _pTop + 6 + r * _rowH;
+   color lblClr = (r == 0) ? Panel_TitleColor : Panel_LabelColor;
+   PanelLabel(PANEL + "l" + IntegerToString(r), _pLeft + 8,   y, label, lblClr);
+   PanelLabel(PANEL + "v" + IntegerToString(r), _pLeft + 132, y, value, clr);
+}
+
+void DrawPanelBg(const int H)
+{
+   string bg = PANEL + "bg";
+   if(ObjectFind(0, bg) < 0) ObjectCreate(0, bg, OBJ_RECTANGLE_LABEL, 0, 0, 0);
+   ObjectSetInteger(0, bg, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   ObjectSetInteger(0, bg, OBJPROP_XDISTANCE, _pLeft);
+   ObjectSetInteger(0, bg, OBJPROP_YDISTANCE, _pTop);
+   ObjectSetInteger(0, bg, OBJPROP_XSIZE, Panel_Width);
+   ObjectSetInteger(0, bg, OBJPROP_YSIZE, H);
+   ObjectSetInteger(0, bg, OBJPROP_BGCOLOR, Panel_BgColor);
+   ObjectSetInteger(0, bg, OBJPROP_BORDER_TYPE, BORDER_FLAT);
+   ObjectSetInteger(0, bg, OBJPROP_COLOR, Panel_BorderColor);
+   ObjectSetInteger(0, bg, OBJPROP_WIDTH, 1);
+   ObjectSetInteger(0, bg, OBJPROP_BACK, false);
+   ObjectSetInteger(0, bg, OBJPROP_SELECTABLE, false);
 }
 
 void DrawPanel()
 {
    if(!Panel_Show) { ObjectsDeleteAll(0, PANEL); return; }
+
+   int N = 13;
+   _rowH = Panel_FontSize + 8;
+   int H  = N * _rowH + 12;
+   int cw = (int)ChartGetInteger(0, CHART_WIDTH_IN_PIXELS, 0);
+   int ch = (int)ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS, 0);
+   bool isRight  = (PanelCorner == PANEL_BOTTOM_RIGHT || PanelCorner == PANEL_TOP_RIGHT);
+   bool isBottom = (PanelCorner == PANEL_BOTTOM_LEFT  || PanelCorner == PANEL_BOTTOM_RIGHT);
+   _pLeft = isRight  ? (cw - Panel_X - Panel_Width) : Panel_X;
+   _pTop  = isBottom ? (ch - Panel_Y - H)           : Panel_Y;
+   if(_pLeft < 0) _pLeft = 0;
+   if(_pTop  < 0) _pTop  = 0;
+
+   DrawPanelBg(H);
+
    string gapTxt  = HardInvalid ? "0" : (MainGap > 0 ? "+" + IntegerToString(MainGap) : IntegerToString(MainGap));
    string xtfName = (XtfStructure == XTF_H4) ? "H4" : "H1";
    string xtfBox  = (XtfStructure == XTF_H4) ? BoxH4Trend : BoxH1Trend;
-   int r = 13;
-   PanelLine(r--, "PANDA XTF BOS", CurrentPair == "" ? Symbol() : CurrentPair, Panel_TitleColor);
-   PanelLine(r--, "BIAS",        MainBias,     StatusColor(MainBias));
-   PanelLine(r--, "GAP",         gapTxt,       StatusColor(gapTxt));
-   PanelLine(r--, "BASE XTF",    BaseXtfText,  Panel_TextColor);
-   PanelLine(r--, "QUOTE XTF",   QuoteXtfText, Panel_TextColor);
-   PanelLine(r--, "XTF " + xtfName,   XtfSummary, Panel_TextColor);
-   PanelLine(r--, "XTF BOX " + xtfName, xtfBox,   StatusColor(xtfBox));
-   PanelLine(r--, "SIGNAL",      SignalStatus, StatusColor(SignalStatus));
-   PanelLine(r--, "BOX H1",      BoxH1Trend,   StatusColor(BoxH1Trend));
-   PanelLine(r--, "BOX H4",      BoxH4Trend,   StatusColor(BoxH4Trend));
-   PanelLine(r--, "PANDA LINES", PLZone,       StatusColor(PLZone));
-   PanelLine(r--, "FLIP",        LatestFlip,   StatusColor(LatestFlip));
-   PanelLine(r--, "BOS",         LatestBos,    StatusColor(LatestBos));
+   int r = 0;
+   PanelRow(r++, "PANDA XTF BOS", CurrentPair == "" ? Symbol() : CurrentPair, Panel_TitleColor);
+   PanelRow(r++, "BIAS",        MainBias,     StatusColor(MainBias));
+   PanelRow(r++, "GAP",         gapTxt,       StatusColor(gapTxt));
+   PanelRow(r++, "BASE XTF",    BaseXtfText,  Panel_TextColor);
+   PanelRow(r++, "QUOTE XTF",   QuoteXtfText, Panel_TextColor);
+   PanelRow(r++, "XTF " + xtfName,   XtfSummary, Panel_TextColor);
+   PanelRow(r++, "XTF BOX " + xtfName, xtfBox,   StatusColor(xtfBox));
+   PanelRow(r++, "SIGNAL",      SignalStatus, StatusColor(SignalStatus));
+   PanelRow(r++, "BOX H1",      BoxH1Trend,   StatusColor(BoxH1Trend));
+   PanelRow(r++, "BOX H4",      BoxH4Trend,   StatusColor(BoxH4Trend));
+   PanelRow(r++, "PANDA LINES", PLZone,       StatusColor(PLZone));
+   PanelRow(r++, "FLIP",        LatestFlip,   StatusColor(LatestFlip));
+   PanelRow(r++, "BOS",         LatestBos,    StatusColor(LatestBos));
 }
 
 //+------------------------------------------------------------------+
