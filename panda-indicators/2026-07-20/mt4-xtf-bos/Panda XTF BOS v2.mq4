@@ -654,8 +654,9 @@ void DrawBox(const string tag, const bool valid, const datetime st, const dateti
    ObjectSetDouble(0, nm, OBJPROP_PRICE2, lo);
    ObjectSetInteger(0, nm, OBJPROP_COLOR, clr);
    ObjectSetInteger(0, nm, OBJPROP_BACK, true);
-   ObjectSetInteger(0, nm, OBJPROP_FILL, false);
-   ObjectSetInteger(0, nm, OBJPROP_WIDTH, 1);
+   ObjectSetInteger(0, nm, OBJPROP_FILL, true);
+   ObjectSetInteger(0, nm, OBJPROP_WIDTH, 2);
+   ObjectSetInteger(0, nm, OBJPROP_STYLE, STYLE_SOLID);
 }
 
 void DrawBoxes()
