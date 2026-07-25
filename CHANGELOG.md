@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-07-25 (Dashboard left-sidebar navigation)
+
+- Redesigned dashboard.js navigation: the 14 tabs (plus admin ENGINE) moved from
+  the horizontal scrolling bar into a persistent vertical left sidebar with icons
+  and active-state highlighting, so every tab is visible at once.
+- Desktop: sticky sidebar beside a flex main column. Mobile (<768px): sidebar
+  becomes a drawer that slides in from a new ☰ header button, with a tap-to-close
+  backdrop; picking a tab auto-closes it.
+- Panels/Table filter+search+sort controls kept as a slim bar above content.
+- Purely presentational/layout change — no scoring, data, tab logic, or feature
+  gating touched. Build + 218/218 JS tests + check_dupes all green.
+
 ## 2026-07-19 (cTrader XTF BOS Panda Lines compatibility)
 
 - Corrected the private cTrader XTF/BOS source to use the same proven legacy

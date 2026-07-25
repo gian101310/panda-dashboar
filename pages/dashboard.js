@@ -3617,8 +3617,10 @@ export default function Dashboard() {
   // URL-synced tab state
   const urlTab = typeof router.query.tab === 'string' ? router.query.tab.toUpperCase().replace(/-/g,' ') : null;
   const [tab, setTabRaw] = useState(urlTab && ALL_TABS_SET.has(urlTab) ? urlTab : 'OVERVIEW');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const setTab = useCallback((t) => {
     setTabRaw(t);
+    setSidebarOpen(false);
     const slug = t.toLowerCase().replace(/\s+/g, '-');
     router.replace({ pathname: '/dashboard', query: { tab: slug } }, undefined, { shallow: true });
   }, [router]);
@@ -3853,6 +3855,7 @@ export default function Dashboard() {
         {/* HEADER */}
         <header style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:isMobile?'8px 12px':'10px 20px',background:'var(--bg-secondary)',borderBottom:'1px solid var(--border)',position:'sticky',top:0,zIndex:100,flexWrap:isMobile?'wrap':'nowrap',gap:isMobile?8:0}}>
           <div style={{display:'flex',alignItems:'center',gap:10}}>
+            {isMobile&&<button onClick={()=>setSidebarOpen(o=>!o)} aria-label="Menu" style={{background:'rgba(0,180,255,0.08)',border:'1px solid #1e3060',borderRadius:6,color:'#00b4ff',fontSize:16,lineHeight:1,padding:'4px 9px',cursor:'pointer'}}>☰</button>}
             <span style={{fontSize:isMobile?18:22}}>🐼</span>
             <div><div style={{fontFamily:orb,fontWeight:900,fontSize:isMobile?11:13,letterSpacing:isMobile?2:4,color:'#00ff9f'}}>PANDA ENGINE</div>{!isMobile&&<div style={{fontFamily:mono,fontSize:8,letterSpacing:3,color:'var(--text-muted)'}}>FOREX INTELLIGENCE · {isMarketOpen()?'LIVE':'MARKET CLOSED'}</div>}</div>
           </div>
@@ -3875,6 +3878,31 @@ export default function Dashboard() {
             <button onClick={handleLogout} style={{background:'transparent',border:'1px solid #2a1525',borderRadius:5,color:'#ff4d6d',fontFamily:mono,fontSize:9,padding:'5px 10px',cursor:'pointer'}}>LOGOUT</button>
           </div>
         </header>
+
+        {/* ===== BODY: SIDEBAR + MAIN ===== */}
+        <div style={{display:'flex',flex:1,position:'relative',zIndex:1,minHeight:0}}>
+
+          {/* Mobile drawer backdrop */}
+          {isMobile&&sidebarOpen&&(
+            <div onClick={()=>setSidebarOpen(false)} style={{position:'fixed',inset:0,zIndex:89,background:'rgba(0,0,0,0.5)',backdropFilter:'blur(2px)'}}/>
+          )}
+
+          {/* SIDEBAR NAV */}
+          <aside style={isMobile
+            ?{position:'fixed',top:0,left:0,bottom:0,width:230,zIndex:90,background:'var(--bg-secondary)',borderRight:'1px solid var(--border)',padding:'58px 10px 16px',display:'flex',flexDirection:'column',gap:4,transform:sidebarOpen?'translateX(0)':'translateX(-105%)',transition:'transform 0.25s ease',boxShadow:sidebarOpen?'4px 0 24px rgba(0,0,0,0.5)':'none',overflowY:'auto'}
+            :{width:190,flexShrink:0,background:'var(--bg-secondary)',borderRight:'1px solid var(--border)',padding:'14px 8px',display:'flex',flexDirection:'column',gap:3,alignSelf:'stretch',position:'sticky',top:0,maxHeight:'100vh',overflowY:'auto'}}>
+            <div style={{fontFamily:mono,fontSize:8,letterSpacing:3,color:'var(--text-muted)',padding:'2px 12px 8px'}}>NAVIGATION</div>
+            {(()=>{const ICON={'OVERVIEW':'🏠','PANELS':'🧩','SIGNALS':'📡','TABLE':'📋','GAP CHART':'📈','RESEARCH':'🔬','CALCULATOR':'🧮','SETUPS':'🎯','VALID PAIRS':'✅','CHART':'📉','ANALYTICS':'📊','SHADOW':'🌑','LOGS':'📜','PANDA AI':'🐼','ENGINE':'🏥'};
+            const items=TABS.filter(t=>{ const feat=TAB_FEATURE[t]; if(!feat) return true; if(isAdmin) return true; const fa=user?.feature_access||[]; if(t==='SHADOW') return fa.includes('shadow'); return fa.includes(feat)||fa.includes('dashboard');});
+            const navStyle=(t,active,accent)=>({display:'flex',alignItems:'center',gap:9,background:active?(accent==='#ffd166'?'rgba(255,209,102,0.12)':'rgba(0,180,255,0.12)'):'transparent',borderLeft:`3px solid ${active?accent:'transparent'}`,color:active?accent:'#c8ddf0',fontFamily:mono,fontSize:10,fontWeight:active?700:500,letterSpacing:1.5,padding:'9px 11px',borderRadius:6,cursor:'pointer',textDecoration:'none',whiteSpace:'nowrap'});
+            return(<>
+              {items.map(t=>(<a key={t} href={`/dashboard?tab=${t.toLowerCase().replace(/\s+/g,'-')}`} onClick={(e)=>{e.preventDefault();setTab(t);}} style={navStyle(t,tab===t,'#00b4ff')}><span style={{fontSize:12,width:16,textAlign:'center'}}>{ICON[t]||'▸'}</span>{t}</a>))}
+              {isAdmin&&<a href="/dashboard?tab=engine" onClick={(e)=>{e.preventDefault();setTab('ENGINE');}} style={{...navStyle('ENGINE',tab==='ENGINE','#ffd166'),marginTop:6,borderTop:'1px solid var(--border)',paddingTop:12,borderRadius:0}}><span style={{fontSize:12,width:16,textAlign:'center'}}>{ICON['ENGINE']}</span>ENGINE</a>}
+            </>);})()}
+          </aside>
+
+          {/* MAIN COLUMN */}
+          <div style={{flex:1,display:'flex',flexDirection:'column',minWidth:0}}>
 
         {/* PAGE VISIBILITY TOGGLE — ADMIN ONLY */}
         {isAdmin&&showPageVis&&pageVis&&(()=>{
@@ -3970,24 +3998,18 @@ export default function Dashboard() {
           <MomentumHeatmap data={data} visible={prefs?.heatmap_visible!==false} onToggle={toggleHeatmap}/>
         )}
 
-        {/* TABS */}
-        <div style={{display:'flex',alignItems:'center',gap:7,padding:isMobile?'0 12px 10px':'0 20px 10px',flexWrap:'nowrap',overflowX:'auto',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',zIndex:1}}>
-          <div style={{display:'flex',background:'var(--bg-secondary)',border:'1px solid var(--border)',borderRadius:7,overflow:'visible',flexShrink:0}}>
-            {TABS.filter(t=>{ const feat=TAB_FEATURE[t]; if(!feat) return true; if(isAdmin) return true; const fa=user?.feature_access||[]; if(t==='SHADOW') return fa.includes('shadow'); return fa.includes(feat)||fa.includes('dashboard');}).map((t,i,arr)=><a key={t} href={`/dashboard?tab=${t.toLowerCase().replace(/\s+/g,'-')}`} onClick={(e)=>{e.preventDefault();setTab(t);}} style={{background:tab===t?'rgba(0,180,255,0.15)':'rgba(255,255,255,0.03)',border:'none',borderRight:i<TABS.length-1?'1px solid var(--border)':'none',color:tab===t?'#00b4ff':'#c8ddf0',fontFamily:mono,fontSize:9,fontWeight:tab===t?700:500,letterSpacing:2,padding:'7px 12px',cursor:'pointer',whiteSpace:'nowrap',textDecoration:'none',display:'inline-block'}}>{t}</a>)}
-            {isAdmin&&<a href="/dashboard?tab=engine" onClick={(e)=>{e.preventDefault();setTab('ENGINE');}} style={{background:tab==='ENGINE'?'rgba(255,209,102,0.15)':'rgba(255,255,255,0.03)',border:'none',borderLeft:'1px solid var(--border)',color:tab==='ENGINE'?'#ffd166':'#c8ddf0',fontFamily:mono,fontSize:9,fontWeight:tab==='ENGINE'?700:500,letterSpacing:2,padding:'7px 12px',cursor:'pointer',textDecoration:'none',display:'inline-block'}}>🏥 ENGINE</a>}
+        {/* FILTERS BAR (Panels/Table only) */}
+        {['PANELS','TABLE'].includes(tab)&&(
+          <div style={{display:'flex',alignItems:'center',gap:7,padding:isMobile?'0 12px 10px':'0 20px 10px',flexWrap:'nowrap',overflowX:'auto',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',zIndex:1}}>
+            <div style={{display:'flex',gap:4}}>
+              {FILTERS.map(f=><button key={f} onClick={()=>setFilter(f)} style={{background:filter===f?(f==='⚠️ CLOSE'?'rgba(255,77,109,0.12)':'rgba(0,180,255,0.1)'):'transparent',border:`1px solid ${filter===f?(f==='⚠️ CLOSE'?'#ff4d6d':'#00b4ff'):'var(--border)'}`,borderRadius:5,color:filter===f?(f==='⚠️ CLOSE'?'#ff4d6d':'#00b4ff'):'var(--text-muted)',fontFamily:mono,fontSize:9,letterSpacing:1,padding:'5px 9px',cursor:'pointer'}}>{f}</button>)}
+            </div>
+            <input style={{background:'var(--bg-secondary)',border:'1px solid var(--border)',borderRadius:5,padding:'6px 10px',color:'var(--text-primary)',fontFamily:raj,fontSize:13,flex:1,minWidth:120}} placeholder="🔍 SEARCH..." value={search} onChange={e=>setSearch(e.target.value)}/>
+            <select style={{background:'var(--bg-secondary)',border:'1px solid var(--border)',borderRadius:5,padding:'6px 10px',color:'var(--text-secondary)',fontFamily:mono,fontSize:9,cursor:'pointer'}} value={sort} onChange={e=>setSort(e.target.value)}>
+              {SORTS.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
           </div>
-          {['PANELS','TABLE'].includes(tab)&&(
-            <>
-              <div style={{display:'flex',gap:4}}>
-                {FILTERS.map(f=><button key={f} onClick={()=>setFilter(f)} style={{background:filter===f?(f==='⚠️ CLOSE'?'rgba(255,77,109,0.12)':'rgba(0,180,255,0.1)'):'transparent',border:`1px solid ${filter===f?(f==='⚠️ CLOSE'?'#ff4d6d':'#00b4ff'):'var(--border)'}`,borderRadius:5,color:filter===f?(f==='⚠️ CLOSE'?'#ff4d6d':'#00b4ff'):'var(--text-muted)',fontFamily:mono,fontSize:9,letterSpacing:1,padding:'5px 9px',cursor:'pointer'}}>{f}</button>)}
-              </div>
-              <input style={{background:'var(--bg-secondary)',border:'1px solid var(--border)',borderRadius:5,padding:'6px 10px',color:'var(--text-primary)',fontFamily:raj,fontSize:13,flex:1,minWidth:120}} placeholder="🔍 SEARCH..." value={search} onChange={e=>setSearch(e.target.value)}/>
-              <select style={{background:'var(--bg-secondary)',border:'1px solid var(--border)',borderRadius:5,padding:'6px 10px',color:'var(--text-secondary)',fontFamily:mono,fontSize:9,cursor:'pointer'}} value={sort} onChange={e=>setSort(e.target.value)}>
-                {SORTS.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-            </>
-          )}
-        </div>
+        )}
 
         {/* CONTENT */}
         <div style={{flex:1,padding:isMobile?'0 10px 16px':'0 20px 20px',zIndex:1}}>
@@ -4177,6 +4199,8 @@ export default function Dashboard() {
         <div style={{fontFamily:mono,fontSize:9,letterSpacing:2,color:'var(--text-muted)',textAlign:'center',padding:'8px 20px',borderTop:'1px solid var(--border)',zIndex:1}}>
           PANDA ENGINE · 15s REFRESH · {displayed.length} PAIRS{closeAlerts>0?` · ⚠️ ${closeAlerts} ALERT${closeAlerts>1?'S':''}`:''}
         </div>
+          </div>{/* /main column */}
+        </div>{/* /body flex row */}
       </div>
       <style>{`
         @keyframes spin{to{transform:rotate(360deg);}}
