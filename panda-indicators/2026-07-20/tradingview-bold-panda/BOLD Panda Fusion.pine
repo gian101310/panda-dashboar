@@ -1,0 +1,972 @@
+//@version=6
+indicator("BOLD + Panda Bias Fusion", shorttitle = "BOLD PANDA", overlay = true, dynamic_requests = true, calc_bars_count = 1800, max_lines_count = 500, max_labels_count = 500, max_boxes_count = 200)
+
+// =================================================================
+// BOLD + Panda Bias Fusion
+// BOLD opening-range / liquidity-sweep engine, gated by the Panda
+// 21-pair currency-strength bias. Longs only when Panda = BUY,
+// shorts only when Panda = SELL. Scoring block is display-free.
+// =================================================================
+const int PANDA_GAP_THRESHOLD = 5
+const int PANDA_SIGNIFICANT = 4
+
+// ---- Panda currency-strength scoring (compute only) ----
+var array<string> PANDA_PAIRS = array.from(
+  "AUDCAD", "AUDJPY", "AUDNZD", "AUDUSD", "CADJPY",
+  "EURAUD", "EURCAD", "EURGBP", "EURJPY", "EURNZD", "EURUSD",
+  "GBPAUD", "GBPCAD", "GBPJPY", "GBPNZD", "GBPUSD",
+  "NZDCAD", "NZDJPY", "NZDUSD", "USDCAD", "USDJPY")
+
+type PairSnapshot
+    float price
+    float shortHigh
+    float shortLow
+    int shortStart
+    int shortEnd
+    float mediumHigh
+    float mediumLow
+    int mediumStart
+    int mediumEnd
+    float longHigh
+    float longLow
+    int longStart
+    int longEnd
+
+f_snapshot() =>
+    var float dayHigh = na
+    var float dayLow = na
+    var int dayStart = na
+    var float d1High = na
+    var float d1Low = na
+    var int d1Start = na
+    var float d2High = na
+    var float d2Low = na
+    var int d2Start = na
+    var float d3High = na
+    var float d3Low = na
+    var int d3Start = na
+    if na(dayHigh)
+        dayHigh := high
+        dayLow := low
+        dayStart := time
+    else if timeframe.change("1D")
+        d3High := d2High
+        d3Low := d2Low
+        d3Start := d2Start
+        d2High := d1High
+        d2Low := d1Low
+        d2Start := d1Start
+        d1High := dayHigh
+        d1Low := dayLow
+        d1Start := dayStart
+        dayHigh := high
+        dayLow := low
+        dayStart := time
+    else
+        dayHigh := math.max(dayHigh, high)
+        dayLow := math.min(dayLow, low)
+
+    var float weekHigh = na
+    var float weekLow = na
+    var int weekStart = na
+    var float w1High = na
+    var float w1Low = na
+    var int w1Start = na
+    var float w2High = na
+    var float w2Low = na
+    var int w2Start = na
+    var float w3High = na
+    var float w3Low = na
+    var int w3Start = na
+    if na(weekHigh)
+        weekHigh := high
+        weekLow := low
+        weekStart := time
+    else if timeframe.change("1W")
+        w3High := w2High
+        w3Low := w2Low
+        w3Start := w2Start
+        w2High := w1High
+        w2Low := w1Low
+        w2Start := w1Start
+        w1High := weekHigh
+        w1Low := weekLow
+        w1Start := weekStart
+        weekHigh := high
+        weekLow := low
+        weekStart := time
+    else
+        weekHigh := math.max(weekHigh, high)
+        weekLow := math.min(weekLow, low)
+
+    var float monthHigh = na
+    var float monthLow = na
+    var int monthStart = na
+    var float m1High = na
+    var float m1Low = na
+    var int m1Start = na
+    var float m2High = na
+    var float m2Low = na
+    var int m2Start = na
+    var float m3High = na
+    var float m3Low = na
+    var int m3Start = na
+    if na(monthHigh)
+        monthHigh := high
+        monthLow := low
+        monthStart := time
+    else if timeframe.change("1M")
+        m3High := m2High
+        m3Low := m2Low
+        m3Start := m2Start
+        m2High := m1High
+        m2Low := m1Low
+        m2Start := m1Start
+        m1High := monthHigh
+        m1Low := monthLow
+        m1Start := monthStart
+        monthHigh := high
+        monthLow := low
+        monthStart := time
+    else
+        monthHigh := math.max(monthHigh, high)
+        monthLow := math.min(monthLow, low)
+
+    PairSnapshot.new(close,
+      math.max(d2High, d3High), math.min(d2Low, d3Low), d3Start, d1Start,
+      math.max(w2High, w3High), math.min(w2Low, w3Low), w3Start, w1Start,
+      math.max(m2High, m3High), math.min(m2Low, m3Low), m3Start, m1Start)
+
+f_currency_index(string currency) =>
+    switch currency
+        "AUD" => 0
+        "CAD" => 1
+        "EUR" => 2
+        "GBP" => 3
+        "JPY" => 4
+        "NZD" => 5
+        "USD" => 6
+        => -1
+
+f_canonical_pair() =>
+    string metadataPair = str.upper(syminfo.basecurrency + syminfo.currency)
+    if array.includes(PANDA_PAIRS, metadataPair)
+        metadataPair
+    else
+        string tickerText = str.upper(syminfo.ticker)
+        string matched = ""
+        int matchCount = 0
+        for candidate in PANDA_PAIRS
+            if str.contains(tickerText, candidate)
+                matched := candidate
+                matchCount += 1
+        matchCount == 1 ? matched : ""
+
+f_vote(float priceValue, float boxHigh, float boxLow) =>
+    na(priceValue) or na(boxHigh) or na(boxLow) ? 0 : priceValue > boxHigh ? 1 : priceValue < boxLow ? -1 : 0
+
+f_add_vote(array<int> target, string currency, int vote) =>
+    int index = f_currency_index(currency)
+    if index >= 0
+        array.set(target, index, array.get(target, index) + vote)
+
+f_add_pair_vote(array<int> target, string pair, int vote) =>
+    string base = str.substring(pair, 0, 3)
+    string quote = str.substring(pair, 3, 6)
+    f_add_vote(target, base, vote)
+    f_add_vote(target, quote, -vote)
+
+f_strongest(int d1, int h4, int h1) =>
+    int positive = math.max(0, math.max(d1, math.max(h4, h1)))
+    int negative = math.min(0, math.min(d1, math.min(h4, h1)))
+    math.abs(positive) == math.abs(negative) ? 0 : math.abs(negative) > math.abs(positive) ? negative : positive
+
+f_conflicted(array<int> dailyScores, array<int> weeklyScores, array<int> monthlyScores, int index) =>
+    int d1 = array.get(monthlyScores, index)
+    int h4 = array.get(weeklyScores, index)
+    int h1 = array.get(dailyScores, index)
+    bool hasPositive = d1 >= PANDA_SIGNIFICANT or h4 >= PANDA_SIGNIFICANT or h1 >= PANDA_SIGNIFICANT
+    bool hasNegative = d1 <= -PANDA_SIGNIFICANT or h4 <= -PANDA_SIGNIFICANT or h1 <= -PANDA_SIGNIFICANT
+    hasPositive and hasNegative
+
+f_box_trend(float formerHigh, float formerLow, float latterHigh, float latterLow) =>
+    if na(formerHigh) or na(formerLow) or na(latterHigh) or na(latterLow)
+        "UNKNOWN"
+    else
+        float latterMidpoint = (latterHigh + latterLow) / 2.0
+        latterMidpoint >= formerHigh ? "UPTREND" : latterMidpoint <= formerLow ? "DOWNTREND" : "RANGING"
+
+f_score(array<int> target, int index) =>
+    array.get(target, index)
+
+f_signed_score(int value) =>
+    value > 0 ? "+" + str.tostring(value) : str.tostring(value)
+
+// Mirrors the dashboard's base_score_tf / quote_score_tf display rule:
+// retain every D1, H4, or H1 value whose absolute score is at least 4.
+f_currency_extremes(string currency, int d1, int h4, int h1) =>
+    string values = ""
+    if math.abs(d1) >= PANDA_SIGNIFICANT
+        values := "D1 " + f_signed_score(d1)
+    if math.abs(h4) >= PANDA_SIGNIFICANT
+        values := values == "" ? "H4 " + f_signed_score(h4) : values + " · H4 " + f_signed_score(h4)
+    if math.abs(h1) >= PANDA_SIGNIFICANT
+        values := values == "" ? "H1 " + f_signed_score(h1) : values + " · H1 " + f_signed_score(h1)
+    currency + ": " + (values == "" ? "NONE" : values)
+
+string chartPair = f_canonical_pair()
+bool supportedPair = chartPair != ""
+
+var array<int> scoresH1 = array.new_int(7, 0)
+var array<int> scoresH4 = array.new_int(7, 0)
+var array<int> scoresD1 = array.new_int(7, 0)
+array.fill(scoresH1, 0)
+array.fill(scoresH4, 0)
+array.fill(scoresD1, 0)
+
+PairSnapshot activeSnapshot = na
+int readySnapshots = 0
+
+for pair in PANDA_PAIRS
+    PairSnapshot snapshot = request.security("OANDA:" + pair, "60", f_snapshot(),
+      ignore_invalid_symbol = true, calc_bars_count = 1800)
+    bool snapshotReady = not na(snapshot) and not na(snapshot.price)
+      and not na(snapshot.shortHigh) and not na(snapshot.shortLow)
+      and not na(snapshot.mediumHigh) and not na(snapshot.mediumLow)
+      and not na(snapshot.longHigh) and not na(snapshot.longLow)
+    if snapshotReady
+        readySnapshots += 1
+        f_add_pair_vote(scoresH1, pair, f_vote(snapshot.price, snapshot.shortHigh, snapshot.shortLow))
+        f_add_pair_vote(scoresH4, pair, f_vote(snapshot.price, snapshot.mediumHigh, snapshot.mediumLow))
+        f_add_pair_vote(scoresD1, pair, f_vote(snapshot.price, snapshot.longHigh, snapshot.longLow))
+    if pair == chartPair
+        activeSnapshot := snapshot
+
+bool scoreReady = supportedPair and readySnapshots == array.size(PANDA_PAIRS) and not na(activeSnapshot)
+int baseIndex = supportedPair ? f_currency_index(str.substring(chartPair, 0, 3)) : -1
+int quoteIndex = supportedPair ? f_currency_index(str.substring(chartPair, 3, 6)) : -1
+string baseCurrency = supportedPair ? str.substring(chartPair, 0, 3) : "BASE"
+string quoteCurrency = supportedPair ? str.substring(chartPair, 3, 6) : "QUOTE"
+
+int baseStrong = scoreReady ? f_strongest(f_score(scoresD1, baseIndex), f_score(scoresH4, baseIndex), f_score(scoresH1, baseIndex)) : 0
+int quoteStrong = scoreReady ? f_strongest(f_score(scoresD1, quoteIndex), f_score(scoresH4, quoteIndex), f_score(scoresH1, quoteIndex)) : 0
+string baseXtf = scoreReady ? f_currency_extremes(baseCurrency, f_score(scoresD1, baseIndex), f_score(scoresH4, baseIndex), f_score(scoresH1, baseIndex)) : "—"
+string quoteXtf = scoreReady ? f_currency_extremes(quoteCurrency, f_score(scoresD1, quoteIndex), f_score(scoresH4, quoteIndex), f_score(scoresH1, quoteIndex)) : "—"
+bool baseConflict = scoreReady and f_conflicted(scoresH1, scoresH4, scoresD1, baseIndex)
+bool quoteConflict = scoreReady and f_conflicted(scoresH1, scoresH4, scoresD1, quoteIndex)
+bool neutralMatchup = scoreReady and math.abs(baseStrong) < PANDA_SIGNIFICANT and math.abs(quoteStrong) < PANDA_SIGNIFICANT
+bool hardInvalid = scoreReady and (baseConflict or quoteConflict or neutralMatchup)
+int pandaGap = scoreReady and not hardInvalid ? baseStrong - quoteStrong : 0
+string pandaBias = not supportedPair ? "UNSUPPORTED SYMBOL" : not scoreReady ? "DATA UNAVAILABLE" : hardInvalid ? "HARD_INVALID" : pandaGap >= PANDA_GAP_THRESHOLD ? "BUY" : pandaGap <= -PANDA_GAP_THRESHOLD ? "SELL" : "WAIT"
+
+string boxH1Trend = scoreReady ? f_box_trend(activeSnapshot.mediumHigh, activeSnapshot.mediumLow, activeSnapshot.shortHigh, activeSnapshot.shortLow) : "UNKNOWN"
+string boxH4Trend = scoreReady ? f_box_trend(activeSnapshot.longHigh, activeSnapshot.longLow, activeSnapshot.mediumHigh, activeSnapshot.mediumLow) : "UNKNOWN"
+
+// ---- Panda bias filter ----
+bool usePandaFilter = input.bool(true, "Require Panda bias alignment", group = "0. Panda Bias Filter", tooltip = "Only allow BOLD LONG when Panda bias is BUY and SHORT when Panda bias is SELL. Turn off for raw BOLD.")
+bool pandaAllowsLong  = (not usePandaFilter) or (pandaBias == "BUY")
+bool pandaAllowsShort = (not usePandaFilter) or (pandaBias == "SELL")
+
+// ---- BOLD V2.4 engine ----
+
+//=============================================================================
+// BOLD V2.4
+// B = Build the opening range on an internal lower timeframe.
+// O = Observe a one-sided liquidity sweep and reclaim.
+// L = Lock direction with a displacement close through the opposite boundary.
+// D = Deploy after an optional retest.
+//
+// Designed for an H1 chart while calculating the complete setup internally
+// from closed M5 bars. V1 is not modified by this script.
+// V2.4 anchors labels to the containing chart candle and adds a cleaner display layer: one sweep marker per session, prominent
+// final signal labels, separated Entry/SL/TP values, and a clear dashboard.
+//=============================================================================
+
+//----------------------------------------------------------------------------- 
+// Input groups
+//----------------------------------------------------------------------------- 
+string GROUP_ENGINE  = "1. H1 / MTF Engine"
+string GROUP_SETUP   = "2. BOLD Setup"
+string GROUP_RISK    = "3. Levels and Alerts"
+string GROUP_LONDON  = "4. London Session"
+string GROUP_NEWYORK = "5. New York Session"
+string GROUP_VISUAL  = "6. Visuals"
+
+//----------------------------------------------------------------------------- 
+// H1 / multi-timeframe engine
+//----------------------------------------------------------------------------- 
+string calculationTimeframe = input.timeframe( "5", "Internal calculation timeframe", group = GROUP_ENGINE, tooltip = "Use 5 minutes on an H1 chart. The opening range, sweeps, breakout and retest are all calculated from closed bars on this timeframe.")
+
+bool enforceH1Maximum = input.bool( true, "Warn above H1 chart", group = GROUP_ENGINE, tooltip = "The script is designed for charts from the internal timeframe up to H1. It can run above H1, but signals may be visually compressed.")
+
+//----------------------------------------------------------------------------- 
+// BOLD setup rules — preserved from V1
+//----------------------------------------------------------------------------- 
+bool requireRetest = input.bool( true, "Require breakout retest", group = GROUP_SETUP)
+
+int retestWindowBars = input.int( 5, "Retest expires after internal bars", minval = 1, maxval = 30, group = GROUP_SETUP, tooltip = "With an M5 engine, 5 bars means a 25-minute retest window.")
+
+bool requireRetestCandle = input.bool( true, "Require directional retest candle", group = GROUP_SETUP, tooltip = "LONG requires a bullish retest close above OR High. SHORT requires a bearish retest close below OR Low.")
+
+bool invalidateDoubleSweep = input.bool( true, "Invalidate if both sides are swept", group = GROUP_SETUP)
+
+int sweepMinTicks = input.int( 1, "Minimum sweep distance in ticks", minval = 0, maxval = 500, group = GROUP_SETUP)
+
+int breakoutBufferTicks = input.int( 0, "Breakout close buffer in ticks", minval = 0, maxval = 500, group = GROUP_SETUP)
+
+int retestToleranceTicks = input.int( 2, "Retest tolerance in ticks", minval = 0, maxval = 500, group = GROUP_SETUP)
+
+bool requireDisplacement = input.bool( true, "Require displacement candle", group = GROUP_SETUP)
+
+float minimumBodyPercent = input.float( 60.0, "Minimum breakout body %", minval = 1.0, maxval = 100.0, step = 1.0, group = GROUP_SETUP) / 100.0
+
+//----------------------------------------------------------------------------- 
+// Risk, levels and alerts
+//----------------------------------------------------------------------------- 
+float riskReward = input.float( 2.0, "Target risk-to-reward", minval = 0.5, maxval = 10.0, step = 0.25, group = GROUP_RISK)
+
+int stopBufferTicks = input.int( 1, "Stop buffer in ticks", minval = 0, maxval = 500, group = GROUP_RISK)
+
+bool showTradeLevels = input.bool( true, "Draw entry, stop and target", group = GROUP_RISK)
+
+bool showTradeValueLabels = input.bool( true, "Show Entry, SL and TP values", group = GROUP_RISK, tooltip = "Displays three visible price labels beside every confirmed BOLD signal.")
+
+int tradeValueOffsetBars = input.int( 3, "Trade-value label offset in chart bars", minval = 1, maxval = 20, group = GROUP_RISK, tooltip = "Entry, SL and TP labels are staggered from this starting offset so they do not cover the BOLD signal label or each other.")
+
+int tradeLevelMinutes = input.int( 240, "Trade-level line length in minutes", minval = 30, maxval = 1440, group = GROUP_RISK)
+
+bool useDynamicAlerts = input.bool( true, "Enable dynamic alert() messages", group = GROUP_RISK, tooltip = "Create a TradingView alert using: Any alert() function call.")
+
+//----------------------------------------------------------------------------- 
+// London session
+//----------------------------------------------------------------------------- 
+bool enableLondon = input.bool( true, "Enable London", group = GROUP_LONDON)
+
+string londonORInput = input.session( "0800-0830", "Opening range", group = GROUP_LONDON)
+
+string londonTradeInput = input.session( "0830-1500", "Signal window", group = GROUP_LONDON)
+
+string londonTimezone = input.string( "Europe/London", "Time zone", group = GROUP_LONDON, tooltip = "IANA time zone. Europe/London automatically follows daylight-saving changes.")
+
+int londonRangeExtensionMinutes = input.int( 390, "OR line extension in minutes", minval = 30, maxval = 1440, group = GROUP_LONDON, tooltip = "Visual only. Default 390 minutes matches 08:30–15:00.")
+
+//----------------------------------------------------------------------------- 
+// New York session — forex default
+//----------------------------------------------------------------------------- 
+bool enableNewYork = input.bool( true, "Enable New York", group = GROUP_NEWYORK)
+
+string newYorkORInput = input.session( "0800-0830", "Opening range", group = GROUP_NEWYORK, tooltip = "Forex default. For US cash indices, try 0930–1000.")
+
+string newYorkTradeInput = input.session( "0830-1500", "Signal window", group = GROUP_NEWYORK, tooltip = "For US cash indices, try 1000–1500.")
+
+string newYorkTimezone = input.string( "America/New_York", "Time zone", group = GROUP_NEWYORK, tooltip = "IANA time zone. America/New_York automatically follows daylight-saving changes.")
+
+int newYorkRangeExtensionMinutes = input.int( 390, "OR line extension in minutes", minval = 30, maxval = 1440, group = GROUP_NEWYORK, tooltip = "Visual only. Default 390 minutes matches 08:30–15:00.")
+
+//----------------------------------------------------------------------------- 
+// Visual settings
+//----------------------------------------------------------------------------- 
+bool showOpeningRanges = input.bool( true, "Show exact-time opening ranges", group = GROUP_VISUAL)
+
+bool shadeOpeningRanges = input.bool( true, "Shade opening-range boxes", group = GROUP_VISUAL)
+
+bool showSweepMarkers = input.bool( true, "Show LS and BS markers", group = GROUP_VISUAL)
+
+bool showDashboard = input.bool( true, "Show dashboard", group = GROUP_VISUAL)
+
+int maxSignalsToKeep = input.int( 80, "Historical signals to keep", minval = 10, maxval = 100, group = GROUP_VISUAL)
+
+int maxSweepsToKeep = input.int( 160, "Historical sweep markers to keep", minval = 20, maxval = 250, group = GROUP_VISUAL)
+
+int maxSessionsToKeep = input.int( 60, "Historical opening ranges to keep", minval = 10, maxval = 80, group = GROUP_VISUAL)
+
+//----------------------------------------------------------------------------- 
+// Shared constants
+//----------------------------------------------------------------------------- 
+string tradingDays = "23456"
+string londonORSession = londonORInput + ":" + tradingDays
+string londonTradeSession = londonTradeInput + ":" + tradingDays
+string newYorkORSession = newYorkORInput + ":" + tradingDays
+string newYorkTradeSession = newYorkTradeInput + ":" + tradingDays
+
+float tickSize = syminfo.mintick
+float sweepDistance = sweepMinTicks * tickSize
+float breakoutBuffer = breakoutBufferTicks * tickSize
+float retestTolerance = retestToleranceTicks * tickSize
+float stopBuffer = stopBufferTicks * tickSize
+
+int tradeLevelMilliseconds = tradeLevelMinutes * 60 * 1000
+int londonExtensionMilliseconds = londonRangeExtensionMinutes * 60 * 1000
+int newYorkExtensionMilliseconds = newYorkRangeExtensionMinutes * 60 * 1000
+
+//=============================================================================
+// State object
+//=============================================================================
+type BoldState
+    float orHigh = na
+    float orLow = na
+    bool rangeReady = false
+    bool longSwept = false
+    bool shortSwept = false
+    float sweepLow = na
+    float sweepHigh = na
+    bool longLocked = false
+    bool shortLocked = false
+    int retestBars = 0
+    bool retestTouched = false
+    bool signalled = false
+    bool invalid = false
+    bool prevInOR = false
+    bool prevInTrade = false
+    int rangeStartTime = na
+    int rangeEndTime = na
+
+var BoldState londonState = BoldState.new()
+var BoldState newYorkState = BoldState.new()
+
+//=============================================================================
+// Helper functions
+//=============================================================================
+f_price(float value) =>
+    na(value) ? "—" : str.tostring(value, format.mintick)
+
+f_signalTime(int value) =>
+    na(value) ? "—" : str.format_time(value, "MM-dd HH:mm", syminfo.timezone)
+
+f_isDisplacement(float barOpen, float barHigh, float barLow, float barClose, bool isLong) =>
+    float candleRange = barHigh - barLow
+    float bodyPercent = candleRange > 0.0 ? math.abs(barClose - barOpen) / candleRange : 0.0
+    bool directionOK = isLong ? barClose > barOpen : barClose < barOpen
+    not requireDisplacement or (directionOK and bodyPercent >= minimumBodyPercent)
+
+f_status(BoldState state, bool enabled) =>
+    string result = "WAITING"
+    if not enabled
+        result := "OFF"
+    else if state.prevInOR
+        result := "BUILDING RANGE"
+    else if state.invalid
+        result := "NO TRADE"
+    else if state.signalled
+        result := "SIGNALLED"
+    else if state.longLocked
+        result := requireRetest ? "LONG: WAIT RETEST" : "LONG LOCKED"
+    else if state.shortLocked
+        result := requireRetest ? "SHORT: WAIT RETEST" : "SHORT LOCKED"
+    else if state.longSwept
+        result := "SELL-SIDE SWEPT"
+    else if state.shortSwept
+        result := "BUY-SIDE SWEPT"
+    else if state.rangeReady and state.prevInTrade
+        result := "WAITING SWEEP"
+    else if state.rangeReady
+        result := "RANGE READY"
+    result
+
+f_statusColor(string status) =>
+    color result = color.new(color.gray, 70)
+    if status == "BUILDING RANGE"
+        result := color.new(color.blue, 65)
+    else if status == "SELL-SIDE SWEPT" or status == "LONG: WAIT RETEST" or status == "LONG LOCKED"
+        result := color.new(color.lime, 70)
+    else if status == "BUY-SIDE SWEPT" or status == "SHORT: WAIT RETEST" or status == "SHORT LOCKED"
+        result := color.new(color.red, 70)
+    else if status == "SIGNALLED"
+        result := color.new(color.orange, 55)
+    else if status == "NO TRADE"
+        result := color.new(color.maroon, 55)
+    result
+
+// Processes one confirmed lower-timeframe candle and mutates one session state.
+f_processIntrabar( BoldState state, float barOpen, float barHigh, float barLow, float barClose, int barTime, bool inOpeningRange, bool inTradeWindow, bool intrabarConfirmed) =>
+
+    bool longSignal = false
+    bool shortSignal = false
+    bool longSweepEvent = false
+    bool shortSweepEvent = false
+    bool longSweepMarkerEvent = false
+    bool shortSweepMarkerEvent = false
+    bool openingRangeFinishedEvent = false
+
+    float signalEntry = na
+    float signalStop = na
+    float signalTarget = na
+
+    bool openingRangeStarted = inOpeningRange and not state.prevInOR
+    bool openingRangeFinished = not inOpeningRange and state.prevInOR
+    bool tradeWindowFinished = not inTradeWindow and state.prevInTrade
+
+    if intrabarConfirmed
+        if openingRangeStarted
+            state.orHigh := barHigh
+            state.orLow := barLow
+            state.rangeReady := false
+            state.longSwept := false
+            state.shortSwept := false
+            state.sweepLow := na
+            state.sweepHigh := na
+            state.longLocked := false
+            state.shortLocked := false
+            state.retestBars := 0
+            state.retestTouched := false
+            state.signalled := false
+            state.invalid := false
+            state.rangeStartTime := barTime
+            state.rangeEndTime := na
+
+        else if inOpeningRange
+            state.orHigh := na(state.orHigh) ? barHigh : math.max(state.orHigh, barHigh)
+            state.orLow := na(state.orLow) ? barLow : math.min(state.orLow, barLow)
+
+        if openingRangeFinished
+            state.rangeReady := not na(state.orHigh) and not na(state.orLow) and state.orHigh > state.orLow
+            state.rangeEndTime := barTime
+            openingRangeFinishedEvent := state.rangeReady
+
+        if tradeWindowFinished
+            state.longLocked := false
+            state.shortLocked := false
+            state.retestBars := 0
+            state.retestTouched := false
+
+        if state.rangeReady and inTradeWindow and not state.invalid and not state.signalled
+            longSweepEvent := barLow < state.orLow - sweepDistance and barClose >= state.orLow and barClose <= state.orHigh
+
+            shortSweepEvent := barHigh > state.orHigh + sweepDistance and barClose <= state.orHigh and barClose >= state.orLow
+
+            bool longLockedThisBar = false
+            bool shortLockedThisBar = false
+
+            if longSweepEvent and shortSweepEvent
+                state.invalid := true
+            else
+                if not state.longSwept and not state.shortSwept and not state.longLocked and not state.shortLocked
+                    if longSweepEvent
+                        state.longSwept := true
+                        state.sweepLow := barLow
+                        longSweepMarkerEvent := true
+                    else if shortSweepEvent
+                        state.shortSwept := true
+                        state.sweepHigh := barHigh
+                        shortSweepMarkerEvent := true
+
+                // Potential LONG: sell-side sweep first, then bullish displacement.
+                if state.longSwept and not state.longLocked
+                    state.sweepLow := na(state.sweepLow) ? barLow : math.min(state.sweepLow, barLow)
+
+                    if invalidateDoubleSweep and shortSweepEvent
+                        state.invalid := true
+                    else if barClose < state.orLow
+                        state.invalid := true
+                    else if barClose > state.orHigh + breakoutBuffer and f_isDisplacement(barOpen, barHigh, barLow, barClose, true)
+                        state.longLocked := true
+                        state.retestBars := 0
+                        state.retestTouched := false
+                        longLockedThisBar := true
+
+                // Potential SHORT: buy-side sweep first, then bearish displacement.
+                if state.shortSwept and not state.shortLocked and not state.invalid
+                    state.sweepHigh := na(state.sweepHigh) ? barHigh : math.max(state.sweepHigh, barHigh)
+
+                    if invalidateDoubleSweep and longSweepEvent
+                        state.invalid := true
+                    else if barClose > state.orHigh
+                        state.invalid := true
+                    else if barClose < state.orLow - breakoutBuffer and f_isDisplacement(barOpen, barHigh, barLow, barClose, false)
+                        state.shortLocked := true
+                        state.retestBars := 0
+                        state.retestTouched := false
+                        shortLockedThisBar := true
+
+                // Deploy LONG.
+                if state.longLocked and not state.invalid
+                    if not requireRetest
+                        longSignal := true
+                    else if not longLockedThisBar
+                        state.retestBars += 1
+
+                        if state.retestBars > retestWindowBars or barClose < state.orLow
+                            state.invalid := true
+                            state.longLocked := false
+                        else
+                            state.retestTouched := state.retestTouched or barLow <= state.orHigh + retestTolerance
+
+                            bool longRetestConfirmed = state.retestTouched and barClose > state.orHigh and (not requireRetestCandle or barClose > barOpen)
+
+                            if longRetestConfirmed
+                                longSignal := true
+
+                // Deploy SHORT.
+                if state.shortLocked and not state.invalid
+                    if not requireRetest
+                        shortSignal := true
+                    else if not shortLockedThisBar
+                        state.retestBars += 1
+
+                        if state.retestBars > retestWindowBars or barClose > state.orHigh
+                            state.invalid := true
+                            state.shortLocked := false
+                        else
+                            state.retestTouched := state.retestTouched or barHigh >= state.orLow - retestTolerance
+
+                            bool shortRetestConfirmed = state.retestTouched and barClose < state.orLow and (not requireRetestCandle or barClose < barOpen)
+
+                            if shortRetestConfirmed
+                                shortSignal := true
+
+        if longSignal or shortSignal
+            state.signalled := true
+            state.longLocked := false
+            state.shortLocked := false
+            state.retestBars := 0
+            state.retestTouched := false
+
+            signalEntry := barClose
+            signalStop := longSignal ? state.sweepLow - stopBuffer : state.sweepHigh + stopBuffer
+
+            if not na(signalStop)
+                float signalRisk = math.abs(signalEntry - signalStop)
+                signalTarget := longSignal ? signalEntry + signalRisk * riskReward : signalEntry - signalRisk * riskReward
+
+        state.prevInOR := inOpeningRange
+        state.prevInTrade := inTradeWindow
+
+    [ longSignal, shortSignal, longSweepMarkerEvent, shortSweepMarkerEvent, openingRangeFinishedEvent, signalEntry, signalStop, signalTarget ]
+
+//=============================================================================
+// Drawing storage and limits
+//=============================================================================
+var array<label> signalLabels = array.new<label>()
+var array<label> sweepLabels = array.new<label>()
+var array<label> tradeValueLabels = array.new<label>()
+var array<line> tradeLines = array.new<line>()
+var array<line> rangeLines = array.new<line>()
+var array<box> rangeBoxes = array.new<box>()
+
+//=============================================================================
+// Lower-timeframe data request
+//=============================================================================
+[ timeData, timeCloseData, openData, highData, lowData, closeData, londonORData, londonTradeData, newYorkORData, newYorkTradeData ] = request.security_lower_tf( syminfo.tickerid, calculationTimeframe, [ time, time_close, open, high, low, close, not na(time("", londonORSession, londonTimezone)), not na(time("", londonTradeSession, londonTimezone)), not na(time("", newYorkORSession, newYorkTimezone)), not na(time("", newYorkTradeSession, newYorkTimezone)) ], ignore_invalid_timeframe = true)
+
+//----------------------------------------------------------------------------- 
+// Timeframe validation
+//----------------------------------------------------------------------------- 
+float chartSeconds = timeframe.in_seconds(timeframe.period)
+float calculationSeconds = timeframe.in_seconds(calculationTimeframe)
+
+if barstate.isfirst and chartSeconds < calculationSeconds
+    runtime.error("BOLD V2.4: The chart timeframe must be equal to or higher than the internal calculation timeframe.")
+
+bool chartAboveH1 = chartSeconds > timeframe.in_seconds("60")
+bool nonStandardChart = not chart.is_standard
+
+//=============================================================================
+// Process every closed intrabar inside the current chart candle
+//=============================================================================
+bool anyLongSignal = false
+bool anyShortSignal = false
+bool londonLongSignalThisBar = false
+bool londonShortSignalThisBar = false
+bool newYorkLongSignalThisBar = false
+bool newYorkShortSignalThisBar = false
+
+string currentSignalSession = ""
+float currentSignalEntry = na
+float currentSignalStop = na
+float currentSignalTarget = na
+int currentSignalTime = na
+
+var string lastSignalText = "NONE"
+var float lastEntry = na
+var float lastStop = na
+var float lastTarget = na
+var int lastSignalTime = na
+var string latestDirectionText = "NO CONFIRMED SIGNAL"
+var string latestSignalSession = "—"
+var int latestSignalTime = na
+
+int intrabarCount = array.size(timeData)
+
+for i = 0 to (intrabarCount == 0 ? na : intrabarCount - 1)
+    int intrabarTime = array.get(timeData, i)
+    int intrabarCloseTime = array.get(timeCloseData, i)
+    float intrabarOpen = array.get(openData, i)
+    float intrabarHigh = array.get(highData, i)
+    float intrabarLow = array.get(lowData, i)
+    float intrabarClose = array.get(closeData, i)
+
+    bool intrabarConfirmed = intrabarCloseTime <= timenow
+
+    bool londonInOR = enableLondon and array.get(londonORData, i)
+    bool londonInTrade = enableLondon and array.get(londonTradeData, i)
+    bool newYorkInOR = enableNewYork and array.get(newYorkORData, i)
+    bool newYorkInTrade = enableNewYork and array.get(newYorkTradeData, i)
+
+    [ londonLong, londonShort, londonLongSweep, londonShortSweep, londonORFinished, londonEntry, londonStop, londonTarget ] = f_processIntrabar( londonState, intrabarOpen, intrabarHigh, intrabarLow, intrabarClose, intrabarTime, londonInOR, londonInTrade, intrabarConfirmed)
+    londonLong := londonLong and pandaAllowsLong
+    londonShort := londonShort and pandaAllowsShort
+
+    [ newYorkLong, newYorkShort, newYorkLongSweep, newYorkShortSweep, newYorkORFinished, newYorkEntry, newYorkStop, newYorkTarget ] = f_processIntrabar( newYorkState, intrabarOpen, intrabarHigh, intrabarLow, intrabarClose, intrabarTime, newYorkInOR, newYorkInTrade, intrabarConfirmed)
+    newYorkLong := newYorkLong and pandaAllowsLong
+    newYorkShort := newYorkShort and pandaAllowsShort
+
+    //-------------------------------------------------------------------------
+    // Draw exact-time London opening range after the range is fully completed.
+    //-------------------------------------------------------------------------
+    if londonORFinished and showOpeningRanges
+        box londonBox = box.new( left = londonState.rangeStartTime, top = londonState.orHigh, right = londonState.rangeEndTime, bottom = londonState.orLow, xloc = xloc.bar_time, border_color = color.new(color.blue, 15), bgcolor = shadeOpeningRanges ? color.new(color.blue, 88) : na)
+
+        line londonHighLine = line.new( x1 = londonState.rangeEndTime, y1 = londonState.orHigh, x2 = londonState.rangeEndTime + londonExtensionMilliseconds, y2 = londonState.orHigh, xloc = xloc.bar_time, color = color.new(color.blue, 0), width = 2)
+
+        line londonLowLine = line.new( x1 = londonState.rangeEndTime, y1 = londonState.orLow, x2 = londonState.rangeEndTime + londonExtensionMilliseconds, y2 = londonState.orLow, xloc = xloc.bar_time, color = color.new(color.blue, 0), width = 2)
+
+        array.push(rangeBoxes, londonBox)
+        array.push(rangeLines, londonHighLine)
+        array.push(rangeLines, londonLowLine)
+
+        if array.size(rangeBoxes) > maxSessionsToKeep
+            box.delete(array.shift(rangeBoxes))
+        while array.size(rangeLines) > maxSessionsToKeep * 2
+            line.delete(array.shift(rangeLines))
+
+    //-------------------------------------------------------------------------
+    // Draw exact-time New York opening range.
+    //-------------------------------------------------------------------------
+    if newYorkORFinished and showOpeningRanges
+        box newYorkBox = box.new( left = newYorkState.rangeStartTime, top = newYorkState.orHigh, right = newYorkState.rangeEndTime, bottom = newYorkState.orLow, xloc = xloc.bar_time, border_color = color.new(color.purple, 15), bgcolor = shadeOpeningRanges ? color.new(color.purple, 88) : na)
+
+        line newYorkHighLine = line.new( x1 = newYorkState.rangeEndTime, y1 = newYorkState.orHigh, x2 = newYorkState.rangeEndTime + newYorkExtensionMilliseconds, y2 = newYorkState.orHigh, xloc = xloc.bar_time, color = color.new(color.purple, 0), width = 2)
+
+        line newYorkLowLine = line.new( x1 = newYorkState.rangeEndTime, y1 = newYorkState.orLow, x2 = newYorkState.rangeEndTime + newYorkExtensionMilliseconds, y2 = newYorkState.orLow, xloc = xloc.bar_time, color = color.new(color.purple, 0), width = 2)
+
+        array.push(rangeBoxes, newYorkBox)
+        array.push(rangeLines, newYorkHighLine)
+        array.push(rangeLines, newYorkLowLine)
+
+        if array.size(rangeBoxes) > maxSessionsToKeep
+            box.delete(array.shift(rangeBoxes))
+        while array.size(rangeLines) > maxSessionsToKeep * 2
+            line.delete(array.shift(rangeLines))
+
+    //-------------------------------------------------------------------------
+    // Sweep markers: LS prepares a LONG; BS prepares a SHORT.
+    //-------------------------------------------------------------------------
+    if showSweepMarkers and londonLongSweep
+        label sweepLabel = label.new( x = bar_index, y = intrabarLow, text = "LS", xloc = xloc.bar_index, style = label.style_label_up, color = color.new(color.lime, 5), textcolor = color.black, size = size.tiny, tooltip = "London sell-side liquidity sweep — watch for a BOLD LONG sequence.")
+        array.push(sweepLabels, sweepLabel)
+
+    if showSweepMarkers and londonShortSweep
+        label sweepLabel = label.new( x = bar_index, y = intrabarHigh, text = "BS", xloc = xloc.bar_index, style = label.style_label_down, color = color.new(color.red, 5), textcolor = color.white, size = size.tiny, tooltip = "London buy-side liquidity sweep — watch for a BOLD SHORT sequence.")
+        array.push(sweepLabels, sweepLabel)
+
+    if showSweepMarkers and newYorkLongSweep
+        label sweepLabel = label.new( x = bar_index, y = intrabarLow, text = "LS", xloc = xloc.bar_index, style = label.style_label_up, color = color.new(color.lime, 5), textcolor = color.black, size = size.tiny, tooltip = "New York sell-side liquidity sweep — watch for a BOLD LONG sequence.")
+        array.push(sweepLabels, sweepLabel)
+
+    if showSweepMarkers and newYorkShortSweep
+        label sweepLabel = label.new( x = bar_index, y = intrabarHigh, text = "BS", xloc = xloc.bar_index, style = label.style_label_down, color = color.new(color.red, 5), textcolor = color.white, size = size.tiny, tooltip = "New York buy-side liquidity sweep — watch for a BOLD SHORT sequence.")
+        array.push(sweepLabels, sweepLabel)
+
+    while array.size(sweepLabels) > maxSweepsToKeep
+        label.delete(array.shift(sweepLabels))
+
+    //-------------------------------------------------------------------------
+    // London final signal.
+    //-------------------------------------------------------------------------
+    if londonLong or londonShort
+        bool isLong = londonLong
+        float signalY = isLong ? intrabarLow : intrabarHigh
+        string directionText = isLong ? "LONG" : "SHORT"
+        color signalColor = isLong ? color.lime : color.red
+        color signalTextColor = isLong ? color.black : color.white
+
+        string signalTooltip = "London BOLD " + directionText + "\nEntry: " + f_price(londonEntry) + "\nSL: " + f_price(londonStop) + "\nTP: " + f_price(londonTarget) + "\nRR: " + str.tostring(riskReward, "#.##")
+
+        label signalLabel = label.new( x = bar_index, y = signalY, text = isLong ? "BOLD\nLONG" : "BOLD\nSHORT", xloc = xloc.bar_index, style = isLong ? label.style_label_up : label.style_label_down, color = signalColor, textcolor = signalTextColor, size = size.large, tooltip = signalTooltip)
+
+        array.push(signalLabels, signalLabel)
+
+        if showTradeLevels and not na(londonStop) and not na(londonTarget)
+            line entryLine = line.new( x1 = intrabarTime, y1 = londonEntry, x2 = intrabarTime + tradeLevelMilliseconds, y2 = londonEntry, xloc = xloc.bar_time, color = signalColor, width = 2)
+
+            line stopLine = line.new( x1 = intrabarTime, y1 = londonStop, x2 = intrabarTime + tradeLevelMilliseconds, y2 = londonStop, xloc = xloc.bar_time, color = color.red, style = line.style_dashed)
+
+            line targetLine = line.new( x1 = intrabarTime, y1 = londonTarget, x2 = intrabarTime + tradeLevelMilliseconds, y2 = londonTarget, xloc = xloc.bar_time, color = color.aqua, style = line.style_dashed)
+
+            array.push(tradeLines, entryLine)
+            array.push(tradeLines, stopLine)
+            array.push(tradeLines, targetLine)
+
+            if showTradeValueLabels
+                label entryValueLabel = label.new( x = bar_index + tradeValueOffsetBars, y = londonEntry, text = "ENTRY " + f_price(londonEntry), xloc = xloc.bar_index, style = label.style_label_left, color = signalColor, textcolor = isLong ? color.black : color.white, size = size.small)
+                label stopValueLabel = label.new( x = bar_index + tradeValueOffsetBars + 1, y = londonStop, text = "SL " + f_price(londonStop), xloc = xloc.bar_index, style = label.style_label_left, color = color.red, textcolor = color.white, size = size.small)
+                label targetValueLabel = label.new( x = bar_index + tradeValueOffsetBars + 2, y = londonTarget, text = "TP " + f_price(londonTarget), xloc = xloc.bar_index, style = label.style_label_left, color = color.aqua, textcolor = color.black, size = size.small)
+
+                array.push(tradeValueLabels, entryValueLabel)
+                array.push(tradeValueLabels, stopValueLabel)
+                array.push(tradeValueLabels, targetValueLabel)
+
+        anyLongSignal := anyLongSignal or londonLong
+        anyShortSignal := anyShortSignal or londonShort
+        londonLongSignalThisBar := londonLongSignalThisBar or londonLong
+        londonShortSignalThisBar := londonShortSignalThisBar or londonShort
+
+        currentSignalSession := "London"
+        currentSignalEntry := londonEntry
+        currentSignalStop := londonStop
+        currentSignalTarget := londonTarget
+        currentSignalTime := intrabarTime
+
+        lastSignalText := "London BOLD " + directionText
+        lastEntry := londonEntry
+        lastStop := londonStop
+        lastTarget := londonTarget
+        lastSignalTime := intrabarTime
+        latestDirectionText := isLong ? "BOLD LONG" : "BOLD SHORT"
+        latestSignalSession := "London"
+        latestSignalTime := intrabarTime
+
+    //-------------------------------------------------------------------------
+    // New York final signal.
+    //-------------------------------------------------------------------------
+    if newYorkLong or newYorkShort
+        bool isLong = newYorkLong
+        float signalY = isLong ? intrabarLow : intrabarHigh
+        string directionText = isLong ? "LONG" : "SHORT"
+        color signalColor = isLong ? color.lime : color.red
+        color signalTextColor = isLong ? color.black : color.white
+
+        string signalTooltip = "New York BOLD " + directionText + "\nEntry: " + f_price(newYorkEntry) + "\nSL: " + f_price(newYorkStop) + "\nTP: " + f_price(newYorkTarget) + "\nRR: " + str.tostring(riskReward, "#.##")
+
+        label signalLabel = label.new( x = bar_index, y = signalY, text = isLong ? "BOLD\nLONG" : "BOLD\nSHORT", xloc = xloc.bar_index, style = isLong ? label.style_label_up : label.style_label_down, color = signalColor, textcolor = signalTextColor, size = size.large, tooltip = signalTooltip)
+
+        array.push(signalLabels, signalLabel)
+
+        if showTradeLevels and not na(newYorkStop) and not na(newYorkTarget)
+            line entryLine = line.new( x1 = intrabarTime, y1 = newYorkEntry, x2 = intrabarTime + tradeLevelMilliseconds, y2 = newYorkEntry, xloc = xloc.bar_time, color = signalColor, width = 2)
+
+            line stopLine = line.new( x1 = intrabarTime, y1 = newYorkStop, x2 = intrabarTime + tradeLevelMilliseconds, y2 = newYorkStop, xloc = xloc.bar_time, color = color.red, style = line.style_dashed)
+
+            line targetLine = line.new( x1 = intrabarTime, y1 = newYorkTarget, x2 = intrabarTime + tradeLevelMilliseconds, y2 = newYorkTarget, xloc = xloc.bar_time, color = color.aqua, style = line.style_dashed)
+
+            array.push(tradeLines, entryLine)
+            array.push(tradeLines, stopLine)
+            array.push(tradeLines, targetLine)
+
+            if showTradeValueLabels
+                label entryValueLabel = label.new( x = bar_index + tradeValueOffsetBars, y = newYorkEntry, text = "ENTRY " + f_price(newYorkEntry), xloc = xloc.bar_index, style = label.style_label_left, color = signalColor, textcolor = isLong ? color.black : color.white, size = size.small)
+                label stopValueLabel = label.new( x = bar_index + tradeValueOffsetBars + 1, y = newYorkStop, text = "SL " + f_price(newYorkStop), xloc = xloc.bar_index, style = label.style_label_left, color = color.red, textcolor = color.white, size = size.small)
+                label targetValueLabel = label.new( x = bar_index + tradeValueOffsetBars + 2, y = newYorkTarget, text = "TP " + f_price(newYorkTarget), xloc = xloc.bar_index, style = label.style_label_left, color = color.aqua, textcolor = color.black, size = size.small)
+
+                array.push(tradeValueLabels, entryValueLabel)
+                array.push(tradeValueLabels, stopValueLabel)
+                array.push(tradeValueLabels, targetValueLabel)
+
+        anyLongSignal := anyLongSignal or newYorkLong
+        anyShortSignal := anyShortSignal or newYorkShort
+        newYorkLongSignalThisBar := newYorkLongSignalThisBar or newYorkLong
+        newYorkShortSignalThisBar := newYorkShortSignalThisBar or newYorkShort
+
+        currentSignalSession := "New York"
+        currentSignalEntry := newYorkEntry
+        currentSignalStop := newYorkStop
+        currentSignalTarget := newYorkTarget
+        currentSignalTime := intrabarTime
+
+        lastSignalText := "New York BOLD " + directionText
+        lastEntry := newYorkEntry
+        lastStop := newYorkStop
+        lastTarget := newYorkTarget
+        lastSignalTime := intrabarTime
+        latestDirectionText := isLong ? "BOLD LONG" : "BOLD SHORT"
+        latestSignalSession := "New York"
+        latestSignalTime := intrabarTime
+
+    while array.size(signalLabels) > maxSignalsToKeep
+        label.delete(array.shift(signalLabels))
+
+    while array.size(tradeLines) > maxSignalsToKeep * 3
+        line.delete(array.shift(tradeLines))
+
+    while array.size(tradeValueLabels) > maxSignalsToKeep * 3
+        label.delete(array.shift(tradeValueLabels))
+
+//=============================================================================
+// Alerts
+//=============================================================================
+alertcondition( anyLongSignal, title = "BOLD V2.4 LONG", message = "BOLD V2.4 LONG on {{ticker}}. The setup was confirmed on the internal lower timeframe.")
+
+alertcondition( anyShortSignal, title = "BOLD V2.4 SHORT", message = "BOLD V2.4 SHORT on {{ticker}}. The setup was confirmed on the internal lower timeframe.")
+
+alertcondition( londonLongSignalThisBar or londonShortSignalThisBar, title = "BOLD V2.4 London Signal", message = "New London BOLD V2 signal on {{ticker}}.")
+
+alertcondition( newYorkLongSignalThisBar or newYorkShortSignalThisBar, title = "BOLD V2.4 New York Signal", message = "New New York BOLD V2 signal on {{ticker}}.")
+
+if (anyLongSignal or anyShortSignal) and useDynamicAlerts
+    string directionText = anyLongSignal ? "LONG" : "SHORT"
+    string dynamicMessage = "BOLD V2.4 " + directionText + " | " + syminfo.ticker + " | Session: " + currentSignalSession + " | Signal time: " + str.format_time(currentSignalTime, "yyyy-MM-dd HH:mm", syminfo.timezone) + " | Entry: " + f_price(currentSignalEntry) + " | SL: " + f_price(currentSignalStop) + " | TP: " + f_price(currentSignalTarget) + " | RR: " + str.tostring(riskReward, "#.##")
+
+    alert(dynamicMessage, alert.freq_once_per_bar)
+
+//=============================================================================
+// Dashboard
+//=============================================================================
+string londonStatus = f_status(londonState, enableLondon)
+string newYorkStatus = f_status(newYorkState, enableNewYork)
+color latestSignalColor = latestDirectionText == "BOLD LONG" ? color.new(color.lime, 25) : latestDirectionText == "BOLD SHORT" ? color.new(color.red, 25) : color.new(color.gray, 60)
+color latestSignalTextColor = latestDirectionText == "BOLD LONG" ? color.black : color.white
+
+var table dashboard = table.new(position.top_right, 4, 7, border_width = 1)
+
+if barstate.islast and showDashboard
+    table.cell(dashboard, 0, 0, "BOLD V2.4", text_color = color.white, bgcolor = color.new(color.black, 0))
+    table.cell(dashboard, 1, 0, "STATE", text_color = color.white, bgcolor = color.new(color.black, 0))
+    table.cell(dashboard, 2, 0, "OR HIGH", text_color = color.white, bgcolor = color.new(color.black, 0))
+    table.cell(dashboard, 3, 0, "OR LOW", text_color = color.white, bgcolor = color.new(color.black, 0))
+
+    table.cell(dashboard, 0, 1, "London", text_color = color.white, bgcolor = color.new(color.blue, 55))
+    table.cell(dashboard, 1, 1, londonStatus, text_color = color.white, bgcolor = f_statusColor(londonStatus))
+    table.cell(dashboard, 2, 1, f_price(londonState.orHigh), text_color = color.white, bgcolor = color.new(color.blue, 85))
+    table.cell(dashboard, 3, 1, f_price(londonState.orLow), text_color = color.white, bgcolor = color.new(color.blue, 85))
+
+    table.cell(dashboard, 0, 2, "New York", text_color = color.white, bgcolor = color.new(color.purple, 55))
+    table.cell(dashboard, 1, 2, newYorkStatus, text_color = color.white, bgcolor = f_statusColor(newYorkStatus))
+    table.cell(dashboard, 2, 2, f_price(newYorkState.orHigh), text_color = color.white, bgcolor = color.new(color.purple, 85))
+    table.cell(dashboard, 3, 2, f_price(newYorkState.orLow), text_color = color.white, bgcolor = color.new(color.purple, 85))
+
+    table.cell(dashboard, 0, 3, "Engine", text_color = color.white, bgcolor = color.new(color.black, 25))
+    table.cell(dashboard, 1, 3, calculationTimeframe + "m inside " + timeframe.period, text_color = color.white, bgcolor = color.new(color.black, 25))
+    table.cell(dashboard, 2, 3, "Closed LTF", text_color = color.white, bgcolor = color.new(color.green, 65))
+    table.cell(dashboard, 3, 3, str.tostring(intrabarCount) + " bars", text_color = color.white, bgcolor = color.new(color.black, 25))
+
+    table.cell(dashboard, 0, 4, "LATEST", text_color = color.white, bgcolor = latestSignalColor)
+    table.cell(dashboard, 1, 4, latestDirectionText, text_color = latestSignalTextColor, bgcolor = latestSignalColor, text_size = size.large)
+    table.cell(dashboard, 2, 4, latestSignalSession, text_color = color.white, bgcolor = latestSignalColor)
+    table.cell(dashboard, 3, 4, f_signalTime(latestSignalTime), text_color = color.white, bgcolor = latestSignalColor)
+
+    table.cell(dashboard, 0, 5, "LEVELS", text_color = color.white, bgcolor = color.new(color.black, 25))
+    table.cell(dashboard, 1, 5, "E " + f_price(lastEntry), text_color = color.white, bgcolor = color.new(color.black, 25))
+    table.cell(dashboard, 2, 5, "SL " + f_price(lastStop), text_color = color.white, bgcolor = color.new(color.black, 25))
+    table.cell(dashboard, 3, 5, "TP " + f_price(lastTarget), text_color = color.white, bgcolor = color.new(color.black, 25))
+
+    string warningText = "READY"
+    color warningColor = color.new(color.green, 60)
+
+    if nonStandardChart
+        warningText := "USE CANDLES"
+        warningColor := color.new(color.red, 35)
+    else if enforceH1Maximum and chartAboveH1
+        warningText := "ABOVE H1"
+        warningColor := color.new(color.orange, 35)
+    else if chartSeconds == timeframe.in_seconds("60") and calculationTimeframe == "5"
+        warningText := "H1 + M5 OK"
+        warningColor := color.new(color.green, 55)
+
+    table.cell(dashboard, 0, 6, "Chart", text_color = color.white, bgcolor = warningColor)
+    table.cell(dashboard, 1, 6, warningText, text_color = color.white, bgcolor = warningColor)
+    table.cell(dashboard, 2, 6, "RR " + str.tostring(riskReward, "#.##"), text_color = color.white, bgcolor = warningColor)
+    color pandaCell = pandaBias == "BUY" ? color.new(color.lime, 25) : pandaBias == "SELL" ? color.new(color.red, 25) : color.new(color.gray, 55)
+    table.cell(dashboard, 3, 6, "Panda " + pandaBias, text_color = pandaBias == "BUY" ? color.black : color.white, bgcolor = pandaCell)
+
+if barstate.islast and not showDashboard
+    table.clear(dashboard, 0, 0, 3, 6)
