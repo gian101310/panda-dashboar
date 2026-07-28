@@ -72,6 +72,7 @@ input int    UsdThreshold    = 4;       // USD extreme score needed to veto a si
 input bool   ShowTradeLevels = true;    // draw Entry / SL / TP1-3 lines
 input bool   MoveToBE        = true;    // move SL to breakeven after TP1
 input int    LevelBars       = 60;      // trade-level line length (bars)
+input bool   ShowHistorySignals = true; // draw past SuperTrend-flip signals on attach
 input bool   GoldAlerts      = true;    // master switch for gold signal alerts
 input bool   GoldPush        = true;    // mobile push (SendNotification)
 input bool   GoldPopup       = true;    // terminal popup alert
@@ -172,6 +173,7 @@ double   GEntry = 0, GSL = 0, GR = 0, GTP1 = 0, GTP2 = 0, GTP3 = 0;
 bool     GTp1 = false, GTp2 = false, GTp3 = false, GBE = false;
 datetime GStart = 0;
 int      GoldLastDir = 0, GoldSeed = 0;
+bool     _goldBackfilled = false;
 int    _pLeft = 0;
 int    _pTop  = 0;
 int    _rowH  = 17;
@@ -1193,13 +1195,36 @@ void GoldDraw()
    GLabel("lTP3",   t2, GTP3,   "TP3 " + (GTp3 ? "OK " : "") + DoubleToString(GTP3, Digits), Panel_BuyColor);
 }
 
+// One-time backfill: draw past SuperTrend-flip signals so history is visible on attach.
+// These are unfiltered (the USD score is a live snapshot, not reconstructable per bar).
+void GoldBackfill(const int rates_total)
+{
+   int startB = rates_total - 2;
+   if(startB > 800) startB = 800;
+   for(int b = startB; b >= 2; b--)
+   {
+      if(!IsVal(TrendDir[b]) || !IsVal(TrendDir[b + 1])) continue;
+      int d  = (TrendDir[b]     == 1.0) ? 1 : -1;
+      int dp = (TrendDir[b + 1] == 1.0) ? 1 : -1;
+      if(d == 1 && dp == -1)      { DrawArrowMark("gsig", Time[b], Low[b],  233, clrLime, false, 2); DrawSigText("gsig", Time[b], Low[b],  "LONG",  clrLime, false); }
+      else if(d == -1 && dp == 1) { DrawArrowMark("gsig", Time[b], High[b], 234, clrRed,  true,  2); DrawSigText("gsig", Time[b], High[b], "SHORT", clrRed,  true); }
+   }
+}
+
 // Runs once per newly closed bar. Signal = SuperTrend flip; USD strength is a veto.
 void ProcessGold(const int rates_total)
 {
    if(rates_total < ST_Period + 3) return;
    if(!IsVal(TrendDir[1])) return;
+   if(!_goldBackfilled)
+   {
+      if(ShowHistorySignals) GoldBackfill(rates_total);
+      _goldBackfilled = true;
+      GoldSeed = 1;
+      GoldLastDir = (TrendDir[1] == 1.0) ? 1 : -1;
+      return;
+   }
    int dirNow = (TrendDir[1] == 1.0) ? 1 : -1;
-   if(GoldSeed == 0) { GoldSeed = 1; GoldLastDir = dirNow; return; }
    bool flipUp   = (GoldLastDir == -1 && dirNow ==  1);
    bool flipDown = (GoldLastDir ==  1 && dirNow == -1);
    GoldLastDir = dirNow;
