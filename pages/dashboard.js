@@ -2977,7 +2977,9 @@ function ovNewsCountdown(eventAtUtc, fallbackMins) {
 }
 
 function OvNewsBanner({ upcomingNews, isMobile }) {
-  const events = upcomingNews?.events || [];
+  // Prefer the 48h look-ahead so the banner always shows the next high-impact
+  // event (even tomorrow); fall back to today's events for older API responses.
+  const events = (upcomingNews?.banner_events?.length ? upcomingNews.banner_events : upcomingNews?.events) || [];
   if (!events.length) return null;
   const next = events[0];
   const nextCount = ovNewsCountdown(next.event_at_utc, next.mins_away);

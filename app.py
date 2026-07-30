@@ -101,7 +101,9 @@ NEWS_ALERT_THRESHOLDS = (
     (2, "2M", "2 MIN"),
     (15, "15M", "15 MIN"),
     (60, "1H", "1 HOUR"),
+    (120, "2H", "2 HOURS"),
     (180, "3H", "3 HOURS"),
+    (240, "4H", "4 HOURS"),
 )
 
 # ---- Currency → pairs mapping for news alert ----

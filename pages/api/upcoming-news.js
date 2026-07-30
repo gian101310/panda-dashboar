@@ -1,5 +1,5 @@
 import { validateSession } from '../../lib/auth';
-import { collectAffectedPairs, normalizeNewsEvents } from '../../lib/newsCalendar.mjs';
+import { collectAffectedPairs, normalizeNewsEvents, normalizeUpcomingHighImpact } from '../../lib/newsCalendar.mjs';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'GET only' });
@@ -16,11 +16,16 @@ export default async function handler(req, res) {
     if (!r.ok) return res.status(200).json({ events: [], affected_pairs: [], count: 0 });
 
     const data = await r.json();
-    const events = normalizeNewsEvents(data, { now: new Date() });
+    const now = new Date();
+    const events = normalizeNewsEvents(data, { now });
+    // Banner look-ahead (next 48h, high impact) so the Overview banner always
+    // shows the next event even if it falls tomorrow. affected_pairs stays today-only.
+    const bannerEvents = normalizeUpcomingHighImpact(data, { now, hoursAhead: 48 });
 
     res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=120');
     return res.status(200).json({
       events,
+      banner_events: bannerEvents,
       affected_pairs: collectAffectedPairs(events),
       count: events.length,
     });
