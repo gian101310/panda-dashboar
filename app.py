@@ -1816,10 +1816,11 @@ def verdict_action_word(row, c):
 
 
 def send_phase_digest(dashboard_rows):
-    """Grouped action message to the main snapshot group.
+    """Grouped action message to the SPIKE bot/group (SIGNAL_*).
     Anti-spam: min 2h between sends AND content must have changed."""
     global PHASE_DIGEST_LAST_SENT, PHASE_DIGEST_LAST_SIG
-    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
+    # Phase digest now goes to the SPIKE bot/group (SIGNAL_*), not the main snapshot group.
+    if not SIGNAL_BOT_TOKEN or not SIGNAL_CHAT_ID:
         return
     if is_market_closed():
         return
@@ -1865,8 +1866,8 @@ def send_phase_digest(dashboard_rows):
 
     try:
         resp = requests.post(
-            f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
-            data={"chat_id": TELEGRAM_CHAT_ID, "text": msg, "parse_mode": "HTML"},
+            f"https://api.telegram.org/bot{SIGNAL_BOT_TOKEN}/sendMessage",
+            data={"chat_id": SIGNAL_CHAT_ID, "text": msg, "parse_mode": "HTML"},
             timeout=15)
         if resp.status_code == 200:
             PHASE_DIGEST_LAST_SENT = now_ts
@@ -2826,8 +2827,8 @@ def check_news_alerts():
                 f"PANDA ENGINE"
             )
             r = requests.post(
-                f"https://api.telegram.org/bot{SIGNAL_BOT_TOKEN}/sendMessage",
-                data={"chat_id": SIGNAL_CHAT_ID, "text": msg, "parse_mode": "HTML"},
+                f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+                data={"chat_id": TELEGRAM_CHAT_ID, "text": msg, "parse_mode": "HTML"},
                 timeout=10
             )
             status = "✓" if r.status_code == 200 else "✗"
