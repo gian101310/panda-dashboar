@@ -1603,6 +1603,17 @@ def run_gap_once():
     if dashboard_payload:
         try:
             snap_ts = datetime.utcnow().isoformat()
+            # Allowlist of columns that actually exist in the signal_snapshots table.
+            # (timestamp / is_valid / gap_delta are set explicitly below; id is auto.)
+            _SNAPSHOT_COLS = (
+                "symbol","gap","bias","confidence","execution","momentum","state",
+                "strength","signal","hard_invalid","close_alert","delta_short",
+                "delta_mid","delta_long","base_d1","base_h4","base_h1","quote_d1",
+                "quote_h4","quote_h1","adv_base_d1","adv_base_h4","adv_base_h1",
+                "adv_quote_d1","adv_quote_h4","adv_quote_h1","atr","atr_reference",
+                "spread","box_h1_trend","box_h4_trend","pl_zone","pl_bias",
+                "pl_g1_valid","base_currency","quote_currency","base_score_tf","quote_score_tf",
+            )
             snapshot_rows = []
             for row in dashboard_payload:
                 bias_val = row.get("bias", "")
@@ -1611,15 +1622,12 @@ def run_gap_once():
                 # Valid = not hard_invalid, bias is BUY/SELL, |gap| >= 5
                 # BB does not require PL zone confirmation
                 is_valid = (not hi) and bias_val in ("BUY", "SELL") and gap_val >= 5
-                snap = dict(row)
+                # Keep ONLY real table columns (allowlist) so payload additions
+                # (pl_st/pl_fl/pl_price, price-context, etc.) can't 400 the whole insert.
+                snap = {k: row.get(k) for k in _SNAPSHOT_COLS if k in row}
                 snap["timestamp"] = snap_ts
                 snap["is_valid"] = is_valid
                 snap["gap_delta"] = gap_deltas.get(row.get("symbol", ""), 0)
-                # Remove fields that don't exist in signal_snapshots table
-                for _drop in ("updated_at", "pdh", "pdl", "pwh", "pwl", "pmh", "pml", "pyh", "pyl",
-                              "pdr_dir", "pdr_ratio", "pdr_strong_live",
-                              "adr_used_pct", "pullback_pct", "consolidating"):
-                    snap.pop(_drop, None)
                 snapshot_rows.append(snap)
             supabase_retry(
                 lambda: supabase.table("signal_snapshots").insert(snapshot_rows).execute(),
