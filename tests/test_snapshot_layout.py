@@ -2,6 +2,7 @@ import importlib.util
 import asyncio
 import os
 import sys
+import tempfile
 import types
 from datetime import datetime, timezone
 from pathlib import Path
@@ -174,6 +175,35 @@ class SchedulerTimingTests(unittest.TestCase):
         self.assertTrue(due)
         self.assertFalse(duplicate_due)
         self.assertEqual(duplicate_mark, mark)
+
+    def test_hourly_snapshot_mark_survives_engine_restart(self):
+        previous_mark_file = os.environ.get("PANDA_SNAPSHOT_MARK_FILE")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            os.environ["PANDA_SNAPSHOT_MARK_FILE"] = str(Path(temp_dir) / "snapshot_hour.txt")
+
+            first_app = _load_app()
+            first_tick = datetime(2026, 6, 18, 14, 2, 0)
+            due, mark = first_app.hourly_snapshot_due(
+                first_tick,
+                first_app.load_snapshot_hour_mark(),
+            )
+            self.assertTrue(due)
+
+            first_app.persist_snapshot_hour_mark(mark)
+
+            restarted_app = _load_app()
+            duplicate_due, duplicate_mark = restarted_app.hourly_snapshot_due(
+                datetime(2026, 6, 18, 14, 35, 0),
+                restarted_app.load_snapshot_hour_mark(),
+            )
+
+            self.assertFalse(duplicate_due)
+            self.assertEqual(duplicate_mark, mark)
+
+        if previous_mark_file is None:
+            os.environ.pop("PANDA_SNAPSHOT_MARK_FILE", None)
+        else:
+            os.environ["PANDA_SNAPSHOT_MARK_FILE"] = previous_mark_file
 
     def test_scheduler_steps_run_in_worker_thread(self):
         app = _load_app()

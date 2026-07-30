@@ -14,6 +14,8 @@
  */
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createClient } from '@supabase/supabase-js';
 import {
   classifyGuardianStatus,
@@ -206,8 +208,17 @@ async function annotateChart(client, setup, plan) {
   return chartId;
 }
 
+// --- HEARTBEAT ---
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const HEARTBEAT_PATH = resolve(__dirname, '..', '.watchdog.heartbeat');
+
+function writeHeartbeat() {
+  try { writeFileSync(HEARTBEAT_PATH, new Date().toISOString()); } catch {}
+}
+
 // --- MAIN LOOP PASS ---
 async function runPass() {
+  writeHeartbeat();
   const timestamp = new Date().toISOString();
   console.log(`\n${'='.repeat(60)}\nLOOP_PASS | ${timestamp}\n${'='.repeat(60)}`);
 

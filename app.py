@@ -71,6 +71,10 @@ ENGINE_SECRET         = os.environ.get("ENGINE_SECRET", "")
 
 # ---- OpenAI (AI Insights) ----
 OPENAI_API_KEY        = os.environ.get("OPENAI_API_KEY", "")
+SNAPSHOT_HOUR_MARK_FILE = os.environ.get(
+    "PANDA_SNAPSHOT_MARK_FILE",
+    os.path.join(MT4_PATH, "panda_snapshot_hour.txt"),
+)
 
 PAIRS = [
     "AUDJPY","AUDCAD","AUDNZD","AUDUSD","CADJPY",
@@ -86,6 +90,8 @@ PREV_MOMENTUM     = {}
 PREV_GAP          = {}
 PREV_BIAS         = {}
 PREV_GAP_INITIALIZED = False
+PREV_ZONE         = {}   # pair -> last TBG_ZONE (ABOVE/BELOW); drives Panda Lines FLIP alerts
+LAST_BOS_T        = {}   # pair -> last seen TBG_BOS_T (unix); first sighting seeds silently, never alerts on boot
 
 # ---- News alert state ----
 NEWS_ALERTED      = set()   # event keys already alerted this week — prevents duplicates
@@ -224,7 +230,7 @@ def parse_tf_score(s):
     try: return int(s)
     except: return 0
 
-def parse_mt4_file(symbol):
+def parse_mt4_file(symbol, _incomplete_attempt=0):
     """
     Reads mt4_SYMBOL.txt from MetaQuotes Common Files.
     Returns dict with all parsed fields or None if file missing/stale.
@@ -285,7 +291,7 @@ def parse_mt4_file(symbol):
 
         # ADV lines — must check before normal currency lines
         adv_m = re.match(
-            r"^ADV\s*:\s*([A-Z]{3})\s*:\s*D1\s*:\s*([+\-\d/]+)\s*\|\s*H4\s*:\s*([+\-\d/]+)\s*\|\s*H1\s*:\s*([+\-\d/]+)",
+            r"^ADV\s*:\s*([A-Z]{3})\s*:?[ \t]*D1\s*:\s*([+\-\d/]+)\s*(?:\|\s*)?H4\s*:\s*([+\-\d/]+)\s*(?:\|\s*)?H1\s*:\s*([+\-\d/]+)",
             line
         )
         if adv_m:
@@ -301,7 +307,7 @@ def parse_mt4_file(symbol):
 
         # Currency score lines (BASE then QUOTE)
         cur_m = re.match(
-            r"^\s*([A-Z]{3})\s*:\s*D1\s*:\s*([+\-\d/]+)\s*\|\s*H4\s*:\s*([+\-\d/]+)\s*\|\s*H1\s*:\s*([+\-\d/]+)",
+            r"^\s*([A-Z]{3})\s*:?[ \t]*D1\s*:\s*([+\-\d/]+)\s*(?:\|\s*)?H4\s*:\s*([+\-\d/]+)\s*(?:\|\s*)?H1\s*:\s*([+\-\d/]+)",
             line
         )
         if cur_m:
@@ -343,7 +349,19 @@ def parse_mt4_file(symbol):
                     "close_price": safe_float(parts[5].strip()),
                 })
 
-    return result if (base_set and quote_set) else None
+    if base_set and quote_set:
+        return result
+
+    # MT4 writes this file in place. A read can succeed while the file contains
+    # only its first currency line, so retry incomplete content just like a lock.
+    if _incomplete_attempt < max_retries - 1:
+        wait = 0.3 * (2 ** _incomplete_attempt)
+        print(f"[INCOMPLETE] {symbol}: retry {_incomplete_attempt + 1}/{max_retries} in {wait:.1f}s")
+        time.sleep(wait)
+        return parse_mt4_file(symbol, _incomplete_attempt + 1)
+
+    print(f"[READ ERROR] {symbol}: incomplete MT4 data after {max_retries} retries")
+    return None
 
 
 # ================= PL FILE PARSER (reads tbg_SYMBOL.txt) =================
@@ -371,8 +389,13 @@ def parse_pl_file(symbol):
         result = {
             "pl_st": None, "pl_fl": None, "pl_price": None,
             "pl_bias": None, "pl_zone": None, "pl_g1_valid": None,
+            "pl_bos": None, "pl_bos_t": None,   # Break of Structure (H1): dir + break-bar unix time
             "pdh": None, "pdl": None, "pwh": None, "pwl": None,
             "pmh": None, "pml": None, "pyh": None, "pyl": None,
+            # v2 exporter price context (optional — absent with v1 exporter)
+            "pdo": None, "pdc": None, "prh": None, "prl": None,
+            "dayo": None, "dayh": None,
+            "dayl": None, "adr_d1": None, "h1r6": None,
         }
         raw_lines = None
         max_retries = 6
@@ -405,6 +428,14 @@ def parse_pl_file(symbol):
                     result["pl_g1_valid"] = line.split(":")[-1].strip() == "VALID"
                 elif line.startswith("TBG_PRICE"):
                     result["pl_price"] = safe_float(line.split(":")[-1].strip())
+                # Break of Structure (H1) — TBG_BOS_T MUST be tested before TBG_BOS (prefix overlap)
+                elif line.startswith("TBG_BOS_T"):
+                    try:
+                        result["pl_bos_t"] = int(line.split(":", 1)[1].strip())
+                    except Exception:
+                        result["pl_bos_t"] = 0
+                elif line.startswith("TBG_BOS"):
+                    result["pl_bos"] = line.split(":", 1)[1].strip()   # BULLISH / BEARISH / NONE
                 # S/R levels from Panda Lines
                 elif line.startswith("PDH"):
                     result["pdh"] = safe_float(line.split(":")[-1].strip())
@@ -422,6 +453,25 @@ def parse_pl_file(symbol):
                     result["pyh"] = safe_float(line.split(":")[-1].strip())
                 elif line.startswith("PYL"):
                     result["pyl"] = safe_float(line.split(":")[-1].strip())
+                # v2 exporter price context
+                elif line.startswith("PDO"):
+                    result["pdo"] = safe_float(line.split(":")[-1].strip())
+                elif line.startswith("PDC"):
+                    result["pdc"] = safe_float(line.split(":")[-1].strip())
+                elif line.startswith("PRH"):
+                    result["prh"] = safe_float(line.split(":")[-1].strip())
+                elif line.startswith("PRL"):
+                    result["prl"] = safe_float(line.split(":")[-1].strip())
+                elif line.startswith("DAYO"):
+                    result["dayo"] = safe_float(line.split(":")[-1].strip())
+                elif line.startswith("DAYH"):
+                    result["dayh"] = safe_float(line.split(":")[-1].strip())
+                elif line.startswith("DAYL"):
+                    result["dayl"] = safe_float(line.split(":")[-1].strip())
+                elif line.startswith("ADR"):
+                    result["adr_d1"] = safe_float(line.split(":")[-1].strip())
+                elif line.startswith("H1R6"):
+                    result["h1r6"] = safe_float(line.split(":")[-1].strip())
         return result if result["pl_zone"] else None
     except Exception as e:
         print(f"[PL PARSE ERROR] {symbol}: {e}")
@@ -520,6 +570,33 @@ def extract_panda_score(line):
     if abs_pos == abs_neg and abs_pos != 0: return 0, False
     if abs_neg > abs_pos: return strongest_neg, False
     return strongest_pos, False
+
+
+def derive_score_tf(line):
+    """
+    Lists the timeframes whose Panda score is EXTREME (|value| >= 4, i.e.
+    4/5/6 positive or negative). Non-extreme values (1/2/3) are ignored.
+    Display/reporting only — never feeds back into gap or scoring.
+
+    Reads raw split values (e.g. '+5/-1') and includes each extreme part.
+    Returns a compact string of TF+signedvalue tokens in D1/H4/H1 order,
+    e.g. "D1+4 H4+5" or "H1-6", or "" if no timeframe is extreme.
+    """
+    if line.strip().startswith("ADV"):
+        return ""
+
+    matches = re.findall(r"(D1|H4|H1)\s*:\s*([+-]?\d+)(?:/([+-]?\d+))?", line)
+    order = {"D1": 0, "H4": 1, "H1": 2}
+    out = []                       # list of (tf_order, tf, value)
+    for tf, v1s, v2s in matches:
+        for vs in (v1s, v2s):
+            if not vs:
+                continue
+            v = int(vs)
+            if abs(v) >= 4:        # only extreme 4/5/6 (or -4/-5/-6)
+                out.append((order.get(tf, 9), tf, v))
+    out.sort(key=lambda x: x[0])
+    return " ".join(f"{tf}{'+' if v > 0 else ''}{v}" for _, tf, v in out)
 
 
 def _build_currency_line(parsed, side):
@@ -940,6 +1017,166 @@ def evaluate_pending_signals(all_scores, all_pl_map):
         print(f"[SIGNAL EVAL] Closed {evaluated}/{len(pending)} signals")
 
 
+# ================= PRICE CONTEXT (v2 EXPORTER) =================
+def compute_price_context(pl, gap):
+    """Derive live PDR / ADR-used / pullback / consolidation from v2 exporter
+    price-context lines. Returns all-None dict when v1 exporter is running."""
+    out = {"pdr_dir": None, "pdr_ratio": None, "pdr_strong_live": None,
+           "adr_used_pct": None, "pullback_pct": None, "consolidating": None}
+    if not pl:
+        return out
+    pdo, pdc   = pl.get("pdo"), pl.get("pdc")
+    pdh, pdl   = pl.get("pdh"), pl.get("pdl")
+    dayh, dayl = pl.get("dayh"), pl.get("dayl")
+    adr, h1r6  = pl.get("adr_d1"), pl.get("h1r6")
+    price      = pl.get("pl_price")
+
+    # PDR from broker daily candle: body vs ADR + retracement check
+    # PRH/PRL = high/low of the SAME bar as PDO/PDC (runt/Sunday candles skipped
+    # by the v2 exporter); fall back to PDH/PDL for older exporter output.
+    if pdo and pdc and adr:
+        body = abs(pdc - pdo)
+        out["pdr_dir"]   = "BULLISH" if pdc >= pdo else "BEARISH"
+        out["pdr_ratio"] = round(body / adr, 2)
+        rh = pl.get("prh") or pdh
+        rl = pl.get("prl") or pdl
+        if rh and rl and rh > rl:
+            retr = ((rh - rl) - body) / (rh - rl)
+            out["pdr_strong_live"] = bool(retr <= 0.5 and body > 0)
+
+    # Today's range consumption + pullback depth off the day extreme
+    if dayh and dayl and adr and dayh >= dayl:
+        out["adr_used_pct"] = round((dayh - dayl) / adr * 100, 0)
+        if price and dayh > dayl and gap is not None:
+            if gap > 0:
+                out["pullback_pct"] = round((dayh - price) / (dayh - dayl) * 100, 0)
+            elif gap < 0:
+                out["pullback_pct"] = round((price - dayl) / (dayh - dayl) * 100, 0)
+
+    # Compression: last 6 H1 bars cover <25% of an average day
+    if h1r6 and adr:
+        out["consolidating"] = bool((h1r6 / adr) < 0.25)
+    return out
+
+
+# ================= SHADOW TRACKER (HIGH-GAP RESEARCH LOGGER) =================
+# Write-only logger: records every |gap| crossing of tiers 9/10/11/12
+# independently of BB's concurrent-position rule. Places NO trades,
+# touches NO locked logic. Exits mirror BB rules for comparability.
+
+SHADOW_TIERS = (9, 10, 11, 12)
+_SHADOW_CACHE = set()       # {(symbol, tier)} currently PENDING
+_SHADOW_CACHE_TS = None
+
+def _refresh_shadow_cache(force=False):
+    global _SHADOW_CACHE, _SHADOW_CACHE_TS
+    from datetime import datetime as _dt
+    now = _dt.utcnow()
+    if not force and _SHADOW_CACHE_TS and (now - _SHADOW_CACHE_TS).total_seconds() < 60:
+        return
+    try:
+        res = supabase.table("shadow_tracker").select("symbol,tier").eq("status", "PENDING").execute()
+        _SHADOW_CACHE = {(r["symbol"], r["tier"]) for r in (res.data or [])}
+        _SHADOW_CACHE_TS = now
+    except Exception as e:
+        print(f"[SHADOW] Cache refresh error: {e}")
+
+
+def check_shadow_entry(symbol, gap, scores, pl_data, momentum=""):
+    """Log a shadow entry each time |gap| crosses a tier boundary upward.
+    Reads PREV_GAP (must be called BEFORE PREV_GAP is updated, same as BB/INTRA checks)."""
+    prev = abs(PREV_GAP.get(symbol, 0) or 0)
+    cur = abs(gap or 0)
+    if cur < SHADOW_TIERS[0] or prev >= cur:
+        return
+    price = pl_data.get("pl_price")
+    if not price or price <= 0:
+        return
+    direction = "BUY" if gap > 0 else "SELL"
+    _refresh_shadow_cache()
+    for tier in SHADOW_TIERS:
+        if prev < tier <= cur and (symbol, tier) not in _SHADOW_CACHE:
+            try:
+                supabase.table("shadow_tracker").insert({
+                    "symbol": symbol, "direction": direction, "tier": tier,
+                    "entry_gap": gap, "peak_gap": cur, "entry_price": price,
+                    "pl_zone": pl_data.get("pl_zone", ""),
+                    "session": get_session(), "momentum": momentum or "",
+                    "base_score": scores.get("base_score", 0),
+                    "quote_score": scores.get("quote_score", 0),
+                    "status": "PENDING", "snapshots": [],
+                }).execute()
+                _SHADOW_CACHE.add((symbol, tier))
+                print(f"[SHADOW] ENTRY T{tier}: {symbol} {direction} gap={gap} price={price}")
+            except Exception as e:
+                print(f"[SHADOW] Entry error {symbol} T{tier}: {e}")
+
+
+def evaluate_pending_shadows(all_scores, all_pl_map):
+    """Close shadow entries with BB-style exits: bias flip (<5), 2-pt drop from peak, Friday close."""
+    from datetime import datetime as _dt
+    try:
+        res = supabase_retry(
+            lambda: supabase.table("shadow_tracker").select("*").eq("status", "PENDING").execute(),
+            label="ShadowEvalFetch")
+        pending = res.data or []
+    except Exception as e:
+        print(f"[SHADOW EVAL] Fetch error: {e}")
+        return
+    if not pending:
+        return
+    now = _dt.utcnow()
+    is_friday_close = (now.weekday() == 4 and now.hour >= 19)
+    closed = 0
+    for sig in pending:
+        symbol = sig["symbol"]
+        current_gap = all_scores.get(symbol, {}).get("gap", 0)
+        current_price = all_pl_map.get(symbol, {}).get("pl_price")
+        abs_gap = abs(current_gap)
+        new_peak = max(sig.get("peak_gap", 0) or 0, abs_gap)
+        pips = calc_pips(symbol, sig["direction"], sig.get("entry_price"), current_price)
+        exit_reason = None
+        if abs_gap < 5:
+            exit_reason = "BIAS_FLIP"
+        elif (new_peak - abs_gap) >= 2:
+            exit_reason = "MOMENTUM_LOSS"
+        elif is_friday_close:
+            exit_reason = "WEEKEND_CLOSE"
+        try:
+            _id = sig["id"]
+            if exit_reason:
+                duration = None
+                try:
+                    created = sig.get("created_at", "")
+                    t0 = _dt.fromisoformat(created.replace("Z", "+00:00")).replace(tzinfo=None)
+                    duration = round((now - t0).total_seconds() / 60, 1)
+                except Exception:
+                    pass
+                outcome = "WIN" if pips > 5 else ("LOSS" if pips < -5 else "FLAT")
+                supabase_retry(
+                    lambda: supabase.table("shadow_tracker").update({
+                        "peak_gap": new_peak, "exit_gap": current_gap,
+                        "exit_price": current_price, "pips": pips,
+                        "exit_reason": exit_reason, "outcome": outcome,
+                        "status": "DONE", "duration_min": duration,
+                        "closed_at": now.isoformat(),
+                    }).eq("id", _id).execute(),
+                    label=f"ShadowExit-{symbol}")
+                _SHADOW_CACHE.discard((symbol, sig.get("tier")))
+                closed += 1
+                print(f"[SHADOW] EXIT T{sig.get('tier')} {symbol} | {exit_reason} | {pips} pips | {outcome}")
+            else:
+                supabase_retry(
+                    lambda: supabase.table("shadow_tracker").update({
+                        "peak_gap": new_peak,
+                    }).eq("id", _id).execute(),
+                    label=f"ShadowHold-{symbol}")
+        except Exception as e:
+            print(f"[SHADOW] Update error {symbol}: {e}")
+    if closed:
+        print(f"[SHADOW EVAL] Closed {closed}/{len(pending)}")
+
+
 # ================= CORE ENGINE =================
 def run_gap_once():
     global PREV_MOMENTUM, PREV_GAP, PREV_GAP_INITIALIZED
@@ -1030,6 +1267,8 @@ def run_gap_once():
                 "confidence":       "INVALID",
                 "base_currency":    parsed["base_cur"],
                 "quote_currency":   parsed["quote_cur"],
+                "base_score_tf":    derive_score_tf(parsed.get("raw_base_line", "")),
+                "quote_score_tf":   derive_score_tf(parsed.get("raw_quote_line", "")),
                 "base_d1":          parsed["base_d1"],
                 "base_h4":          parsed["base_h4"],
                 "base_h1":          parsed["base_h1"],
@@ -1061,6 +1300,7 @@ def run_gap_once():
                 "pml":             all_pl_map.get(symbol, {}).get("pml"),
                 "pyh":             all_pl_map.get(symbol, {}).get("pyh"),
                 "pyl":             all_pl_map.get(symbol, {}).get("pyl"),
+                **compute_price_context(all_pl_map.get(symbol, {}), 0),
                 "updated_at":       datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
             })
             gap_history_payload.append({"timestamp": timestamp, "symbol": symbol, "gap": 0})
@@ -1158,6 +1398,8 @@ def run_gap_once():
         pl_data = all_pl_map.get(symbol, {})
         check_bb_entry(symbol, gap, scores, pl_data, momentum, parsed)
         check_intra_entry(symbol, gap, scores, pl_data, momentum, parsed)
+        check_shadow_entry(symbol, gap, scores, pl_data, momentum)  # write-only research logger
+        check_structure_alerts(symbol, pl_data)  # Panda Lines FLIP (zone cross) + H1 BOS Telegram alerts
 
         # ---- Gap Alert: abs(gap) 9–12 + valid Panda Lines ----
         _abs_gap = abs(gap)
@@ -1197,6 +1439,8 @@ def run_gap_once():
             "confidence":       confidence,
             "base_currency":    parsed["base_cur"],
             "quote_currency":   parsed["quote_cur"],
+            "base_score_tf":    derive_score_tf(parsed.get("raw_base_line", "")),
+            "quote_score_tf":   derive_score_tf(parsed.get("raw_quote_line", "")),
             "base_d1":          parsed["base_d1"],
             "base_h4":          parsed["base_h4"],
             "base_h1":          parsed["base_h1"],
@@ -1228,6 +1472,7 @@ def run_gap_once():
             "pml":             all_pl_map.get(symbol, {}).get("pml"),
             "pyh":             all_pl_map.get(symbol, {}).get("pyh"),
             "pyl":             all_pl_map.get(symbol, {}).get("pyl"),
+            **compute_price_context(all_pl_map.get(symbol, {}), gap),
             "updated_at":       datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
         })
 
@@ -1265,6 +1510,12 @@ def run_gap_once():
             print(f"[SUPABASE] Dashboard: {len(dashboard_payload)} pairs")
         except Exception as e:
             print("[SUPABASE ERROR] Dashboard:", e)
+
+        # ---- Phase digest to Telegram (2h min interval, only on change) ----
+        try:
+            send_phase_digest(dashboard_payload)
+        except Exception as e:
+            print(f"[PHASE DIGEST] wrapper error: {e}")
 
     # ---- STEP 4b: Write score files for MT4 panel ----
     for row in dashboard_payload:
@@ -1365,7 +1616,9 @@ def run_gap_once():
                 snap["is_valid"] = is_valid
                 snap["gap_delta"] = gap_deltas.get(row.get("symbol", ""), 0)
                 # Remove fields that don't exist in signal_snapshots table
-                for _drop in ("updated_at", "pdh", "pdl", "pwh", "pwl", "pmh", "pml", "pyh", "pyl"):
+                for _drop in ("updated_at", "pdh", "pdl", "pwh", "pwl", "pmh", "pml", "pyh", "pyl",
+                              "pdr_dir", "pdr_ratio", "pdr_strong_live",
+                              "adr_used_pct", "pullback_pct", "consolidating"):
                     snap.pop(_drop, None)
                 snapshot_rows.append(snap)
             supabase_retry(
@@ -1445,6 +1698,7 @@ def run_gap_once():
 
     # ---- Evaluate pending signal results (price-based) ----
     evaluate_pending_signals(all_scores, all_pl_map)
+    evaluate_pending_shadows(all_scores, all_pl_map)
 
     # ---- Signal Tracker: update cycle via Vercel API ----
     try:
@@ -1472,6 +1726,234 @@ def run_gap_once():
 
     print(f"[ENGINE] Cycle complete")
     return dashboard_payload
+
+# ================= PHASE DIGEST (Telegram, grouped by action) =================
+PHASE_DIGEST_LAST_SENT = 0.0
+PHASE_DIGEST_LAST_SIG  = ""
+
+def classify_phase_server(row):
+    """Server-side mirror of dashboard computePhase — view logic only, no locked formulas."""
+    gap = row.get("gap") or 0
+    ag = abs(gap)
+    if ag < 5 or row.get("hard_invalid"):
+        return None
+    state = row.get("state") or ""
+    mom   = row.get("momentum") or ""
+    fading   = mom in ("FADING", "COOLING", "REVERSING", "REVERSAL")
+    igniting = mom in ("SPARK", "BUILDING", "EMERGING")
+    adr_used = row.get("adr_used_pct")
+
+    if state.startswith("DEEP_PULLBACK"):                       ph = "RISK"
+    elif state.startswith("PULLBACK"):                          ph = "PULLBACK"
+    elif fading:                                                ph = "LATE"
+    elif (igniting or state.startswith("EXPAND")) and ag <= 9:  ph = "START"
+    elif igniting or state.startswith("EXPAND"):                ph = "MID"
+    elif ag >= 12:                                              ph = "LATE"
+    else:                                                       ph = "MID"
+    if adr_used is not None and adr_used >= 70 and ph in ("START", "MID"):
+        ph = "LATE"
+
+    direction = "BUY" if gap > 0 else "SELL"
+    pdr_ok = bool(row.get("pdr_strong_live")) and (
+        (direction == "BUY" and row.get("pdr_dir") == "BULLISH") or
+        (direction == "SELL" and row.get("pdr_dir") == "BEARISH"))
+    pb = row.get("pullback_pct")
+    ready_pb = (ph == "PULLBACK" and pdr_ok and pb is not None and 30 <= pb <= 60)
+    return {"phase": ph, "dir": direction, "gap": gap, "pdr_ok": pdr_ok, "pb": pb, "ready_pb": ready_pb}
+
+
+def in_pullback_zone_now(row):
+    """Live pullback detection: 30-60% retrace of today's move OR price at a Panda
+    Line AFTER a real retrace. Guards: the day must have moved (>=30% ADR used)
+    and price must have retraced >=20% — proximity without a prior move is NOT
+    a pullback."""
+    pb = row.get("pullback_pct")
+    adr_used = row.get("adr_used_pct")
+    moved = adr_used is not None and adr_used >= 30
+    retraced = pb is not None and pb >= 20
+    pb_ok = moved and pb is not None and 30 <= pb <= 60
+    line_ok = False
+    price, st, fl, atr = row.get("pl_price"), row.get("pl_st"), row.get("pl_fl"), row.get("atr")
+    if moved and retraced and price and atr and (st is not None or fl is not None):
+        pip = 0.01 if "JPY" in (row.get("symbol") or "").upper() else 0.0001
+        lines = [x for x in (st, fl) if x is not None]
+        dist_pips = min(abs(price - l) for l in lines) / pip
+        line_ok = dist_pips <= (atr * 0.15)
+    return pb_ok or line_ok
+
+
+def verdict_action_word(row, c):
+    """Snapshot ACTION word — Boss-G execution rules.
+    gap>=9 + PL agree = EXECUTE. Valid bias otherwise = pullback play. PDR = bonus only."""
+    if c is None:
+        return "WAIT"
+    if c["phase"] == "RISK":
+        return "CLOSE?"
+    if c["phase"] == "LATE":
+        return "NO CHASE"
+    gap = row.get("gap") or 0
+    ag = abs(gap)
+    direction = "BUY" if gap > 0 else "SELL"
+    zone = (row.get("pl_zone") or "").upper()
+    pl_valid = (direction == "BUY" and zone == "ABOVE") or (direction == "SELL" and zone == "BELOW")
+    if ag >= 9 and pl_valid:
+        return "EXECUTE"
+    if in_pullback_zone_now(row):
+        return "ENTER PB"
+    return "PB WAIT"
+
+
+def send_phase_digest(dashboard_rows):
+    """Grouped action message to the main snapshot group.
+    Anti-spam: min 2h between sends AND content must have changed."""
+    global PHASE_DIGEST_LAST_SENT, PHASE_DIGEST_LAST_SIG
+    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
+        return
+    if is_market_closed():
+        return
+    if not telegram_circuit.allow():
+        return
+    now_ts = time.time()
+    if now_ts - PHASE_DIGEST_LAST_SENT < 7200:
+        return
+
+    groups = {"EXEC": [], "PBNOW": [], "PBWAIT": [], "WATCH": [], "CLOSE": []}
+    for r in dashboard_rows:
+        c = classify_phase_server(r)
+        if not c:
+            continue
+        tag = f"{r.get('symbol')} {c['dir']} {c['gap']:+.0f}"
+        star = " ★" if c.get("pdr_ok") else ""
+        w = verdict_action_word(r, c)
+        if w == "CLOSE?":     groups["CLOSE"].append(tag)
+        elif w == "NO CHASE": groups["WATCH"].append(tag)
+        elif w == "EXECUTE":  groups["EXEC"].append(tag + star)
+        elif w == "ENTER PB": groups["PBNOW"].append(tag + star)
+        else:                 groups["PBWAIT"].append(tag)
+
+    sig = "|".join(",".join(sorted(v)) for v in groups.values())
+    if sig == PHASE_DIGEST_LAST_SIG or not any(groups.values()):
+        return
+
+    lines = ["🐼 <b>PANDA PHASE DIGEST</b>", datetime.now().strftime("%d %b %H:%M"), ""]
+    def _sec(icon, title, items, hint):
+        if not items:
+            return
+        lines.append(f"{icon} <b>{title}</b>")
+        for t in items:
+            lines.append(f"   {t}")
+        lines.append(f"   <i>{hint}</i>")
+        lines.append("")
+    _sec("🟢", "MARKET EXECUTE — GAP 9+ & PL CONFIRMED", groups["EXEC"], "market entry rule met — ★ = PDR bonus aligned")
+    _sec("🎯", "IN PULLBACK ZONE NOW — ENTER", groups["PBNOW"], "price is at the pullback area right now — enter with stop beyond the line")
+    _sec("🟡", "PULLBACK PLAY — WAIT FOR ZONE", groups["PBWAIT"], "bias confirmed — wait for 30-60% retrace or Panda Line tag")
+    _sec("⚠️", "WATCH OUT — LATE/EXHAUSTED", groups["WATCH"], "no new entries")
+    _sec("🔴", "CLOSE IF OPEN", groups["CLOSE"], "trend at risk — protect open trades")
+    msg = "\n".join(lines).strip()
+
+    try:
+        resp = requests.post(
+            f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+            data={"chat_id": TELEGRAM_CHAT_ID, "text": msg, "parse_mode": "HTML"},
+            timeout=15)
+        if resp.status_code == 200:
+            PHASE_DIGEST_LAST_SENT = now_ts
+            PHASE_DIGEST_LAST_SIG  = sig
+            print(f"[PHASE DIGEST] Sent ({sum(len(v) for v in groups.values())} pairs)")
+        else:
+            print(f"[PHASE DIGEST] Telegram error {resp.status_code}: {resp.text[:120]}")
+    except Exception as e:
+        print(f"[PHASE DIGEST] Send error: {e}")
+
+
+# ================= NIGHTLY ANALYST (private — Boss-G only) =================
+LAST_ANALYST_DATE = None
+
+def _agg_signal_rows(rows, key_fn):
+    groups = {}
+    for r in rows:
+        k = key_fn(r) or "?"
+        g = groups.setdefault(k, {"n": 0, "w": 0, "l": 0, "net": 0.0})
+        pips = float(r.get("pips") or 0)
+        g["n"] += 1
+        g["net"] += pips
+        if pips > 5: g["w"] += 1
+        elif pips < -5: g["l"] += 1
+    return groups
+
+def nightly_analyst():
+    """Trailing-30-day performance digest → LOGIN_ALERT bot (admin private chat).
+    Runs once per day via master_scheduler."""
+    if not LOGIN_ALERT_BOT_TOKEN or not LOGIN_ALERT_CHAT_ID:
+        print("[ANALYST] Skipped — login alert bot not configured")
+        return
+    try:
+        since = (datetime.utcnow() - timedelta(days=30)).isoformat()
+        res = supabase.table("signal_results") \
+            .select("symbol,strategy,session,entry_gap,pips,created_at") \
+            .eq("status", "DONE").gte("created_at", since).limit(8000).execute()
+        rows = res.data or []
+
+        sh = supabase.table("shadow_tracker").select("tier,pips,status,created_at") \
+            .gte("created_at", since).limit(4000).execute()
+        shadow = sh.data or []
+        shadow_done = [r for r in shadow if r.get("status") == "DONE"]
+
+        lines = ["🐼 NIGHTLY ANALYST — last 30 days", ""]
+
+        if rows:
+            net = sum(float(r.get("pips") or 0) for r in rows)
+            wins = sum(1 for r in rows if float(r.get("pips") or 0) > 5)
+            losses = sum(1 for r in rows if float(r.get("pips") or 0) < -5)
+            lines.append(f"SIGNALS: {len(rows)} closed | {wins}W/{losses}L | net {net:+.0f} pips")
+
+            by_sess = _agg_signal_rows(rows, lambda r: r.get("session"))
+            sess_str = " | ".join(f"{k}: {v['net']:+.0f}p (n={v['n']})" for k, v in sorted(by_sess.items()) if k and k != "?")
+            if sess_str: lines.append(f"SESSIONS: {sess_str}")
+
+            hi = [r for r in rows if abs(r.get("entry_gap") or 0) >= 9]
+            if hi:
+                hi_net = sum(float(r.get("pips") or 0) for r in hi)
+                lines.append(f"GAP 9+: {len(hi)} signals, {hi_net:+.0f} pips ({hi_net/len(hi):+.1f}/signal)")
+
+            by_pair = _agg_signal_rows(rows, lambda r: r.get("symbol"))
+            ranked = sorted(by_pair.items(), key=lambda kv: kv[1]["net"], reverse=True)
+            if ranked:
+                best = ", ".join(f"{k} {v['net']:+.0f}" for k, v in ranked[:3])
+                worst = ", ".join(f"{k} {v['net']:+.0f}" for k, v in ranked[-3:])
+                lines.append(f"BEST: {best}")
+                lines.append(f"WORST: {worst}")
+        else:
+            lines.append("SIGNALS: none closed in window")
+
+        lines.append("")
+        if shadow:
+            sd_net = sum(float(r.get("pips") or 0) for r in shadow_done)
+            sd_w = sum(1 for r in shadow_done if float(r.get("pips") or 0) > 5)
+            sd_l = sum(1 for r in shadow_done if float(r.get("pips") or 0) < -5)
+            open_n = len(shadow) - len(shadow_done)
+            avg = (sd_net / len(shadow_done)) if shadow_done else 0
+            lines.append(f"SHADOW 9+: {len(shadow)} entries ({open_n} open) | {sd_w}W/{sd_l}L | net {sd_net:+.0f}p | avg {avg:+.1f}/trade")
+        else:
+            lines.append("SHADOW 9+: no entries yet")
+
+        msg = "\n".join(lines)
+        r = requests.post(
+            f"https://api.telegram.org/bot{LOGIN_ALERT_BOT_TOKEN}/sendMessage",
+            data={"chat_id": LOGIN_ALERT_CHAT_ID, "text": msg},
+            timeout=15)
+        print(f"[ANALYST] {'Sent' if r.status_code == 200 else f'Telegram error {r.status_code}'}")
+    except Exception as e:
+        print(f"[ANALYST] Error: {e}")
+
+
+def maybe_run_nightly_analyst(now):
+    """Fire once daily at 01:00 local (before the 2-4AM UAE trade window)."""
+    global LAST_ANALYST_DATE
+    if now.hour == 1 and LAST_ANALYST_DATE != now.date():
+        LAST_ANALYST_DATE = now.date()
+        nightly_analyst()
+
 
 # ================= SNAPSHOT GENERATOR =================
 def _score_label(raw_score):
@@ -1554,14 +2036,14 @@ def build_snapshot_layout(pair_count):
     gutter = 32
     header_h = 220
     footer_h = 120
-    row_h = 300
+    row_h = 370   # +70 for EXTREME TF (XTF) line — v9
     row_gap = 16
     width = margin * 2 + card_w * columns + gutter * (columns - 1)
     height = header_h + rows_per_col * (row_h + row_gap) + footer_h
     return {
         "columns": columns,
         "rows_per_col": rows_per_col,
-        "fields": ["PAIR", "GAP", "BIAS", "H1/H4", "PL", "SCORE"],
+        "fields": ["PAIR", "GAP", "BIAS", "H1/H4", "PL", "SCORE", "XTF"],
         "width": width,
         "height": height,
         "card_w": card_w,
@@ -1573,7 +2055,7 @@ def build_snapshot_layout(pair_count):
         "row_gap": row_gap,
         "accent_w": 18,
         "top_offsets": {"gap": 430, "bias": 680},
-        "line_offsets": {"box": 112, "metrics": 198},
+        "line_offsets": {"box": 112, "metrics": 198, "xtf": 284},
         "bottom_offsets": {"box": 0, "fl_st": 0, "score": 650},
     }
 
@@ -1632,7 +2114,7 @@ def generate_snapshot(pair_data):
     draw.rectangle([0, 0, width, HEADER_H], fill=BG_CARD)
     draw.rectangle([0, HEADER_H - 4, width, HEADER_H], fill=ACCENT)
     draw.text((MARGIN, 40), "PANDA ENGINE v3.0", fill=TEXT_HEAD, font=font_title)
-    draw.text((MARGIN, 120), "PAIR  GAP  BIAS    H1/H4 BOX    PL       SCORE",
+    draw.text((MARGIN, 120), "PAIR  GAP  BIAS    H1/H4 BOX + PDR    PL  ACTION  SCORE",
               fill=TEXT_HEAD, font=font_hdr)
 
     # ---- Data rows ----
@@ -1687,12 +2169,22 @@ def generate_snapshot(pair_data):
 
         draw.text((x + BOTTOM_OFFSETS["box"], box_y), f"H1/H4 {p.get('box_badge', '-')}",
                   fill=tc, font=font_data)
+        draw.text((x + 800, box_y), f"PDR {p.get('pdr', '-')}",
+                  fill=tc, font=font_data)
         draw.text((x + BOTTOM_OFFSETS["fl_st"], metrics_y), f"PL {p.get('pl_zone', '-')}",
                   fill=tc, font=font_data)
-        draw.text((x + BOTTOM_OFFSETS["score"], metrics_y), f"SCORE {p.get('score', '-')}",
+        _act = p.get("action", "")
+        if _act:
+            draw.text((x + 380, metrics_y), _act, fill=tc, font=font_data)
+        draw.text((x + 740, metrics_y), f"SCORE {p.get('score', '-')}",
                   fill=tc, font=font_data)
 
-    # ---- Footer ----
+        # EXTREME TF line (v9) — timeframes at ±4/5/6 per currency, e.g. "GBP D1+5 H4+5 | JPY H1-5"
+        xtf_y = y_card + LINE_OFFSETS.get("xtf", 284)
+        draw.text((x + BOTTOM_OFFSETS["box"], xtf_y), f"XTF {p.get('xtf', '-')}",
+                  fill=tc, font=font_data)
+
+    # ---- Footer (clean — legend lives on the dashboard Overview tab) ----
     footer_y = height - FOOTER_H
     draw.rectangle([0, footer_y, width, footer_y + FOOTER_H], fill=BG_CARD)
     draw.rectangle([0, footer_y, width, footer_y + 4], fill=ACCENT)
@@ -1723,6 +2215,17 @@ def send_snapshot():
     try:
         res  = supabase.table("dashboard").select("*").execute()
         data = res.data or []
+
+        # ---- PDR map (from pdr_cache, refreshed by /api/pdr on the dashboard) ----
+        pdr_map = {}
+        try:
+            _pdr_res = supabase.table("pdr_cache").select("symbol,pdr_strength,pdr_strong,pdr_direction").execute()
+            for _p in (_pdr_res.data or []):
+                if _p.get("symbol"):
+                    pdr_map[_p["symbol"]] = _p
+        except Exception as _pe:
+            print(f"[SNAPSHOT] PDR fetch skipped: {_pe}")
+
         pair_data    = []
         buy_count    = 0
         sell_count   = 0
@@ -1780,14 +2283,51 @@ def send_snapshot():
                 white_count += 1
                 bias_val = "INVALID"
 
+            # ACTION word from execution rules (easy read on the image)
+            _pc = classify_phase_server(r)
+            action_word = verdict_action_word(r, _pc)
+
+            # PDR in plain words RELATIVE TO BIAS (live broker data preferred):
+            #   SUPPORTS = yesterday moved with the bias and held (continuation backdrop)
+            #   WEAK SUP = right direction, no conviction
+            #   AGAINST  = yesterday opposed the bias (trend-turn risk)
+            _pdir, _pstrong, _pratio = r.get("pdr_dir"), bool(r.get("pdr_strong_live")), r.get("pdr_ratio")
+            if _pdir is None:
+                _pc_row = pdr_map.get(symbol)
+                if _pc_row and _pc_row.get("pdr_strength") is not None:
+                    _pdir = "BULLISH" if (_pc_row.get("pdr_direction") or "") == "BULLISH" else "BEARISH"
+                    _pstrong = bool(_pc_row.get("pdr_strong"))
+                    _pratio = _pc_row.get("pdr_strength")
+            if _pdir is None:
+                pdr_display = "-"
+            elif bias_val in ("BUY", "SELL"):
+                _aligned = (bias_val == "BUY" and _pdir == "BULLISH") or (bias_val == "SELL" and _pdir == "BEARISH")
+                if _aligned and _pstrong: pdr_display = "SUPPORTS"
+                elif _aligned:            pdr_display = "WEAK SUP"
+                else:                     pdr_display = "AGAINST"
+            else:
+                _arrow = "▲" if _pdir == "BULLISH" else "▼"
+                pdr_display = f"{_arrow}{float(_pratio or 0):.1f}{'S' if _pstrong else 'w'}"
+
+            # EXTREME TF string from derive_score_tf fields (v9)
+            _b_tf = (r.get("base_score_tf") or "").strip()
+            _q_tf = (r.get("quote_score_tf") or "").strip()
+            _xtf_parts = []
+            if _b_tf: _xtf_parts.append(f"{r.get('base_currency') or symbol[:3]} {_b_tf}")
+            if _q_tf: _xtf_parts.append(f"{r.get('quote_currency') or symbol[3:6]} {_q_tf}")
+            xtf_str = " | ".join(_xtf_parts) if _xtf_parts else "NONE"
+
             pair_data.append({
                 "symbol": symbol,
                 "gap": gap,
                 "bias": bias_val,
                 "box_badge": box_badge,
                 "pl_zone": pl_zone_v,
+                "pdr": pdr_display,
+                "action": action_word,
                 "score": conf_display,
                 "category": category,
+                "xtf": xtf_str,
             })
 
         # Sort alphabetically by symbol
@@ -1795,7 +2335,7 @@ def send_snapshot():
 
         if not pair_data:
             pair_data = [{"symbol": "NO DATA", "gap": 0, "bias": "-", "box_badge": "-",
-                          "pl_zone": "-", "score": 0, "category": "WHITE"}]
+                          "pl_zone": "-", "score": 0, "category": "WHITE", "xtf": "-"}]
 
         img_path = generate_snapshot(pair_data)
 
@@ -1886,6 +2426,68 @@ MOMENTUM_GUIDE = {
     "STABLE":        ("▬",  "MONITOR — No strong momentum"),
     "NEUTRAL":       ("○",  "WAIT — No valid signal"),
 }
+
+# ================= STRUCTURE ALERTS (Panda Lines FLIP + H1 BOS) =================
+def _send_structure_alert(text):
+    """Low-level sender for structure alerts — same bot/chat + circuit breaker as gap/spike alerts."""
+    if is_market_closed():
+        return
+    if not telegram_circuit.allow():
+        return
+    try:
+        body = (text + f"\n\n⏰ {datetime.now().strftime('%H:%M')}\n🐼 PANDA ENGINE v3.0")[:4000]
+        response = requests.post(
+            f"https://api.telegram.org/bot{SIGNAL_BOT_TOKEN}/sendMessage",
+            data={"chat_id": SIGNAL_CHAT_ID, "text": body, "parse_mode": "HTML"},
+            timeout=15
+        )
+        if response.status_code == 200:
+            telegram_circuit.success()
+        else:
+            print("[STRUCTURE ALERT ERROR]", response.text)
+            telegram_circuit.failure()
+    except Exception as e:
+        print("[STRUCTURE ALERT ERROR]:", e)
+        telegram_circuit.failure()
+
+
+def check_structure_alerts(pair, pl):
+    """
+    Fire Telegram on (1) Panda Lines FLIP — TBG_ZONE crossing ABOVE<->BELOW — and
+    (2) a new H1 Break of Structure, deduped on the break-bar time (TBG_BOS_T).
+    First sighting of a pair seeds state silently so there is no burst on engine restart.
+    Mutates module dicts PREV_ZONE / LAST_BOS_T in place (no rebinding — no `global` needed).
+    """
+    if not pl:
+        return
+    zone  = pl.get("pl_zone")
+    bos   = (pl.get("pl_bos") or "NONE")
+    bos_t = int(pl.get("pl_bos_t") or 0)
+
+    # ---- FLIP: TBG_ZONE crossing ABOVE <-> BELOW (BETWEEN = no side, no spam) ----
+    prev = PREV_ZONE.get(pair)
+    if zone in ("ABOVE", "BELOW"):
+        if prev in ("ABOVE", "BELOW") and prev != zone:
+            direction = "BULLISH" if zone == "ABOVE" else "BEARISH"
+            _send_structure_alert(
+                f"🐼 <b>PANDA LINES FLIP — {pair}</b>\n"
+                f"   {prev} → {zone}  (<b>{direction}</b>)"
+            )
+        PREV_ZONE[pair] = zone
+    elif prev is None:
+        PREV_ZONE[pair] = zone   # seed only (may be BETWEEN/None); a real side is set above
+
+    # ---- BOS: new H1 break, deduped on break-bar time ----
+    if pair not in LAST_BOS_T:
+        LAST_BOS_T[pair] = bos_t   # first-sighting seed — never alerts on a stale/boot value
+    elif bos in ("BULLISH", "BEARISH") and bos_t > 0 and bos_t != LAST_BOS_T[pair]:
+        arrow = "🔼" if bos == "BULLISH" else "🔽"
+        _send_structure_alert(
+            f"🐼 <b>BREAK OF STRUCTURE — {pair} (H1)</b>\n"
+            f"   {bos} BOS confirmed {arrow}"
+        )
+        LAST_BOS_T[pair] = bos_t
+
 
 def send_spike_alert(spikes):
     if is_market_closed():
@@ -2035,6 +2637,28 @@ def hourly_snapshot_due(now, last_hour_mark):
     if last_hour_mark == hour_mark:
         return False, last_hour_mark
     return True, hour_mark
+
+def load_snapshot_hour_mark():
+    try:
+        with open(SNAPSHOT_HOUR_MARK_FILE, "r", encoding="utf-8") as f:
+            raw = f.read().strip()
+        return datetime.fromisoformat(raw) if raw else None
+    except FileNotFoundError:
+        return None
+    except Exception as e:
+        print(f"[HOURLY] Could not load snapshot hour mark: {e}")
+        return None
+
+def persist_snapshot_hour_mark(hour_mark):
+    if not hour_mark:
+        return
+    try:
+        tmp_path = f"{SNAPSHOT_HOUR_MARK_FILE}.tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            f.write(hour_mark.isoformat())
+        os.replace(tmp_path, SNAPSHOT_HOUR_MARK_FILE)
+    except Exception as e:
+        print(f"[HOURLY] Could not persist snapshot hour mark: {e}")
 
 async def run_scheduler_step(label, *steps):
     """Run blocking engine work outside FastAPI's event loop."""
@@ -2360,6 +2984,8 @@ def daily_cleanup():
 async def master_scheduler():
     global LAST_QUARTER_MARK, LAST_HOUR_MARK, LAST_NEWS_MARK
     await asyncio.sleep(5)
+    if LAST_HOUR_MARK is None:
+        LAST_HOUR_MARK = load_snapshot_hour_mark()
     print("[SCHEDULER] Started — waiting for next 15-min mark...")
 
     while True:
@@ -2391,6 +3017,7 @@ async def master_scheduler():
                 async with ENGINE_LOCK:
                     try:
                         print(f"\n{'='*50}\n[HOURLY] Firing at {now.strftime('%H:%M:%S')}")
+                        persist_snapshot_hour_mark(hour_mark)
                         await run_scheduler_step("hourly-gap", run_gap_once)
                         # Auto-reset circuit breaker before hourly snapshot
                         # — ensures snapshot always attempts, even after transient failures
@@ -2406,6 +3033,7 @@ async def master_scheduler():
                             telegram_circuit.locked_until = 0
                         await run_scheduler_step("hourly-ai-update", send_ai_snapshot)
                         await run_scheduler_step("hourly-cleanup", daily_cleanup)
+                        maybe_run_nightly_analyst(now)
                     except Exception as e:
                         print("[ENGINE ERROR - hourly]:", e)
                 LAST_HOUR_MARK = hour_mark
@@ -2537,6 +3165,132 @@ def force_gap_only():
         return {"status": "OK", "pairs": len(result) if result else 0}
     except Exception as e:
         return {"status": "ERROR", "message": str(e)}
+
+# ================= PANDA STRAT EA API =================
+# Returns per-symbol signal data for the Panda Strat MT5 EA.
+# The EA polls this endpoint every 30s. Engine does the filtering,
+# EA just reads the verdict and executes.
+
+PANDA_A_TIER_SET = {"EURAUD", "AUDJPY", "EURNZD", "NZDUSD", "GBPUSD", "EURJPY"}
+PANDA_BLACKLIST_SET = {"CADJPY", "AUDCAD", "AUDUSD"}
+PANDA_GOOD_MOM_SET = {"STRONG", "BUILDING", "SPARK"}
+
+@app.get("/api/ea/panda")
+def ea_panda_signal(request: Request, symbol: str = ""):
+    """
+    Returns Panda Strat signal for a single symbol.
+    EA calls: GET /api/ea/panda?symbol=EURCAD
+    Auth: ENGINE_SECRET in X-Engine-Secret header.
+    Response: {action: "BUY"|"SELL"|"NONE", gap, momentum, box_h4, session, reason}
+    """
+    secret = request.headers.get("x-engine-secret", "")
+    if not ENGINE_SECRET or secret != ENGINE_SECRET:
+        return {"error": "unauthorized"}
+
+    if not symbol or len(symbol) < 6:
+        return {"action": "NONE", "reason": "no_symbol"}
+
+    sym = symbol.upper()[:6]
+
+    # Pair filter
+    if sym in PANDA_BLACKLIST_SET:
+        return {"action": "NONE", "reason": "blacklisted", "symbol": sym}
+    if sym not in PANDA_A_TIER_SET:
+        return {"action": "NONE", "reason": "not_a_tier", "symbol": sym}
+
+    # Session filter
+    session = get_session()
+    if session == "LONDON":
+        return {"action": "NONE", "reason": "london_session", "symbol": sym, "session": session}
+
+    # Get live dashboard data
+    try:
+        res = supabase.table("dashboard").select("*").eq("symbol", sym).limit(1).execute()
+        if not res.data:
+            return {"action": "NONE", "reason": "no_data", "symbol": sym}
+        row = res.data[0]
+    except Exception as e:
+        return {"action": "NONE", "reason": f"db_error: {e}", "symbol": sym}
+
+    gap = row.get("gap", 0)
+    abs_gap = abs(gap)
+    momentum = row.get("momentum", "")
+    box_h4 = row.get("box_h4_trend", "")
+    hard_invalid = row.get("hard_invalid", True)
+
+    # Hard invalid
+    if hard_invalid:
+        return {"action": "NONE", "reason": "hard_invalid", "symbol": sym, "gap": gap}
+
+    # Gap threshold
+    if abs_gap < 6:
+        return {"action": "NONE", "reason": "gap_below_6", "symbol": sym, "gap": gap}
+
+    # Direction
+    direction = "BUY" if gap >= 6 else "SELL" if gap <= -6 else "NONE"
+    if direction == "NONE":
+        return {"action": "NONE", "reason": "no_bias", "symbol": sym, "gap": gap}
+
+    # Momentum filter
+    if momentum not in PANDA_GOOD_MOM_SET:
+        return {"action": "NONE", "reason": f"bad_momentum:{momentum}", "symbol": sym, "gap": gap, "momentum": momentum}
+
+    # Box H4 alignment
+    expected_box = "UPTREND" if direction == "BUY" else "DOWNTREND"
+    if box_h4 != expected_box:
+        return {"action": "NONE", "reason": f"box_h4_mismatch:{box_h4}", "symbol": sym, "gap": gap, "box_h4": box_h4}
+
+    # Check for existing PENDING signal (prevent stacking)
+    try:
+        pending = supabase.table("signal_results").select("id").eq("symbol", sym).eq("strategy", "PANDA").eq("status", "PENDING").execute()
+        has_pending = bool(pending.data and len(pending.data) > 0)
+    except Exception:
+        has_pending = False
+
+    return {
+        "action": direction,
+        "symbol": sym,
+        "gap": gap,
+        "momentum": momentum,
+        "box_h4": box_h4,
+        "session": session,
+        "has_pending_signal": has_pending,
+        "reason": "all_filters_passed"
+    }
+
+
+@app.get("/api/ea/panda/exit")
+def ea_panda_exit(request: Request, symbol: str = ""):
+    """
+    Returns exit signal for an open PANDA trade.
+    EA calls: GET /api/ea/panda/exit?symbol=EURCAD
+    Response: {should_exit: true|false, reason, gap, pips_flat_hours}
+    """
+    secret = request.headers.get("x-engine-secret", "")
+    if not ENGINE_SECRET or secret != ENGINE_SECRET:
+        return {"error": "unauthorized"}
+
+    sym = symbol.upper()[:6] if symbol else ""
+    if not sym:
+        return {"should_exit": false, "reason": "no_symbol"}
+
+    try:
+        res = supabase.table("dashboard").select("gap,momentum,bias").eq("symbol", sym).limit(1).execute()
+        if not res.data:
+            return {"should_exit": False, "reason": "no_data"}
+        row = res.data[0]
+    except Exception as e:
+        return {"should_exit": False, "reason": f"db_error: {e}"}
+
+    gap = row.get("gap", 0)
+    abs_gap = abs(gap)
+
+    # Exit conditions
+    if abs_gap < 5:
+        return {"should_exit": True, "reason": "BIAS_FLIP", "gap": gap}
+
+    return {"should_exit": False, "reason": "hold", "gap": gap, "momentum": row.get("momentum", "")}
+
 
 @app.get("/status")
 def get_status():
