@@ -2,7 +2,8 @@ from pathlib import Path
 import re
 from collections import Counter
 
-src = Path(r'C:\Users\Admin\panda-dashboard\pages\dashboard.js')
+# Cross-platform: resolve relative to this script's location (works on Mac + Windows)
+src = Path(__file__).resolve().parent / 'pages' / 'dashboard.js'
 code = src.read_text(encoding='utf-8-sig')
 
 funcs = re.findall(r'function ([A-Za-z_][A-Za-z0-9_]*)\s*[\(\{]', code)

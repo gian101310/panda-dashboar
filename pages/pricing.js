@@ -6,26 +6,13 @@ const mono = "'Share Tech Mono',monospace";
 const orb = "'Orbitron',sans-serif";
 const raj = "'Rajdhani',sans-serif";
 
-const TIERS = [
-  {
-    name: 'STARTER', price: '0', period: '', sub: 'FREE FOR 1 WEEK', color: '#445566', tag: null,
-    features: ['Live signals tab', 'Position calculator'],
-    cta: 'START FREE TRIAL', href: '/login',
-  },
-  {
-    name: 'PRO', price: '99', period: '/mo', sub: 'or $3,499 one-time (lifetime)', color: '#00ff9f', tag: 'MOST POPULAR',
-    features: ['Everything in Starter, plus:', 'Panel tab', 'Full data table', 'Valid setups tab', 'Panda AI assistant', 'Research tab'],
-    cta: 'GO PRO →', href: 'https://pay.ziina.com/PandaEngine/T-57VTBVN?source=app',
-  },
-  {
-    name: 'ELITE', price: '699', period: '/mo', sub: 'or $4,999 one-time (lifetime)', color: '#00b4ff', tag: 'FULL ACCESS',
-    features: ['Everything in Pro, plus:', 'Overview tab', 'Signal logs tab', 'Valid pairs filter', 'Telegram signal alerts', 'Spike signal alerts', 'Private trading journal', 'Chart tab', 'MT4/MT5 Panda Indicators', 'Bias detection indicators'],
-    cta: 'GO ELITE →', href: 'https://pay.ziina.com/PandaEngine/iCPVN84Mw?source=app',
-  },
-];
+import { curSym, mapDbTiers, FALLBACK_TIERS } from '../lib/pricingClient';
+import { mergePublicOverlayProducts } from '../lib/indicatorStore.mjs';
 export default function PricingPage() {
   const router = useRouter();
   const [visible, setVisible] = useState(false);
+  const [tiers, setTiers] = useState(FALLBACK_TIERS);
+  const [products, setProducts] = useState(() => mergePublicOverlayProducts([]));
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [pfSignupOpen, setPfSignupOpen] = useState(false);
@@ -38,7 +25,13 @@ export default function PricingPage() {
   const [pfSignupToken, setPfSignupToken] = useState('');
   const [pfSignupTelegram, setPfSignupTelegram] = useState('');
 
-  useEffect(() => { setVisible(true); }, []);
+  useEffect(() => {
+    setVisible(true);
+    fetch('/api/pricing').then(r => r.json()).then(j => {
+      if (j?.tiers?.length) setTiers(mapDbTiers(j.tiers));
+      setProducts(mergePublicOverlayProducts(j?.products || []));
+    }).catch(() => {});
+  }, []);
 
   const pfOpenSignup = (tier) => {
     setPfSignupTier(tier); setPfSignupEmail(''); setPfSignupUsername(''); setPfSignupTelegram('');
@@ -96,16 +89,17 @@ export default function PricingPage() {
         {/* TIERS */}
         <section style={{ position: 'relative', zIndex: 1, padding: '40px 24px 80px', maxWidth: 1020, margin: '0 auto' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 20, alignItems: 'start' }}>
-            {TIERS.map((t, i) => {
+            {tiers.map((t, i) => {
               const isPro = t.name === 'PRO';
               return (
                 <div key={i} style={{ background: isPro ? 'linear-gradient(135deg,#0a1420,#0e1a2a)' : 'linear-gradient(135deg,#0a0e1a,#0e1525)', border: `1px solid ${isPro ? '#00ff9f33' : '#1a2540'}`, borderRadius: 14, padding: '36px 28px', position: 'relative', transform: isPro ? 'scale(1.03)' : 'none', boxShadow: isPro ? '0 0 50px rgba(0,255,159,0.08)' : 'none' }} className="tier-card">
                   {t.tag && <div style={{ position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)', background: t.color, color: '#050810', fontFamily: orb, fontSize: 8, fontWeight: 700, letterSpacing: 2, padding: '4px 14px', borderRadius: 20 }}>{t.tag}</div>}
                   <div style={{ fontFamily: orb, fontSize: 12, fontWeight: 700, letterSpacing: 3, color: t.color, marginBottom: 20 }}>{t.name}</div>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 6 }}>
-                    <span style={{ fontFamily: mono, fontSize: 14, color: '#445566' }}>$</span>
+                    <span style={{ fontFamily: mono, fontSize: 14, color: '#445566' }}>{curSym(t.cur)}</span>
                     <span style={{ fontFamily: orb, fontSize: 48, fontWeight: 900, color: '#e8eaf0' }}>{t.price}</span>
                     <span style={{ fontFamily: mono, fontSize: 12, color: '#445566' }}>{t.period}</span>
+                    {t.was && <span style={{ fontFamily: mono, fontSize: 15, color: '#445566', textDecoration: 'line-through', marginLeft: 8 }}>{curSym(t.cur)}{t.was}</span>}
                   </div>
                   {t.sub && <div style={{ fontFamily: mono, fontSize: 10, color: '#ffd166', letterSpacing: 1, marginBottom: 22 }}>{t.sub}</div>}
                   {!t.sub && <div style={{ marginBottom: 22 }} />}
@@ -117,12 +111,38 @@ export default function PricingPage() {
                       </div>
                     ))}
                   </div>
-                  <button onClick={() => pfOpenSignup(t.name.toLowerCase())} style={{ width: '100%', background: isPro ? '#00ff9f' : 'transparent', border: `1px solid ${t.color}`, borderRadius: 8, color: isPro ? '#050810' : t.color, fontFamily: orb, fontSize: 11, fontWeight: 700, letterSpacing: 2, padding: '14px', cursor: 'pointer', transition: 'all 0.2s' }} className={isPro ? 'cta-btn' : 'tier-btn'}>{t.cta}</button>
+                  <button onClick={() => pfOpenSignup(t.tier || t.name.toLowerCase())} style={{ width: '100%', background: isPro ? '#00ff9f' : 'transparent', border: `1px solid ${t.color}`, borderRadius: 8, color: isPro ? '#050810' : t.color, fontFamily: orb, fontSize: 11, fontWeight: 700, letterSpacing: 2, padding: '14px', cursor: 'pointer', transition: 'all 0.2s' }} className={isPro ? 'cta-btn' : 'tier-btn'}>{t.cta}</button>
                 </div>
               );
             })}
           </div>
         </section>
+
+        {/* STORE — INDICATORS */}
+        {products.length > 0 && (
+          <section style={{ position: 'relative', zIndex: 1, padding: '20px 24px 40px', maxWidth: 900, margin: '0 auto' }}>
+            <div style={{ textAlign: 'center', marginBottom: 28 }}>
+              <div style={{ fontFamily: mono, fontSize: 10, letterSpacing: 5, color: '#00b4ff', marginBottom: 10 }}>ONE-TIME PURCHASE</div>
+              <h3 style={{ fontFamily: orb, fontSize: 22, fontWeight: 700, margin: 0 }}>cTRADER / MT4 / MT5 INDICATORS</h3>
+              <p style={{ fontFamily: raj, fontSize: 14, color: '#6b7d8e', marginTop: 8 }}>Download first, then request activation for your trading account number.</p>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 16 }}>
+              {products.map((p) => (
+                <div key={p.code} style={{ background: 'linear-gradient(135deg,#0a0e1a,#0e1525)', border: '1px solid #1a2540', borderRadius: 12, padding: '26px 22px', display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ fontFamily: mono, fontSize: 9, color: '#00b4ff', letterSpacing: 3, marginBottom: 7 }}>{p.platform}</div>
+                  <div style={{ fontFamily: orb, fontSize: 13, fontWeight: 700, letterSpacing: 2, color: '#e8eaf0', marginBottom: 8 }}>{p.name}</div>
+                  {p.description && <p style={{ fontFamily: raj, fontSize: 13, color: '#8899aa', lineHeight: 1.5, marginBottom: 14, flex: 1 }}>{p.description}</p>}
+                  <div style={{ fontFamily: orb, fontSize: p.price > 0 ? 25 : 14, fontWeight: 900, color: '#ffd166', marginBottom: 16 }}>{p.priceLabel}</div>
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    <a href={`/api/indicator-download?product=${encodeURIComponent(p.code)}`} style={{ width: '100%', textAlign: 'center', textDecoration: 'none', background: 'transparent', border: '1px solid #00b4ff', borderRadius: 8, color: '#00b4ff', fontFamily: orb, fontSize: 9, fontWeight: 700, letterSpacing: 2, padding: '12px' }}>DOWNLOAD LICENSED</a>
+                    {p.paymentLink && <button onClick={() => window.open(p.paymentLink, '_blank', 'noopener,noreferrer')} style={{ width: '100%', background: 'transparent', border: '1px solid #ffd166', borderRadius: 8, color: '#ffd166', fontFamily: orb, fontSize: 9, fontWeight: 700, letterSpacing: 2, padding: '12px', cursor: 'pointer' }} className="tier-btn">BUY NOW →</button>}
+                    <button onClick={() => router.push('/#indicators')} style={{ width: '100%', background: 'transparent', border: '1px solid #00ff9f', borderRadius: 8, color: '#00ff9f', fontFamily: orb, fontSize: 9, fontWeight: 700, letterSpacing: 2, padding: '12px', cursor: 'pointer' }} className="tier-btn">REQUEST ACTIVATION</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* pf-reviews */}
         <section style={{ position: 'relative', zIndex: 1, padding: '40px 24px 20px', maxWidth: 900, margin: '0 auto' }}>

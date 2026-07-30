@@ -2,12 +2,7 @@
 // Receives trade execution results from MT5 EA via WebRequest
 // Auth: Bearer token via EA_API_KEY env var (machine-to-machine, no cookie)
 
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  'https://jxkelchxitwuilpbrwxk.supabase.co',
-  process.env.SUPABASE_SERVICE_KEY || ''
-);
+import { supabase } from '../../lib/supabase';
 
 export default async function handler(req, res) {
   // Only POST allowed
@@ -40,21 +35,10 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Missing required fields: ticket, symbol, strategy, fill_price, open_time, magic, direction' });
     }
 
-    // Check duplicate (ticket is UNIQUE but handle gracefully)
-    const { data: existing } = await supabase
-      .from('ea_executions')
-      .select('id')
-      .eq('ticket', String(ticket))
-      .maybeSingle();
-
-    if (existing) {
-      return res.status(200).json({ id: existing.id, symbol, status: 'already_recorded' });
-    }
-
-    // Insert
+    // Atomic ticket upsert avoids the check-then-insert race when an EA retries.
     const { data, error } = await supabase
       .from('ea_executions')
-      .insert({
+      .upsert({
         ticket: String(ticket),
         symbol,
         strategy,
@@ -79,12 +63,12 @@ export default async function handler(req, res) {
         signal_to_fill_sec: (signal_write_time && open_time)
           ? Math.round((new Date(open_time) - new Date(signal_write_time)) / 1000)
           : null
-      })
+      }, { onConflict: 'ticket' })
       .select('id')
       .single();
 
     if (error) {
-      console.error('[EA-RESULT] Insert error:', error.message);
+      console.error('[EA-RESULT] Upsert error:', error.message);
       return res.status(500).json({ error: error.message });
     }
 

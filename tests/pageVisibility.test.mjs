@@ -76,6 +76,6 @@ test('admin-maintenance access unlocks only the normal login page', () => {
 });
 
 test('maps every dashboard-controlled public route', () => {
-  assert.equal(ROUTE_TO_PAGE_KEY['/guardian'], 'guardian');
+  assert.equal(ROUTE_TO_PAGE_KEY['/guardian'], undefined);
   assert.equal(ROUTE_TO_PAGE_KEY['/stream'], 'stream');
 });

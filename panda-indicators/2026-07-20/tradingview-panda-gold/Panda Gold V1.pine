@@ -1,0 +1,453 @@
+//@version=6
+indicator("Panda Gold V1", shorttitle = "PANDA GOLD", overlay = true, dynamic_requests = true, calc_bars_count = 1800, max_lines_count = 500, max_labels_count = 500, max_boxes_count = 200)
+
+// =================================================================
+// Panda Gold V1
+// SuperTrend filtered-flip entries, fixed 1R / 2R / 3R targets with
+// stop-to-breakeven after TP1, filtered by Panda USD strength
+// (do not fight a strong USD on gold). Non-repainting on bar close.
+// Currency scoring block below is compute-only (no drawing).
+// =================================================================
+const int PANDA_GAP_THRESHOLD = 5
+const int PANDA_SIGNIFICANT = 4
+
+// ---- Panda currency-strength scoring (compute only; used for USD read) ----
+var array<string> PANDA_PAIRS = array.from(
+  "AUDCAD", "AUDJPY", "AUDNZD", "AUDUSD", "CADJPY",
+  "EURAUD", "EURCAD", "EURGBP", "EURJPY", "EURNZD", "EURUSD",
+  "GBPAUD", "GBPCAD", "GBPJPY", "GBPNZD", "GBPUSD",
+  "NZDCAD", "NZDJPY", "NZDUSD", "USDCAD", "USDJPY")
+
+type PairSnapshot
+    float price
+    float shortHigh
+    float shortLow
+    int shortStart
+    int shortEnd
+    float mediumHigh
+    float mediumLow
+    int mediumStart
+    int mediumEnd
+    float longHigh
+    float longLow
+    int longStart
+    int longEnd
+
+f_snapshot() =>
+    var float dayHigh = na
+    var float dayLow = na
+    var int dayStart = na
+    var float d1High = na
+    var float d1Low = na
+    var int d1Start = na
+    var float d2High = na
+    var float d2Low = na
+    var int d2Start = na
+    var float d3High = na
+    var float d3Low = na
+    var int d3Start = na
+    if na(dayHigh)
+        dayHigh := high
+        dayLow := low
+        dayStart := time
+    else if timeframe.change("1D")
+        d3High := d2High
+        d3Low := d2Low
+        d3Start := d2Start
+        d2High := d1High
+        d2Low := d1Low
+        d2Start := d1Start
+        d1High := dayHigh
+        d1Low := dayLow
+        d1Start := dayStart
+        dayHigh := high
+        dayLow := low
+        dayStart := time
+    else
+        dayHigh := math.max(dayHigh, high)
+        dayLow := math.min(dayLow, low)
+
+    var float weekHigh = na
+    var float weekLow = na
+    var int weekStart = na
+    var float w1High = na
+    var float w1Low = na
+    var int w1Start = na
+    var float w2High = na
+    var float w2Low = na
+    var int w2Start = na
+    var float w3High = na
+    var float w3Low = na
+    var int w3Start = na
+    if na(weekHigh)
+        weekHigh := high
+        weekLow := low
+        weekStart := time
+    else if timeframe.change("1W")
+        w3High := w2High
+        w3Low := w2Low
+        w3Start := w2Start
+        w2High := w1High
+        w2Low := w1Low
+        w2Start := w1Start
+        w1High := weekHigh
+        w1Low := weekLow
+        w1Start := weekStart
+        weekHigh := high
+        weekLow := low
+        weekStart := time
+    else
+        weekHigh := math.max(weekHigh, high)
+        weekLow := math.min(weekLow, low)
+
+    var float monthHigh = na
+    var float monthLow = na
+    var int monthStart = na
+    var float m1High = na
+    var float m1Low = na
+    var int m1Start = na
+    var float m2High = na
+    var float m2Low = na
+    var int m2Start = na
+    var float m3High = na
+    var float m3Low = na
+    var int m3Start = na
+    if na(monthHigh)
+        monthHigh := high
+        monthLow := low
+        monthStart := time
+    else if timeframe.change("1M")
+        m3High := m2High
+        m3Low := m2Low
+        m3Start := m2Start
+        m2High := m1High
+        m2Low := m1Low
+        m2Start := m1Start
+        m1High := monthHigh
+        m1Low := monthLow
+        m1Start := monthStart
+        monthHigh := high
+        monthLow := low
+        monthStart := time
+    else
+        monthHigh := math.max(monthHigh, high)
+        monthLow := math.min(monthLow, low)
+
+    PairSnapshot.new(close,
+      math.max(d2High, d3High), math.min(d2Low, d3Low), d3Start, d1Start,
+      math.max(w2High, w3High), math.min(w2Low, w3Low), w3Start, w1Start,
+      math.max(m2High, m3High), math.min(m2Low, m3Low), m3Start, m1Start)
+
+f_currency_index(string currency) =>
+    switch currency
+        "AUD" => 0
+        "CAD" => 1
+        "EUR" => 2
+        "GBP" => 3
+        "JPY" => 4
+        "NZD" => 5
+        "USD" => 6
+        => -1
+
+f_canonical_pair() =>
+    string metadataPair = str.upper(syminfo.basecurrency + syminfo.currency)
+    if array.includes(PANDA_PAIRS, metadataPair)
+        metadataPair
+    else
+        string tickerText = str.upper(syminfo.ticker)
+        string matched = ""
+        int matchCount = 0
+        for candidate in PANDA_PAIRS
+            if str.contains(tickerText, candidate)
+                matched := candidate
+                matchCount += 1
+        matchCount == 1 ? matched : ""
+
+f_vote(float priceValue, float boxHigh, float boxLow) =>
+    na(priceValue) or na(boxHigh) or na(boxLow) ? 0 : priceValue > boxHigh ? 1 : priceValue < boxLow ? -1 : 0
+
+f_add_vote(array<int> target, string currency, int vote) =>
+    int index = f_currency_index(currency)
+    if index >= 0
+        array.set(target, index, array.get(target, index) + vote)
+
+f_add_pair_vote(array<int> target, string pair, int vote) =>
+    string base = str.substring(pair, 0, 3)
+    string quote = str.substring(pair, 3, 6)
+    f_add_vote(target, base, vote)
+    f_add_vote(target, quote, -vote)
+
+f_strongest(int d1, int h4, int h1) =>
+    int positive = math.max(0, math.max(d1, math.max(h4, h1)))
+    int negative = math.min(0, math.min(d1, math.min(h4, h1)))
+    math.abs(positive) == math.abs(negative) ? 0 : math.abs(negative) > math.abs(positive) ? negative : positive
+
+f_conflicted(array<int> dailyScores, array<int> weeklyScores, array<int> monthlyScores, int index) =>
+    int d1 = array.get(monthlyScores, index)
+    int h4 = array.get(weeklyScores, index)
+    int h1 = array.get(dailyScores, index)
+    bool hasPositive = d1 >= PANDA_SIGNIFICANT or h4 >= PANDA_SIGNIFICANT or h1 >= PANDA_SIGNIFICANT
+    bool hasNegative = d1 <= -PANDA_SIGNIFICANT or h4 <= -PANDA_SIGNIFICANT or h1 <= -PANDA_SIGNIFICANT
+    hasPositive and hasNegative
+
+f_box_trend(float formerHigh, float formerLow, float latterHigh, float latterLow) =>
+    if na(formerHigh) or na(formerLow) or na(latterHigh) or na(latterLow)
+        "UNKNOWN"
+    else
+        float latterMidpoint = (latterHigh + latterLow) / 2.0
+        latterMidpoint >= formerHigh ? "UPTREND" : latterMidpoint <= formerLow ? "DOWNTREND" : "RANGING"
+
+f_score(array<int> target, int index) =>
+    array.get(target, index)
+
+f_signed_score(int value) =>
+    value > 0 ? "+" + str.tostring(value) : str.tostring(value)
+
+// Mirrors the dashboard's base_score_tf / quote_score_tf display rule:
+// retain every D1, H4, or H1 value whose absolute score is at least 4.
+f_currency_extremes(string currency, int d1, int h4, int h1) =>
+    string values = ""
+    if math.abs(d1) >= PANDA_SIGNIFICANT
+        values := "D1 " + f_signed_score(d1)
+    if math.abs(h4) >= PANDA_SIGNIFICANT
+        values := values == "" ? "H4 " + f_signed_score(h4) : values + " · H4 " + f_signed_score(h4)
+    if math.abs(h1) >= PANDA_SIGNIFICANT
+        values := values == "" ? "H1 " + f_signed_score(h1) : values + " · H1 " + f_signed_score(h1)
+    currency + ": " + (values == "" ? "NONE" : values)
+
+string chartPair = f_canonical_pair()
+bool supportedPair = chartPair != ""
+
+var array<int> scoresH1 = array.new_int(7, 0)
+var array<int> scoresH4 = array.new_int(7, 0)
+var array<int> scoresD1 = array.new_int(7, 0)
+array.fill(scoresH1, 0)
+array.fill(scoresH4, 0)
+array.fill(scoresD1, 0)
+
+PairSnapshot activeSnapshot = na
+int readySnapshots = 0
+
+for pair in PANDA_PAIRS
+    PairSnapshot snapshot = request.security("OANDA:" + pair, "60", f_snapshot(),
+      ignore_invalid_symbol = true, calc_bars_count = 1800)
+    bool snapshotReady = not na(snapshot) and not na(snapshot.price)
+      and not na(snapshot.shortHigh) and not na(snapshot.shortLow)
+      and not na(snapshot.mediumHigh) and not na(snapshot.mediumLow)
+      and not na(snapshot.longHigh) and not na(snapshot.longLow)
+    if snapshotReady
+        readySnapshots += 1
+        f_add_pair_vote(scoresH1, pair, f_vote(snapshot.price, snapshot.shortHigh, snapshot.shortLow))
+        f_add_pair_vote(scoresH4, pair, f_vote(snapshot.price, snapshot.mediumHigh, snapshot.mediumLow))
+        f_add_pair_vote(scoresD1, pair, f_vote(snapshot.price, snapshot.longHigh, snapshot.longLow))
+    if pair == chartPair
+        activeSnapshot := snapshot
+
+bool scoreReady = supportedPair and readySnapshots == array.size(PANDA_PAIRS) and not na(activeSnapshot)
+int baseIndex = supportedPair ? f_currency_index(str.substring(chartPair, 0, 3)) : -1
+int quoteIndex = supportedPair ? f_currency_index(str.substring(chartPair, 3, 6)) : -1
+string baseCurrency = supportedPair ? str.substring(chartPair, 0, 3) : "BASE"
+string quoteCurrency = supportedPair ? str.substring(chartPair, 3, 6) : "QUOTE"
+
+int baseStrong = scoreReady ? f_strongest(f_score(scoresD1, baseIndex), f_score(scoresH4, baseIndex), f_score(scoresH1, baseIndex)) : 0
+int quoteStrong = scoreReady ? f_strongest(f_score(scoresD1, quoteIndex), f_score(scoresH4, quoteIndex), f_score(scoresH1, quoteIndex)) : 0
+string baseXtf = scoreReady ? f_currency_extremes(baseCurrency, f_score(scoresD1, baseIndex), f_score(scoresH4, baseIndex), f_score(scoresH1, baseIndex)) : "—"
+string quoteXtf = scoreReady ? f_currency_extremes(quoteCurrency, f_score(scoresD1, quoteIndex), f_score(scoresH4, quoteIndex), f_score(scoresH1, quoteIndex)) : "—"
+bool baseConflict = scoreReady and f_conflicted(scoresH1, scoresH4, scoresD1, baseIndex)
+bool quoteConflict = scoreReady and f_conflicted(scoresH1, scoresH4, scoresD1, quoteIndex)
+bool neutralMatchup = scoreReady and math.abs(baseStrong) < PANDA_SIGNIFICANT and math.abs(quoteStrong) < PANDA_SIGNIFICANT
+bool hardInvalid = scoreReady and (baseConflict or quoteConflict or neutralMatchup)
+int pandaGap = scoreReady and not hardInvalid ? baseStrong - quoteStrong : 0
+string pandaBias = not supportedPair ? "UNSUPPORTED SYMBOL" : not scoreReady ? "DATA UNAVAILABLE" : hardInvalid ? "HARD_INVALID" : pandaGap >= PANDA_GAP_THRESHOLD ? "BUY" : pandaGap <= -PANDA_GAP_THRESHOLD ? "SELL" : "WAIT"
+
+string boxH1Trend = scoreReady ? f_box_trend(activeSnapshot.mediumHigh, activeSnapshot.mediumLow, activeSnapshot.shortHigh, activeSnapshot.shortLow) : "UNKNOWN"
+string boxH4Trend = scoreReady ? f_box_trend(activeSnapshot.longHigh, activeSnapshot.longLow, activeSnapshot.mediumHigh, activeSnapshot.mediumLow) : "UNKNOWN"
+
+// ---- USD strength read (independent of the chart symbol) ----
+bool basketReady = readySnapshots == array.size(PANDA_PAIRS)
+int  usdIdx      = f_currency_index("USD")
+int  usdStrong   = basketReady ? f_strongest(f_score(scoresD1, usdIdx), f_score(scoresH4, usdIdx), f_score(scoresH1, usdIdx)) : 0
+
+// ---- Inputs ----
+string G_ST = "1. SuperTrend"
+float  stFactor = input.float(3.0, "SuperTrend factor", minval = 0.5, step = 0.1, group = G_ST)
+int    stAtr    = input.int(10, "SuperTrend ATR length", minval = 1, group = G_ST)
+
+string G_FILTER = "2. USD Filter"
+bool   useUsdFilter = input.bool(true, "Filter by Panda USD strength", group = G_FILTER, tooltip = "Block LONG gold when USD is strongly bid, and SHORT gold when USD is strongly weak.")
+int    usdThreshold = input.int(4, "USD strength threshold", minval = 1, maxval = 6, group = G_FILTER)
+
+string G_TRADE = "3. Trade"
+bool   showTradeLevels = input.bool(true, "Draw Entry / SL / TP levels", group = G_TRADE)
+bool   moveToBE        = input.bool(true, "Move SL to breakeven after TP1", group = G_TRADE)
+int    tradeLevelBars  = input.int(60, "Level line length (bars)", minval = 10, maxval = 500, group = G_TRADE)
+
+string G_VIS = "4. Visuals"
+bool showSignals  = input.bool(true, "Show LONG / SHORT labels", group = G_VIS)
+bool colorCandles = input.bool(true, "Color candles by trend", group = G_VIS)
+bool showSessions = input.bool(true, "Shade London / New York sessions", group = G_VIS)
+bool showDashboard = input.bool(true, "Show dashboard", group = G_VIS)
+
+// ---- SuperTrend and filtered flip ----
+[stValue, stDir] = ta.supertrend(stFactor, stAtr)
+bool flipUp   = stDir == -1 and stDir[1] ==  1
+bool flipDown = stDir ==  1 and stDir[1] == -1
+
+bool usdBlocksLong  = useUsdFilter and basketReady and usdStrong >=  usdThreshold
+bool usdBlocksShort = useUsdFilter and basketReady and usdStrong <= -usdThreshold
+bool allowLong  = not usdBlocksLong
+bool allowShort = not usdBlocksShort
+
+bool newLong  = flipUp   and allowLong  and barstate.isconfirmed
+bool newShort = flipDown and allowShort and barstate.isconfirmed
+
+// ---- Trade state machine (single active trade, 1R/2R/3R, SL to BE) ----
+var bool  inTrade = false
+var int   tradeDir = 0
+var float eEntry = na
+var float eSL = na
+var float eR = na
+var float eTP1 = na
+var float eTP2 = na
+var float eTP3 = na
+var bool  tp1Hit = false
+var bool  tp2Hit = false
+var bool  tp3Hit = false
+var bool  atBE = false
+
+if newLong or newShort
+    tradeDir := newLong ? 1 : -1
+    eEntry := close
+    eSL := stValue
+    eR := math.abs(eEntry - eSL)
+    eTP1 := tradeDir == 1 ? eEntry + eR      : eEntry - eR
+    eTP2 := tradeDir == 1 ? eEntry + 2.0 * eR : eEntry - 2.0 * eR
+    eTP3 := tradeDir == 1 ? eEntry + 3.0 * eR : eEntry - 3.0 * eR
+    tp1Hit := false
+    tp2Hit := false
+    tp3Hit := false
+    atBE := false
+    inTrade := eR > 0.0
+
+if inTrade and barstate.isconfirmed and not (newLong or newShort)
+    if tradeDir == 1
+        if not tp1Hit and high >= eTP1
+            tp1Hit := true
+            if moveToBE
+                eSL := eEntry
+                atBE := true
+        if not tp2Hit and high >= eTP2
+            tp2Hit := true
+        if not tp3Hit and high >= eTP3
+            tp3Hit := true
+            inTrade := false
+        if low <= eSL
+            inTrade := false
+    else
+        if not tp1Hit and low <= eTP1
+            tp1Hit := true
+            if moveToBE
+                eSL := eEntry
+                atBE := true
+        if not tp2Hit and low <= eTP2
+            tp2Hit := true
+        if not tp3Hit and low <= eTP3
+            tp3Hit := true
+            inTrade := false
+        if high >= eSL
+            inTrade := false
+
+// ---- SuperTrend plot + candle color + sessions ----
+float upTrend = stDir == -1 ? stValue : na
+float dnTrend = stDir ==  1 ? stValue : na
+plot(upTrend, "SuperTrend Base (up)", color = color.new(color.lime, 0), style = plot.style_linebr, linewidth = 2)
+plot(dnTrend, "SuperTrend Base (down)", color = color.new(color.red, 0), style = plot.style_linebr, linewidth = 2)
+barcolor(colorCandles ? (stDir == -1 ? color.new(color.lime, 0) : color.new(color.red, 0)) : na)
+
+bool inLondon = not na(time(timeframe.period, "0800-1700", "Europe/London"))
+bool inNY     = not na(time(timeframe.period, "0800-1700", "America/New_York"))
+bgcolor(showSessions and inLondon ? color.new(color.blue, 92) : na, title = "London session")
+bgcolor(showSessions and inNY ? color.new(color.orange, 92) : na, title = "New York session")
+
+// ---- Signal labels ----
+if showSignals and newLong
+    label.new(bar_index, low, "Long ▲", style = label.style_label_up, color = color.new(color.lime, 0), textcolor = color.black, size = size.small)
+if showSignals and newShort
+    label.new(bar_index, high, "Short ▼", style = label.style_label_down, color = color.new(color.red, 0), textcolor = color.white, size = size.small)
+
+// ---- Persistent trade level lines / labels ----
+var line lnEntry = na
+var line lnSL = na
+var line lnTP1 = na
+var line lnTP2 = na
+var line lnTP3 = na
+var label lbEntry = na
+var label lbSL = na
+var label lbTP1 = na
+var label lbTP2 = na
+var label lbTP3 = na
+
+if showTradeLevels and (newLong or newShort)
+    line.delete(lnEntry)
+    line.delete(lnSL)
+    line.delete(lnTP1)
+    line.delete(lnTP2)
+    line.delete(lnTP3)
+    label.delete(lbEntry)
+    label.delete(lbSL)
+    label.delete(lbTP1)
+    label.delete(lbTP2)
+    label.delete(lbTP3)
+    int xR = bar_index + tradeLevelBars
+    lnEntry := line.new(bar_index, eEntry, xR, eEntry, color = color.new(color.gray, 0), width = 1)
+    lnSL := line.new(bar_index, eSL, xR, eSL, color = color.new(color.red, 0), width = 1, style = line.style_dashed)
+    lnTP1 := line.new(bar_index, eTP1, xR, eTP1, color = color.new(color.teal, 0), width = 1)
+    lnTP2 := line.new(bar_index, eTP2, xR, eTP2, color = color.new(color.teal, 30), width = 1)
+    lnTP3 := line.new(bar_index, eTP3, xR, eTP3, color = color.new(color.teal, 55), width = 1)
+    lbEntry := label.new(xR, eEntry, "", style = label.style_label_left, color = color.new(color.gray, 20), textcolor = color.white, size = size.small)
+    lbSL := label.new(xR, eSL, "", style = label.style_label_left, color = color.new(color.red, 10), textcolor = color.white, size = size.small)
+    lbTP1 := label.new(xR, eTP1, "", style = label.style_label_left, color = color.new(color.teal, 10), textcolor = color.white, size = size.small)
+    lbTP2 := label.new(xR, eTP2, "", style = label.style_label_left, color = color.new(color.teal, 25), textcolor = color.white, size = size.small)
+    lbTP3 := label.new(xR, eTP3, "", style = label.style_label_left, color = color.new(color.teal, 45), textcolor = color.white, size = size.small)
+
+if showTradeLevels and inTrade and not na(lnSL)
+    line.set_y1(lnSL, eSL)
+    line.set_y2(lnSL, eSL)
+    label.set_y(lbSL, eSL)
+    label.set_text(lbEntry, "ENTRY " + str.tostring(eEntry, format.mintick))
+    label.set_text(lbSL, (atBE ? "SL (BE) " : "SL ") + str.tostring(eSL, format.mintick))
+    label.set_text(lbTP1, "TP1 " + (tp1Hit ? "✓ " : "") + str.tostring(eTP1, format.mintick))
+    label.set_text(lbTP2, "TP2 " + (tp2Hit ? "✓ " : "") + str.tostring(eTP2, format.mintick))
+    label.set_text(lbTP3, "TP3 " + (tp3Hit ? "✓ " : "") + str.tostring(eTP3, format.mintick))
+
+// ---- Dashboard ----
+var table dash = table.new(position.top_right, 2, 9, border_width = 1, frame_color = color.new(color.gray, 40), frame_width = 1)
+if showDashboard and barstate.islast
+    string sigTxt = inTrade ? (tradeDir == 1 ? "LONG" : "SHORT") : "FLAT"
+    color  sigCol = inTrade ? (tradeDir == 1 ? color.new(color.green, 0) : color.new(color.red, 0)) : color.new(color.gray, 0)
+    string filtTxt = not useUsdFilter ? "OFF" : usdBlocksLong ? "USD strong → no longs" : usdBlocksShort ? "USD weak → no shorts" : "CLEAR"
+    color  hdrBg = color.new(color.black, 0)
+    color  keyBg = color.new(#1b2530, 0)
+    color  valBg = color.new(#101820, 0)
+    table.cell(dash, 0, 0, "PANDA GOLD", text_color = color.white, bgcolor = hdrBg, text_size = size.small)
+    table.cell(dash, 1, 0, sigTxt, text_color = color.white, bgcolor = sigCol, text_size = size.small)
+    table.cell(dash, 0, 1, "Timeframe", text_color = color.silver, bgcolor = keyBg, text_size = size.small)
+    table.cell(dash, 1, 1, timeframe.period, text_color = color.white, bgcolor = valBg, text_size = size.small)
+    table.cell(dash, 0, 2, "USD strength", text_color = color.silver, bgcolor = keyBg, text_size = size.small)
+    table.cell(dash, 1, 2, basketReady ? str.tostring(usdStrong) : "loading", text_color = color.white, bgcolor = valBg, text_size = size.small)
+    table.cell(dash, 0, 3, "USD filter", text_color = color.silver, bgcolor = keyBg, text_size = size.small)
+    table.cell(dash, 1, 3, filtTxt, text_color = color.white, bgcolor = valBg, text_size = size.small)
+    table.cell(dash, 0, 4, "Entry", text_color = color.silver, bgcolor = keyBg, text_size = size.small)
+    table.cell(dash, 1, 4, inTrade ? str.tostring(eEntry, format.mintick) : "-", text_color = color.white, bgcolor = valBg, text_size = size.small)
+    table.cell(dash, 0, 5, "SL", text_color = color.silver, bgcolor = keyBg, text_size = size.small)
+    table.cell(dash, 1, 5, inTrade ? (atBE ? "BE " : "") + str.tostring(eSL, format.mintick) : "-", text_color = color.white, bgcolor = valBg, text_size = size.small)
+    table.cell(dash, 0, 6, "TP1 (1R)", text_color = color.silver, bgcolor = keyBg, text_size = size.small)
+    table.cell(dash, 1, 6, inTrade ? (tp1Hit ? "✓ " : "") + str.tostring(eTP1, format.mintick) : "-", text_color = color.white, bgcolor = valBg, text_size = size.small)
+    table.cell(dash, 0, 7, "TP2 (2R)", text_color = color.silver, bgcolor = keyBg, text_size = size.small)
+    table.cell(dash, 1, 7, inTrade ? (tp2Hit ? "✓ " : "") + str.tostring(eTP2, format.mintick) : "-", text_color = color.white, bgcolor = valBg, text_size = size.small)
+    table.cell(dash, 0, 8, "TP3 (3R)", text_color = color.silver, bgcolor = keyBg, text_size = size.small)
+    table.cell(dash, 1, 8, inTrade ? (tp3Hit ? "✓ " : "") + str.tostring(eTP3, format.mintick) : "-", text_color = color.white, bgcolor = valBg, text_size = size.small)
+
+// ---- Alerts ----
+alertcondition(newLong, "Panda Gold LONG", "Panda Gold: LONG flip on {{ticker}} {{interval}}")
+alertcondition(newShort, "Panda Gold SHORT", "Panda Gold: SHORT flip on {{ticker}} {{interval}}")

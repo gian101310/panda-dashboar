@@ -1,0 +1,44 @@
+PANDA MT5 DASHBOARD OVERLAY - LICENSED
+======================================
+
+Package contents
+- PandaDashboardOverlayMT5-Licensed.ex5   the dashboard panel (indicator)
+- PandaDashboardFeedMT5-Licensed.ex5      the data feed (expert advisor, REQUIRED, never trades)
+
+Why two files: MetaTrader does not allow indicators to access the internet.
+The small feed expert advisor downloads the dashboard snapshot once per
+minute and shares it with every chart. The indicator only displays it.
+
+Install
+1. In MT5 open File > Open Data Folder.
+2. Copy PandaDashboardOverlayMT5-Licensed.ex5 into MQL5\Indicators.
+3. Copy PandaDashboardFeedMT5-Licensed.ex5 into MQL5\Experts.
+4. Restart MT5.
+5. Tools > Options > Expert Advisors: tick "Allow WebRequest for listed URL",
+   double-click the empty line, type exactly  https://pandaengine.app
+   press Enter, then OK.
+
+Run
+6. Attach PandaDashboardFeedMT5-Licensed to ONE chart only (any supported
+   pair). It shows a small "PANDA FEED" badge and never places trades.
+7. Attach PandaDashboardOverlayMT5-Licensed to every chart where you want
+   the panel. Pick the corner with the PanelCorner input (top/bottom,
+   left/right) or drag the panel by its header.
+
+Activation
+- The software reads your trading account number automatically.
+- Your account must be paid and APPROVED for Panda MT5 Dashboard Overlay.
+  Request activation at https://pandaengine.app. The panel shows LIVE once
+  approved.
+
+Status messages
+- LIVE               data flowing
+- ATTACH FEED EA     the feed expert advisor is not running yet (step 6)
+- ALLOW WEBREQUEST   the WebRequest URL is missing (step 5)
+- STALE              connection lost; check internet and the feed chart
+- PENDING / LICENSE REQUIRED   account approval not complete
+- UNSUPPORTED SYMBOL attach to one of the 21 supported forex pairs
+
+Supported pairs: AUDCAD AUDJPY AUDNZD AUDUSD CADJPY EURAUD EURCAD EURGBP
+EURJPY EURNZD EURUSD GBPAUD GBPCAD GBPJPY GBPNZD GBPUSD NZDCAD NZDJPY
+NZDUSD USDCAD USDJPY

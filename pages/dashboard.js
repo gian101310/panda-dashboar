@@ -120,6 +120,242 @@ function PdrBadge({ pdr }) {
   );
 }
 
+// ===== LIVE PDR BADGE (broker data from v2 exporter — preferred over Twelve Data) =====
+function LivePdrBadge({ row }) {
+  if (row?.pdr_dir == null) return null;
+  const monoF = "'Share Tech Mono',monospace";
+  const strong = !!row.pdr_strong_live;
+  const color = strong ? '#00ff9f' : '#6b7280';
+  return (
+    <span style={{fontFamily:monoF,fontSize:8,padding:'1px 5px',borderRadius:4,
+      background:strong?'rgba(0,255,159,0.12)':'rgba(107,114,128,0.12)',
+      color,border:`1px solid ${color}40`,letterSpacing:1}}>
+      {row.pdr_dir==='BULLISH'?'▲':'▼'} {Number(row.pdr_ratio??0).toFixed(2)} {strong?'STRONG':'WEAK'} <span style={{color:'#00ff9f',fontSize:7}}>LIVE</span>
+    </span>
+  );
+}
+
+// ===== PDR VERDICT (plain-language: does yesterday support this trade?) =====
+function PdrVerdict({ row, pdr }) {
+  const gap = row?.gap ?? 0;
+  if (Math.abs(gap) < 5) return null;
+  const dir = gap > 0 ? 'BUY' : 'SELL';
+  // Prefer live broker PDR (v2 exporter), fallback to Twelve Data
+  const pdrDir = row?.pdr_dir != null ? row.pdr_dir : pdr?.direction;
+  const pdrStrong = row?.pdr_dir != null ? !!row.pdr_strong_live : !!pdr?.strong;
+  if (pdrDir == null) return null;
+  const monoF = "'Share Tech Mono',monospace";
+  const aligned = (dir === 'BUY' && pdrDir === 'BULLISH') || (dir === 'SELL' && pdrDir === 'BEARISH');
+  let v;
+  if (aligned && pdrStrong) v = { txt: `✓ SUPPORTS ${dir}`, c: '#00ff9f', tip: `Yesterday was a strong ${pdrDir.toLowerCase()} day that held its move — it supports today's ${dir} bias. Continuation conditions met on the PDR side.` };
+  else if (aligned) v = { txt: '~ WEAK SUPPORT', c: '#ffd166', tip: `Yesterday moved with the ${dir} bias but without conviction (small body or heavy retrace). Not a filter-kill, but no real tailwind either.` };
+  else v = { txt: `✗ AGAINST ${dir}`, c: '#ffaa44', tip: `Yesterday moved AGAINST today's ${dir} bias. This is NOT a continuation setup — treat it as a riskier trend-turn attempt: extra confirmation, smaller size, or skip.` };
+  return (
+    <span title={v.tip} style={{fontFamily:monoF,fontSize:8,padding:'1px 6px',borderRadius:4,marginLeft:4,
+      color:v.c,background:v.c+'12',border:`1px solid ${v.c}35`,fontWeight:700,letterSpacing:0.5,cursor:'help'}}>
+      {v.txt}
+    </span>
+  );
+}
+
+// ===== TRADE VERDICT (Boss-G execution rules) =====
+// Rule 1: |gap| >= 9 + Panda Lines agree = MARKET EXECUTION. PDR = bonus confirmation only.
+// Rule 2: valid bias (|gap| 5-8.9, or 9+ without PL) = PULLBACK PLAY — never "no trade".
+// Rule 3: live pullback detection — price retraced 30-60% of today's move OR sitting at a Panda Line.
+function isPullbackZoneNow(row, dir) {
+  const pb = row?.pullback_pct;
+  const adrUsed = row?.adr_used_pct;
+  // GUARD: there must be a real move to pull back FROM (day covered >=30% of ADR)
+  // and price must have actually retraced (>=20%). Being near a line without a
+  // prior move is NOT a pullback — it's just proximity.
+  const moved = adrUsed != null && adrUsed >= 30;
+  const retraced = pb != null && pb >= 20;
+  const pbOk = moved && pb != null && pb >= 30 && pb <= 60;
+  let lineOk = false;
+  const price = row?.pl_price, st = row?.pl_st, fl = row?.pl_fl, atr = row?.atr;
+  if (moved && retraced && price && atr && (st != null || fl != null)) {
+    const pip = row.symbol?.includes('JPY') ? 0.01 : 0.0001;
+    const lines = [st, fl].filter(x => x != null);
+    const distPips = Math.min(...lines.map(l => Math.abs(price - l))) / pip;
+    lineOk = distPips <= atr * 0.15; // at a Panda Line AFTER a real retrace
+  }
+  return { now: pbOk || lineOk, pbOk, lineOk, pb };
+}
+
+function computeVerdict(row, pdr, t) {
+  const gap = row?.gap ?? 0;
+  const ag = Math.abs(gap);
+  if (ag < 5 || row?.hard_invalid) {
+    if (row?.consolidating === true) return { icon: '🔵', txt: 'NO TRADE — WAIT FOR BREAKOUT', hint: 'No valid bias and price is compressed. Let it pick a direction first.', c: '#6b7280' };
+    return { icon: '⚪', txt: 'NO TRADE — WAIT', hint: 'No valid bias right now (gap below 5 or hard invalid).', c: '#6b7280' };
+  }
+  const dir = gap > 0 ? 'BUY' : 'SELL';
+  const p = computePhase(row, pdr) || {};
+  const label = p.label || '';
+  const pdrAligned = !!p.pdrAligned;
+  const pdrNote = pdrAligned ? ' PDR supports — bonus confirmation ✓.' : '';
+
+  // Safety overrides first
+  if ((t && t.closeAlert) || label.includes('AT RISK')) return { icon: '🔴', txt: 'CLOSE / PROTECT', hint: 'Trend is at risk. No new entries — protect any open trade.', c: '#ff4d6d' };
+  if (label.includes('LATE') || label.includes('EXTENDED')) return { icon: '🟠', txt: `${dir} VALID — TOO LATE, WAIT FOR PULLBACK`, hint: 'Bias is valid but the move is mature or the daily range is spent. No market entry — only a pullback re-entry.', c: '#ffaa44' };
+
+  const zone = (row?.pl_zone || '').toUpperCase();
+  const plValid = (dir === 'BUY' && zone === 'ABOVE') || (dir === 'SELL' && zone === 'BELOW');
+  const z = isPullbackZoneNow(row, dir);
+
+  // RULE 1 — market execution
+  if (ag >= 9 && plValid) {
+    return { icon: '🟢', txt: `MARKET EXECUTE ${dir}`, hint: `Gap 9+ with Panda Lines confirmed — market execution rule met.${pdrNote || ' PDR not aligned — still valid, bonus missing.'}`, c: '#00ff9f' };
+  }
+
+  // RULE 2 — pullback play (valid bias, gap 5-8.9, or 9+ without PL confirmation)
+  if (z.now) {
+    const where = z.lineOk && z.pbOk ? 'price is AT the Panda Line and retraced ' + Math.round(z.pb) + '%' : z.lineOk ? 'price is AT the Panda Line' : `retraced ${Math.round(z.pb)}% of today's move`;
+    return { icon: '🟢', txt: `ENTER ${dir} — IN PULLBACK ZONE NOW`, hint: `Bias confirmed and ${where} — this is the pullback area. Market-enter here with stop beyond the line/extreme instead of waiting for a pending order.${pdrNote}`, c: '#00ff9f' };
+  }
+  const pbInfo = z.pb != null ? ` Currently retraced ${Math.round(z.pb)}%.` : '';
+  return { icon: '🟡', txt: `PULLBACK PLAY ${dir} — WAIT FOR ZONE`, hint: `Bias confirmed${ag >= 9 ? ' (gap 9+ but Panda Lines not confirming yet)' : ''} — wait for a 30-60% retrace or a tag of the Panda Line / PB ENTRY level.${pbInfo}${pdrNote}`, c: '#ffd166' };
+}
+
+function VerdictBanner({ row, pdr, t, compact }) {
+  const v = computeVerdict(row, pdr, t);
+  if (!v) return null;
+  const monoF = "'Share Tech Mono',monospace";
+  if (compact) return (
+    <span title={v.hint} style={{fontFamily:monoF,fontSize:9,color:v.c,background:v.c+'14',border:`1px solid ${v.c}40`,borderRadius:4,padding:'2px 8px',fontWeight:700,letterSpacing:0.5,cursor:'help',whiteSpace:'nowrap',display:'inline-block'}}>{v.icon} {v.txt}</span>
+  );
+  return (
+    <div title={v.hint} style={{display:'flex',flexDirection:'column',gap:2,background:v.c+'10',border:`1px solid ${v.c}45`,borderLeft:`3px solid ${v.c}`,borderRadius:6,padding:'6px 10px',cursor:'help'}}>
+      <span style={{fontFamily:monoF,fontSize:10,color:v.c,fontWeight:700,letterSpacing:1}}>{v.icon} {v.txt}</span>
+      <span style={{fontFamily:monoF,fontSize:8,color:'var(--text-muted)',lineHeight:1.35}}>{v.hint}</span>
+    </div>
+  );
+}
+
+// ===== TREND PHASE (catching vs riding vs chasing) =====
+// Combines structural state + momentum + gap trajectory + PDR into one
+// entry-timing answer. Read-only view logic — no locked formulas touched.
+function computePhase(row, pdr) {
+  const gap = row.gap ?? 0, ag = Math.abs(gap);
+  if (ag < 5 || row.hard_invalid) return null;
+  const dir = gap > 0 ? 'BUY' : 'SELL';
+  const state = row.state || '';
+  const mom = row.momentum || '';
+  const dm = row.delta_mid ?? 0;
+  const withTrend = dir === 'BUY' ? dm > 0 : dm < 0;
+  const fading = mom === 'FADING' || mom === 'COOLING' || mom === 'REVERSING' || mom === 'REVERSAL';
+  // Live broker PDR (v2 exporter) preferred; Twelve Data fallback
+  const pdrAligned = row.pdr_dir != null
+    ? !!(row.pdr_strong_live && ((dir === 'BUY' && row.pdr_dir === 'BULLISH') || (dir === 'SELL' && row.pdr_dir === 'BEARISH')))
+    : !!(pdr && pdr.strong && ((dir === 'BUY' && pdr.direction === 'BULLISH') || (dir === 'SELL' && pdr.direction === 'BEARISH')));
+  const utcH = new Date().getUTCHours();
+  const asian = utcH >= 22 || utcH < 6;
+
+  const igniting = mom === 'SPARK' || mom === 'BUILDING' || mom === 'EMERGING';
+  let phase;
+  if (state.startsWith('DEEP_PULLBACK')) phase = { label: '⚠ TREND AT RISK', color: '#ff4d6d', tip: 'Deep pullback — trend may be ending. No new entries.' };
+  else if (state.startsWith('PULLBACK')) phase = { label: '🎯 PULLBACK ZONE', color: '#ffd166', tip: 'Healthy pullback inside a valid trend — this is the continuation entry window, not chasing.' };
+  else if (fading) phase = { label: "🌙 LATE — DON'T CHASE", color: '#ffaa44', tip: 'Momentum fading — the move is mature. Entering here is chasing.' };
+  else if (igniting && ag <= 9) phase = { label: '🚀 START — CATCHING', color: '#00ff9f', tip: 'Momentum igniting (SPARK/BUILDING) with gap still early — catching the start of the trend.' };
+  else if (state.startsWith('EXPAND') && ag <= 9) phase = { label: '🚀 START — CATCHING', color: '#00ff9f', tip: 'Fresh expansion, gap still early — catching the start of the trend.' };
+  else if (igniting || state.startsWith('EXPAND')) phase = { label: '🔥 MID — RIDING', color: '#00b4ff', tip: 'Established trend still pushing — good for holders, be selective adding new.' };
+  else if (row.consolidating === true) phase = { label: '🔵 CONSOLIDATING', color: '#6b7280', tip: 'Price compressed — last 6 hours covered under 25% of an average day. Energy building; wait for the break.' };
+  else if (ag >= 12) phase = { label: '🌙 EXTENDED', color: '#ffaa44', tip: 'Gap at the top of the valid range (5–12) — much of the move may be done. Wait for a pullback.' };
+  else phase = withTrend
+    ? { label: '🔥 MID — RIDING', color: '#00b4ff', tip: 'Trend intact and gap holding with direction.' }
+    : { label: '⏸ STALLING', color: '#6b7280', tip: 'Gap not making progress — wait for expansion or a pullback.' };
+
+  // Live ADR check overrides optimistic phases: fuel mostly burned = late, price-confirmed
+  const adrUsed = row.adr_used_pct;
+  if (adrUsed != null && adrUsed >= 70 && (phase.label.includes('START') || phase.label.includes('MID'))) {
+    phase = { label: '🌙 LATE — ADR SPENT', color: '#ffaa44', tip: `Today already used ${Math.round(adrUsed)}% of its average daily range — most of the fuel is burned. Wait for a pullback or the next session.` };
+  }
+
+  const checks = [
+    { k: 'BIAS', ok: true },
+    { k: 'PDR', ok: pdrAligned },
+    { k: 'ASIAN', ok: asian },
+  ];
+  const continuation = pdrAligned && asian && (phase.label.includes('PULLBACK') || phase.label.includes('START') || phase.label.includes('MID'));
+  return { ...phase, dir, checks, continuation, pdrAligned, asian, adrUsed, pullbackPct: row.pullback_pct, livePdr: row.pdr_dir != null };
+}
+
+function PhaseBadge({ row, pdr }) {
+  const p = computePhase(row, pdr);
+  if (!p) return null;
+  const monoF = "'Share Tech Mono',monospace";
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:3,marginTop:2}}>
+      <div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}>
+        <span style={{fontFamily:monoF,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>PHASE</span>
+        <span title={p.tip} style={{fontFamily:monoF,fontSize:9,color:p.color,background:p.color+'14',border:`1px solid ${p.color}40`,borderRadius:4,padding:'1px 7px',fontWeight:700,cursor:'help',letterSpacing:0.5}}>{p.label}</span>
+      </div>
+      <div style={{display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>
+        {p.checks.map(c=>(<span key={c.k} style={{fontFamily:monoF,fontSize:7,color:c.ok?'#00ff9f':'#6b7280',background:c.ok?'rgba(0,255,159,0.08)':'rgba(107,114,128,0.08)',border:`1px solid ${c.ok?'#00ff9f30':'#6b728030'}`,borderRadius:3,padding:'1px 5px',letterSpacing:0.5}}>{c.ok?'✓':'○'} {c.k}</span>))}
+        {p.continuation && <span title="Valid bias + strong aligned PDR + Asian session — your continuation checklist is complete." style={{fontFamily:monoF,fontSize:8,color:'#ffd166',background:'rgba(255,209,102,0.12)',border:'1px solid rgba(255,209,102,0.4)',borderRadius:3,padding:'1px 6px',fontWeight:700,letterSpacing:0.5,cursor:'help'}}>★ CONTINUATION SETUP</span>}
+      </div>
+      {(p.adrUsed!=null||p.pullbackPct!=null)&&<div style={{display:'flex',alignItems:'center',gap:6}}>
+        {p.adrUsed!=null&&<span title="How much of an average daily range today has already covered. Above 70% = the move is mostly done for the day." style={{fontFamily:monoF,fontSize:8,color:p.adrUsed>=70?'#ffaa44':'var(--text-muted)',cursor:'help'}}>ADR {Math.round(p.adrUsed)}% used</span>}
+        {p.pullbackPct!=null&&<span title="How far price has retraced from today's extreme in your trade direction. 30-60% = healthy continuation pullback; above 80% = trend failing." style={{fontFamily:monoF,fontSize:8,color:p.pullbackPct>=30&&p.pullbackPct<=60?'#ffd166':'var(--text-muted)',cursor:'help'}}>PB {Math.round(p.pullbackPct)}%</span>}
+        {p.livePdr&&<span title="PDR computed live from your broker's daily candles (v2 exporter)" style={{fontFamily:monoF,fontSize:7,color:'#00ff9f',letterSpacing:0.5}}>LIVE</span>}
+      </div>}
+    </div>
+  );
+}
+
+// ===== PHASE LEGEND (fixed banner under Overview) =====
+const PHASE_LEGEND = [
+  { icon: '🚀', name: 'START — CATCHING', color: '#00ff9f', what: 'Gap fresh (5–9) and momentum igniting (SPARK/BUILDING) or expanding.', action: 'Best entries live here. You are catching the start, not chasing.' },
+  { icon: '🔥', name: 'MID — RIDING', color: '#00b4ff', what: 'Trend established and still pushing with direction.', action: 'Good for trades already open. Be selective adding new — prefer a pullback.' },
+  { icon: '🎯', name: 'PULLBACK ZONE', color: '#ffd166', what: 'Healthy pullback inside a valid trend.', action: 'Your continuation entry window. With ✓ PDR + ✓ ASIAN this is the A+ setup.' },
+  { icon: '🌙', name: "LATE — DON'T CHASE", color: '#ffaa44', what: 'Momentum FADING/COOLING — the move is mature.', action: 'No new entries. Entering here is chasing the end of the move.' },
+  { icon: '🌙', name: 'EXTENDED', color: '#ffaa44', what: 'Gap at the top of the valid 5–12 range.', action: 'Most of the move may be done. Wait for the pullback instead.' },
+  { icon: '⚠', name: 'TREND AT RISK', color: '#ff4d6d', what: 'Deep pullback — trend structure breaking down.', action: 'Stand aside. Existing trades: consider tightening or closing.' },
+  { icon: '⏸', name: 'STALLING', color: '#6b7280', what: 'Valid gap but no progress either way.', action: 'Wait for expansion or a pullback before acting.' },
+  { icon: '🔵', name: 'CONSOLIDATING', color: '#6b7280', what: 'Price compressed — last 6 hours covered under 25% of an average day.', action: 'Energy is building. Wait for the breakout; do not trade inside the box.' },
+  { icon: '🌙', name: 'LATE — ADR SPENT', color: '#ffaa44', what: 'Today already used 70%+ of its average daily range.', action: 'Fuel is burned. No chasing — wait for a pullback or the next session.' },
+];
+
+function PhaseLegend({ isMobile }) {
+  const monoF = "'Share Tech Mono',monospace";
+  return (
+    <div style={{marginTop:14,background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:10,padding:'12px 14px'}}>
+      <div style={{fontFamily:"'Orbitron',sans-serif",fontSize:11,fontWeight:700,letterSpacing:2,color:'var(--text-secondary)',marginBottom:8}}>PHASE GUIDE — WHERE AM I IN THE TREND?</div>
+      <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(auto-fit,minmax(280px,1fr))',gap:8}}>
+        {PHASE_LEGEND.map(p=>(
+          <div key={p.name} style={{display:'flex',flexDirection:'column',gap:3,background:'rgba(0,0,0,0.15)',border:`1px solid ${p.color}25`,borderRadius:7,padding:'8px 10px'}}>
+            <span style={{fontFamily:monoF,fontSize:10,color:p.color,fontWeight:700,letterSpacing:0.5}}>{p.icon} {p.name}</span>
+            <span style={{fontFamily:monoF,fontSize:9,color:'var(--text-muted)',lineHeight:1.45}}>{p.what}</span>
+            <span style={{fontFamily:monoF,fontSize:9,color:'var(--text-secondary)',lineHeight:1.45}}>👉 {p.action}</span>
+          </div>
+        ))}
+      </div>
+      <div style={{fontFamily:monoF,fontSize:9,color:'var(--text-muted)',marginTop:8,lineHeight:1.5}}>Checklist chips on each card: <span style={{color:'#00ff9f'}}>✓ BIAS</span> gap in valid 5–12 range · <span style={{color:'#00ff9f'}}>✓ PDR</span> yesterday closed strong in your direction · <span style={{color:'#00ff9f'}}>✓ ASIAN</span> Asian session live. All three + a catchable phase = <span style={{color:'#ffd166',fontWeight:700}}>★ CONTINUATION SETUP</span>.</div>
+      <div style={{fontFamily:monoF,fontSize:9,color:'var(--text-muted)',marginTop:6,lineHeight:1.6}}>
+        <span style={{color:'var(--text-secondary)',fontWeight:700,letterSpacing:1}}>PDR — DOES YESTERDAY SUPPORT THE TRADE? </span>
+        <span style={{color:'#00ff9f'}}>✓ SUPPORTS</span> yesterday moved your direction and held it — best conditions (A-play) ·
+        <span style={{color:'#ffd166'}}> ~ WEAK SUPPORT</span> right direction, no conviction — neutral ·
+        <span style={{color:'#ffaa44'}}> ✗ AGAINST</span> yesterday moved the other way — not a continuation; trend-turn attempt only with extra confirmation, smaller size, or skip.
+      </div>
+      <div style={{fontFamily:monoF,fontSize:9,color:'var(--text-muted)',marginTop:6,lineHeight:1.6}}>
+        <span style={{color:'var(--text-secondary)',fontWeight:700,letterSpacing:1}}>TELEGRAM SNAPSHOT — ACTION WORDS: </span>
+        <span style={{color:'#00ff9f'}}>EXECUTE</span> gap 9+ & Panda Lines confirmed — market entry rule met ·
+        <span style={{color:'#00ff9f'}}> ENTER PB</span> price is in the pullback area right now ·
+        <span style={{color:'#ffd166'}}> PB WAIT</span> valid bias — wait for a 30-60% retrace or Panda Line tag ·
+        <span style={{color:'#ffaa44'}}> NO CHASE</span> too late, no new entries ·
+        <span style={{color:'#ff4d6d'}}> CLOSE?</span> trend at risk — protect open trades ·
+        <span style={{color:'#6b7280'}}> WAIT</span> no valid bias.
+      </div>
+      <div style={{fontFamily:monoF,fontSize:9,color:'var(--text-muted)',marginTop:4,lineHeight:1.6}}>
+        <span style={{color:'var(--text-secondary)',fontWeight:700,letterSpacing:1}}>SNAPSHOT PDR WORDS: </span>
+        <span style={{color:'#00ff9f'}}>SUPPORTS</span> yesterday moved WITH the bias and held — continuation backdrop ·
+        <span style={{color:'#ffd166'}}> WEAK SUP</span> right direction, no conviction ·
+        <span style={{color:'#ffaa44'}}> AGAINST</span> yesterday opposed the bias — trend-turn risk. On WAIT pairs the raw form shows instead (▲/▼ strength + S strong / w weak).
+      </div>
+    </div>
+  );
+}
+
 // ===== BOX TREND DETECTION =====
 function boxTrend(trend) {
   if (!trend || trend === 'UNKNOWN') return null;
@@ -176,12 +412,21 @@ function atrFill(atrPoints, currentPrice, entryPrice) {
 // D1 ADV → next-month bias (critical last 3 days of month — hold into new month?)
 // Returns: { label, color, bg, border, detail, level, verdicts:{h1,h4,d1}, holdExit }
 function advScore(row) {
+  // ADV SUBSTITUTION READING (Boss-G spec):
+  // NEXT DAY  = current D1 + current H4 + ADV H1 (replaces H1 only where ADV H1 has a score)
+  // NEXT WEEK = current D1 + ADV H4 + ADV H1 (replace where present; valid from Friday close)
+  // NEXT MONTH = ADV D1 + ADV H4 + ADV H1 (replace where present)
+  // ADV score of 0 = walang score -> keep the current TF score (nothing changes).
   if (!row) return null;
-  const bD1 = row.adv_base_d1 ?? 0, bH4 = row.adv_base_h4 ?? 0, bH1 = row.adv_base_h1 ?? 0;
-  const qD1 = row.adv_quote_d1 ?? 0, qH4 = row.adv_quote_h4 ?? 0, qH1 = row.adv_quote_h1 ?? 0;
-  const advH1 = bH1 - qH1;
-  const advH4 = bH4 - qH4;
-  const advD1 = bD1 - qD1;
+  const abD1 = row.adv_base_d1 ?? 0, abH4 = row.adv_base_h4 ?? 0, abH1 = row.adv_base_h1 ?? 0;
+  const aqD1 = row.adv_quote_d1 ?? 0, aqH4 = row.adv_quote_h4 ?? 0, aqH1 = row.adv_quote_h1 ?? 0;
+  if (!abD1 && !abH4 && !abH1 && !aqD1 && !aqH4 && !aqH1) return null; // no advance data at all
+  const bD1c = row.base_d1 ?? 0, bH4c = row.base_h4 ?? 0, bH1c = row.base_h1 ?? 0;
+  const qD1c = row.quote_d1 ?? 0, qH4c = row.quote_h4 ?? 0, qH1c = row.quote_h1 ?? 0;
+  const sub = (adv, cur) => (adv !== 0 ? adv : cur);
+  const advH1 = (bD1c + bH4c + sub(abH1, bH1c)) - (qD1c + qH4c + sub(aqH1, qH1c));                       // next-day reading
+  const advH4 = (bD1c + sub(abH4, bH4c) + sub(abH1, bH1c)) - (qD1c + sub(aqH4, qH4c) + sub(aqH1, qH1c)); // next-week reading
+  const advD1 = (sub(abD1, bD1c) + sub(abH4, bH4c) + sub(abH1, bH1c)) - (sub(aqD1, qD1c) + sub(aqH4, qH4c) + sub(aqH1, qH1c)); // next-month reading
   const isBuy = (row.gap ?? 0) > 0;
   const okH1 = isBuy ? advH1 >= 5 : advH1 <= -5;
   const okH4 = isBuy ? advH4 >= 5 : advH4 <= -5;
@@ -194,9 +439,10 @@ function advScore(row) {
   const isFriWindow = dow >= 4 || dow === 0; // Thu-Sun: weekend decision window
   const isMonthEnd  = (lastDay - dom) <= 2;  // Last 3 days of month
   // Per-TF verdicts
-  const h1v = okH1 ? {tag:'HOLD',note:'Next-day bias aligned',c:'#00ff9f'} : {tag:'EXIT',note:'Tomorrow gap may flip',c:'#ff4d6d'};
-  const h4v = okH4 ? {tag:'HOLD',note:isFriWindow?'Safe to hold over weekend':'Weekly bias aligned',c:'#00ff9f'} : {tag:'EXIT',note:isFriWindow?'Exit before weekend — H4 weak':'Next-week gap weakening',c:'#ff4d6d'};
-  const d1v = okD1 ? {tag:'HOLD',note:isMonthEnd?'Safe to hold into new month':'Monthly bias aligned',c:'#00ff9f'} : {tag:'EXIT',note:isMonthEnd?'Exit before month end — D1 weak':'Next-month bias fading',c:'#ff4d6d'};
+  const fmtg = v => (v>0?'+':'')+v;
+  const h1v = okH1 ? {tag:'HOLD',note:`Next-day reading ${fmtg(advH1)} keeps the bias`,c:'#00ff9f'} : {tag:'EXIT',note:`Next-day reading ${fmtg(advH1)} loses the bias`,c:'#ff4d6d'};
+  const h4v = okH4 ? {tag:'HOLD',note:(isFriWindow?'Safe to hold over weekend':`Next-week reading ${fmtg(advH4)} keeps the bias`)+' · valid from Fri close',c:'#00ff9f'} : {tag:'EXIT',note:(isFriWindow?'Exit before weekend — next-week reading weak':`Next-week reading ${fmtg(advH4)} loses the bias`)+' · valid from Fri close',c:'#ff4d6d'};
+  const d1v = okD1 ? {tag:'HOLD',note:isMonthEnd?'Safe to hold into new month':`Next-month reading ${fmtg(advD1)} keeps the bias`,c:'#00ff9f'} : {tag:'EXIT',note:isMonthEnd?'Exit before month end — next-month reading weak':`Next-month reading ${fmtg(advD1)} loses the bias`,c:'#ff4d6d'};
   // Combined hold/exit
   const exits = [!okH1, !okH4, !okD1].filter(Boolean).length;
   let holdExit, label, color, bg, border, level;
@@ -214,7 +460,7 @@ function advScore(row) {
     bg = 'rgba(255,209,102,0.10)'; border = 'rgba(255,209,102,0.35)'; level = 'WARN';
   }
   const fmt = v => (v>0?'+':'')+v;
-  const detail = `H1:${fmt(advH1)} H4:${fmt(advH4)} D1:${fmt(advD1)}`;
+  const detail = `TMRW:${fmt(advH1)} WK:${fmt(advH4)} MTH:${fmt(advD1)}`;
   // Contextual urgency flags
   const urgent = [];
   if (isFriWindow && !okH4) urgent.push('⚠️ WEEKEND');
@@ -886,7 +1132,12 @@ function EngineHealth() {
   const [health,setHealth]=useState(null);
   const [loading,setLoading]=useState(true);
   const load=useCallback(async()=>{setLoading(true);try{const res=await fetch('/api/engine-health');if(res.ok) setHealth(await res.json());}catch{}setLoading(false);},[]);
-  useEffect(()=>{load();const t=setInterval(load,30000);return()=>clearInterval(t);},[load]);
+  useEffect(()=>{
+    load();
+    const tick=()=>{ if(typeof document!=='undefined' && document.visibilityState==='hidden') return; load(); };
+    const t=setInterval(tick,60000);
+    return()=>clearInterval(t);
+  },[load]);
   if(loading) return <div style={{textAlign:'center',padding:60,fontFamily:mono,fontSize:10,color:'var(--text-muted)',letterSpacing:3}}>LOADING ENGINE STATUS...</div>;
   if(!health) return <div style={{textAlign:'center',padding:60,fontFamily:mono,fontSize:10,color:'#ff4d6d'}}>ENGINE HEALTH UNAVAILABLE</div>;
   const statusColor=health.isAlive?'#00ff9f':'#ff4d6d';
@@ -965,6 +1216,55 @@ function PlatformButtons({symbol}){
 }
 
 // ===== PAIR CARD =====
+// ===== EXTREME-TIMEFRAME BADGE =====
+// Lists every timeframe whose Panda score is extreme (|value| 4/5/6), with its
+// signed value. Non-extreme values (1/2/3) are ignored. A side with no extreme
+// timeframe (e.g. CAD) is omitted. Reads base_score_tf / quote_score_tf written
+// by the engine (derive_score_tf), format "D1+4 H4+5".
+function ScoreTfBadge({ row, showLabel = true, mt = 2, showEmpty = false }) {
+  const mono = "'Share Tech Mono',monospace";
+  const b = row?.base_score_tf || '';
+  const q = row?.quote_score_tf || '';
+  const bc = row?.base_currency || row?.symbol?.slice(0, 3) || 'BASE';
+  const qc = row?.quote_currency || row?.symbol?.slice(3, 6) || 'QUOTE';
+  const side = (cur, str, keyp) => {
+    if (!str) return null;
+    // Only accept new-format tokens like "D1+4" / "H1-6"; ignore legacy values.
+    const toks = str.split(/\s+/).filter(t => /^(D1|H4|H1)[+-]\d+$/.test(t));
+    if (!toks.length) return null;
+    return (
+      <span key={keyp} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+        <span style={{ fontFamily: mono, fontSize: 8, color: 'var(--text-secondary)', fontWeight: 700, letterSpacing: 0.5 }}>{cur}</span>
+        {toks.map((t, i) => {
+          const tf = t.slice(0, 2);
+          const val = t.slice(2);
+          const pos = !val.startsWith('-');
+          const col = pos ? '#00ff9f' : '#ff4d6d';
+          return <span key={i} title={`${cur} ${tf} score ${val} (extreme)`} style={{ fontFamily: mono, fontSize: 8, color: col, background: col + '14', border: `1px solid ${col}33`, borderRadius: 3, padding: '1px 5px', whiteSpace: 'nowrap', fontWeight: 600, cursor: 'help' }}>{tf} {val}</span>;
+        })}
+      </span>
+    );
+  };
+  const bEl = side(bc, b, 'b');
+  const qEl = side(qc, q, 'q');
+  if (!bEl && !qEl) {
+    if (!showEmpty) return null;
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: mt, flexWrap: 'wrap' }}>
+        {showLabel && <span style={{ fontFamily: mono, fontSize: 8, color: 'var(--text-secondary)', letterSpacing: 1, fontWeight: 600 }}>EXTREME TF</span>}
+        <span title="No timeframe on either currency has an extreme score (±4/5/6) right now — gap is built from moderate scores." style={{ fontFamily: mono, fontSize: 8, color: 'var(--text-muted)', border: '1px solid var(--border)', borderRadius: 3, padding: '1px 5px', cursor: 'help' }}>NONE</span>
+      </div>
+    );
+  }
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: mt, flexWrap: 'wrap' }}>
+      {showLabel && <span style={{ fontFamily: mono, fontSize: 8, color: 'var(--text-secondary)', letterSpacing: 1, fontWeight: 600 }}>EXTREME TF</span>}
+      {bEl}
+      {qEl}
+    </div>
+  );
+}
+
 function PairCard({ row, trend, cotBias, confidence, memoryIndex, pdr, newsAlert }) {
   const gap=row.gap??0,valid=isValid(gap)&&!row.hard_invalid&&!isNeutralMatchup(row),bias=biasFromGap(gap),sig=signalLabel(row.signal,row.strength),strVal=row.strength??0,sc=stateColor(row.state),t=trend||{};
   const sparkColor=t.trend1h==='STRONGER'?'#00ff9f':t.trend1h==='WEAKER'?'#ff4d6d':'var(--text-muted)';
@@ -982,6 +1282,7 @@ function PairCard({ row, trend, cotBias, confidence, memoryIndex, pdr, newsAlert
       {t.closeAlert&&<div style={{background:'rgba(255,77,109,0.1)',border:'1px solid rgba(255,77,109,0.4)',borderRadius:5,padding:'4px 8px',display:'flex',alignItems:'center',gap:5}}><span>⚠️</span><span style={{fontFamily:mono,fontSize:9,color:'#ff4d6d',letterSpacing:1}}>CONSIDER CLOSING</span></div>}
       {newsAlert&&<div style={{background:'rgba(255,209,102,0.08)',border:'1px solid rgba(255,209,102,0.35)',borderRadius:5,padding:'3px 8px',display:'flex',alignItems:'center',gap:5}}><span style={{fontSize:10}}>📰</span><span style={{fontFamily:mono,fontSize:9,color:'#ffd166',letterSpacing:1,fontWeight:700}}>HIGH IMPACT NEWS</span></div>}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}><span style={{fontFamily:orb,fontSize:13,fontWeight:900,letterSpacing:2,color:'var(--text-primary)'}}>{row.symbol}</span><div style={{display:'flex',alignItems:'center',gap:5}}><span style={{fontSize:12}}>{sig.icon}</span><span style={{fontFamily:mono,fontSize:10,color:bias.color,background:bias.bg,border:`1px solid ${bias.border}`,borderRadius:4,padding:'2px 7px',fontWeight:700}}>{bias.label}</span></div></div>
+      <VerdictBanner row={row} pdr={pdr} t={t}/>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
         <div style={{display:'flex',alignItems:'center',gap:6}}>
           <span style={{fontFamily:orb,fontSize:26,fontWeight:900,color:bias.color,textShadow:`0 0 14px ${bias.color}99`,lineHeight:1}}>{gap>0?'+':''}{Number(gap).toFixed(1)}</span>
@@ -989,7 +1290,9 @@ function PairCard({ row, trend, cotBias, confidence, memoryIndex, pdr, newsAlert
         </div>
         <Sparkline data={t.history} color={sparkColor}/>
       </div>
+      <PhaseBadge row={row} pdr={pdr}/>
       {(()=>{const mu=getMatchup(row);if(!mu)return null;return(<div style={{display:'flex',alignItems:'center',gap:6,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>MATCHUP</span><span style={{fontFamily:mono,fontSize:9,color:mu.color,background:mu.color+'12',border:`1px solid ${mu.color}30`,borderRadius:4,padding:'1px 7px',whiteSpace:'nowrap'}}>{mu.label}</span>{mu.note==='IDEAL'&&<span style={{fontFamily:mono,fontSize:7,color:mu.color,letterSpacing:1,opacity:0.8}}>IDEAL</span>}{mu.note==='AVOID'&&<span style={{fontFamily:mono,fontSize:7,color:'#ffaa44',letterSpacing:1,opacity:0.8}}>AVOID</span>}</div>);})()}
+      <ScoreTfBadge row={row}/>
       {(()=>{const bh1=boxTrend(row.box_h1_trend),bh4=boxTrend(row.box_h4_trend);if(!bh1&&!bh4)return null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>BOX</span>{bh4&&<span style={{fontFamily:mono,fontSize:8,color:bh4.color,background:bh4.bg,border:`1px solid ${bh4.border}`,borderRadius:3,padding:'1px 6px'}}>H4 {bh4.label}</span>}{bh1&&<span style={{fontFamily:mono,fontSize:8,color:bh1.color,background:bh1.bg,border:`1px solid ${bh1.border}`,borderRadius:3,padding:'1px 6px'}}>H1 {bh1.label}</span>}</div>);})()}
       {(()=>{ const pl=plZoneBadge(row.pl_zone,row.bias); if(!pl)return null; const plTip=pl.valid?'Panda Lines confirmed: Panda Lines agree with gap direction. This is the price confirmation layer.':'Panda Lines not confirmed: price structure does not yet agree with gap direction. Wait for alignment or use as additional caution.'; return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>PL</span><span title={plTip} style={{fontFamily:mono,fontSize:8,color:pl.color,background:pl.bg,border:`1px solid ${pl.border}`,borderRadius:3,padding:'1px 6px',fontWeight:700,cursor:'help'}}>{pl.label}</span>{pl.valid&&<span style={{fontFamily:mono,fontSize:7,color:'#00ff9f',letterSpacing:1}}>✅</span>}{!pl.valid&&<span style={{fontFamily:mono,fontSize:7,color:'#ff7744',letterSpacing:1}}>⛔</span>}</div>);})()}{(()=>{
   const bc=boxConfirm(row.bias,row.box_h4_trend,row.box_h1_trend);
@@ -1006,23 +1309,19 @@ function PairCard({ row, trend, cotBias, confidence, memoryIndex, pdr, newsAlert
 {adv.urgent&&adv.urgent.map((u,i)=><span key={i} style={{fontFamily:mono,fontSize:7,color:'#ff4d6d',fontWeight:700,letterSpacing:0.5}}>{u}</span>)}
 </div>
 <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
-{[['H1',adv.verdicts.h1,adv.gaps.h1],['H4',adv.verdicts.h4,adv.gaps.h4],['D1',adv.verdicts.d1,adv.gaps.d1]].map(([tf,v,g])=><span key={tf} style={{fontFamily:mono,fontSize:7,color:v.c,background:v.c+'12',border:`1px solid ${v.c}28`,borderRadius:3,padding:'1px 5px',whiteSpace:'nowrap'}}>{tf} {v.tag} {g>0?'+':''}{g}</span>)}
+{[['TMRW',adv.verdicts.h1,adv.gaps.h1],['NEXT WK',adv.verdicts.h4,adv.gaps.h4],['NEXT MTH',adv.verdicts.d1,adv.gaps.d1]].map(([tf,v,g])=><span key={tf} title={v.note} style={{fontFamily:mono,fontSize:7,color:v.c,background:v.c+'12',border:`1px solid ${v.c}28`,borderRadius:3,padding:'1px 5px',whiteSpace:'nowrap',cursor:'help'}}>{tf} {v.tag} {g>0?'+':''}{g}</span>)}
 </div>
 </div>);})()}{cotBias&&<div style={{display:'flex',alignItems:'center',gap:4}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>COT</span><span style={{fontFamily:mono,fontSize:9,color:cotBias.bias==='BULLISH'?'#00ff9f':'#ff4d6d',background:cotBias.bias==='BULLISH'?'rgba(0,255,159,0.08)':'rgba(255,77,109,0.08)',border:`1px solid ${cotBias.bias==='BULLISH'?'#00ff9f33':'#ff4d6d33'}`,borderRadius:3,padding:'1px 5px'}}>{cotBias.bias==='BULLISH'?'▲':'▼'} {cotBias.bias}</span></div>}
       {(()=>{if(!confidence)return null;const cs=confStyle(confidence.confidence);if(!cs)return null;const tip=confidence.reasons?confidence.reasons.join(' · '):'';return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>CONF</span><span title={tip} style={{fontFamily:mono,fontSize:9,color:cs.color,background:cs.bg,border:`1px solid ${cs.border}`,borderRadius:4,padding:'1px 7px',fontWeight:700,cursor:'help'}}>{confidence.confidence} {cs.label}</span>{confidence.conflict&&<span title="Real-time confidence is high but historical win rate for this gap level is ≤50%. Proceed with caution." style={{fontFamily:mono,fontSize:8,color:'#ff4d6d',background:'rgba(255,77,109,0.1)',border:'1px solid rgba(255,77,109,0.3)',borderRadius:4,padding:'1px 6px',fontWeight:700,cursor:'help'}}>⚠️ CONFLICT</span>}</div>);})()}
       {(()=>{const em=getEdgeMemory(row,memoryIndex);if(!em)return null;const fc=em.flag==='PROVEN_EDGE'?'#00ff9f':em.flag==='DEAD_ZONE'?'#ff4d6d':'#00b4ff';const icon=em.flag==='PROVEN_EDGE'?'✅':em.flag==='DEAD_ZONE'?'⛔':'📊';const lbl=em.flag?em.flag.replace('_',' '):(em.maturity||'').toUpperCase();const wrPct=Math.round((em.winRate||0)*100);const resPct=em.resRate!=null?Math.round(em.resRate*100):null;const edgeTip=em.flag==='PROVEN_EDGE'?`Proven edge: ${wrPct}% win rate from ${em.sample} resolved signals at this gap level. High probability setup.`:em.flag==='DEAD_ZONE'?`Dead zone: only ${wrPct}% win rate from ${em.sample} signals. Historically this gap level loses money.`:`${(em.maturity||'').toUpperCase()}: ${wrPct}% win rate from ${em.sample} signals. Needs more data to confirm edge.`;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2,flexWrap:'wrap'}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>EDGE</span><span title={edgeTip} style={{fontFamily:mono,fontSize:9,color:fc,background:fc+'12',border:`1px solid ${fc}33`,borderRadius:4,padding:'1px 7px',fontWeight:700,cursor:'help'}}>{icon} {lbl}</span><span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>Win:{wrPct}%{resPct!=null?` | Res:${resPct}%`:''} (n={em.sample})</span></div>);})()}
-      {pdr&&<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>PDR</span><PdrBadge pdr={pdr}/></div>}
+      {(pdr||row.pdr_dir!=null)&&<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2,flexWrap:'wrap'}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>PDR</span>{row.pdr_dir!=null?<LivePdrBadge row={row}/>:<PdrBadge pdr={pdr}/>}<PdrVerdict row={row} pdr={pdr}/></div>}
       {(()=>{const isBuy=bias.label==='BUY',isSell=bias.label==='SELL';if(!isBuy&&!isSell)return null;const isJpy=row.symbol?.includes('JPY');const dec=isJpy?3:5;const levels=isBuy?[{l:'PDL',v:row.pdl},{l:'PWL',v:row.pwl},{l:'PML',v:row.pml},{l:'PYL',v:row.pyl}].filter(x=>x.v!=null).sort((a,b)=>b.v-a.v):[{l:'PDH',v:row.pdh},{l:'PWH',v:row.pwh},{l:'PMH',v:row.pmh},{l:'PYH',v:row.pyh}].filter(x=>x.v!=null).sort((a,b)=>a.v-b.v);const top2=levels.slice(0,2);if(!top2.length)return null;const c1=isBuy?'#00ff9f':'#ff4d6d';const c2='#00b4ff';return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2,flexWrap:'wrap'}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>PB ENTRY</span>{top2.map((lv,i)=><span key={lv.l} style={{fontFamily:mono,fontSize:9,color:i===0?c1:c2,background:(i===0?c1:c2)+'12',border:`1px solid ${(i===0?c1:c2)}28`,borderRadius:3,padding:'1px 6px',fontWeight:600}}>{lv.l} {Number(lv.v).toFixed(dec)}</span>)}</div>);})()}
       <div style={{display:'flex',flexDirection:'column',gap:3}}>
         <div style={{display:'flex',alignItems:'center',gap:6}}>
           <span style={{fontFamily:mono,fontSize:10,color:t.momentumColor||'var(--text-muted)',background:(t.momentumColor||'var(--text-muted)')+'18',border:`1px solid ${(t.momentumColor||'var(--text-muted)')}30`,borderRadius:4,padding:'2px 8px',letterSpacing:1}}>{momIcons[t.momentum]||'▬'} {t.momentum||'NEUTRAL'}</span>
           {t.velocity&&t.velocity!=='STABLE'&&<span style={{fontFamily:mono,fontSize:9,color:t.velocity==='ACCELERATING'?'#00ff9f':'#ffaa44'}}>{t.velocity==='ACCELERATING'?'⚡ ACC':'↘ DEC'}</span>}
         </div>
-        {(() => { const g = getMomentumAction(t.momentum, row.bias, t); return g ? (
-          <div style={{display:'flex',alignItems:'center',gap:4}}>
-            <span style={{fontFamily:mono,fontSize:9,color:g.color,background:g.color+'12',borderRadius:3,padding:'1px 6px',letterSpacing:0.5,fontWeight:700}}>👉 {g.action}</span>
-          </div>
-        ) : null; })()}
+        {/* momentum 👉 action removed — the VERDICT banner is the single instruction; momentum stays as data */}
       </div>
       <div style={{display:'flex',background:'var(--bg-card)',borderRadius:6,padding:'6px 8px'}}><DeltaChip label="1H" delta={t.delta1h}/><div style={{width:1,background:'var(--border)',margin:'0 4px'}}/><DeltaChip label="4H" delta={t.delta4h}/><div style={{width:1,background:'var(--border)',margin:'0 4px'}}/><DeltaChip label="8H" delta={t.delta8h}/></div>
       <div style={{display:'flex',alignItems:'center',gap:5}}><div style={{width:5,height:5,borderRadius:'50%',background:sc,flexShrink:0}}/><span style={{fontFamily:mono,fontSize:9,color:sc}}>{row.state||'NEUTRAL'}</span></div>
@@ -1107,6 +1406,9 @@ function PairCardModal({ row, trend, cotBias, onClose, isMobile, confidence, mem
           {mu && <span style={{fontFamily:mono,fontSize:10,color:mu.color,background:mu.color+'12',border:`1px solid ${mu.color}30`,borderRadius:6,padding:'4px 12px'}}>{mu.label}</span>}
         </div>
 
+        {/* Extreme timeframe badge */}
+        <ScoreTfBadge row={row} mt={0} showEmpty/>
+
         {/* ADV Score Warning */}
         {(()=>{const adv=advScore(row);if(!adv)return null;return(
           <div style={{display:'flex',alignItems:'center',gap:8,padding:'10px 14px',background:adv.bg,borderRadius:8,border:`1px solid ${adv.border}`}}>
@@ -1152,6 +1454,9 @@ function PairCardModal({ row, trend, cotBias, onClose, isMobile, confidence, mem
             <span style={{fontFamily:mono,fontSize:10,color:'var(--text-muted)'}}>Win:{wrPct}%{resPct!=null?` | Res:${resPct}%`:''} (n={em.sample})</span>
           </div>);})()}
 
+        {/* Trade Verdict */}
+        <VerdictBanner row={row} pdr={pdr} t={trend}/>
+
         {/* Confidence Conflict */}
         {confidence&&confidence.conflict&&<div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',background:'rgba(255,77,109,0.08)',borderRadius:8,border:'1px solid rgba(255,77,109,0.25)'}}>
           <span style={{fontFamily:mono,fontSize:10,color:'#ff4d6d',fontWeight:700}}>⚠️ CONFLICT</span>
@@ -1159,10 +1464,16 @@ function PairCardModal({ row, trend, cotBias, onClose, isMobile, confidence, mem
         </div>}
 
         {/* PDR */}
-        {pdr&&<div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',background:'rgba(0,0,0,0.15)',borderRadius:8}}>
+        {(pdr||row.pdr_dir!=null)&&<div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',background:'rgba(0,0,0,0.15)',borderRadius:8,flexWrap:'wrap'}}>
           <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2}}>PDR</span>
-          <PdrBadge pdr={pdr}/>
+          {row.pdr_dir!=null?<LivePdrBadge row={row}/>:<PdrBadge pdr={pdr}/>}
+          <PdrVerdict row={row} pdr={pdr}/>
         </div>}
+
+        {/* Trend Phase */}
+        <div style={{padding:'8px 12px',background:'rgba(0,0,0,0.15)',borderRadius:8}}>
+          <PhaseBadge row={row} pdr={pdr}/>
+        </div>
 
         {/* Pullback Entry Zones — Nearest S/R + SL */}
         {(()=>{const isBuy=bias.label==='BUY',isSell=bias.label==='SELL';if(!isBuy&&!isSell)return null;const price=row.pl_price;if(!price)return null;const isJpy=row.symbol?.includes('JPY');const dec=isJpy?3:5;const pip=isJpy?0.01:0.0001;const fmt=v=>v!=null?Number(v).toFixed(dec):'—';const toPips=v=>Math.round(Math.abs(v)/pip);const entryColor=isBuy?'#00ff9f':'#ff4d6d';
@@ -1301,6 +1612,37 @@ function ValidSetupsTab({ data, trends, cotMap, confidenceMap }) {
       <div style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2,marginBottom:4}}>
         {valid.length} VALID SETUP{valid.length!==1?'S':''} · GAP &gt;= 5
       </div>
+      {/* ONE-GLANCE ACTION BOARD */}
+      {(()=>{
+        const groups = { trade: [], pullback: [], watch: [], close: [] };
+        valid.forEach(r=>{
+          const p = computePhase(r, null);
+          if (!p) return;
+          const t2 = trends[r.symbol] || {};
+          if (t2.closeAlert || p.label.includes('AT RISK')) { groups.close.push({r,p}); return; }
+          if (p.label.includes('PULLBACK')) { groups.pullback.push({r,p}); return; }
+          if (p.label.includes('START') || p.continuation) { groups.trade.push({r,p}); return; }
+          if (p.label.includes('LATE') || p.label.includes('EXTENDED')) { groups.watch.push({r,p}); return; }
+        });
+        const box=(title,color,items,hint)=>(
+          <div style={{flex:'1 1 220px',background:'var(--bg-card)',border:`1px solid ${color}30`,borderRadius:10,padding:'10px 12px',minWidth:200}}>
+            <div style={{fontFamily:mono,fontSize:9,color,letterSpacing:1.5,fontWeight:700,marginBottom:6}}>{title} ({items.length})</div>
+            {items.length===0?<span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>none</span>:
+              <div style={{display:'flex',flexWrap:'wrap',gap:5}}>
+                {items.map(({r,p})=><span key={r.symbol} title={p.tip} style={{fontFamily:mono,fontSize:9,color,background:color+'12',border:`1px solid ${color}30`,borderRadius:4,padding:'2px 7px',fontWeight:700,cursor:'help'}}>{r.symbol} {r.gap>0?'+':''}{Number(r.gap).toFixed(0)}{p.continuation?' ★':''}</span>)}
+              </div>}
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',marginTop:6}}>{hint}</div>
+          </div>
+        );
+        return (
+          <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:10}}>
+            {box('✅ READY TO TRADE','#00ff9f',groups.trade,'Catching the start — check the PB ENTRY level, then execute')}
+            {box('🎯 ON PULLBACK','#ffd166',groups.pullback,'Continuation window — enter at the PB ENTRY level · ★ = full checklist')}
+            {box('⚠️ WATCH OUT','#ffaa44',groups.watch,'Late or exhausted — no new entries, wait for reset')}
+            {box('🔴 CLOSE IF OPEN','#ff4d6d',groups.close,'Trend at risk or close alert — protect open trades')}
+          </div>
+        );
+      })()}
       {valid.map(row => {
         const gap = row.gap ?? 0;
         const bias = gap > 0 ? { label:'BUY', color:'#00ff9f', border:'#00ff9f33', bg:'rgba(0,255,159,0.08)' }
@@ -1336,8 +1678,10 @@ function ValidSetupsTab({ data, trends, cotMap, confidenceMap }) {
 
             {/* MOMENTUM + ACTION */}
             <div style={{flex:1}}>
+              <div style={{marginBottom:5}}><VerdictBanner row={row} pdr={null} t={t} compact/></div>
               <div style={{fontFamily:mono,fontSize:9,color:t.momentumColor||'var(--text-muted)',background:(t.momentumColor||'var(--text-muted)')+'18',border:`1px solid ${(t.momentumColor||'var(--text-muted)')}30`,borderRadius:4,padding:'2px 8px',display:'inline-block',marginBottom:4}}>{t.momentum||'NEUTRAL'}</div>
-              {g && <div style={{fontFamily:mono,fontSize:10,color:g.color,fontWeight:700}}>👉 {g.action}</div>}{(()=>{const mu=getMatchup(row);if(!mu)return null;return(<div style={{fontFamily:mono,fontSize:9,color:mu.color,background:mu.color+'12',border:`1px solid ${mu.color}28`,borderRadius:4,padding:'2px 7px',display:'inline-block',marginTop:3,whiteSpace:'nowrap'}}>{mu.label}{mu.note&&<span style={{marginLeft:5,opacity:0.7,fontSize:8}}>{mu.note}</span>}</div>);})()}
+              {(()=>{const mu=getMatchup(row);if(!mu)return null;return(<div style={{fontFamily:mono,fontSize:9,color:mu.color,background:mu.color+'12',border:`1px solid ${mu.color}28`,borderRadius:4,padding:'2px 7px',display:'inline-block',marginTop:3,whiteSpace:'nowrap'}}>{mu.label}{mu.note&&<span style={{marginLeft:5,opacity:0.7,fontSize:8}}>{mu.note}</span>}</div>);})()}
+              <ScoreTfBadge row={row}/>
               {(()=>{const bh4=boxTrend(row.box_h4_trend),bh1=boxTrend(row.box_h1_trend);if(!bh4&&!bh1)return null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>BOX</span>{bh4&&<span style={{fontFamily:mono,fontSize:8,color:bh4.color,background:bh4.bg,border:`1px solid ${bh4.border}`,borderRadius:3,padding:'1px 6px'}}>H4 {bh4.label}</span>}{bh1&&<span style={{fontFamily:mono,fontSize:8,color:bh1.color,background:bh1.bg,border:`1px solid ${bh1.border}`,borderRadius:3,padding:'1px 6px'}}>H1 {bh1.label}</span>}</div>);})()}
               {(()=>{ const pl=plZoneBadge(row.pl_zone,row.bias); if(!pl)return null; return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>PL</span><span style={{fontFamily:mono,fontSize:9,color:pl.color,background:pl.bg,border:`1px solid ${pl.border}`,borderRadius:4,padding:'1px 8px',fontWeight:700}}>{pl.label}</span>{pl.valid&&<span style={{fontFamily:mono,fontSize:8,color:'#00ff9f',fontWeight:700}}>G1 ✅</span>}{!pl.valid&&<span style={{fontFamily:mono,fontSize:8,color:'#ff7744'}}>G1 ⛔</span>}</div>);})()}
               {(()=>{
@@ -1454,10 +1798,12 @@ function ValidPairsTab({ data, trends, cotMap, confidenceMap }) {
           <div style={{fontFamily:"'Orbitron',sans-serif",fontSize:22,fontWeight:900,color:bias.color,lineHeight:1}}>{gap>0?'+':''}{Number(gap).toFixed(0)}</div>
         </div>
         <div style={{flex:1,display:'flex',flexDirection:'column',gap:4}}>
+          <div><VerdictBanner row={row} pdr={null} t={t} compact/></div>
           <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
             {t.momentum&&<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:mc,background:mc+'18',border:`1px solid ${mc}30`,borderRadius:4,padding:'2px 8px'}}>{t.momentum}</span>}
             {(()=>{const mu=getMatchup(row);if(!mu)return null;return(<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:mu.color,background:mu.color+'12',border:`1px solid ${mu.color}28`,borderRadius:4,padding:'1px 7px',whiteSpace:'nowrap'}}>{mu.label}</span>);})()}
           </div>
+          <ScoreTfBadge row={row}/>
           {(()=>{
             const bh4=boxTrend(row.box_h4_trend),bh1=boxTrend(row.box_h1_trend);
             const bconf=boxConfirm(row.bias,row.box_h4_trend,row.box_h1_trend);
@@ -1557,7 +1903,8 @@ function OpenTradesPanel() {
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 30000);
+    const tick=()=>{ if(typeof document!=='undefined' && document.visibilityState==='hidden') return; load(); };
+    const t = setInterval(tick, 60000);
     return () => clearInterval(t);
   }, [load]);
 
@@ -1841,6 +2188,103 @@ function ChartTab({ data }) {
   );
 }
 
+// ===== SHADOW TRACKER TAB (gap 9/10/11/12 research logger) =====
+function ShadowTab() {
+  const monoF = "'Share Tech Mono',monospace";
+  const orbF = "'Orbitron',sans-serif";
+  const [rows, setRows] = useState([]);
+  const [summary, setSummary] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [filterTier, setFilterTier] = useState('');
+  const [filterStatus, setFilterStatus] = useState('ALL');
+
+  const fetchRows = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (filterTier) params.set('tier', filterTier);
+      if (filterStatus !== 'ALL') params.set('status', filterStatus);
+      const res = await fetch(`/api/shadow-log?${params}`);
+      const d = await res.json();
+      setRows(d.rows || []);
+      setSummary(d.summary || null);
+    } catch (e) { console.error(e); }
+    setLoading(false);
+  }, [filterTier, filterStatus]);
+
+  useEffect(() => { fetchRows(); }, [fetchRows]);
+
+  const fmtT = (ts) => { try { return new Date(ts).toLocaleString('en-GB', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit', hour12:false }); } catch { return '—'; } };
+  const selS = { fontFamily:monoF, fontSize:10, padding:'5px 8px', borderRadius:5, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text-primary)', cursor:'pointer' };
+  const hd = { fontFamily:monoF, fontSize:9, color:'var(--text-secondary)', letterSpacing:1, padding:'6px 8px', textAlign:'left', whiteSpace:'nowrap' };
+  const td = { fontFamily:monoF, fontSize:10, padding:'5px 8px', whiteSpace:'nowrap' };
+  const statCard = (label, val, color) => (
+    <div style={{background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:8,padding:'10px 16px',display:'flex',flexDirection:'column',gap:3}}>
+      <span style={{fontFamily:monoF,fontSize:8,color:'var(--text-muted)',letterSpacing:1.5}}>{label}</span>
+      <span style={{fontFamily:orbF,fontSize:16,fontWeight:700,color:color||'var(--text-primary)'}}>{val}</span>
+    </div>
+  );
+
+  return (
+    <div style={{maxWidth:1100,margin:'0 auto'}}>
+      <div style={{fontFamily:orbF,fontSize:15,fontWeight:700,color:'#00b4ff',letterSpacing:3,marginBottom:6}}>SHADOW TRACKER</div>
+      <div style={{fontFamily:monoF,fontSize:9,color:'var(--text-muted)',letterSpacing:2,marginBottom:14}}>HIGH-GAP RESEARCH LOG · TIERS 9/10/11/12 · NO REAL TRADES · VALIDATING THE 9+ EDGE</div>
+
+      {summary && <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:14}}>
+        {statCard('ENTRIES', summary.total)}
+        {statCard('OPEN', summary.open, '#00b4ff')}
+        {statCard('CLOSED', summary.done)}
+        {statCard('WINS', summary.wins, '#00ff9f')}
+        {statCard('LOSSES', summary.losses, '#ff4d6d')}
+        {statCard('NET PIPS', summary.net_pips, summary.net_pips >= 0 ? '#00ff9f' : '#ff4d6d')}
+        {statCard('AVG/TRADE', summary.avg_pips, summary.avg_pips >= 0 ? '#00ff9f' : '#ff4d6d')}
+      </div>}
+
+      <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:14,flexWrap:'wrap'}}>
+        <select value={filterTier} onChange={e=>setFilterTier(e.target.value)} style={selS}>
+          <option value="">ALL TIERS</option>
+          {[9,10,11,12].map(t=><option key={t} value={t}>TIER {t}</option>)}
+        </select>
+        <select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)} style={selS}>
+          {['ALL','PENDING','DONE'].map(s=><option key={s} value={s}>{s}</option>)}
+        </select>
+        <button onClick={fetchRows} style={{...selS,color:'#00b4ff'}}>↻ REFRESH</button>
+        {loading && <span style={{fontFamily:monoF,fontSize:9,color:'var(--text-muted)'}}>loading…</span>}
+      </div>
+
+      {rows.length === 0 && !loading && <div style={{fontFamily:monoF,fontSize:11,color:'var(--text-muted)',padding:'30px 0',textAlign:'center'}}>No shadow entries yet — they appear when any pair&apos;s |gap| crosses 9, 10, 11, or 12 while the engine is running.</div>}
+
+      {rows.length > 0 && <div style={{overflowX:'auto',background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:10}}>
+        <table style={{width:'100%',borderCollapse:'collapse'}}>
+          <thead><tr style={{background:'var(--bg-hover)'}}>{['OPENED','SYMBOL','TIER','DIR','ENTRY GAP','PEAK','PIPS','OUTCOME','EXIT REASON','SESSION','PL ZONE','STATUS'].map(h=><th key={h} style={hd}>{h}</th>)}</tr></thead>
+          <tbody>
+            {rows.map(r=>{
+              const dirC = r.direction==='BUY'?'#00ff9f':'#ff4d6d';
+              const outC = r.outcome==='WIN'?'#00ff9f':r.outcome==='LOSS'?'#ff4d6d':'var(--text-muted)';
+              return (
+                <tr key={r.id} style={{borderTop:'1px solid var(--border)'}}>
+                  <td style={{...td,color:'var(--text-muted)'}}>{fmtT(r.created_at)}</td>
+                  <td style={{...td,fontWeight:700}}>{r.symbol}</td>
+                  <td style={{...td,color:'#ffd166'}}>T{r.tier}</td>
+                  <td style={{...td,color:dirC,fontWeight:700}}>{r.direction}</td>
+                  <td style={td}>{r.entry_gap!=null?Number(r.entry_gap).toFixed(1):'—'}</td>
+                  <td style={td}>{r.peak_gap!=null?Number(r.peak_gap).toFixed(1):'—'}</td>
+                  <td style={{...td,color:outC,fontWeight:700}}>{r.pips!=null?Number(r.pips).toFixed(1):'—'}</td>
+                  <td style={{...td,color:outC}}>{r.outcome||'—'}</td>
+                  <td style={{...td,color:'var(--text-muted)'}}>{r.exit_reason||'—'}</td>
+                  <td style={{...td,color:'var(--text-muted)'}}>{r.session||'—'}</td>
+                  <td style={{...td,color:'var(--text-muted)'}}>{r.pl_zone||'—'}</td>
+                  <td style={{...td,color:r.status==='PENDING'?'#00b4ff':'var(--text-muted)'}}>{r.status}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>}
+    </div>
+  );
+}
+
 // ===== SIGNAL LOG TAB =====
 function SignalLogTab() {
   const mono = "'Share Tech Mono',monospace";
@@ -1908,7 +2352,7 @@ function SignalLogTab() {
         <table style={{width:'100%',borderCollapse:'collapse',fontFamily:mono,fontSize:10}}>
           <thead>
             <tr style={{background:'var(--bg-secondary)'}}>
-              {['TIME','PAIR','GAP','BIAS','CONF','EXEC','SCORE','MOMENTUM','STATE','STR','PL','VALID'].map(h=>(
+              {['TIME','PAIR','GAP','BIAS','CONF','EXEC','SCORE','EXTREME TF','MOMENTUM','STATE','STR','PL','VALID'].map(h=>(
                 <th key={h} style={{padding:'8px 6px',color:'var(--text-muted)',fontWeight:600,fontSize:9,letterSpacing:1,textAlign:'left',borderBottom:'1px solid var(--border)',whiteSpace:'nowrap'}}>{h}</th>
               ))}
             </tr>
@@ -1927,6 +2371,7 @@ function SignalLogTab() {
                   <td style={{padding:'6px',color:r.confidence==='HIGH'?'#00ff9f':r.confidence==='MEDIUM'?'#ffd166':'var(--text-muted)'}}>{r.confidence||'—'}</td>
                   <td style={{padding:'6px',color:r.execution==='MARKET'?'#00ff9f':r.execution==='PULLBACK'?'#ffd166':'var(--text-muted)'}}>{r.execution||'—'}</td>
                   <td style={{padding:'6px'}}>{(()=>{const cf=computeConfidence(r,null,null);if(!cf)return <span style={{color:'var(--text-muted)'}}>—</span>;const cs=confStyle(cf.confidence);return <span style={{fontSize:9,color:cs.color,fontWeight:700}}>{cf.confidence}</span>;})()}</td>
+                  <td style={{padding:'6px',whiteSpace:'nowrap'}}>{(r.base_score_tf||r.quote_score_tf)?<ScoreTfBadge row={r} mt={0} showLabel={false}/>:<span style={{color:'var(--text-muted)'}}>—</span>}</td>
                   <td style={{padding:'6px',color:r.momentum==='STRONG'?'#00ff9f':r.momentum==='BUILDING'?'#00b4ff':'var(--text-muted)'}}>{r.momentum||'—'}</td>
                   <td style={{padding:'6px',color:'var(--text-muted)'}}>{r.state||'—'}</td>
                   <td style={{padding:'6px',fontWeight:700,color:r.strength>=2?'#00ff9f':r.strength>=1?'#ffd166':'var(--text-muted)'}}>{Number(r.strength||0).toFixed(1)}</td>
@@ -2450,6 +2895,7 @@ function OvSignalCard({ pair, tier, onClick, delay }) {
       <span style={{fontFamily:mono,fontSize:9,color:OV_COLORS.textMuted,letterSpacing:1}}>{Math.abs(pair.gap)>=9&&pair.pl_zone!=='BETWEEN'?'INTRA':'BB'}</span>
       {pair.pdr_strong&&<span style={{fontFamily:mono,fontSize:9,color:OV_COLORS.buy,background:OV_COLORS.buyDim,border:`1px solid ${OV_COLORS.buy}25`,borderRadius:3,padding:'2px 6px'}}>PDR ✓</span>}
     </div>}
+    <div style={{marginBottom:isL?4:8}}><ScoreTfBadge row={pair} mt={0} showLabel={!isL} showEmpty={!isL}/></div>
     {(()=>{const isBuy=pair.bias==='BUY',isSell=pair.bias==='SELL';if(!isBuy&&!isSell)return null;const isJpy=pair.symbol?.includes('JPY');const dec=isJpy?3:5;const levels=isBuy?[{l:'PDL',v:pair.pdl},{l:'PWL',v:pair.pwl},{l:'PML',v:pair.pml},{l:'PYL',v:pair.pyl}].filter(x=>x.v!=null).sort((a,b)=>b.v-a.v):[{l:'PDH',v:pair.pdh},{l:'PWH',v:pair.pwh},{l:'PMH',v:pair.pmh},{l:'PYH',v:pair.pyh}].filter(x=>x.v!=null).sort((a,b)=>a.v-b.v);const top2=levels.slice(0,2);if(!top2.length)return null;const c1=isBuy?OV_COLORS.buy:OV_COLORS.sell;const c2='#00b4ff';return(<div style={{display:'flex',alignItems:'center',gap:isL?4:6,marginBottom:isL?4:8}}>
       <span style={{fontFamily:mono,fontSize:isL?7:8,color:OV_COLORS.textMuted,letterSpacing:2,fontWeight:600}}>PB ENTRY</span>
       {top2.map((lv,i)=><span key={lv.l} style={{fontFamily:mono,fontSize:isH?11:isL?9:10,color:i===0?c1:c2,background:(i===0?c1:c2)+'12',border:`1px solid ${(i===0?c1:c2)}28`,borderRadius:isL?3:4,padding:isL?'1px 5px':'2px 8px',fontWeight:700,letterSpacing:0.5}}>{lv.l} {Number(lv.v).toFixed(dec)}</span>)}
@@ -2642,12 +3088,13 @@ function OverviewTab({ data, trends, pdrData, upcomingNews, spikes, confidenceMa
     symbol:row.symbol, gap:row.gap??0, bias:row.bias||'WAIT',
     momentum:trends[row.symbol]?.momentum||'NEUTRAL', closeAlert:trends[row.symbol]?.closeAlert||false,
     pl_zone:row.pl_zone||'BETWEEN', box_h4:row.box_h4_trend||'RANGING', box_h1:row.box_h1_trend||'RANGING',
-    pdr_strong:pdrData[row.symbol]?.strong||false, pdr_strength:pdrData[row.symbol]?.strength||0,
-    pdr_direction:pdrData[row.symbol]?.direction||'NEUTRAL',
+    pdr_strong:(row.pdr_dir!=null?!!row.pdr_strong_live:(pdrData[row.symbol]?.strong||false)), pdr_strength:(row.pdr_dir!=null?(row.pdr_ratio||0):(pdrData[row.symbol]?.strength||0)),
+    pdr_direction:(row.pdr_dir!=null?row.pdr_dir:(pdrData[row.symbol]?.direction||'NEUTRAL')),
     edge:confidenceMap[row.symbol]?.historical?.flag||null, conf:confidenceMap[row.symbol]?.confidence||0,
     conflict:confidenceMap[row.symbol]?.conflict||false,
     news:upcomingNews?.affected_pairs?.includes(row.symbol)||false, hard_invalid:row.hard_invalid||false,
     pdl:row.pdl, pdh:row.pdh, pwl:row.pwl, pwh:row.pwh, pml:row.pml, pmh:row.pmh, pyl:row.pyl, pyh:row.pyh,
+    base_score_tf:row.base_score_tf||'', quote_score_tf:row.quote_score_tf||'', base_currency:row.base_currency, quote_currency:row.quote_currency,
   })).sort((a,b)=>b.conf-a.conf), [data,trends,pdrData,confidenceMap,upcomingNews]);
 
   // Session + market mode
@@ -2841,7 +3288,7 @@ function OverviewTab({ data, trends, pdrData, upcomingNews, spikes, confidenceMa
 }
 
 
-const TABS = ['OVERVIEW','PANELS','SIGNALS','TABLE','GAP CHART','RESEARCH','CALCULATOR','SETUPS','VALID PAIRS','CHART','ANALYTICS','LOGS','PANDA AI'];
+const TABS = ['OVERVIEW','PANELS','SIGNALS','TABLE','GAP CHART','RESEARCH','CALCULATOR','SETUPS','VALID PAIRS','CHART','ANALYTICS','SHADOW','LOGS','PANDA AI'];
 // Maps each tab to the feature_access key that controls it
 const TAB_FEATURE = {
   'OVERVIEW':    'overview',
@@ -2857,6 +3304,7 @@ const TAB_FEATURE = {
   'ENGINE':      'engine',
   'CHART':       'chart',
   'ANALYTICS':   'analytics',
+  'SHADOW':      'shadow',
   'LOGS':        'signal_log',
   'PANDA AI':    'panda_ai',
 };
@@ -2911,7 +3359,7 @@ function SignalAnalytics() {
 
       {/* STRATEGY FILTER */}
       <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
-        {['ALL','BB','INTRA'].map(st=>(
+        {['ALL','BB','INTRA','PANDA'].map(st=>(
           <button key={st} onClick={()=>setStratFilter(st)} style={{fontFamily:mono,fontSize:9,padding:'4px 12px',borderRadius:4,border:`1px solid ${stratFilter===st?'#00b4ff':'var(--border)'}`,background:stratFilter===st?'rgba(0,180,255,0.15)':'var(--bg-card)',color:stratFilter===st?'#00b4ff':'var(--text-muted)',cursor:'pointer',letterSpacing:2}}>{st}</button>
         ))}
         <select value={pairFilter} onChange={e=>setPairFilter(e.target.value)} style={{fontFamily:mono,fontSize:9,padding:'4px 8px',borderRadius:4,border:'1px solid var(--border)',background:'var(--bg-card)',color:'var(--text-primary)',cursor:'pointer',letterSpacing:1}}>
@@ -3169,8 +3617,10 @@ export default function Dashboard() {
   // URL-synced tab state
   const urlTab = typeof router.query.tab === 'string' ? router.query.tab.toUpperCase().replace(/-/g,' ') : null;
   const [tab, setTabRaw] = useState(urlTab && ALL_TABS_SET.has(urlTab) ? urlTab : 'OVERVIEW');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const setTab = useCallback((t) => {
     setTabRaw(t);
+    setSidebarOpen(false);
     const slug = t.toLowerCase().replace(/\s+/g, '-');
     router.replace({ pathname: '/dashboard', query: { tab: slug } }, undefined, { shallow: true });
   }, [router]);
@@ -3271,8 +3721,18 @@ export default function Dashboard() {
     const t = setInterval(fetchNews, 5 * 60 * 1000);
     return () => clearInterval(t);
   },[]);
-  useEffect(()=>{const t=setInterval(()=>fetchData(true),15000);return()=>clearInterval(t);},[fetchData]);
-  useEffect(()=>{const t=setInterval(fetchSpikes,15000);fetchSpikes();return()=>clearInterval(t);},[fetchSpikes]);
+  // Polling — paused when tab hidden to save Vercel Fluid CPU
+  useEffect(()=>{
+    const tick=()=>{ if(typeof document!=='undefined' && document.visibilityState==='hidden') return; fetchData(true); };
+    const t=setInterval(tick,30000);
+    return()=>clearInterval(t);
+  },[fetchData]);
+  useEffect(()=>{
+    const tick=()=>{ if(typeof document!=='undefined' && document.visibilityState==='hidden') return; fetchSpikes(); };
+    const t=setInterval(tick,30000);
+    fetchSpikes();
+    return()=>clearInterval(t);
+  },[fetchSpikes]);
   useEffect(()=>{if(tab==='RESEARCH'&&cotData.length===0) fetchCot();},[tab,cotData.length,fetchCot]);
   useEffect(()=>{fetchCot();},[fetchCot]);
   useEffect(()=>{
@@ -3297,10 +3757,13 @@ export default function Dashboard() {
     if(res.ok) setMaintenance(next);
   }
 
-  // Heartbeat — ping every 60s so admin can see who's online
+  // Heartbeat — ping every 2 min so admin can see who's online (skips when tab hidden)
   useEffect(()=>{
     fetch('/api/heartbeat',{method:'POST'}).catch(()=>{});
-    const hb=setInterval(()=>fetch('/api/heartbeat',{method:'POST'}).catch(()=>{}),60000);
+    const hb=setInterval(()=>{
+      if(typeof document!=='undefined' && document.visibilityState==='hidden') return;
+      fetch('/api/heartbeat',{method:'POST'}).catch(()=>{});
+    },120000);
     return()=>clearInterval(hb);
   },[]);
 
@@ -3392,6 +3855,7 @@ export default function Dashboard() {
         {/* HEADER */}
         <header style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:isMobile?'8px 12px':'10px 20px',background:'var(--bg-secondary)',borderBottom:'1px solid var(--border)',position:'sticky',top:0,zIndex:100,flexWrap:isMobile?'wrap':'nowrap',gap:isMobile?8:0}}>
           <div style={{display:'flex',alignItems:'center',gap:10}}>
+            {isMobile&&<button onClick={()=>setSidebarOpen(o=>!o)} aria-label="Menu" style={{background:'rgba(0,180,255,0.08)',border:'1px solid #1e3060',borderRadius:6,color:'#00b4ff',fontSize:16,lineHeight:1,padding:'4px 9px',cursor:'pointer'}}>☰</button>}
             <span style={{fontSize:isMobile?18:22}}>🐼</span>
             <div><div style={{fontFamily:orb,fontWeight:900,fontSize:isMobile?11:13,letterSpacing:isMobile?2:4,color:'#00ff9f'}}>PANDA ENGINE</div>{!isMobile&&<div style={{fontFamily:mono,fontSize:8,letterSpacing:3,color:'var(--text-muted)'}}>FOREX INTELLIGENCE · {isMarketOpen()?'LIVE':'MARKET CLOSED'}</div>}</div>
           </div>
@@ -3409,22 +3873,45 @@ export default function Dashboard() {
             {(isAdmin||user?.role==='vip'||user?.feature_access?.includes('journal'))&&<button onClick={()=>window.location.href='/journal'} style={{background:'rgba(255,209,102,0.06)',border:'1px solid #ffd16633',borderRadius:5,color:'#ffd166',fontFamily:mono,fontSize:9,padding:'5px 10px',cursor:'pointer'}}>📓 JOURNAL</button>}
             <button onClick={()=>window.location.href='/strength'} style={{background:'rgba(78,154,241,0.06)',border:'1px solid #4e9af133',borderRadius:5,color:'#4e9af1',fontFamily:mono,fontSize:9,padding:'5px 10px',cursor:'pointer'}}>STRENGTH</button>
             {isAdmin&&<button onClick={()=>window.location.href='/admin'} style={{background:'rgba(255,209,102,0.08)',border:'1px solid #ffd16644',borderRadius:5,color:'#ffd166',fontFamily:mono,fontSize:9,padding:'5px 10px',cursor:'pointer'}}>🛡️ ADMIN</button>}
-            {isAdmin&&<button onClick={()=>window.location.href='/guardian'} style={{background:'rgba(255,77,109,0.08)',border:'1px solid #ff4d6d44',borderRadius:5,color:'#ff4d6d',fontFamily:mono,fontSize:9,padding:'5px 10px',cursor:'pointer'}}>GUARDIAN</button>}
             {isAdmin&&<button onClick={()=>setShowPageVis(!showPageVis)} style={{background:showPageVis?'rgba(204,119,255,0.15)':'rgba(204,119,255,0.06)',border:'1px solid #cc77ff44',borderRadius:5,color:'#cc77ff',fontFamily:mono,fontSize:9,padding:'5px 10px',cursor:'pointer'}}>👁️ PAGES</button>}
             {isAdmin&&<button onClick={toggleMaintenance} style={{background:maintenance?'rgba(255,77,109,0.12)':'rgba(0,255,159,0.06)',border:`1px solid ${maintenance?'#ff4d6d33':'#00ff9f33'}`,borderRadius:5,color:maintenance?'#ff4d6d':'#00ff9f',fontFamily:mono,fontSize:9,padding:'5px 10px',cursor:'pointer'}}>{maintenance?'🔴 SITE OFF':'🟢 SITE ON'}</button>}
             <button onClick={handleLogout} style={{background:'transparent',border:'1px solid #2a1525',borderRadius:5,color:'#ff4d6d',fontFamily:mono,fontSize:9,padding:'5px 10px',cursor:'pointer'}}>LOGOUT</button>
           </div>
         </header>
 
+        {/* ===== BODY: SIDEBAR + MAIN ===== */}
+        <div style={{display:'flex',flex:1,position:'relative',zIndex:1,minHeight:0}}>
+
+          {/* Mobile drawer backdrop */}
+          {isMobile&&sidebarOpen&&(
+            <div onClick={()=>setSidebarOpen(false)} style={{position:'fixed',inset:0,zIndex:89,background:'rgba(0,0,0,0.5)',backdropFilter:'blur(2px)'}}/>
+          )}
+
+          {/* SIDEBAR NAV */}
+          <aside style={isMobile
+            ?{position:'fixed',top:0,left:0,bottom:0,width:230,zIndex:90,background:'var(--bg-secondary)',borderRight:'1px solid var(--border)',padding:'58px 10px 16px',display:'flex',flexDirection:'column',gap:4,transform:sidebarOpen?'translateX(0)':'translateX(-105%)',transition:'transform 0.25s ease',boxShadow:sidebarOpen?'4px 0 24px rgba(0,0,0,0.5)':'none',overflowY:'auto'}
+            :{width:190,flexShrink:0,background:'var(--bg-secondary)',borderRight:'1px solid var(--border)',padding:'14px 8px',display:'flex',flexDirection:'column',gap:3,alignSelf:'stretch',position:'sticky',top:0,maxHeight:'100vh',overflowY:'auto'}}>
+            <div style={{fontFamily:mono,fontSize:8,letterSpacing:3,color:'var(--text-muted)',padding:'2px 12px 8px'}}>NAVIGATION</div>
+            {(()=>{const ICON={'OVERVIEW':'🏠','PANELS':'🧩','SIGNALS':'📡','TABLE':'📋','GAP CHART':'📈','RESEARCH':'🔬','CALCULATOR':'🧮','SETUPS':'🎯','VALID PAIRS':'✅','CHART':'📉','ANALYTICS':'📊','SHADOW':'🌑','LOGS':'📜','PANDA AI':'🐼','ENGINE':'🏥'};
+            const items=TABS.filter(t=>{ const feat=TAB_FEATURE[t]; if(!feat) return true; if(isAdmin) return true; const fa=user?.feature_access||[]; if(t==='SHADOW') return fa.includes('shadow'); return fa.includes(feat)||fa.includes('dashboard');});
+            const navStyle=(t,active,accent)=>({display:'flex',alignItems:'center',gap:9,background:active?(accent==='#ffd166'?'rgba(255,209,102,0.12)':'rgba(0,180,255,0.12)'):'transparent',borderLeft:`3px solid ${active?accent:'transparent'}`,color:active?accent:'#c8ddf0',fontFamily:mono,fontSize:10,fontWeight:active?700:500,letterSpacing:1.5,padding:'9px 11px',borderRadius:6,cursor:'pointer',textDecoration:'none',whiteSpace:'nowrap'});
+            return(<>
+              {items.map(t=>(<a key={t} href={`/dashboard?tab=${t.toLowerCase().replace(/\s+/g,'-')}`} onClick={(e)=>{e.preventDefault();setTab(t);}} style={navStyle(t,tab===t,'#00b4ff')}><span style={{fontSize:12,width:16,textAlign:'center'}}>{ICON[t]||'▸'}</span>{t}</a>))}
+              {isAdmin&&<a href="/dashboard?tab=engine" onClick={(e)=>{e.preventDefault();setTab('ENGINE');}} style={{...navStyle('ENGINE',tab==='ENGINE','#ffd166'),marginTop:6,borderTop:'1px solid var(--border)',paddingTop:12,borderRadius:0}}><span style={{fontSize:12,width:16,textAlign:'center'}}>{ICON['ENGINE']}</span>ENGINE</a>}
+            </>);})()}
+          </aside>
+
+          {/* MAIN COLUMN */}
+          <div style={{flex:1,display:'flex',flexDirection:'column',minWidth:0}}>
+
         {/* PAGE VISIBILITY TOGGLE — ADMIN ONLY */}
         {isAdmin&&showPageVis&&pageVis&&(()=>{
           const PAGES = [
             { key:'landing',   label:'🏠 LANDING',   route:'/' },
-            { key:'funnel',    label:'🔄 FUNNEL',    route:'/funnel' },
+            { key:'funnel',    label:'🔄 GET STARTED', route:'/get-started' },
             { key:'pricing',   label:'💰 PRICING',   route:'/pricing' },
             { key:'portfolio', label:'📁 PORTFOLIO', route:'/portfolio' },
             { key:'login',     label:'🔐 LOGIN',     route:'/login' },
-            { key:'guardian',  label:'🛡️ GUARDIAN',  route:'/guardian' },
             { key:'stream',    label:'📡 STREAM',    route:'/stream' },
           ];
           const togglePage = async (pgKey) => {
@@ -3511,24 +3998,18 @@ export default function Dashboard() {
           <MomentumHeatmap data={data} visible={prefs?.heatmap_visible!==false} onToggle={toggleHeatmap}/>
         )}
 
-        {/* TABS */}
-        <div style={{display:'flex',alignItems:'center',gap:7,padding:isMobile?'0 12px 10px':'0 20px 10px',flexWrap:'nowrap',overflowX:'auto',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',zIndex:1}}>
-          <div style={{display:'flex',background:'var(--bg-secondary)',border:'1px solid var(--border)',borderRadius:7,overflow:'visible',flexShrink:0}}>
-            {TABS.filter(t=>{ const feat=TAB_FEATURE[t]; if(!feat) return true; if(isAdmin) return true; const fa=user?.feature_access||[]; return fa.includes(feat)||fa.includes('dashboard');}).map((t,i,arr)=><a key={t} href={`/dashboard?tab=${t.toLowerCase().replace(/\s+/g,'-')}`} onClick={(e)=>{e.preventDefault();setTab(t);}} style={{background:tab===t?'rgba(0,180,255,0.15)':'rgba(255,255,255,0.03)',border:'none',borderRight:i<TABS.length-1?'1px solid var(--border)':'none',color:tab===t?'#00b4ff':'#c8ddf0',fontFamily:mono,fontSize:9,fontWeight:tab===t?700:500,letterSpacing:2,padding:'7px 12px',cursor:'pointer',whiteSpace:'nowrap',textDecoration:'none',display:'inline-block'}}>{t}</a>)}
-            {isAdmin&&<a href="/dashboard?tab=engine" onClick={(e)=>{e.preventDefault();setTab('ENGINE');}} style={{background:tab==='ENGINE'?'rgba(255,209,102,0.15)':'rgba(255,255,255,0.03)',border:'none',borderLeft:'1px solid var(--border)',color:tab==='ENGINE'?'#ffd166':'#c8ddf0',fontFamily:mono,fontSize:9,fontWeight:tab==='ENGINE'?700:500,letterSpacing:2,padding:'7px 12px',cursor:'pointer',textDecoration:'none',display:'inline-block'}}>🏥 ENGINE</a>}
+        {/* FILTERS BAR (Panels/Table only) */}
+        {['PANELS','TABLE'].includes(tab)&&(
+          <div style={{display:'flex',alignItems:'center',gap:7,padding:isMobile?'0 12px 10px':'0 20px 10px',flexWrap:'nowrap',overflowX:'auto',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',zIndex:1}}>
+            <div style={{display:'flex',gap:4}}>
+              {FILTERS.map(f=><button key={f} onClick={()=>setFilter(f)} style={{background:filter===f?(f==='⚠️ CLOSE'?'rgba(255,77,109,0.12)':'rgba(0,180,255,0.1)'):'transparent',border:`1px solid ${filter===f?(f==='⚠️ CLOSE'?'#ff4d6d':'#00b4ff'):'var(--border)'}`,borderRadius:5,color:filter===f?(f==='⚠️ CLOSE'?'#ff4d6d':'#00b4ff'):'var(--text-muted)',fontFamily:mono,fontSize:9,letterSpacing:1,padding:'5px 9px',cursor:'pointer'}}>{f}</button>)}
+            </div>
+            <input style={{background:'var(--bg-secondary)',border:'1px solid var(--border)',borderRadius:5,padding:'6px 10px',color:'var(--text-primary)',fontFamily:raj,fontSize:13,flex:1,minWidth:120}} placeholder="🔍 SEARCH..." value={search} onChange={e=>setSearch(e.target.value)}/>
+            <select style={{background:'var(--bg-secondary)',border:'1px solid var(--border)',borderRadius:5,padding:'6px 10px',color:'var(--text-secondary)',fontFamily:mono,fontSize:9,cursor:'pointer'}} value={sort} onChange={e=>setSort(e.target.value)}>
+              {SORTS.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
           </div>
-          {['PANELS','TABLE'].includes(tab)&&(
-            <>
-              <div style={{display:'flex',gap:4}}>
-                {FILTERS.map(f=><button key={f} onClick={()=>setFilter(f)} style={{background:filter===f?(f==='⚠️ CLOSE'?'rgba(255,77,109,0.12)':'rgba(0,180,255,0.1)'):'transparent',border:`1px solid ${filter===f?(f==='⚠️ CLOSE'?'#ff4d6d':'#00b4ff'):'var(--border)'}`,borderRadius:5,color:filter===f?(f==='⚠️ CLOSE'?'#ff4d6d':'#00b4ff'):'var(--text-muted)',fontFamily:mono,fontSize:9,letterSpacing:1,padding:'5px 9px',cursor:'pointer'}}>{f}</button>)}
-              </div>
-              <input style={{background:'var(--bg-secondary)',border:'1px solid var(--border)',borderRadius:5,padding:'6px 10px',color:'var(--text-primary)',fontFamily:raj,fontSize:13,flex:1,minWidth:120}} placeholder="🔍 SEARCH..." value={search} onChange={e=>setSearch(e.target.value)}/>
-              <select style={{background:'var(--bg-secondary)',border:'1px solid var(--border)',borderRadius:5,padding:'6px 10px',color:'var(--text-secondary)',fontFamily:mono,fontSize:9,cursor:'pointer'}} value={sort} onChange={e=>setSort(e.target.value)}>
-                {SORTS.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-            </>
-          )}
-        </div>
+        )}
 
         {/* CONTENT */}
         <div style={{flex:1,padding:isMobile?'0 10px 16px':'0 20px 20px',zIndex:1}}>
@@ -3538,7 +4019,7 @@ export default function Dashboard() {
               <span style={{fontFamily:mono,fontSize:12,letterSpacing:3,color:'var(--text-muted)'}}>LOADING...</span>
             </div>
 ):tab==='OVERVIEW'?(
-<OverviewTab data={data} trends={trends} pdrData={pdrData} upcomingNews={upcomingNews} spikes={spikes} confidenceMap={confidenceMap} memoryIndex={memoryIndex} onSelectPair={setSelectedPair} isMobile={isMobile} lastUpdate={lastUpdate}/>
+<><OverviewTab data={data} trends={trends} pdrData={pdrData} upcomingNews={upcomingNews} spikes={spikes} confidenceMap={confidenceMap} memoryIndex={memoryIndex} onSelectPair={setSelectedPair} isMobile={isMobile} lastUpdate={lastUpdate}/><PhaseLegend isMobile={isMobile}/></>
           ):tab==='PANELS'?(
             displayed.length===0
               ?<div style={{textAlign:'center',padding:60,fontFamily:mono,fontSize:11,letterSpacing:3,color:'var(--text-muted)'}}>NO PAIRS MATCH</div>
@@ -3548,7 +4029,9 @@ export default function Dashboard() {
               </div></>
           ):tab==='SETUPS'?(<ValidSetupsTab data={data} trends={trends} cotMap={cotMap} confidenceMap={confidenceMap}/>
 ):tab==='VALID PAIRS'?(<ValidPairsTab data={data} trends={trends} cotMap={cotMap} confidenceMap={confidenceMap}/>
-):tab==='SPIKE LOG'||tab==='LOGS'?(
+):tab==='SHADOW'&&(isAdmin||(user?.feature_access||[]).includes('shadow'))?(
+<ShadowTab/>
+          ):tab==='SPIKE LOG'||tab==='LOGS'?(
 <div>
   <div style={{display:'flex',gap:8,marginBottom:12}}>
     {['Signal Log','Spike Log'].map(st=>(
@@ -3716,6 +4199,8 @@ export default function Dashboard() {
         <div style={{fontFamily:mono,fontSize:9,letterSpacing:2,color:'var(--text-muted)',textAlign:'center',padding:'8px 20px',borderTop:'1px solid var(--border)',zIndex:1}}>
           PANDA ENGINE · 15s REFRESH · {displayed.length} PAIRS{closeAlerts>0?` · ⚠️ ${closeAlerts} ALERT${closeAlerts>1?'S':''}`:''}
         </div>
+          </div>{/* /main column */}
+        </div>{/* /body flex row */}
       </div>
       <style>{`
         @keyframes spin{to{transform:rotate(360deg);}}

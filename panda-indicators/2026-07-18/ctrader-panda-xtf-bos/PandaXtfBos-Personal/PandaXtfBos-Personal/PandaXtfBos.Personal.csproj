@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AssemblyName>PandaEnginePersonalXtfBos</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../PandaXtfBos.Personal.cs" Link="PandaXtfBos.Personal.cs" />
+    <PackageReference Include="cTrader.Automate" Version="1.*" />
+  </ItemGroup>
+</Project>

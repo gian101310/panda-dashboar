@@ -7,7 +7,6 @@
         "build": "next build",
         "start": "next start",
         "plot:engine-pb": "node tools/plot-engine-pb.mjs",
-        "account:guardian": "node tools/account-guardian-agent.mjs",
         "execute:engine-pb": "node tools/execute-engine-pb.mjs",
         "breakeven": "node tools/breakeven-agent.mjs",
         "journal:sync": "node tools/journal-sync-agent.mjs",
@@ -19,8 +18,7 @@
         "chart:manage": "node tools/chart-manager-agent.mjs",
         "account:report": "node tools/account-report-agent.mjs",
         "alerts": "node tools/price-alert-agent.mjs",
-        "chart:annotate": "node tools/chart-annotator-agent.mjs",
-        "auto:loop": "node tools/autonomous-loop.mjs"
+        "chart:annotate": "node tools/chart-annotator-agent.mjs"
     },
     "dependencies": {
         "@supabase/supabase-js": "^2.45.4",

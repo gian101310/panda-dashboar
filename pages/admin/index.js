@@ -6,12 +6,12 @@ const mono = "'Share Tech Mono', monospace";
 // ── TAB ACCESS ──
 const ALL_FEATURES = [
   'overview','panels','table','setups','valid_pairs','spike_log','signal_log',
-  'signals','gap_chart','analytics','panda_ai',
+  'signals','gap_chart','analytics','panda_ai','shadow',
   'cot','calendar','calculator','journal','engine',
   'heatmap','spike_banner',
 ];
 const FEATURE_GROUPS = {
-  'TABS': ['overview','panels','table','setups','valid_pairs','spike_log','signal_log','signals','gap_chart','analytics','panda_ai','cot','calendar','calculator','journal','engine'],
+  'TABS': ['overview','panels','table','setups','valid_pairs','spike_log','signal_log','signals','gap_chart','analytics','panda_ai','shadow','cot','calendar','calculator','journal','engine'],
   'WIDGETS': ['heatmap','spike_banner'],
 };
 const FEATURE_LABELS = {
@@ -31,6 +31,7 @@ const FEATURE_LABELS = {
   engine:       '🏥 ENGINE tab',
   analytics:    '📊 ANALYTICS tab',
   panda_ai:     '🤖 PANDA AI tab',
+  shadow:       '🕶️ SHADOW tab (research)',
   heatmap:      '🗺️ Heatmap widget',
   spike_banner: '🔔 Spike Banner widget',
 };
@@ -38,7 +39,7 @@ const TIER_FEATURES = {
   starter: ['signals','calculator'],
   pro:     ['signals','calculator','panels','table','setups','panda_ai','calendar','cot'],
   elite:   ['signals','calculator','panels','table','setups','panda_ai','calendar','cot','overview','signal_log','valid_pairs','alerts','spike_log','journal','chart','gap_chart','analytics','heatmap','mt4_indicators','bias_indicators'],
-  admin:   ['overview','panels','table','setups','valid_pairs','spike_log','signal_log','signals','gap_chart','analytics','panda_ai','cot','calendar','calculator','journal','engine','heatmap','spike_banner'],
+  admin:   ['overview','panels','table','setups','valid_pairs','spike_log','signal_log','signals','gap_chart','analytics','panda_ai','shadow','cot','calendar','calculator','journal','engine','heatmap','spike_banner'],
 };
 const orb = "'Orbitron', sans-serif";
 const raj = "'Rajdhani', sans-serif";
@@ -451,6 +452,7 @@ export default function AdminPanel() {
             <button style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(255,209,102,0.15)', border: '1px solid #ffd166', borderRadius: 6, color: '#ffd166', fontFamily: mono, fontSize: 8, letterSpacing: 1, padding: '5px 10px', cursor: 'default' }}>🛡️ ADMIN</button>
             <button onClick={() => window.location.href = '/admin/license'} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(0,180,255,0.10)', border: '1px solid #00b4ff44', borderRadius: 6, color: '#00b4ff', fontFamily: mono, fontSize: 8, letterSpacing: 1, padding: '5px 10px', cursor: 'pointer' }}>LICENSE</button>
             <button onClick={() => window.location.href = '/admin/pf-approvals'} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(0,180,255,0.10)', border: '1px solid #00b4ff44', borderRadius: 6, color: '#00b4ff', fontFamily: mono, fontSize: 8, letterSpacing: 1, padding: '5px 10px', cursor: 'pointer' }}>✅ APPROVE</button>
+            <button onClick={() => window.location.href = '/admin/pricing'} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(255,209,102,0.10)', border: '1px solid #ffd16644', borderRadius: 6, color: '#ffd166', fontFamily: mono, fontSize: 8, letterSpacing: 1, padding: '5px 10px', cursor: 'pointer' }}>💰 PRICING</button>
             <button onClick={async () => { await fetch('/api/logout', { method: 'POST' }); window.location.href = '/login'; }} style={{ background: 'transparent', border: '1px solid #2a1525', borderRadius: 6, color: '#ff4d6d', fontFamily: mono, fontSize: 8, padding: '5px 10px', cursor: 'pointer' }}>LOGOUT</button>
           </div>
         </header>

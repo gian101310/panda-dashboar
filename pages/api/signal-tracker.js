@@ -52,11 +52,28 @@ function classifyStrategy(pair) {
   return 'BB';
 }
 
+// Debounce window: a PL_FLIPPED close re-opening within this window is PL-zone
+// flicker, not a fresh signal (Phase 8: BB re-opened same symbol 30-77x/day)
+const REOPEN_DEBOUNCE_MIN = 60;
+
 async function openNewTrackers(dashboardPairs, openTrackers) {
   const openSymbols = new Set(openTrackers.map(t => `${t.symbol}_${t.strategy}`));
   const newTrackers = [];
   const now = new Date();
   const hour = now.getUTCHours();
+
+  // Fetch recent PL_FLIPPED closes for debounce (non-blocking on error)
+  let debounced = new Set();
+  try {
+    const cutoff = new Date(now - REOPEN_DEBOUNCE_MIN * 60 * 1000).toISOString();
+    const { data: recentClosed } = await supabase
+      .from('signal_tracker')
+      .select('symbol, strategy')
+      .eq('status', 'CLOSED')
+      .eq('close_reason', 'PL_FLIPPED')
+      .gte('closed_at', cutoff);
+    if (recentClosed) debounced = new Set(recentClosed.map(t => `${t.symbol}_${t.strategy}`));
+  } catch (e) { /* debounce is best-effort */ }
 
   // Fetch PDR cache for all symbols being considered
   const candidateSymbols = dashboardPairs
@@ -80,6 +97,7 @@ async function openNewTrackers(dashboardPairs, openTrackers) {
     const strategy = classifyStrategy(pair);
     const key = `${pair.symbol}_${strategy}`;
     if (openSymbols.has(key)) continue;
+    if (debounced.has(key)) continue; // PL-flip flicker — skip re-open within debounce window
 
     const pdr = pdrMap[pair.symbol] || null;
     newTrackers.push({
@@ -87,6 +105,7 @@ async function openNewTrackers(dashboardPairs, openTrackers) {
       direction: pair.bias,
       strategy,
       gap_at_open: Math.abs(pair.gap),
+      gap_delta_at_open: pair.delta_short ?? null,
       confidence_at_open: null,
       momentum_at_open: pair.momentum || null,
       pl_zone_at_open: pair.pl_zone || null,
@@ -217,7 +236,7 @@ export default async function handler(req, res) {
       // Default action: full update cycle
       // 1. Get current dashboard data
       const { data: dashboardPairs, error: dashErr } = await supabase
-        .from('dashboard').select('symbol, gap, bias, confidence, momentum, pl_zone, box_h1_trend, box_h4_trend');
+        .from('dashboard').select('symbol, gap, bias, confidence, momentum, pl_zone, box_h1_trend, box_h4_trend, delta_short');
       if (dashErr) return res.status(500).json({ error: dashErr.message });
 
       // 2. Get all open trackers

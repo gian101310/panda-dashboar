@@ -11,10 +11,40 @@ function getFingerprint(req) {
   return crypto.createHash('sha256').update(ua + lang + enc).digest('hex').slice(0, 32);
 }
 
+// ===== LOGIN RATE LIMIT (in-memory, per serverless instance) =====
+// 5 failed attempts per IP+username → locked for 10 minutes
+const FAIL_LIMIT = 5;
+const FAIL_WINDOW_MS = 10 * 60 * 1000;
+const loginFails = new Map(); // key → { count, first }
+
+function rlKey(req, username) {
+  const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'noip';
+  return ip + '|' + (username || '').toLowerCase();
+}
+function rlCheck(key) {
+  const e = loginFails.get(key);
+  if (!e) return false;
+  if (Date.now() - e.first > FAIL_WINDOW_MS) { loginFails.delete(key); return false; }
+  return e.count >= FAIL_LIMIT;
+}
+function rlFail(key) {
+  const e = loginFails.get(key);
+  if (!e || Date.now() - e.first > FAIL_WINDOW_MS) loginFails.set(key, { count: 1, first: Date.now() });
+  else e.count++;
+  if (loginFails.size > 5000) loginFails.clear(); // memory guard
+}
+function rlClear(key) { loginFails.delete(key); }
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'Missing credentials' });
+
+  const rl = rlKey(req, username);
+  if (rlCheck(rl)) {
+    await logAccess(username, 'LOGIN_RATE_LIMITED', req, false, 'Too many failed attempts');
+    return res.status(429).json({ error: 'Too many failed attempts. Try again in 10 minutes.' });
+  }
 
   try {
     const { data: user } = await supabase
@@ -24,6 +54,7 @@ export default async function handler(req, res) {
       .single();
 
     if (!user) {
+      rlFail(rl);
       await logAccess(username, 'LOGIN_FAILED', req, false, 'User not found');
       return res.status(401).json({ error: 'Invalid username or password' });
     }
@@ -47,9 +78,11 @@ export default async function handler(req, res) {
 
     const hash = hashPassword(password);
     if (hash !== user.password_hash) {
+      rlFail(rl);
       await logAccess(username, 'LOGIN_FAILED', req, false, 'Wrong password');
       return res.status(401).json({ error: 'Invalid username or password' });
     }
+    rlClear(rl);
 
     const fingerprint = getFingerprint(req);
     const ip = req.headers['x-forwarded-for'] || '';

@@ -1,7 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import { INDICATOR_PRODUCTS } from '../lib/indicatorProducts.mjs';
+import {
+  PUBLIC_INDICATOR_PRODUCTS as LEGACY_INDICATOR_PRODUCTS,
+} from '../lib/indicatorProducts.mjs';
+import { mergePublicOverlayProducts } from '../lib/indicatorStore.mjs';
+import { curSym, mapDbTiers, FALLBACK_TIERS } from '../lib/pricingClient';
 
 const mono = "'Share Tech Mono',monospace";
 const orb  = "'Orbitron',sans-serif";
@@ -22,11 +26,7 @@ const STEPS = [
   { num:'03', title:'YOU DECIDE', desc:'Signals land on your dashboard with all the data. Confidence score, edge history, session context. You make the call.', color:'#7C3AED' },
 ];
 
-const TIERS = [
-  { name:'STARTER', price:'0', period:'', sub:'FREE FOR 1 WEEK', color:'#445566', tag:null, features:['Live signals tab','Position calculator'], cta:'START FREE TRIAL', tier:'starter' },
-  { name:'PRO', price:'99', period:'/mo', sub:'or $3,499 one-time (lifetime)', color:'#00ff9f', tag:'MOST POPULAR', features:['Everything in Starter, plus:','Panel tab','Full data table','Valid setups tab','Panda AI assistant','Research tab'], cta:'GO PRO →', tier:'pro' },
-  { name:'ELITE', price:'699', period:'/mo', sub:'or $4,999 one-time (lifetime)', color:'#00b4ff', tag:'FULL ACCESS', features:['Everything in Pro, plus:','Overview tab','Signal logs tab','Valid pairs filter','Telegram signal alerts','Spike signal alerts','Private trading journal','Chart tab','MT4/MT5 Panda Indicators','Bias detection indicators'], cta:'GO ELITE →', tier:'elite' },
-];
+// Live tier pricing comes from /api/pricing (edited in /admin/pricing); FALLBACK_TIERS used if unreachable
 
 const TESTIMONIALS = [
   { text:'I used to spend 2 hours every morning scanning charts. Now I open the dashboard, check the bias, and I know exactly which pairs to focus on. Completely changed my routine.', who:'Ahmad K.', role:'Swing Trader', loc:'Dubai, UAE', stat:'+2,340 pips tracked' },
@@ -95,10 +95,19 @@ function OrbitalRing() {
 export default function LandingPage() {
   const router = useRouter();
   const [scrollY, setScrollY] = useState(0);
+  const [TIERS, setTIERS] = useState(FALLBACK_TIERS);
+  const [overlayProducts, setOverlayProducts] = useState(() => mergePublicOverlayProducts([]));
   const [liveSignals, setLiveSignals] = useState([]);
   const [pairCount, setPairCount] = useState(21);
   const [licenseModal, setLicenseModal] = useState(null);
-  const [licenseForm, setLicenseForm] = useState({ customer_name: '', contact: '', mt4_account_id: '', telegram_username: '' });
+  const [licenseForm, setLicenseForm] = useState({ customer_name: '', contact: '', trading_account_number: '', telegram_username: '' });
+
+  useEffect(() => {
+    fetch('/api/pricing').then(r => r.json()).then(j => {
+      if (j?.tiers?.length) setTIERS(mapDbTiers(j.tiers));
+      setOverlayProducts(mergePublicOverlayProducts(j?.products || []));
+    }).catch(() => {});
+  }, []);
   const [licenseBusy, setLicenseBusy] = useState(false);
   const [licenseOk, setLicenseOk] = useState(false);
   const [licenseErr, setLicenseErr] = useState('');
@@ -127,7 +136,7 @@ export default function LandingPage() {
 
   function openLicenseRequest(product) {
     setLicenseModal(product);
-    setLicenseForm({ customer_name: '', contact: '', mt4_account_id: '', telegram_username: '' });
+    setLicenseForm({ customer_name: '', contact: '', trading_account_number: '', telegram_username: '' });
     setLicenseOk(false);
     setLicenseErr('');
   }
@@ -153,6 +162,11 @@ export default function LandingPage() {
     }
     setLicenseBusy(false);
   }
+
+  const requestPlatform = licenseModal?.platform || 'MT4';
+  const requestAccountLabel = requestPlatform === 'CTRADER'
+    ? 'cTrader account number'
+    : `${requestPlatform} account number`;
 
   return (
     <>
@@ -180,7 +194,7 @@ export default function LandingPage() {
             <a href="#indicators" style={{ color: '#6b7fa8', fontFamily: mono, fontSize: 10, letterSpacing: 2, textDecoration: 'none', padding: '8px 14px' }}>INDICATORS</a>
             <a href="#pricing" style={{ color: '#6b7fa8', fontFamily: mono, fontSize: 10, letterSpacing: 2, textDecoration: 'none', padding: '8px 14px' }}>PRICING</a>
             <button onClick={() => router.push('/login')} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, color: '#8899bb', fontFamily: mono, fontSize: 10, letterSpacing: 2, cursor: 'pointer', padding: '8px 18px' }}>LOG IN</button>
-            <button onClick={() => router.push('/funnel')} style={{ background: 'linear-gradient(135deg,#00ff9f,#00cc7a)', border: 'none', borderRadius: 6, color: '#050810', fontFamily: orb, fontSize: 9, fontWeight: 700, letterSpacing: 2, cursor: 'pointer', padding: '10px 22px', boxShadow: '0 0 20px rgba(0,255,159,0.2)' }}>GET ACCESS</button>
+            <button onClick={() => router.push('/get-started')} style={{ background: 'linear-gradient(135deg,#00ff9f,#00cc7a)', border: 'none', borderRadius: 6, color: '#050810', fontFamily: orb, fontSize: 9, fontWeight: 700, letterSpacing: 2, cursor: 'pointer', padding: '10px 22px', boxShadow: '0 0 20px rgba(0,255,159,0.2)' }}>GET ACCESS</button>
           </div>
         </nav>
 
@@ -211,7 +225,7 @@ export default function LandingPage() {
 
           {/* CTAs */}
           <div style={{ display: 'flex', gap: 16, animation: 'fadeSlideUp 0.8s ease 0.8s both', flexWrap: 'wrap', justifyContent: 'center' }}>
-            <button onClick={() => router.push('/funnel')} style={{ background: 'linear-gradient(135deg,#00ff9f,#00cc7a)', border: 'none', borderRadius: 8, color: '#050810', fontFamily: orb, fontSize: 12, fontWeight: 700, letterSpacing: 3, cursor: 'pointer', padding: '16px 40px', boxShadow: '0 0 30px rgba(0,255,159,0.25)', transition: 'all 0.3s' }}>START FREE</button>
+            <button onClick={() => router.push('/get-started')} style={{ background: 'linear-gradient(135deg,#00ff9f,#00cc7a)', border: 'none', borderRadius: 8, color: '#050810', fontFamily: orb, fontSize: 12, fontWeight: 700, letterSpacing: 3, cursor: 'pointer', padding: '16px 40px', boxShadow: '0 0 30px rgba(0,255,159,0.25)', transition: 'all 0.3s' }}>START FREE</button>
             <button onClick={() => { const el = document.getElementById('features'); el?.scrollIntoView({ behavior: 'smooth' }); }} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: '#8899bb', fontFamily: mono, fontSize: 11, letterSpacing: 2, cursor: 'pointer', padding: '16px 32px', transition: 'all 0.3s' }}>SEE HOW IT WORKS ↓</button>
           </div>
 
@@ -475,27 +489,41 @@ export default function LandingPage() {
           </div>
         </Section>
 
-        {/* ═══ PRICING ═══ */}
         {/* INDICATORS */}
         <Section id="indicators">
           <div style={{ maxWidth: 1100, margin: '0 auto', padding: '80px 24px 120px' }}>
             <div style={{ textAlign: 'center', marginBottom: 60 }}>
-              <span style={{ fontFamily: mono, fontSize: 10, color: '#ffd166', letterSpacing: 4, display: 'block', marginBottom: 16 }}>MT4 INDICATORS</span>
+              <span style={{ fontFamily: mono, fontSize: 10, color: '#ffd166', letterSpacing: 4, display: 'block', marginBottom: 16 }}>PANDA DASHBOARD OVERLAYS</span>
               <h2 style={{ fontFamily: orb, fontSize: 'clamp(22px,3.5vw,36px)', fontWeight: 900, letterSpacing: 3, margin: 0 }}>
-                REQUEST ACCESS.<br/><span style={{ color: '#00ff9f' }}>ACTIVATE AFTER APPROVAL.</span>
+                DOWNLOAD NOW.<br/><span style={{ color: '#00ff9f' }}>ACTIVATE AFTER APPROVAL.</span>
               </h2>
               <p style={{ fontFamily: raj, fontSize: 16, color: '#6b7fa8', maxWidth: 560, margin: '18px auto 0', lineHeight: 1.55 }}>
-                Submit your MT4 account ID below. Panda will confirm payment, approve your account, and send the indicator file directly.
+                Choose cTrader, MT4, or MT5. The Licensed file is available immediately and activates only after Panda approves your trading account number.
               </p>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 20 }}>
-              {INDICATOR_PRODUCTS.map((product) => (
+              {overlayProducts.map((product) => (
                 <div key={product.code} style={{ padding: '30px 26px', background: 'rgba(12,18,32,0.6)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14 }}>
-                  <div style={{ fontFamily: orb, fontSize: 14, fontWeight: 800, letterSpacing: 2, color: product.code === 'panda_full_v3' ? '#00ff9f' : '#00b4ff', marginBottom: 10 }}>{product.name}</div>
+                  <div style={{ fontFamily: mono, fontSize: 9, color: '#ffd166', letterSpacing: 3, marginBottom: 10 }}>{product.platform}</div>
+                  <div style={{ fontFamily: orb, fontSize: 14, fontWeight: 800, letterSpacing: 2, color: '#00b4ff', marginBottom: 10 }}>{product.name}</div>
                   <div style={{ fontFamily: mono, fontSize: 10, color: '#ffd166', letterSpacing: 2, marginBottom: 18 }}>{product.priceLabel}</div>
                   <p style={{ fontFamily: raj, fontSize: 14, color: '#8899bb', lineHeight: 1.55, margin: '0 0 22px' }}>
-                    Licensed per MT4 account. The indicator only runs on approved accounts — request access to get started.
+                    {product.installNote}
                   </p>
+                  <div style={{ display: 'grid', gap: 9 }}>
+                    <a href={`/api/indicator-download?product=${encodeURIComponent(product.code)}`} style={{ display: 'block', textAlign: 'center', textDecoration: 'none', background: 'rgba(0,180,255,0.10)', border: '1px solid #00b4ff44', borderRadius: 7, color: '#00b4ff', fontFamily: mono, fontSize: 9, letterSpacing: 2, padding: '11px 12px' }}>DOWNLOAD LICENSED</a>
+                    {product.paymentLink && <a href={product.paymentLink} target="_blank" rel="noopener noreferrer" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', background: 'rgba(255,209,102,0.10)', border: '1px solid #ffd16644', borderRadius: 7, color: '#ffd166', fontFamily: mono, fontSize: 9, letterSpacing: 2, padding: '11px 12px' }}>BUY NOW</a>}
+                    <button onClick={() => openLicenseRequest(product)} style={{ width: '100%', background: 'rgba(0,255,159,0.10)', border: '1px solid #00ff9f44', borderRadius: 7, color: '#00ff9f', fontFamily: mono, fontSize: 9, letterSpacing: 2, padding: '11px 12px', cursor: 'pointer' }}>REQUEST ACTIVATION</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{ fontFamily: mono, fontSize: 9, color: '#445566', letterSpacing: 3, margin: '52px 0 18px', textAlign: 'center' }}>OTHER PANDA INDICATORS</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 20 }}>
+              {LEGACY_INDICATOR_PRODUCTS.map((product) => (
+                <div key={product.code} style={{ padding: '24px 22px', background: 'rgba(12,18,32,0.45)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 12 }}>
+                  <div style={{ fontFamily: orb, fontSize: 13, fontWeight: 800, letterSpacing: 2, color: product.code === 'panda_full_v3' ? '#00ff9f' : '#00b4ff', marginBottom: 10 }}>{product.name}</div>
+                  <div style={{ fontFamily: mono, fontSize: 10, color: '#ffd166', letterSpacing: 2, marginBottom: 18 }}>{product.priceLabel}</div>
                   <button onClick={() => openLicenseRequest(product)} style={{ width: '100%', background: 'rgba(0,255,159,0.10)', border: '1px solid #00ff9f44', borderRadius: 7, color: '#00ff9f', fontFamily: mono, fontSize: 9, letterSpacing: 2, padding: '11px 12px', cursor: 'pointer' }}>REQUEST ACCESS</button>
                 </div>
               ))}
@@ -515,14 +543,14 @@ export default function LandingPage() {
               {TIERS.map((t, i) => <div key={t.name} style={{ padding: '32px 28px', background: t.tag ? 'rgba(0,255,159,0.03)' : 'rgba(12,18,32,0.6)', border: `1px solid ${t.tag ? 'rgba(0,255,159,0.2)' : 'rgba(255,255,255,0.06)'}`, borderRadius: 14, position: 'relative', textAlign: 'center' }}>
                 {t.tag && <div style={{ position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)', fontFamily: mono, fontSize: 9, color: '#050810', background: t.color, padding: '4px 16px', borderRadius: 20, letterSpacing: 2, fontWeight: 700 }}>{t.tag}</div>}
                 <div style={{ fontFamily: orb, fontSize: 14, fontWeight: 700, letterSpacing: 3, color: t.color, marginBottom: 16 }}>{t.name}</div>
-                <div style={{ fontFamily: orb, fontSize: 48, fontWeight: 900, color: '#e8f0ff', lineHeight: 1 }}>${t.price}<span style={{ fontFamily: mono, fontSize: 14, color: '#4a5578' }}>{t.period}</span></div>
+                <div style={{ fontFamily: orb, fontSize: 48, fontWeight: 900, color: '#e8f0ff', lineHeight: 1 }}><span style={{ fontFamily: mono, fontSize: 16, color: '#4a5578' }}>{curSym(t.cur)}</span>{t.price}<span style={{ fontFamily: mono, fontSize: 14, color: '#4a5578' }}>{t.period}</span>{t.was && <span style={{ fontFamily: mono, fontSize: 16, color: '#4a5578', textDecoration: 'line-through', marginLeft: 8 }}>{curSym(t.cur)}{t.was}</span>}</div>
                 {t.sub && <div style={{ fontFamily: mono, fontSize: 10, color: '#ffd166', letterSpacing: 1, marginTop: 8 }}>{t.sub}</div>}
                 <div style={{ margin: '24px 0', display: 'flex', flexDirection: 'column', gap: 10, textAlign: 'left' }}>
                   {t.features.map(f => <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: raj, fontSize: 14, color: '#8899bb' }}>
                     <span style={{ color: t.color, fontSize: 12 }}>✓</span>{f}
                   </div>)}
                 </div>
-                <button onClick={() => router.push('/funnel')} style={{ width: '100%', padding: '14px 0', fontFamily: orb, fontSize: 10, fontWeight: 700, letterSpacing: 3, cursor: 'pointer', borderRadius: 8, border: t.tag ? 'none' : `1px solid ${t.color}40`, background: t.tag ? `linear-gradient(135deg,${t.color},${t.color}cc)` : 'rgba(255,255,255,0.04)', color: t.tag ? '#050810' : t.color, boxShadow: t.tag ? `0 0 20px ${t.color}25` : 'none', transition: 'all 0.3s' }}>{t.cta}</button>
+                <button onClick={() => router.push('/get-started')} style={{ width: '100%', padding: '14px 0', fontFamily: orb, fontSize: 10, fontWeight: 700, letterSpacing: 3, cursor: 'pointer', borderRadius: 8, border: t.tag ? 'none' : `1px solid ${t.color}40`, background: t.tag ? `linear-gradient(135deg,${t.color},${t.color}cc)` : 'rgba(255,255,255,0.04)', color: t.tag ? '#050810' : t.color, boxShadow: t.tag ? `0 0 20px ${t.color}25` : 'none', transition: 'all 0.3s' }}>{t.cta}</button>
               </div>)}
             </div>
           </div>
@@ -569,7 +597,7 @@ export default function LandingPage() {
             <p style={{ fontFamily: raj, fontSize: 18, color: '#6b7fa8', lineHeight: 1.5, marginBottom: 40 }}>
               The engine is already running. 21 pairs. Every 5 minutes. The only question is whether you're watching.
             </p>
-            <button onClick={() => router.push('/funnel')} style={{ background: 'linear-gradient(135deg,#00ff9f,#00cc7a)', border: 'none', borderRadius: 8, color: '#050810', fontFamily: orb, fontSize: 14, fontWeight: 700, letterSpacing: 4, cursor: 'pointer', padding: '18px 48px', boxShadow: '0 0 40px rgba(0,255,159,0.3)', transition: 'all 0.3s' }}>GET ACCESS NOW</button>
+            <button onClick={() => router.push('/get-started')} style={{ background: 'linear-gradient(135deg,#00ff9f,#00cc7a)', border: 'none', borderRadius: 8, color: '#050810', fontFamily: orb, fontSize: 14, fontWeight: 700, letterSpacing: 4, cursor: 'pointer', padding: '18px 48px', boxShadow: '0 0 40px rgba(0,255,159,0.3)', transition: 'all 0.3s' }}>GET ACCESS NOW</button>
           </div>
         </section>
 
@@ -630,7 +658,7 @@ export default function LandingPage() {
                   <div style={{ fontFamily: mono, fontSize: 10, letterSpacing: 4, color: '#00ff9f', marginBottom: 10 }}>REQUEST SENT</div>
                   <h3 style={{ fontFamily: orb, fontSize: 20, margin: '0 0 12px' }}>{licenseModal.name}</h3>
                   <p style={{ fontFamily: raj, fontSize: 14, color: '#8899bb', lineHeight: 1.55, marginBottom: 20 }}>
-                    Your request is pending. Panda will send you the payment link and indicator file via Telegram or email.
+                    Your request is pending. The installed indicator will activate after approval. Panda will contact you about payment when applicable.
                   </p>
                   <button onClick={() => setLicenseModal(null)} style={{ width: '100%', background: '#00ff9f', border: 'none', borderRadius: 8, color: '#050810', fontFamily: orb, fontSize: 11, fontWeight: 800, letterSpacing: 2, padding: 12, cursor: 'pointer' }}>CLOSE</button>
                 </div>
@@ -639,13 +667,13 @@ export default function LandingPage() {
                   <div style={{ fontFamily: mono, fontSize: 10, letterSpacing: 4, color: '#00b4ff', marginBottom: 8 }}>ACTIVATE INDICATOR</div>
                   <h3 style={{ fontFamily: orb, fontSize: 21, margin: '0 0 8px' }}>{licenseModal.name}</h3>
                   <p style={{ fontFamily: raj, fontSize: 13, color: '#6b7fa8', lineHeight: 1.5, marginBottom: 18 }}>
-                    Enter your MT4 account ID. Add your Telegram username to receive the payment link and indicator file directly via Telegram.
+                    Enter your {requestAccountLabel}. Add your Telegram username for faster activation updates.
                   </p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     <input value={licenseForm.customer_name} onChange={(e) => setLicenseForm((f) => ({ ...f, customer_name: e.target.value }))} placeholder="Your name" style={{ background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '12px 14px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, outline: 'none' }} />
                     <input value={licenseForm.contact} onChange={(e) => setLicenseForm((f) => ({ ...f, contact: e.target.value }))} placeholder="Email address" style={{ background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '12px 14px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, outline: 'none' }} />
                     <input value={licenseForm.telegram_username} onChange={(e) => setLicenseForm((f) => ({ ...f, telegram_username: e.target.value }))} placeholder="Telegram username (optional — for faster delivery)" style={{ background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '12px 14px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, outline: 'none' }} />
-                    <input value={licenseForm.mt4_account_id} onChange={(e) => setLicenseForm((f) => ({ ...f, mt4_account_id: e.target.value }))} placeholder="MT4 account ID, numbers only" style={{ background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '12px 14px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, outline: 'none' }} />
+                    <input value={licenseForm.trading_account_number} onChange={(e) => setLicenseForm((f) => ({ ...f, trading_account_number: e.target.value }))} placeholder={`${requestAccountLabel}, numbers only`} inputMode="numeric" style={{ background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '12px 14px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, outline: 'none' }} />
                   </div>
                   {licenseErr && <div style={{ fontFamily: mono, fontSize: 10, color: '#ff4d6d', marginTop: 12 }}>{licenseErr}</div>}
                   <button onClick={submitLicenseRequest} disabled={licenseBusy} style={{ width: '100%', background: '#00ff9f', border: 'none', borderRadius: 8, color: '#050810', fontFamily: orb, fontSize: 11, fontWeight: 800, letterSpacing: 2, padding: 13, marginTop: 16, cursor: licenseBusy ? 'not-allowed' : 'pointer', opacity: licenseBusy ? 0.65 : 1 }}>

@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AssemblyName>PandaDashboardOverlay-Licensed</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../PandaDashboardOverlay.Core.cs" Link="PandaDashboardOverlay.Core.cs" />
+    <Compile Include="../../PandaDashboardOverlay.Licensed.cs" Link="PandaDashboardOverlay.Licensed.cs" />
+    <PackageReference Include="cTrader.Automate" Version="1.*" />
+  </ItemGroup>
+</Project>

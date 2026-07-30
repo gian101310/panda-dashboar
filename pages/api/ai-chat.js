@@ -111,6 +111,12 @@ That's me! You can:
 - BOX TREND: Whether price structure on H1 and H4 is trending up, down, or ranging.
 - VALID vs INVALID: Valid signals pass all the engine's checks. Invalid means something conflicts.
 - SESSIONS: Asian (evening UAE), London (morning UAE), New York (afternoon UAE). Different sessions have different characteristics.
+- PDR (Previous Day Rally): Did yesterday's daily candle move decisively and HOLD its move? ▲ = yesterday was bullish, ▼ = bearish. STRONG (S) = big body that kept most of its gains. WEAK (w) = small or heavily-retraced body.
+- PDR VERDICT chip (plain language): "✓ SUPPORTS BUY/SELL" = yesterday moved the same direction as today's bias and held it — the best backdrop for a continuation. "~ WEAK SUPPORT" = right direction but no conviction — neutral. "✗ AGAINST" = yesterday moved the OPPOSITE way — today's bias is trying to turn the trend, which is riskier; the setup is not a continuation.
+- PHASE badge: answers "where am I in the trend?" — 🚀 START (catching the beginning), 🔥 MID (riding, be selective), 🎯 PULLBACK ZONE (continuation entry window), 🌙 LATE/EXTENDED/ADR SPENT (too late, don't chase), ⚠ TREND AT RISK (protect open trades), 🔵 CONSOLIDATING (compressed, wait for the break).
+- ADR used %: how much of an average day's range has already been traveled today. Above 70% = most of the day's fuel is burned.
+- PB %: how far price pulled back from today's extreme. 30-60% is the classic healthy continuation pullback; above 80% suggests the trend is failing.
+- ★ CONTINUATION SETUP: appears when valid bias + strong aligned PDR + Asian session all line up during a catchable phase — the highest-alignment condition the dashboard tracks.
 
 ── TIPS FOR NEW USERS ──
 1. Start with the OVERVIEW or PANELS tab to scan the market.
@@ -225,12 +231,10 @@ PROVEN_EDGE: n>=50 + win_rate>=70% + resolution_rate>=25%.
 DEAD_ZONE: n>=50 + win_rate<=30%. DEVELOPING: n=20-49.
 Conflict flag: real-time confidence>=70 AND historical win_rate<=50 on proven pattern.
 
-=== KEY CONFIRMED FINDINGS ===
-BB gap 7 + Panda Lines confirmed: 91% win rate (n=27). BB gap 7 no PL: 0% win rate (n=53).
-BB overall: 78.4% resolved win rate, 25.8% resolution rate. Execution gap: 22.9pts.
-Asian session: +1582 pips. London session: -272 pips. New York: +489 pips.
-4-12h holds: +2614 pips. Under 1h: -238 pips. Over 12h: diminishing.
-Alpha pairs: NZDCAD, NZDUSD, AUDJPY, GBPAUD. Leak pairs: GBPJPY, GBPCAD, GBPUSD, EURUSD.
+=== STATISTICAL DATA POLICY ===
+Historical performance changes as samples grow. Use live query tools or the newest ai_memory records for every win rate, sample size, pair ranking, session result, hold result, or execution statistic.
+The weekly_edge_revalidation memory overrides historical edge claims. If a stored note conflicts with fresh analysis, identify the older claim as retired and report the current sample instead.
+Never present admin_brain best_edge or dead_zone notes as current evidence.
 
 === PDR (Previous Day Rally) ===
 pdr_strength = body/ATR (strong>=0.5). retracement = (range-body)/range (clean<=0.25). Both must pass for STRONG.
@@ -251,8 +255,8 @@ Pattern Agent (14 memories): cross-reference → alpha/leak pairs, session edge,
 Master Agent: injects all 57 memories into every response. Re-run when signal_results grows 50+.
 
 === ARCHITECTURE ===
-Engine: app.py (~1676 lines) local PC → future VPS. Dashboard: dashboard.js (~2759 lines) on Vercel.
-Supabase: 20 tables. 21 pairs. 5-min engine cycles.`;
+Engine: app.py on the local Windows PC. Dashboard: Next.js on Vercel.
+Supabase persistence. 21 pairs. 5-minute engine cycles.`;
 
 // ─── BRAIN CONTEXT (admin only) ───────────────────────────────────────────────
 async function fetchBrainContext() {
@@ -265,6 +269,7 @@ async function fetchBrainContext() {
     let ctx = '\n=== BOSS-G PERSONAL BRAIN (your persistent memory) ===\n';
     const groups = {};
     for (const r of data) {
+      if (r.key === 'best_edge' || r.key === 'dead_zone') continue;
       if (!groups[r.category]) groups[r.category] = [];
       groups[r.category].push(`  [${r.key}]: ${r.value}`);
     }
@@ -306,7 +311,7 @@ async function fetchMemoryContext() {
     .select('type, factor, pair, strategy, win_rate, sample_size, metadata, computed_at')
     .order('computed_at', { ascending: false }).limit(50);
   if (!data || data.length === 0) return '';
-  const sections = { signal_pattern: [], edge_analysis: [], confluence_validation: [], behavior: [] };
+  const sections = { signal_pattern: [], edge_analysis: [], confluence_validation: [], behavior: [], tracker_lifecycle: [] };
   for (const m of data) {
     const key = sections[m.type] ? m.type : 'signal_pattern';
     const desc = m.metadata?.description || m.factor;
@@ -316,7 +321,9 @@ async function fetchMemoryContext() {
     const flat = m.metadata?.flat_pct != null ? ` | flat:${m.metadata.flat_pct}%` : '';
     const sess = m.metadata?.session ? ` | sess:${m.metadata.session}` : '';
     const hold = m.metadata?.hold_bucket ? ` | hold:${m.metadata.hold_bucket}` : '';
-    sections[key].push(`${desc} (n=${m.sample_size}${wr}${pips}${avg}${flat}${sess}${hold})`);
+    const life = m.metadata?.median_hours != null ? ` | med-life:${m.metadata.median_hours}h` : '';
+    const surv = m.metadata?.pct_survive_6h != null ? ` | 6h-survival:${m.metadata.pct_survive_6h}%` : '';
+    sections[key].push(`${desc} (n=${m.sample_size}${wr}${pips}${avg}${flat}${sess}${hold}${life}${surv})`);
   }
   const latest = data.reduce((b, m) => m.computed_at > b ? m.computed_at : b, '');
   let ctx = `HISTORICAL ANALYSIS (n>=20 validated; entries marked LOW SAMPLE are logged but NOT statistically validated — always state the caveat):\nComputed: ${latest?.slice(0,10)} | ${data.length} memories\n`;
@@ -324,6 +331,7 @@ async function fetchMemoryContext() {
   if (sections.edge_analysis.length) ctx += '\nEDGE ANALYSIS:\n' + sections.edge_analysis.join('\n');
   if (sections.confluence_validation.length) ctx += '\nCONFLUENCE:\n' + sections.confluence_validation.join('\n');
   if (sections.behavior.length) ctx += '\nBEHAVIOR:\n' + sections.behavior.join('\n');
+  if (sections.tracker_lifecycle.length) ctx += '\nSIGNAL LIFECYCLE (Phase 8 — tracker-based, gap-derived, NOT price-verified):\n' + sections.tracker_lifecycle.join('\n');
   return ctx;
 }
 
@@ -347,7 +355,8 @@ async function fetchMarketContext() {
 
 async function fetchReviewContext() {
   const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-  const [signals, tracker] = await Promise.all([
+  const since90 = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+  const [signals, tracker, highGap] = await Promise.all([
     supabase.from('signal_results')
       .select('symbol,strategy,direction,entry_gap,peak_gap,pips,outcome,momentum,pl_zone,duration_min,created_at')
       .gte('created_at', since)
@@ -357,13 +366,27 @@ async function fetchReviewContext() {
       .select('symbol,strategy,direction,gap_at_open,peak_gap,net_pips,close_reason,momentum_at_open,pl_zone_at_open,session_at_open,opened_at,closed_at,status')
       .gte('opened_at', since)
       .order('opened_at', { ascending: false })
-      .limit(50)
+      .limit(50),
+    // High-gap signals are rare (e.g. |gap| 11-12) and get pushed out of the recent-100 window,
+    // which made the AI wrongly report "no records" for them. Pull them explicitly over 90 days.
+    supabase.from('signal_results')
+      .select('symbol,strategy,direction,entry_gap,peak_gap,pips,outcome,pl_zone,created_at')
+      .or('entry_gap.gte.9,entry_gap.lte.-9')
+      .gte('created_at', since90)
+      .order('created_at', { ascending: false })
+      .limit(60)
   ]);
   let ctx = '';
   if (signals.data?.length) {
     ctx += 'SIGNAL RESULTS (last 30 days):\n';
     ctx += signals.data.map(s =>
       `${s.symbol} ${s.strategy} ${s.direction} gap:${s.entry_gap} peak:${s.peak_gap} pips:${s.pips ?? 'pending'} outcome:${s.outcome || 'PENDING'} pl:${s.pl_zone || '-'} mom:${s.momentum || '-'} dur:${s.duration_min || '-'}m`
+    ).join('\n');
+  }
+  if (highGap.data?.length) {
+    ctx += '\n\nHIGH-GAP SIGNALS |gap|>=9 (last 90 days — includes rare gap 11/12):\n';
+    ctx += highGap.data.map(s =>
+      `${s.symbol} ${s.strategy} ${s.direction} gap:${s.entry_gap} peak:${s.peak_gap} pips:${s.pips ?? 'pending'} outcome:${s.outcome || 'PENDING'} pl:${s.pl_zone || '-'} ${String(s.created_at).slice(0,10)}`
     ).join('\n');
   }
   if (tracker.data?.length) {
@@ -438,6 +461,147 @@ async function fetchTradeContext() {
   return ctx;
 }
 
+// ─── AI QUERY TOOLS (function calling — read-only aggregates) ─────────────────
+const GAP_BUCKETS = [[5,7,'5-6.9'],[7,9,'7-8.9'],[9,11,'9-10.9'],[11,13,'11-12.9'],[13,99,'13+']];
+function gapBucket(g) { const ag = Math.abs(g || 0); for (const [lo,hi,label] of GAP_BUCKETS) if (ag >= lo && ag < hi) return label; return '<5'; }
+
+function aggregate(rows, keyFn, pipsKey) {
+  const groups = {};
+  for (const r of rows) {
+    const k = keyFn(r) || 'UNKNOWN';
+    if (!groups[k]) groups[k] = { n: 0, wins: 0, losses: 0, flats: 0, net_pips: 0 };
+    const g = groups[k];
+    g.n++;
+    const pips = parseFloat(r[pipsKey]) || 0;
+    g.net_pips += pips;
+    if (pips > 5) g.wins++; else if (pips < -5) g.losses++; else g.flats++;
+  }
+  for (const k of Object.keys(groups)) {
+    const g = groups[k];
+    g.net_pips = Math.round(g.net_pips * 10) / 10;
+    g.avg_pips = Math.round((g.net_pips / g.n) * 100) / 100;
+    const decided = g.wins + g.losses;
+    g.win_rate_decided = decided ? Math.round((g.wins / decided) * 1000) / 10 : null;
+  }
+  return groups;
+}
+
+async function toolSignalStats(a) {
+  const days = Math.min(a.days || 30, 120);
+  const since = new Date(Date.now() - days * 86400000).toISOString();
+  let q = supabase.from('signal_results')
+    .select('symbol,strategy,session,entry_gap,pips,momentum,created_at')
+    .eq('status', 'DONE').gte('created_at', since).limit(8000);
+  if (a.strategy) q = q.eq('strategy', a.strategy);
+  if (a.symbol) q = q.eq('symbol', String(a.symbol).toUpperCase());
+  if (a.session) q = q.eq('session', a.session);
+  const { data, error } = await q;
+  if (error) return { error: error.message };
+  let rows = data || [];
+  if (a.min_gap) rows = rows.filter(r => Math.abs(r.entry_gap || 0) >= a.min_gap);
+  const keyFns = {
+    symbol: r => r.symbol, session: r => r.session, momentum: r => r.momentum,
+    gap_bucket: r => gapBucket(r.entry_gap),
+    day_of_week: r => ['SUN','MON','TUE','WED','THU','FRI','SAT'][new Date(r.created_at).getUTCDay()],
+    none: () => 'ALL',
+  };
+  return { lookback_days: days, total_signals: rows.length,
+           groups: aggregate(rows, keyFns[a.group_by] || keyFns.none, 'pips') };
+}
+
+async function toolGapHistory(a) {
+  const days = Math.min(a.days || 7, 30);
+  const since = new Date(Date.now() - days * 86400000).toISOString();
+  const { data, error } = await supabase.from('gap_history')
+    .select('timestamp,gap').eq('symbol', String(a.symbol || '').toUpperCase())
+    .gte('timestamp', since).order('timestamp', { ascending: true }).limit(5000);
+  if (error) return { error: error.message };
+  const rows = data || [];
+  if (!rows.length) return { symbol: a.symbol, points: 0 };
+  const gaps = rows.map(r => r.gap || 0);
+  const step = Math.max(1, Math.floor(rows.length / 40));
+  return { symbol: String(a.symbol).toUpperCase(), lookback_days: days, points: rows.length,
+           current: gaps[gaps.length - 1], min: Math.min(...gaps), max: Math.max(...gaps),
+           sampled: rows.filter((_, i) => i % step === 0).map(r => ({ t: r.timestamp?.slice(5, 16), gap: r.gap })) };
+}
+
+async function toolShadowStats(a) {
+  const days = Math.min(a.days || 30, 120);
+  const since = new Date(Date.now() - days * 86400000).toISOString();
+  let q = supabase.from('shadow_tracker').select('symbol,tier,session,pips,status,created_at')
+    .gte('created_at', since).limit(4000);
+  if (a.tier) q = q.eq('tier', a.tier);
+  const { data, error } = await q;
+  if (error) return { error: error.message };
+  const rows = data || [];
+  const done = rows.filter(r => r.status === 'DONE');
+  const keyFns = { tier: r => `T${r.tier}`, symbol: r => r.symbol, session: r => r.session, none: () => 'ALL' };
+  return { lookback_days: days, total: rows.length, open: rows.length - done.length,
+           groups: aggregate(done, keyFns[a.group_by] || keyFns.tier, 'pips') };
+}
+
+async function toolJournalStats(a) {
+  const days = Math.min(a.days || 90, 365);
+  const since = new Date(Date.now() - days * 86400000).toISOString();
+  let q = supabase.from('manual_trades')
+    .select('symbol,direction,profit_loss_pips,entry_time')
+    .not('exit_time', 'is', null).gte('entry_time', since).limit(3000);
+  if (a.symbol) q = q.eq('symbol', String(a.symbol).toUpperCase());
+  const { data, error } = await q;
+  if (error) return { error: error.message };
+  const keyFns = { symbol: r => r.symbol, direction: r => r.direction, none: () => 'ALL' };
+  return { lookback_days: days, total_trades: (data || []).length,
+           groups: aggregate(data || [], keyFns[a.group_by] || keyFns.symbol, 'profit_loss_pips') };
+}
+
+const BASE_TOOLS = [
+  { type: 'function', function: { name: 'query_signal_stats',
+      description: 'Aggregate historical engine signal performance (wins/losses/flats, net & avg pips, win rate). Use for any question about how signals performed by pair, session, gap size, momentum, or day of week.',
+      parameters: { type: 'object', properties: {
+        strategy: { type: 'string', enum: ['BB', 'INTRA'] },
+        symbol: { type: 'string', description: 'pair e.g. GBPJPY' },
+        session: { type: 'string', enum: ['ASIAN', 'LONDON', 'NEW_YORK'] },
+        min_gap: { type: 'number', description: 'minimum |entry gap|' },
+        days: { type: 'number', description: 'lookback days (max 120), default 30' },
+        group_by: { type: 'string', enum: ['symbol', 'session', 'gap_bucket', 'momentum', 'day_of_week', 'none'] },
+      } } } },
+  { type: 'function', function: { name: 'query_gap_history',
+      description: 'Recent gap score history for one pair: current, min, max and sampled points. Use for "how has X been moving" questions.',
+      parameters: { type: 'object', properties: {
+        symbol: { type: 'string' }, days: { type: 'number', description: 'max 30, default 7' },
+      }, required: ['symbol'] } } },
+];
+const ADMIN_TOOLS = [
+  { type: 'function', function: { name: 'query_shadow_stats',
+      description: 'ADMIN: shadow tracker (gap 9/10/11/12 tier crossings research log) performance grouped by tier, symbol or session.',
+      parameters: { type: 'object', properties: {
+        tier: { type: 'number', enum: [9, 10, 11, 12] },
+        days: { type: 'number' },
+        group_by: { type: 'string', enum: ['tier', 'symbol', 'session', 'none'] },
+      } } } },
+  { type: 'function', function: { name: 'query_journal_stats',
+      description: 'ADMIN: real manual trade journal aggregates by symbol or direction.',
+      parameters: { type: 'object', properties: {
+        symbol: { type: 'string' }, days: { type: 'number' },
+        group_by: { type: 'string', enum: ['symbol', 'direction', 'none'] },
+      } } } },
+];
+
+async function runAiTool(name, args, isAdmin) {
+  switch (name) {
+    case 'query_signal_stats': return toolSignalStats(args || {});
+    case 'query_gap_history':  return toolGapHistory(args || {});
+    case 'query_shadow_stats': return isAdmin ? toolShadowStats(args || {}) : { error: 'admin only' };
+    case 'query_journal_stats': return isAdmin ? toolJournalStats(args || {}) : { error: 'admin only' };
+    default: return { error: `unknown tool ${name}` };
+  }
+}
+
+const TOOLS_NOTE = `
+
+=== DATA QUERY TOOLS ===
+You have live query tools against the real signal database. When a question involves historical performance, win rates, pair comparisons, sessions, gap sizes, or trends over time — CALL A TOOL instead of guessing or relying only on the static context. Always report sample sizes (n) alongside any win rate. If n < 20, say the sample is too small to trust.`;
+
 // ─── MAIN HANDLER ─────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
@@ -489,6 +653,8 @@ export default async function handler(req, res) {
     } else {
       sysPrompt = USER_PROMPT;
     }
+    const useTools = mode === 'chat';
+    if (useTools) sysPrompt += TOOLS_NOTE;
 
     // ── Build messages with history ─────────────────────────────────────────
     const messages = [{ role: 'system', content: sysPrompt }];
@@ -499,30 +665,56 @@ export default async function handler(req, res) {
     }
     messages.push({ role: 'user', content: userContent });
 
-    // ── Call OpenAI ─────────────────────────────────────────────────────────
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_API_KEY}` },
-      body: JSON.stringify({
+    // ── Call OpenAI (with tool-calling loop in chat mode) ───────────────────
+    const tools = useTools ? (isAdmin ? [...BASE_TOOLS, ...ADMIN_TOOLS] : BASE_TOOLS) : undefined;
+    let convo = messages;
+    let reply = 'No response.';
+    let toolsUsed = [];
+
+    for (let iter = 0; iter < 4; iter++) {
+      const body = {
         model: 'gpt-4o-mini',
-        messages,
+        messages: convo,
         max_tokens: isAdmin ? 2000 : 1200,
         temperature: isAdmin ? 0.5 : 0.3
-      })
-    });
+      };
+      if (tools) body.tools = tools;
 
-    if (!response.ok) {
-      const err = await response.text();
-      console.error('[AI-CHAT] OpenAI error:', response.status, err);
-      // Parse to get a readable message
-      let msg = 'OpenAI error';
-      try { const parsed = JSON.parse(err); msg = parsed?.error?.message || msg; } catch(_) {}
-      return res.status(500).json({ error: msg, detail: err });
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_API_KEY}` },
+        body: JSON.stringify(body)
+      });
+
+      if (!response.ok) {
+        const err = await response.text();
+        console.error('[AI-CHAT] OpenAI error:', response.status, err);
+        let msg = 'OpenAI error';
+        try { const parsed = JSON.parse(err); msg = parsed?.error?.message || msg; } catch(_) {}
+        return res.status(500).json({ error: msg, detail: err });
+      }
+
+      const data = await response.json();
+      const aiMsg = data.choices?.[0]?.message;
+
+      if (aiMsg?.tool_calls?.length && tools && iter < 3) {
+        convo = [...convo, aiMsg];
+        for (const tc of aiMsg.tool_calls) {
+          let result;
+          try {
+            result = await runAiTool(tc.function?.name, JSON.parse(tc.function?.arguments || '{}'), isAdmin);
+          } catch (e) { result = { error: e.message }; }
+          toolsUsed.push(tc.function?.name);
+          convo.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(result) });
+        }
+        continue;
+      }
+
+      reply = aiMsg?.content || 'No response.';
+      break;
     }
 
-    const data = await response.json();
-    const reply = data.choices?.[0]?.message?.content || 'No response.';
-    return res.status(200).json({ reply, mode, isAdmin });
+    return res.status(200).json({ reply, mode, isAdmin, tools_used: toolsUsed });
 
   } catch (err) {
     return res.status(500).json({ error: err.message });

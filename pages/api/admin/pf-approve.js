@@ -1,18 +1,36 @@
 import { supabase } from '../../../lib/supabase';
 import { validateSession, hashPassword } from '../../../lib/auth';
+import crypto from 'crypto';
 
 const PF_BOT_TOKEN = process.env.PF_BOT_TOKEN || '';
 const PF_APPROVE_BOT_TOKEN = process.env.PF_APPROVE_BOT_TOKEN || PF_BOT_TOKEN;
 const PF_ADMIN_CHAT = process.env.PF_ADMIN_CHAT || '';
 
 const PF_PAYMENT_LINKS = {
-  pro:            'https://pay.ziina.com/PandaEngine/T-57VTBVN?source=app',
-  elite:          'https://pay.ziina.com/PandaEngine/iCPVN84Mw?source=app',
-  pro_lifetime:   'https://pay.ziina.com/PandaEngine/qaur8a9nV?source=app',
-  elite_lifetime: 'https://pay.ziina.com/PandaEngine/YJrPnZIsG?source=app',
+  pro:            'https://pay.ziina.com/pandaengine/-N_F9jwMf?source=app',  // AED 49/mo
+  elite:          'https://pay.ziina.com/pandaengine/_pOykTgTs?source=app',  // AED 99/mo
+  pro_lifetime:   'https://pay.ziina.com/pandaengine/gZMGfgrNt?source=app',  // AED 499
+  elite_lifetime: 'https://pay.ziina.com/pandaengine/7R5dOWfTe?source=app',  // AED 999
 };
 
-function pfGenPassword() { return 'Panda#' + Math.floor(1000 + Math.random() * 9000); }
+function pfGenPassword() { return 'Panda#' + crypto.randomBytes(4).toString('hex'); }
+
+// Live pricing from admin panel — falls back to PF_PAYMENT_LINKS if DB read fails
+async function getTierPricing(tierKey) {
+  try {
+    const { data } = await supabase.from('pricing_tiers')
+      .select('currency, price_monthly, pay_link_monthly')
+      .eq('tier_key', tierKey).maybeSingle();
+    return data || null;
+  } catch { return null; }
+}
+function fmtPrice(tp, tierKey) {
+  if (tp && tp.price_monthly != null) {
+    const sym = tp.currency === 'USD' ? '$' : (tp.currency || '') + ' ';
+    return `${sym}${tp.price_monthly}/mo`;
+  }
+  return tierKey === 'elite' ? '$27/mo' : '$13/mo';
+}
 
 // Send via old bot (@panda_engine_alerts_bot) for approved/existing users
 async function pfSendApproveBot(chatId, text) {
@@ -69,10 +87,22 @@ export default async function handler(req, res) {
     const { data: pendingUsers } = await supabase
       .from('panda_users').select('id, username, role, pf_tier, pf_approved, created_at, is_active')
       .eq('pf_approved', false).order('created_at', { ascending: false }).limit(100);
+    const { data: approvedUsers, count: approvedCount } = await supabase
+      .from('panda_users')
+      .select('id, username, role, pf_tier, pf_approved, created_at, is_active, max_devices', { count: 'exact' })
+      .eq('pf_approved', true)
+      .order('created_at', { ascending: false })
+      .limit(500);
     const { data: events } = await supabase
       .from('pf_security_events').select('*')
       .order('created_at', { ascending: false }).limit(50);
-    return res.status(200).json({ signups: signups || [], pending_users: pendingUsers || [], events: events || [] });
+    return res.status(200).json({
+      signups: signups || [],
+      pending_users: pendingUsers || [],
+      approved_users: approvedUsers || [],
+      counts: { approved_users: approvedCount || 0 },
+      events: events || [],
+    });
   }
 
   if (req.method !== 'POST') return res.status(405).end();
@@ -162,8 +192,9 @@ export default async function handler(req, res) {
       if (!req_row) return res.status(404).json({ error: 'signup not found' });
       if (!req_row.telegram_chat_id) return res.status(400).json({ error: 'User has not connected Telegram yet' });
       const t = req_row.tier || 'pro';
-      const payLink = PF_PAYMENT_LINKS[t] || PF_PAYMENT_LINKS.pro;
-      const price = t === 'elite' ? '$699/mo' : '$99/mo';
+      const tp = await getTierPricing(t);
+      const payLink = tp?.pay_link_monthly || PF_PAYMENT_LINKS[t] || PF_PAYMENT_LINKS.pro;
+      const price = fmtPrice(tp, t);
       const dm = [
         '🐼 <b>PANDA ENGINE — PAYMENT REMINDER</b>',
         '━━━━━━━━━━━━━━━━━━━━━━',

@@ -41,7 +41,7 @@ test('summarizeOpenRisk identifies missing stop losses and floating loss', () =>
   assert.deepEqual(summary.missingSlPositionIds, [2866758, 2884771]);
 });
 
-test('classifyGuardianStatus is RED when any open position has no stop loss', () => {
+test('classifyGuardianStatus warns but does not lock intentional hedges without stop loss', () => {
   const status = classifyGuardianStatus({
     risk: { dailyRemaining: 1907.54, maxLossRemaining: 2572.13 },
     positions: [
@@ -51,9 +51,9 @@ test('classifyGuardianStatus is RED when any open position has no stop loss', ()
     pendingOrders: [],
   });
 
-  assert.equal(status.state, 'RED');
-  assert.equal(status.mode, 'LOCKED');
-  assert.ok(status.blockers.includes('OPEN_POSITION_WITHOUT_SL'));
+  assert.equal(status.state, 'YELLOW');
+  assert.equal(status.mode, 'RECOVERY');
+  assert.ok(status.warnings.includes('OPEN_POSITION_WITHOUT_SL'));
 });
 
 test('classifyGuardianStatus is YELLOW in recovery mode when buffers are thin', () => {
