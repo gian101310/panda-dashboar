@@ -3270,7 +3270,7 @@ function OverviewTab({ data, trends, pdrData, upcomingNews, spikes, confidenceMa
             </div>
             <OvExposureRings exposure={exposure}/>
           </div>
-          <div style={{animation:'fadeSlideUp 0.4s ease 500ms both'}}><OvAIPanel/></div>
+          {/* AI Insight panel removed from Overview */}
         </div>
       </div>
 
@@ -3290,7 +3290,7 @@ function OverviewTab({ data, trends, pdrData, upcomingNews, spikes, confidenceMa
 }
 
 
-const TABS = ['OVERVIEW','PANELS','SIGNALS','TABLE','GAP CHART','RESEARCH','CALCULATOR','SETUPS','VALID PAIRS','CHART','ANALYTICS','SHADOW','LOGS','PANDA AI'];
+const TABS = ['OVERVIEW','PANELS','SIGNALS','TABLE','GAP CHART','RESEARCH','CALCULATOR','SETUPS','PHASE GUIDE','VALID PAIRS','CHART','ANALYTICS','SHADOW','LOGS','PANDA AI'];
 // Maps each tab to the feature_access key that controls it
 const TAB_FEATURE = {
   'OVERVIEW':    'overview',
@@ -3894,7 +3894,7 @@ export default function Dashboard() {
             ?{position:'fixed',top:0,left:0,bottom:0,width:230,zIndex:90,background:'var(--bg-secondary)',borderRight:'1px solid var(--border)',padding:'58px 10px 16px',display:'flex',flexDirection:'column',gap:4,transform:sidebarOpen?'translateX(0)':'translateX(-105%)',transition:'transform 0.25s ease',boxShadow:sidebarOpen?'4px 0 24px rgba(0,0,0,0.5)':'none',overflowY:'auto'}
             :{width:190,flexShrink:0,background:'var(--bg-secondary)',borderRight:'1px solid var(--border)',padding:'14px 8px',display:'flex',flexDirection:'column',gap:3,alignSelf:'stretch',position:'sticky',top:0,maxHeight:'100vh',overflowY:'auto'}}>
             <div style={{fontFamily:mono,fontSize:8,letterSpacing:3,color:'var(--text-muted)',padding:'2px 12px 8px'}}>NAVIGATION</div>
-            {(()=>{const ICON={'OVERVIEW':'🏠','PANELS':'🧩','SIGNALS':'📡','TABLE':'📋','GAP CHART':'📈','RESEARCH':'🔬','CALCULATOR':'🧮','SETUPS':'🎯','VALID PAIRS':'✅','CHART':'📉','ANALYTICS':'📊','SHADOW':'🌑','LOGS':'📜','PANDA AI':'🐼','ENGINE':'🏥'};
+            {(()=>{const ICON={'OVERVIEW':'🏠','PANELS':'🧩','SIGNALS':'📡','TABLE':'📋','GAP CHART':'📈','RESEARCH':'🔬','CALCULATOR':'🧮','SETUPS':'🎯','PHASE GUIDE':'🧭','VALID PAIRS':'✅','CHART':'📉','ANALYTICS':'📊','SHADOW':'🌑','LOGS':'📜','PANDA AI':'🐼','ENGINE':'🏥'};
             const items=TABS.filter(t=>{ const feat=TAB_FEATURE[t]; if(!feat) return true; if(isAdmin) return true; const fa=user?.feature_access||[]; if(t==='SHADOW') return fa.includes('shadow'); return fa.includes(feat)||fa.includes('dashboard');});
             const navStyle=(t,active,accent)=>({display:'flex',alignItems:'center',gap:9,background:active?(accent==='#ffd166'?'rgba(255,209,102,0.12)':'rgba(0,180,255,0.12)'):'transparent',borderLeft:`3px solid ${active?accent:'transparent'}`,color:active?accent:'#c8ddf0',fontFamily:mono,fontSize:10,fontWeight:active?700:500,letterSpacing:1.5,padding:'9px 11px',borderRadius:6,cursor:'pointer',textDecoration:'none',whiteSpace:'nowrap'});
             return(<>
@@ -4021,7 +4021,7 @@ export default function Dashboard() {
               <span style={{fontFamily:mono,fontSize:12,letterSpacing:3,color:'var(--text-muted)'}}>LOADING...</span>
             </div>
 ):tab==='OVERVIEW'?(
-<><OverviewTab data={data} trends={trends} pdrData={pdrData} upcomingNews={upcomingNews} spikes={spikes} confidenceMap={confidenceMap} memoryIndex={memoryIndex} onSelectPair={setSelectedPair} isMobile={isMobile} lastUpdate={lastUpdate}/><PhaseLegend isMobile={isMobile}/></>
+<OverviewTab data={data} trends={trends} pdrData={pdrData} upcomingNews={upcomingNews} spikes={spikes} confidenceMap={confidenceMap} memoryIndex={memoryIndex} onSelectPair={setSelectedPair} isMobile={isMobile} lastUpdate={lastUpdate}/>
           ):tab==='PANELS'?(
             displayed.length===0
               ?<div style={{textAlign:'center',padding:60,fontFamily:mono,fontSize:11,letterSpacing:3,color:'var(--text-muted)'}}>NO PAIRS MATCH</div>
@@ -4194,6 +4194,7 @@ export default function Dashboard() {
            :tab==='RESEARCH'?<ResearchTab pairs={validPairs} cotData={cotData} cotLoading={cotLoading} fetchCot={fetchCot}/>
            :tab==='CALCULATOR'?<PositionCalculator/>
            :tab==='ENGINE'?<EngineHealth/>
+           :tab==='PHASE GUIDE'?<div style={{maxWidth:1200,margin:'0 auto'}}><PhaseLegend isMobile={isMobile}/></div>
            :tab==='OPEN TRADES'?null
           :null}
         </div>

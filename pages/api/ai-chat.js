@@ -462,7 +462,7 @@ async function fetchTradeContext() {
 }
 
 // ─── AI QUERY TOOLS (function calling — read-only aggregates) ─────────────────
-const GAP_BUCKETS = [[5,7,'5-6.9'],[7,9,'7-8.9'],[9,11,'9-10.9'],[11,13,'11-12.9'],[13,99,'13+']];
+const GAP_BUCKETS = [[5,7,'5-6'],[7,9,'7-8'],[9,10,'9'],[10,11,'10'],[11,12,'11'],[12,13,'12'],[13,99,'13+']];
 function gapBucket(g) { const ag = Math.abs(g || 0); for (const [lo,hi,label] of GAP_BUCKETS) if (ag >= lo && ag < hi) return label; return '<5'; }
 
 function aggregate(rows, keyFn, pipsKey) {
@@ -634,7 +634,7 @@ export default async function handler(req, res) {
     // ── Build user content by mode ──────────────────────────────────────────
     let userContent = '';
     if (mode === 'insights') {
-      userContent = `MARKET DATA:\n${marketData}\n\n${memoryContext}\n\nAnalyze all 21 pairs. Describe the current bias landscape. Identify currency themes. Show which pairs have strong gap scores and whether Panda Lines are confirming. Include historical pattern data where relevant with sample sizes. Remember: describe data only — no trade recommendations.`;
+      userContent = `MARKET DATA:\n${marketData}\n\n${memoryContext}\n\nAnalyze all 21 pairs. Describe the current bias landscape. Identify currency themes. Show which pairs have strong gap scores and whether Panda Lines are confirming. Explicitly call out every pair currently at |gap| 9, 10, 11, or 12 — these are the strongest and rarest gaps, so never omit them. Include historical pattern data where relevant with sample sizes. Remember: describe data only — no trade recommendations.`;
     } else if (mode === 'review') {
       const [reviewData, tradeData] = await Promise.all([fetchReviewContext(), fetchTradeContext()]);
       userContent = `MARKET DATA:\n${marketData}\n\n${reviewData}\n${tradeData}\n\n${memoryContext}\n\nDescribe the signal performance data. Analyze outcomes by gap level, Panda Lines confirmation, session, and hold duration. Show which pairs and conditions produced wins vs losses vs flats. Include per-pair win rates and P/L from trade journal data. Identify behavioral patterns. Present data factually — no trade recommendations.`;
