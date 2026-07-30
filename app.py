@@ -2697,6 +2697,17 @@ def fetch_news_feed():
 
 def parse_news_time(date_str, time_str):
     """Parse FF date/time string to UTC datetime. Returns None if unparseable."""
+    _ds = (date_str or "").strip()
+    # New FF format: `date` is a full ISO datetime WITH offset (e.g.
+    # "2026-07-28T21:30:00-04:00") and there is no separate `time` field.
+    if "T" in _ds:
+        try:
+            _dt = datetime.fromisoformat(_ds)
+            if _dt.tzinfo is None:
+                _dt = _dt.replace(tzinfo=timezone.utc)
+            return _dt.astimezone(timezone.utc)
+        except Exception:
+            return None
     if not time_str or time_str.lower() in ("all day","tentative","","tbd"):
         return None
     try:
