@@ -1,6 +1,27 @@
 # CLAUDE.md — Panda Engine Context File
 > Cowork and Codex use this shared handoff. Keep it current and never store secrets here.
 
+## SESSION UPDATE — 2026-07-31 (Windows Cowork) ← READ FIRST
+
+- **Divergence RESOLVED.** The old "Panda Engine folder is diverged / push from
+  `panda-dashboard`" guidance is OBSOLETE. `C:\Users\Admin\Documents\Claude\Projects\Panda Engine`
+  is now the canonical, up-to-date repo on `origin/main` AND the machine running the engine.
+  `C:\Users\Admin\panda-dashboard` is now the behind-until-pulled secondary. Full details and
+  this session's changes: `docs/CLAUDE_WINDOWS_HANDOFF_2026-07-31.md`.
+- **The engine runs HIDDEN** (the watchdog + autopull scheduled tasks are S4U, so no popup
+  terminal). Restart it with `RESTART_ENGINE.bat` / `RESTART_ENGINE.ps1` — never a visible
+  terminal, never `python app.py`. Any `app.py` change needs a restart via this tool to load.
+- **Standing workflow rules (from now on):**
+  1. At session start, `git fetch` then `git pull --ff-only origin main` in the engine folder
+     FIRST, and check whether Boss-G made changes on the Mac side before doing anything else.
+  2. After any engine (`app.py`) change, run `RESTART_ENGINE` so the hidden engine reloads.
+  3. Never force-push; keep commits narrowly scoped; verify Vercel READY after UI pushes.
+- Shipped this session: FLIP/BOS Telegram alerts, `signal_snapshots` allowlist fix (Signal Log
+  populates again), market-closed auto-heal guard, hourly (4h→1h) news alerts + 15m/2m, Overview
+  news banner 48h look-ahead, hidden-engine ops, and `Panda_Exporter_v2_BOS.mq4` (v2 price-context
+  + BOS; in the MT4 Experts folder, not yet committed — do NOT ship the v1-based
+  `Panda_Exporter_BOS.mq4`).
+
 ## OPERATOR
 
 - Boss-G is the sole operator and final approver.
