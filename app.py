@@ -1485,7 +1485,9 @@ def run_gap_once():
 
     # ---- AUTO-HEAL: Track consecutive stale cycles ----
     global CONSECUTIVE_STALE
-    if stale_count > 5:
+    # Skip auto-heal when the market is closed — stale files are EXPECTED then, so
+    # don't self-restart (this was causing a restart + new-terminal loop every ~15 min on weekends).
+    if stale_count > 5 and not is_market_closed():
         CONSECUTIVE_STALE += 1
         print(f"[HEAL] Consecutive stale cycles: {CONSECUTIVE_STALE}")
         if CONSECUTIVE_STALE >= 3:

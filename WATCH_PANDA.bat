@@ -22,6 +22,6 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "Add-Content -LiteralPath $log -Value \"$stamp RECOVER status=$statusDetail procs=$($procs.Count)\";" ^
   "foreach ($p in $procs) { try { Stop-Process -Id $p.ProcessId -Force -ErrorAction Stop; Add-Content -LiteralPath $log -Value \"$stamp STOPPED pid=$($p.ProcessId) name=$($p.Name)\" } catch { Add-Content -LiteralPath $log -Value \"$stamp STOP_FAIL pid=$($p.ProcessId) err=$($_.Exception.Message)\" } };" ^
   "Start-Sleep -Seconds 3;" ^
-  "Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', \"`\"$starter`\"\" -WorkingDirectory $root -WindowStyle Minimized;" ^
+  "Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', \"`\"$starter`\"\" -WorkingDirectory $root -WindowStyle Hidden;" ^
   "Add-Content -LiteralPath $log -Value \"$stamp STARTED Panda Engine via START_PANDA.bat\";" ^
   "exit 0"
