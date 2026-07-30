@@ -19,8 +19,14 @@
 - Shipped this session: FLIP/BOS Telegram alerts, `signal_snapshots` allowlist fix (Signal Log
   populates again), market-closed auto-heal guard, hourly (4h→1h) news alerts + 15m/2m, Overview
   news banner 48h look-ahead, hidden-engine ops, and `Panda_Exporter_v2_BOS.mq4` (v2 price-context
-  + BOS; in the MT4 Experts folder, not yet committed — do NOT ship the v1-based
-  `Panda_Exporter_BOS.mq4`).
+  + BOS; now committed to the repo — do NOT ship the v1-based `Panda_Exporter_BOS.mq4`).
+- Later same day: fixed ForexFactory ISO date parsing (banner + news alerts were silently dropping
+  ALL events); Phase Guide moved to its own **PHASE GUIDE** tab (removed from Overview); Overview
+  "AI Insight" box removed; Panda AI now surfaces exact gaps 9/10/11/12.
+- **Telegram routing (current):** MAIN group (`TELEGRAM_*`) = hourly snapshot, AI snapshot, and
+  **news alerts**. SPIKE bot (`SIGNAL_*`, "Panda Gap Spike alert") = spike / gap / early-entry /
+  FLIP-BOS alerts + the **phase digest**. (Phase digest and news alerts were swapped 2026-07-31.)
+  Full map in `docs/CLAUDE_WINDOWS_HANDOFF_2026-07-31.md`.
 
 ## OPERATOR
 

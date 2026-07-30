@@ -269,3 +269,37 @@ This file (`docs/SKILL_PANDA_ENGINE.md`) is the skill source of truth in the rep
 After significant changes: update this file, commit it, and re-upload it in
 Claude Settings > Capabilities on BOTH the Mac and any other Claude install so
 remote and home sessions load identical context. Log every session in CHANGELOG.md.
+
+
+---
+
+## 11. TELEGRAM ROUTING (as of 2026-07-31)
+
+Two Telegram destinations (`SIGNAL_*` falls back to `TELEGRAM_*` if its env vars are unset):
+
+- **MAIN group** — `TELEGRAM_TOKEN` / `TELEGRAM_CHAT_ID`: hourly snapshot image (`send_snapshot`),
+  AI snapshot narrator (`send_ai_snapshot`), and **news alerts** (`check_news_alerts`).
+- **SPIKE / SIGNAL bot** — `SIGNAL_BOT_TOKEN` / `SIGNAL_CHAT_ID` ("Panda Gap Spike alert"): spike
+  (`send_spike_alert`), gap-zone (`send_gap_alert`), early-entry (`send_early_entry_alert`),
+  FLIP/BOS structure (`_send_structure_alert`), and the **phase digest** (`send_phase_digest`).
+- **HEALTH** — `ENGINE_HEALTH_CHAT_ID` (falls back to main): auto-heal / health.
+- **LOGIN / reports** — `LOGIN_ALERT_BOT_TOKEN` / `LOGIN_ALERT_CHAT_ID`: login alerts, nightly
+  analyst, daily cleanup.
+
+> 2026-07-31 swap: phase digest moved MAIN→SPIKE; news alerts moved SPIKE→MAIN.
+
+## 12. 2026-07-31 SESSION CHANGES (Windows Cowork)
+
+- FLIP + BOS Telegram alerts (`check_structure_alerts`; `TBG_BOS`/`TBG_BOS_T` parsed in `parse_pl_file`).
+- `signal_snapshots` insert uses a column allowlist (was silently 400ing → Signal Log stayed empty).
+- News: hourly thresholds 4h/3h/2h/1h + 15m/2m; ForexFactory ISO date parsing fixed (the feed's
+  `date` is a combined ISO datetime with no `time` — the banner AND alerts had never fired before).
+  Overview news banner shows the next high-impact event within 48h.
+- AUTO-HEAL `sys.exit` is skipped when the market is closed (stops the weekend restart storm).
+- Engine runs HIDDEN; restart via `RESTART_ENGINE.bat`/`.ps1` (watchdog + autopull tasks set to S4U).
+- Repo reconciled: the `Panda Engine` folder is now canonical + up-to-date + the running engine;
+  the `panda-dashboard` clone is secondary. Details: `docs/CLAUDE_WINDOWS_HANDOFF_2026-07-31.md`.
+- MT4 exporter: use `Panda_Exporter_v2_BOS.mq4` (v2 price-context + BOS); the v1-based
+  `Panda_Exporter_BOS.mq4` is superseded.
+- Dashboard: PHASE GUIDE is now its own tab; Overview "AI Insight" removed; Panda AI surfaces exact
+  gaps 9/10/11/12.

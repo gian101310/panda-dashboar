@@ -93,3 +93,40 @@
   strategy definitions.
 - Scoring logic, Supabase RLS posture, and the 2026-07-17 indicator state are unchanged
   except where noted above.
+
+
+---
+
+## Later 2026-07-31 additions (same session, all pushed to `main`)
+
+- **News date parsing fixed** (`lib/newsCalendar.mjs` + `app.py` `parse_news_time`). ForexFactory
+  gives ONE combined ISO datetime in `date` (e.g. `2026-07-28T21:30:00-04:00`) with no separate
+  `time`. The old code expected separate `date`+`time`, so it silently dropped EVERY event — which
+  had broken BOTH the Overview news banner AND the Telegram news alerts (they never fired). Now
+  parses the ISO directly (legacy fallback kept). `commit fff84a1`.
+- **`Panda_Exporter_v2_BOS.mq4` committed** to `panda-indicators/2026-07-30/mt4-exporter-bos/` with
+  a README marking the v1-based `Panda_Exporter_BOS.mq4` SUPERSEDED (missing v2 price-context — do
+  not deploy). `commit fff84a1`.
+- **Phase Guide moved to its own tab** (`pages/dashboard.js`). The phase legend (`PhaseLegend`) was
+  rendered under Overview (`<OverviewTab/><PhaseLegend/>`). Now a dedicated **PHASE GUIDE** tab (🧭,
+  no feature-gate) and removed from Overview. `commit 5e95c67`.
+- **Overview "AI Insight" box removed** (`OvAIPanel` dropped from `OverviewTab`). `commit 5e95c67`.
+- **Panda AI surfaces exact gaps 9/10/11/12** (`pages/api/ai-chat.js`). `GAP_BUCKETS` broken out
+  from `9-10.9`/`11-12.9` into individual `9`,`10`,`11`,`12`; insights prompt now forces it to call
+  out every pair at |gap| 9-12. `commit 5e95c67`.
+- **Telegram routing swap** (`app.py`, `commit 198144d`):
+  - **Phase digest** (`send_phase_digest`) → now the **SPIKE bot** (`SIGNAL_*`); was the main group.
+  - **News alerts** (`check_news_alerts`) → now the **MAIN group** (`TELEGRAM_*`); was the spike bot.
+
+### Current Telegram routing (as of 2026-07-31)
+
+- **MAIN group** — `TELEGRAM_TOKEN` / `TELEGRAM_CHAT_ID`: hourly snapshot image, AI snapshot narrator,
+  and **news alerts**.
+- **SPIKE / SIGNAL bot** — `SIGNAL_BOT_TOKEN` / `SIGNAL_CHAT_ID` ("Panda Gap Spike alert"; falls back
+  to main if the SIGNAL_* env vars are unset): spike alerts, gap-zone alerts, early-entry alerts,
+  FLIP/BOS structure alerts, and the **phase digest**.
+- **HEALTH** — `ENGINE_HEALTH_CHAT_ID` (falls back to main): engine auto-heal / health.
+- **LOGIN / reports** — `LOGIN_ALERT_BOT_TOKEN` / `LOGIN_ALERT_CHAT_ID`: login alerts, nightly
+  analyst, daily cleanup.
+
+Reminder: `app.py` changes only take effect after `RESTART_ENGINE` (the engine runs hidden).
