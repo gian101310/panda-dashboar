@@ -125,6 +125,20 @@ Colors: BUY `#00ff9f` · SELL `#ff4d6d` · accent `#00b4ff` · warning `#ffd166`
 - Handoffs: read `CODEX_HANDOFF.md` (latest first) at session start; write significant sessions to `CHANGELOG.md`.
 - After updating the skill source in `docs/`, re-upload it in Claude Settings > Capabilities so both locations load the same context.
 
+### Two-machine sync workflow (Mac <-> Windows) — ALWAYS FOLLOW
+
+1. **Start of every session, either machine:** `git fetch` then `git pull --ff-only origin main`
+   FIRST, and read the newest handoff (`docs/MAC_HANDOFF_*` or `docs/CLAUDE_WINDOWS_HANDOFF_*`,
+   latest date first) before touching anything. Assume the other machine may have pushed since.
+2. **After any change made ON THE MAC:** before ending the session, write a Mac->Windows handoff at
+   `docs/MAC_HANDOFF_<YYYY-MM-DD>.md` (TL;DR / commits this session / feature changes / pending-next /
+   locked-unchanged), commit it together with the changes, and push to `main`. Then Boss-G only has to
+   tell Windows to pull.
+3. **After any change made ON WINDOWS:** same rule in reverse — write/refresh
+   `docs/CLAUDE_WINDOWS_HANDOFF_<YYYY-MM-DD>.md`, commit, push; Boss-G tells the Mac to pull.
+4. Handoff docs are the source of truth for "what changed and why." Keep them latest-date-first and
+   never delete old ones (they form the trail). Never force-push; keep commits narrowly scoped.
+
 ## REFERENCE FILES
 
 - `AGENTS.md` — locked operating rules.
