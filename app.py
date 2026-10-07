@@ -2551,6 +2551,170 @@ def generate_snapshot(pair_data):
     img.save("snapshot.png", quality=95)
     return "snapshot.png"
 
+def generate_adv_scorecard(rows):
+    """
+    Renders a second Telegram image focused on score internals:
+    BASE/QUOTE D1-H4-H1 plus ADV D1-H4-H1. Visual only; scoring is unchanged.
+    """
+    rows = sorted(rows, key=lambda r: r.get("symbol") or "")
+    columns = 2 if len(rows) > 12 else 1
+    rows_per_col = max(1, (len(rows) + columns - 1) // columns)
+    card_w = 1700
+    margin = 36
+    gutter = 32
+    header_h = 230
+    footer_h = 110
+    row_h = 235
+    row_gap = 14
+    width = margin * 2 + card_w * columns + gutter * (columns - 1)
+    height = header_h + rows_per_col * (row_h + row_gap) + footer_h
+
+    bg_page = (214, 220, 226)
+    bg_card = (236, 239, 243)
+    bg_card2 = (226, 231, 236)
+    bg_buy = (125, 210, 160)
+    bg_buy2 = (105, 195, 145)
+    bg_sell = (248, 130, 152)
+    bg_sell2 = (232, 108, 132)
+    bg_yellow = (255, 210, 72)
+    bg_yellow2 = (242, 190, 42)
+    text_head = (24, 30, 42)
+    text_dark = (48, 58, 74)
+    accent = (0, 110, 205)
+    buy_col = (0, 88, 44)
+    sell_col = (170, 0, 28)
+    watch_col = (118, 62, 0)
+    muted_col = (70, 82, 102)
+
+    img = Image.new("RGB", (width, height), bg_page)
+    draw = ImageDraw.Draw(img)
+    font_title = _load_snapshot_font("arialbd.ttf", 72)
+    font_hdr = _load_snapshot_font("arialbd.ttf", 48)
+    font_pair = _load_snapshot_font("arialbd.ttf", 58)
+    font_data = _load_snapshot_font("arial.ttf", 48)
+    font_bold = _load_snapshot_font("arialbd.ttf", 50)
+    font_sm = _load_snapshot_font("arial.ttf", 40)
+
+    draw.rectangle([0, 0, width, header_h], fill=bg_card)
+    draw.rectangle([0, header_h - 4, width, header_h], fill=accent)
+    draw.text((margin, 38), "PANDA ADV SCORECARD", fill=text_head, font=font_title)
+    draw.text((margin, 122), "PAIR  GAP  BIAS    BASE/QUOTE RAW TF     ADV BASE/QUOTE TF",
+              fill=text_head, font=font_hdr)
+
+    def _tf_line(prefix, d1, h4, h1):
+        return f"{prefix} D1 {int(d1 or 0):+d} H4 {int(h4 or 0):+d} H1 {int(h1 or 0):+d}"
+
+    def _adv_row_category(r):
+        gap = r.get("gap") or 0
+        bias = r.get("bias") or ""
+        if not r.get("hard_invalid") and bias == "BUY" and abs(gap) >= 5:
+            return "BUY"
+        if not r.get("hard_invalid") and bias == "SELL" and abs(gap) >= 5:
+            return "SELL"
+        base_vals = [r.get("base_d1"), r.get("base_h4"), r.get("base_h1")]
+        quote_vals = [r.get("quote_d1"), r.get("quote_h4"), r.get("quote_h1")]
+        base_extreme = any(abs(v or 0) >= 4 for v in base_vals)
+        quote_extreme = any(abs(v or 0) >= 4 for v in quote_vals)
+        base_signs = {1 if v > 0 else -1 for v in base_vals if v is not None and abs(v) >= 4}
+        quote_signs = {1 if v > 0 else -1 for v in quote_vals if v is not None and abs(v) >= 4}
+        same_side_conflict = bool(base_signs and quote_signs and base_signs == quote_signs)
+        return "YELLOW" if (base_extreme or quote_extreme) and not same_side_conflict else "WHITE"
+
+    for idx, r in enumerate(rows):
+        col = idx // rows_per_col
+        row = idx % rows_per_col
+        x_card = margin + col * (card_w + gutter)
+        y_card = header_h + row * (row_h + row_gap) + row_gap
+        y_end = y_card + row_h
+        cat = _adv_row_category(r)
+        if cat == "BUY":
+            fill = bg_buy if idx % 2 == 0 else bg_buy2
+            tc = buy_col
+        elif cat == "SELL":
+            fill = bg_sell if idx % 2 == 0 else bg_sell2
+            tc = sell_col
+        elif cat == "YELLOW":
+            fill = bg_yellow if idx % 2 == 0 else bg_yellow2
+            tc = watch_col
+        else:
+            fill = bg_card if idx % 2 == 0 else bg_card2
+            tc = muted_col
+        symbol = r.get("symbol") or "-"
+        gap = r.get("gap") or 0
+        bias = r.get("bias") or "INVALID"
+        if cat == "YELLOW":
+            bias = "WATCH"
+        elif bias not in ("BUY", "SELL") or abs(gap) < 5 or r.get("hard_invalid"):
+            bias = "INVALID"
+        base_cur = r.get("base_currency") or symbol[:3]
+        quote_cur = r.get("quote_currency") or symbol[3:6]
+
+        draw.rectangle([x_card, y_card, x_card + card_w, y_end], fill=fill)
+        draw.rectangle([x_card, y_card, x_card + 16, y_end], fill=tc)
+        x = x_card + 42
+        draw.text((x, y_card + 22), symbol, fill=tc, font=font_pair)
+        draw.text((x + 360, y_card + 28), f"{gap:+.0f}" if gap else "0", fill=tc, font=font_bold)
+        draw.text((x + 520, y_card + 28), bias, fill=tc, font=font_bold)
+
+        raw_base = _tf_line(base_cur, r.get("base_d1"), r.get("base_h4"), r.get("base_h1"))
+        raw_quote = _tf_line(quote_cur, r.get("quote_d1"), r.get("quote_h4"), r.get("quote_h1"))
+        adv_base = _tf_line("ADV " + base_cur, r.get("adv_base_d1"), r.get("adv_base_h4"), r.get("adv_base_h1"))
+        adv_quote = _tf_line("ADV " + quote_cur, r.get("adv_quote_d1"), r.get("adv_quote_h4"), r.get("adv_quote_h1"))
+
+        draw.text((x, y_card + 96), raw_base, fill=text_dark, font=font_data)
+        draw.text((x + 780, y_card + 96), adv_base, fill=text_dark, font=font_data)
+        draw.text((x, y_card + 158), raw_quote, fill=text_dark, font=font_data)
+        draw.text((x + 780, y_card + 158), adv_quote, fill=text_dark, font=font_data)
+
+    footer_y = height - footer_h
+    draw.rectangle([0, footer_y, width, footer_y + footer_h], fill=bg_card)
+    draw.rectangle([0, footer_y, width, footer_y + 4], fill=accent)
+    draw.text((margin, footer_y + 28), f"PANDA ENGINE v3.0  |  ADV SCORECARD  |  {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+              fill=text_head, font=font_sm)
+
+    img.save("snapshot_adv.png", quality=95)
+    return "snapshot_adv.png"
+
+def _send_telegram_photo(path, caption, component="telegram_photo"):
+    max_h = 4096
+    send_path = path
+    try:
+        pil_img = Image.open(path)
+        iw, ih = pil_img.size
+        try:
+            orig_size = os.path.getsize(path)
+        except Exception:
+            orig_size = None
+        need_resize = (ih > max_h) or (orig_size and orig_size > 4_000_000)
+        if need_resize:
+            scale = min(1.0, max_h / float(ih)) if ih > 0 else 1.0
+            new_w = int(iw * scale)
+            new_h = int(ih * scale)
+            resized = pil_img.resize((new_w, new_h), Image.LANCZOS)
+            if resized.mode in ("RGBA", "P"):
+                resized = resized.convert("RGB")
+            base, _ = os.path.splitext(path)
+            send_path = f"{base}_send.jpg"
+            resized.save(send_path, format="JPEG", quality=85, optimize=True)
+            print(f"[SNAPSHOT] Resized {iw}x{ih} -> {new_w}x{new_h} and saved {send_path}")
+    except Exception as resize_err:
+        print(f"[SNAPSHOT] Resize skipped: {resize_err}")
+
+    mime_type = "image/jpeg" if send_path.lower().endswith((".jpg", ".jpeg")) else "image/png"
+    with open(send_path, "rb") as f:
+        files = {"photo": (os.path.basename(send_path), f, mime_type)}
+        response = requests.post(
+            f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto",
+            data={"chat_id": TELEGRAM_CHAT_ID, "caption": caption},
+            files=files,
+            timeout=30,
+        )
+    if response.status_code == 200:
+        print(f"[TELEGRAM] {component} sent OK")
+        return True, response
+    print(f"[TELEGRAM ERROR] {component}: {response.text}")
+    return False, response
+
 def build_snapshot_caption(buy_count, sell_count, yellow_count, white_count, now=None):
     ts = (now or datetime.now()).strftime("%Y-%m-%d %H:%M")
     return (
@@ -2712,44 +2876,12 @@ def send_snapshot():
 
         img_path = generate_snapshot(pair_data)
 
-        # Telegram sendPhoto rejects images taller than ~6000px.
-        # Resize proportionally to max 4096px height before sending, or convert to JPEG if large.
-        MAX_H = 4096
-        send_path = img_path
-        try:
-            pil_img = Image.open(img_path)
-            iw, ih = pil_img.size
-            # check original file size too
-            try:
-                orig_size = os.path.getsize(img_path)
-            except Exception:
-                orig_size = None
-            need_resize = (ih > MAX_H) or (orig_size and orig_size > 4_000_000)
-            if need_resize:
-                scale = min(1.0, MAX_H / float(ih)) if ih > 0 else 1.0
-                new_w = int(iw * scale)
-                new_h = int(ih * scale)
-                resized = pil_img.resize((new_w, new_h), Image.LANCZOS)
-                if resized.mode in ("RGBA", "P"):
-                    resized = resized.convert("RGB")
-                send_path = "snapshot_send.jpg"
-                resized.save(send_path, format="JPEG", quality=85, optimize=True)
-                print(f"[SNAPSHOT] Resized {iw}x{ih} → {new_w}x{new_h} and saved {send_path}")
-        except Exception as resize_err:
-            print(f"[SNAPSHOT] Resize skipped: {resize_err}")
-
-        # Choose correct content-type based on file extension
-        mime_type = "image/jpeg" if send_path.lower().endswith(('.jpg', '.jpeg')) else 'image/png'
-        with open(send_path, "rb") as f:
-            files = {"photo": (os.path.basename(send_path), f, mime_type)}
-            response = requests.post(
-                f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto",
-                data={"chat_id": TELEGRAM_CHAT_ID,
-                      "caption": build_snapshot_caption(buy_count, sell_count, yellow_count, white_count)},
-                files=files, timeout=30
-            )
-        if response.status_code == 200:
-            print("[TELEGRAM] Snapshot sent OK")
+        sent_ok, response = _send_telegram_photo(
+            img_path,
+            build_snapshot_caption(buy_count, sell_count, yellow_count, white_count),
+            component="Snapshot",
+        )
+        if sent_ok:
             telegram_circuit.success()
             try:
                 supabase_retry(
@@ -2760,8 +2892,16 @@ def send_snapshot():
                     label="SnapshotLog"
                 )
             except: pass
+            try:
+                adv_path = generate_adv_scorecard(data)
+                _send_telegram_photo(
+                    adv_path,
+                    f"PANDA ADV SCORECARD\n{datetime.now().strftime('%Y-%m-%d %H:%M')}\nRaw + ADV D1/H4/H1",
+                    component="ADV scorecard",
+                )
+            except Exception as adv_err:
+                print(f"[ADV SNAPSHOT ERROR]: {adv_err}")
         else:
-            print("[TELEGRAM ERROR]", response.text)
             telegram_circuit.failure()
             try:
                 supabase_retry(

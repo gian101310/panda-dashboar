@@ -7,6 +7,7 @@
 - Added a separate Panda Gold `XAUUSD` signal add-on in `app.py`.
 - Gold uses Twelve Data candles, SuperTrend flip logic, and Panda USD-strength filtering.
 - Gold appears in the open Telegram snapshot slot and sends SIGNAL-bot alerts on fresh LONG/SHORT flips.
+- Added a second Telegram image: `PANDA ADV SCORECARD`, sent alongside the normal snapshot.
 - Fixed Telegram snapshot display for non-valid forex rows:
   - one-sided extreme currency = yellow `WATCH`;
   - same-side extreme conflict = white `INVALID`.
@@ -41,6 +42,19 @@
      - valid pairs keep BUY/SELL;
      - one-sided strong/weak currency rows show yellow `WATCH`;
      - same-side extreme conflicts such as EUR weak + NZD weak show white `INVALID`.
+   - Added `generate_adv_scorecard()` for a second Telegram snapshot showing:
+     - pair;
+     - gap;
+     - bias;
+     - raw base/quote D1/H4/H1;
+     - ADV base/quote D1/H4/H1.
+   - Added `_send_telegram_photo()` reusable Telegram photo sender.
+   - Normal snapshot send now also sends the ADV scorecard after the main image succeeds.
+   - ADV scorecard row fills match the main snapshot:
+     - green = valid BUY;
+     - red = valid SELL;
+     - yellow = WATCH;
+     - white/gray = INVALID.
 
 ## Verification
 
@@ -50,6 +64,7 @@
 - Restarted hidden engine with `RESTART_ENGINE.ps1`
 - Sent test Telegram message successfully.
 - Sent corrected Telegram snapshots successfully.
+- Sent normal snapshot plus ADV scorecard successfully.
 - Verified Gold dry read after Twelve Data key was added:
   - `XAUUSD` no longer offline;
   - current state was `FLAT`;
