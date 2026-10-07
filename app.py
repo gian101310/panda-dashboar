@@ -37,6 +37,18 @@ load_dotenv()
 
 app = FastAPI()
 
+def _env_float(name, default):
+    try:
+        return float(os.environ.get(name, str(default)) or default)
+    except Exception:
+        return default
+
+def _env_int(name, default):
+    try:
+        return int(os.environ.get(name, str(default)) or default)
+    except Exception:
+        return default
+
 # ================= CORS =================
 app.add_middleware(
     CORSMiddleware,
@@ -68,6 +80,16 @@ MAX_FILE_AGE_SECONDS  = 300   # 5 mins — mt4 files update every ~2 mins
 LOGIN_ALERT_BOT_TOKEN = os.environ.get("LOGIN_ALERT_BOT_TOKEN", "")
 LOGIN_ALERT_CHAT_ID   = os.environ.get("LOGIN_ALERT_CHAT_ID", "")
 ENGINE_SECRET         = os.environ.get("ENGINE_SECRET", "")
+TWELVEDATA_API_KEY    = os.environ.get("TWELVEDATA_API_KEY", "")
+GOLD_SYMBOL           = os.environ.get("PANDA_GOLD_SYMBOL", "XAUUSD").upper()
+GOLD_TD_SYMBOL        = os.environ.get("PANDA_GOLD_TD_SYMBOL", "XAU/USD")
+GOLD_INTERVAL         = os.environ.get("PANDA_GOLD_INTERVAL", "1h")
+GOLD_ST_FACTOR        = _env_float("PANDA_GOLD_ST_FACTOR", 3.0)
+GOLD_ST_ATR           = _env_int("PANDA_GOLD_ST_ATR", 10)
+GOLD_USD_THRESHOLD    = _env_int("PANDA_GOLD_USD_THRESHOLD", 4)
+GOLD_USD_QUORUM       = _env_int("PANDA_GOLD_USD_QUORUM", 18)
+GOLD_BLOCK_OFFLINE    = os.environ.get("PANDA_GOLD_BLOCK_OFFLINE", "0").lower() in ("1", "true", "yes", "on")
+GOLD_SIGNAL_MARK_FILE = os.environ.get("PANDA_GOLD_SIGNAL_MARK_FILE", os.path.join(MT4_PATH, "panda_gold_signal_mark.txt"))
 
 # ---- OpenAI (AI Insights) ----
 OPENAI_API_KEY        = os.environ.get("OPENAI_API_KEY", "")
@@ -672,6 +694,316 @@ def compute_scores_all_pairs(parsed_map):
         }
 
     return results
+
+
+# ================= PANDA GOLD SIGNAL ADD-ON =================
+
+def _gold_interval_seconds(interval):
+    m = re.match(r"^(\d+)(min|h|day|week|month)$", str(interval).strip().lower())
+    if not m:
+        return 3600
+    n = int(m.group(1))
+    unit = m.group(2)
+    if unit == "min": return n * 60
+    if unit == "h": return n * 3600
+    if unit == "day": return n * 86400
+    if unit == "week": return n * 604800
+    if unit == "month": return n * 2592000
+    return 3600
+
+def _parse_td_datetime(value):
+    if not value:
+        return None
+    raw = str(value).replace("Z", "+00:00")
+    try:
+        dt = datetime.fromisoformat(raw)
+    except Exception:
+        dt = None
+        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+            try:
+                dt = datetime.strptime(str(value), fmt)
+                break
+            except Exception:
+                pass
+        if dt is None:
+            return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+def _fetch_gold_candles(outputsize=220):
+    if not TWELVEDATA_API_KEY:
+        return [], "TWELVEDATA_API_KEY missing"
+    try:
+        resp = requests.get(
+            "https://api.twelvedata.com/time_series",
+            params={
+                "symbol": GOLD_TD_SYMBOL,
+                "interval": GOLD_INTERVAL,
+                "outputsize": outputsize,
+                "apikey": TWELVEDATA_API_KEY,
+            },
+            timeout=12,
+        )
+        data = resp.json()
+        values = data.get("values") if isinstance(data, dict) else None
+        if not values:
+            return [], data.get("message", "no values") if isinstance(data, dict) else "bad response"
+        candles = []
+        for v in values:
+            dt = _parse_td_datetime(v.get("datetime"))
+            candle = {
+                "time": dt,
+                "open": safe_float(v.get("open")),
+                "high": safe_float(v.get("high")),
+                "low": safe_float(v.get("low")),
+                "close": safe_float(v.get("close")),
+            }
+            if candle["time"] and all(candle[k] is not None for k in ("open", "high", "low", "close")):
+                candles.append(candle)
+        candles.sort(key=lambda c: c["time"])
+        if candles:
+            last_close = candles[-1]["time"] + timedelta(seconds=_gold_interval_seconds(GOLD_INTERVAL))
+            if datetime.now(timezone.utc) < last_close:
+                candles = candles[:-1]
+        return candles, None
+    except Exception as e:
+        return [], str(e)
+
+def _rma(values, length):
+    out = [None] * len(values)
+    if len(values) < length:
+        return out
+    seed = sum(values[:length]) / length
+    out[length - 1] = seed
+    prev = seed
+    for i in range(length, len(values)):
+        prev = ((prev * (length - 1)) + values[i]) / length
+        out[i] = prev
+    return out
+
+def _compute_gold_supertrend(candles):
+    if len(candles) < GOLD_ST_ATR + 3:
+        return []
+    trs = []
+    for i, c in enumerate(candles):
+        if i == 0:
+            trs.append(c["high"] - c["low"])
+        else:
+            prev_close = candles[i - 1]["close"]
+            trs.append(max(c["high"] - c["low"], abs(c["high"] - prev_close), abs(c["low"] - prev_close)))
+    atrs = _rma(trs, GOLD_ST_ATR)
+
+    rows = []
+    prev_final_upper = prev_final_lower = prev_st = prev_dir = None
+    for i, c in enumerate(candles):
+        atr = atrs[i]
+        if atr is None:
+            rows.append({**c, "atr": None, "st": None, "dir": None, "new_long": False, "new_short": False})
+            continue
+        hl2 = (c["high"] + c["low"]) / 2.0
+        basic_upper = hl2 + GOLD_ST_FACTOR * atr
+        basic_lower = hl2 - GOLD_ST_FACTOR * atr
+        if prev_final_upper is None:
+            final_upper = basic_upper
+            final_lower = basic_lower
+            direction = 1
+        else:
+            prev_close = candles[i - 1]["close"]
+            final_lower = basic_lower if (basic_lower > prev_final_lower or prev_close < prev_final_lower) else prev_final_lower
+            final_upper = basic_upper if (basic_upper < prev_final_upper or prev_close > prev_final_upper) else prev_final_upper
+            if prev_st == prev_final_upper:
+                direction = -1 if c["close"] > final_upper else 1
+            else:
+                direction = 1 if c["close"] < final_lower else -1
+        st = final_lower if direction == -1 else final_upper
+        rows.append({
+            **c,
+            "atr": atr,
+            "st": st,
+            "dir": direction,
+            "new_long": direction == -1 and prev_dir == 1,
+            "new_short": direction == 1 and prev_dir == -1,
+        })
+        prev_final_upper = final_upper
+        prev_final_lower = final_lower
+        prev_st = st
+        prev_dir = direction
+    return rows
+
+def _mode_int(values):
+    counts = {}
+    for v in values:
+        if v is not None:
+            counts[int(v)] = counts.get(int(v), 0) + 1
+    if not counts:
+        return 0
+    return sorted(counts.items(), key=lambda kv: (-kv[1], -abs(kv[0])))[0][0]
+
+def _gold_usd_strength(parsed_map):
+    d1_vals, h4_vals, h1_vals = [], [], []
+    for parsed in parsed_map.values():
+        if parsed.get("base_cur") == "USD":
+            d1_vals.append(parsed.get("base_d1"))
+            h4_vals.append(parsed.get("base_h4"))
+            h1_vals.append(parsed.get("base_h1"))
+        if parsed.get("quote_cur") == "USD":
+            d1_vals.append(parsed.get("quote_d1"))
+            h4_vals.append(parsed.get("quote_h4"))
+            h1_vals.append(parsed.get("quote_h1"))
+    d1 = _mode_int(d1_vals)
+    h4 = _mode_int(h4_vals)
+    h1 = _mode_int(h1_vals)
+    positive = max(0, d1, h4, h1)
+    negative = min(0, d1, h4, h1)
+    strongest = 0 if abs(positive) == abs(negative) else negative if abs(negative) > abs(positive) else positive
+    return strongest, {"D1": d1, "H4": h4, "H1": h1}
+
+def _load_gold_mark():
+    try:
+        with open(GOLD_SIGNAL_MARK_FILE, "r", encoding="utf-8") as f:
+            return f.read().strip()
+    except Exception:
+        return ""
+
+def _save_gold_mark(mark):
+    try:
+        with open(GOLD_SIGNAL_MARK_FILE, "w", encoding="utf-8") as f:
+            f.write(mark)
+    except Exception as e:
+        print(f"[GOLD] mark write failed: {e}")
+
+def build_gold_signal(parsed_map):
+    """
+    Panda Gold V1.1 server-side add-on:
+    SuperTrend flip on XAUUSD, filtered by Panda USD strength. This is deliberately
+    separate from the locked 21-pair gap scorer.
+    """
+    basket_ready = len(parsed_map) >= GOLD_USD_QUORUM
+    usd_strength, usd_tf = _gold_usd_strength(parsed_map) if basket_ready else (0, {"D1": 0, "H4": 0, "H1": 0})
+    usd_offline = not basket_ready
+    candles, err = _fetch_gold_candles()
+    rows = _compute_gold_supertrend(candles)
+    if err or not rows:
+        return {
+            "symbol": GOLD_SYMBOL, "status": "OFFLINE", "bias": "WAIT", "gap": 0,
+            "entry": None, "sl": None, "tp1": None, "tp2": None, "tp3": None,
+            "usd_strength": usd_strength, "usd_tf": usd_tf, "basket_ready": basket_ready,
+            "filter": "OFFLINE", "error": err or "not enough candles", "new_signal": False,
+            "signal_time": None, "price": None,
+        }
+
+    allow_long = not (basket_ready and usd_strength >= GOLD_USD_THRESHOLD) and not (usd_offline and GOLD_BLOCK_OFFLINE)
+    allow_short = not (basket_ready and usd_strength <= -GOLD_USD_THRESHOLD) and not (usd_offline and GOLD_BLOCK_OFFLINE)
+    in_trade = False
+    trade_dir = 0
+    entry = sl = tp1 = tp2 = tp3 = None
+    tp1_hit = tp2_hit = tp3_hit = at_be = False
+    last_signal = None
+
+    for row in rows:
+        new_long = row["new_long"] and allow_long
+        new_short = row["new_short"] and allow_short
+        if new_long or new_short:
+            trade_dir = 1 if new_long else -1
+            entry = row["close"]
+            sl = row["st"]
+            risk = abs(entry - sl) if sl is not None else 0
+            tp1 = entry + risk if trade_dir == 1 else entry - risk
+            tp2 = entry + 2.0 * risk if trade_dir == 1 else entry - 2.0 * risk
+            tp3 = entry + 3.0 * risk if trade_dir == 1 else entry - 3.0 * risk
+            tp1_hit = tp2_hit = tp3_hit = at_be = False
+            in_trade = risk > 0
+            last_signal = {"dir": trade_dir, "time": row["time"], "entry": entry, "sl": sl, "tp1": tp1, "tp2": tp2, "tp3": tp3}
+            continue
+        if in_trade:
+            if trade_dir == 1:
+                if not tp1_hit and row["high"] >= tp1:
+                    tp1_hit = True
+                    sl = entry
+                    at_be = True
+                if not tp2_hit and row["high"] >= tp2:
+                    tp2_hit = True
+                if not tp3_hit and row["high"] >= tp3:
+                    tp3_hit = True
+                    in_trade = False
+                if row["low"] <= sl:
+                    in_trade = False
+            else:
+                if not tp1_hit and row["low"] <= tp1:
+                    tp1_hit = True
+                    sl = entry
+                    at_be = True
+                if not tp2_hit and row["low"] <= tp2:
+                    tp2_hit = True
+                if not tp3_hit and row["low"] <= tp3:
+                    tp3_hit = True
+                    in_trade = False
+                if row["high"] >= sl:
+                    in_trade = False
+
+    latest = rows[-1]
+    latest_new_signal = bool(last_signal and last_signal["time"] == latest["time"])
+    status = "LONG" if in_trade and trade_dir == 1 else "SHORT" if in_trade and trade_dir == -1 else "FLAT"
+    bias = "BUY" if status == "LONG" else "SELL" if status == "SHORT" else "WAIT"
+    filter_text = (
+        "OFFLINE" if usd_offline else
+        "USD strong - no longs" if basket_ready and usd_strength >= GOLD_USD_THRESHOLD else
+        "USD weak - no shorts" if basket_ready and usd_strength <= -GOLD_USD_THRESHOLD else
+        "CLEAR"
+    )
+    return {
+        "symbol": GOLD_SYMBOL, "status": status, "bias": bias,
+        "gap": 9 if status == "LONG" else -9 if status == "SHORT" else 0,
+        "entry": entry, "sl": sl, "tp1": tp1, "tp2": tp2, "tp3": tp3,
+        "tp1_hit": tp1_hit, "tp2_hit": tp2_hit, "tp3_hit": tp3_hit, "at_be": at_be,
+        "usd_strength": usd_strength, "usd_tf": usd_tf, "basket_ready": basket_ready,
+        "filter": filter_text, "error": None, "new_signal": latest_new_signal,
+        "signal_time": latest["time"].isoformat() if latest_new_signal else None,
+        "price": latest["close"], "st": latest["st"],
+    }
+
+def gold_signal_to_snapshot_card(gold):
+    if not gold:
+        return None
+    status = gold.get("status") or "OFFLINE"
+    entry = gold.get("entry")
+    sl = gold.get("sl")
+    tp1 = gold.get("tp1")
+    score_bits = []
+    if entry is not None:
+        score_bits.append(f"E {entry:.2f}")
+    if sl is not None:
+        score_bits.append(("BE " if gold.get("at_be") else "SL ") + f"{sl:.2f}")
+    score_text = " | ".join(score_bits) if score_bits else (gold.get("error") or "WAIT")
+    tp_text = f"TP1 {'OK ' if gold.get('tp1_hit') else ''}{tp1:.2f}" if tp1 is not None else "-"
+    filter_text = gold.get("filter") or "-"
+    filter_label = (
+        "USD+" if "strong" in filter_text.lower() else
+        "USD-" if "weak" in filter_text.lower() else
+        "OFFLINE" if "offline" in filter_text.lower() else
+        filter_text
+    )
+    return {
+        "symbol": GOLD_SYMBOL,
+        "gap": gold.get("gap") or 0,
+        "bias": (gold.get("bias") or "WAIT") if status != "OFFLINE" else "OFFLINE",
+        "box_badge": f"ST {GOLD_INTERVAL}",
+        "pl_zone": filter_label,
+        "pdr": f"USD {gold.get('usd_strength', 0):+d}",
+        "action": "GOLD" if status in ("LONG", "SHORT") else "WAIT",
+        "score": score_text.replace(" | ", " "),
+        "category": "BUY" if status == "LONG" else "SELL" if status == "SHORT" else "YELLOW" if status == "OFFLINE" else "WHITE",
+        "xtf": tp_text,
+    }
+
+def _load_current_parsed_map_for_gold():
+    parsed = {}
+    for symbol in PAIRS:
+        p = parse_mt4_file(symbol)
+        if p is not None:
+            parsed[symbol] = p
+    return parsed
 
 
 # ================= GAP HISTORY =================
@@ -1708,6 +2040,17 @@ def run_gap_once():
         print(f"[EARLY ENTRY] {len(early_alerts)} pair(s) just crossed into valid territory!")
         send_early_entry_alert(early_alerts)
 
+    # ---- Panda Gold add-on: SuperTrend flip + USD strength filter (separate from locked gap scorer) ----
+    try:
+        gold_signal = build_gold_signal(all_parsed_map)
+        if gold_signal.get("status") != "OFFLINE":
+            print(f"[GOLD] {gold_signal.get('status')} {GOLD_SYMBOL} | USD {gold_signal.get('usd_strength', 0):+d} | {gold_signal.get('filter')}")
+        else:
+            print(f"[GOLD] OFFLINE {GOLD_SYMBOL}: {gold_signal.get('error')}")
+        send_gold_signal_alert(gold_signal)
+    except Exception as e:
+        print(f"[GOLD ERROR]: {e}")
+
     # ---- Evaluate pending signal results (price-based) ----
     evaluate_pending_signals(all_scores, all_pl_map)
     evaluate_pending_shadows(all_scores, all_pl_map)
@@ -2276,9 +2619,17 @@ def send_snapshot():
             # Validity for Telegram: gap threshold + not hard_invalid (no PL filter)
             is_valid = (not hard_inv) and bias_val in ("BUY", "SELL") and abs_gap >= 5
 
-            # YELLOW check: any individual TF score ±4/5/6 = STRONG or WEAK currency
-            all_tf = [base_d1, base_h4, base_h1, quote_d1, quote_h4, quote_h1]
-            has_strong_currency = any(abs(v) >= 4 for v in all_tf if v is not None)
+            # WATCH check: one-sided extreme currency stays yellow.
+            # If both currencies are extreme in the same direction (e.g. EUR weak + NZD weak),
+            # it is a same-side conflict and should display as white INVALID.
+            base_tf_vals = [base_d1, base_h4, base_h1]
+            quote_tf_vals = [quote_d1, quote_h4, quote_h1]
+            base_extreme = any(abs(v) >= 4 for v in base_tf_vals if v is not None)
+            quote_extreme = any(abs(v) >= 4 for v in quote_tf_vals if v is not None)
+            base_extreme_signs = {1 if v > 0 else -1 for v in base_tf_vals if v is not None and abs(v) >= 4}
+            quote_extreme_signs = {1 if v > 0 else -1 for v in quote_tf_vals if v is not None and abs(v) >= 4}
+            same_side_conflict = bool(base_extreme_signs and quote_extreme_signs and base_extreme_signs == quote_extreme_signs)
+            has_watch_currency = (base_extreme or quote_extreme) and not same_side_conflict
 
             # Categorize for coloring
             if is_valid:
@@ -2287,10 +2638,10 @@ def send_snapshot():
                     buy_count += 1
                 else:
                     sell_count += 1
-            elif has_strong_currency:
+            elif has_watch_currency:
                 category = "YELLOW"
                 yellow_count += 1
-                bias_val = "BUY" if gap > 0 else "SELL" if gap < 0 else "WAIT"
+                bias_val = "WATCH"
             else:
                 category = "WHITE"
                 white_count += 1
@@ -2345,6 +2696,15 @@ def send_snapshot():
 
         # Sort alphabetically by symbol
         pair_data.sort(key=lambda p: p["symbol"])
+
+        # One extra snapshot slot for Panda Gold. This is intentionally appended
+        # outside the locked 21-pair gap engine and does not affect forex scoring.
+        try:
+            gold_card = gold_signal_to_snapshot_card(build_gold_signal(_load_current_parsed_map_for_gold()))
+            if gold_card:
+                pair_data.append(gold_card)
+        except Exception as gold_snapshot_err:
+            print(f"[SNAPSHOT GOLD] skipped: {gold_snapshot_err}")
 
         if not pair_data:
             pair_data = [{"symbol": "NO DATA", "gap": 0, "bias": "-", "box_badge": "-",
@@ -2604,6 +2964,56 @@ def send_early_entry_alert(alerts):
             telegram_circuit.failure()
     except Exception as e:
         print("[EARLY ENTRY ERROR]:", e)
+        telegram_circuit.failure()
+
+def send_gold_signal_alert(gold):
+    if not gold or not gold.get("new_signal"):
+        return
+    if is_market_closed():
+        print(f"[GOLD ALERT] Market closed - skipped ({market_time_label()})")
+        return
+    if not telegram_circuit.allow():
+        print(f"[GOLD ALERT BLOCKED] Circuit breaker locked — failures: {telegram_circuit.failures}")
+        return
+
+    direction = "LONG" if gold.get("status") == "LONG" else "SHORT" if gold.get("status") == "SHORT" else ""
+    if not direction:
+        return
+    mark = f"{direction}|{gold.get('signal_time') or ''}"
+    if mark == _load_gold_mark():
+        return
+
+    try:
+        icon = "📈" if direction == "LONG" else "📉"
+        usd_tf = gold.get("usd_tf") or {}
+        text = (
+            f"🥇 <b>PANDA GOLD {direction}</b> {icon}\n"
+            f"━━━━━━━━━━━━━━━━━━━━━\n"
+            f"<b>{GOLD_SYMBOL}</b> | SuperTrend flip confirmed\n"
+            f"Interval: <b>{GOLD_INTERVAL}</b>\n"
+            f"Entry: <b>{gold.get('entry'):.2f}</b>\n"
+            f"SL: <b>{gold.get('sl'):.2f}</b>\n"
+            f"TP1: <b>{gold.get('tp1'):.2f}</b> | TP2: <b>{gold.get('tp2'):.2f}</b> | TP3: <b>{gold.get('tp3'):.2f}</b>\n\n"
+            f"USD strength: <b>{gold.get('usd_strength', 0):+d}</b> "
+            f"(D1 {usd_tf.get('D1', 0):+d} / H4 {usd_tf.get('H4', 0):+d} / H1 {usd_tf.get('H1', 0):+d})\n"
+            f"Filter: <b>{html.escape(gold.get('filter') or 'CLEAR')}</b>\n\n"
+            f"<i>Currency bias data only. Not financial advice.</i>\n"
+            f"🐼 PANDA ENGINE v3.0"
+        )
+        response = requests.post(
+            f"https://api.telegram.org/bot{SIGNAL_BOT_TOKEN}/sendMessage",
+            data={"chat_id": SIGNAL_CHAT_ID, "text": text[:4000], "parse_mode": "HTML"},
+            timeout=15
+        )
+        if response.status_code == 200:
+            _save_gold_mark(mark)
+            print(f"[GOLD ALERT] Sent {GOLD_SYMBOL} {direction} → signals bot")
+            telegram_circuit.success()
+        else:
+            print("[GOLD ALERT ERROR]", response.text)
+            telegram_circuit.failure()
+    except Exception as e:
+        print("[GOLD ALERT ERROR]:", e)
         telegram_circuit.failure()
 
 # ================= LOGIN ALERT =================
