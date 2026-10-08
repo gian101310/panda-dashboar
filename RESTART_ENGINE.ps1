@@ -9,8 +9,18 @@ $procs = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Obj
   ($_.CommandLine -match 'uvicorn app:app' -or $_.CommandLine -match 'START_PANDA') -and
   ($_.CommandLine -notmatch 'RESTART_ENGINE|WATCH_PANDA')
 }
-foreach($p in $procs){
+
+$portPids = @(Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue |
+  Select-Object -ExpandProperty OwningProcess -Unique)
+$portProcs = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+  Where-Object { $portPids -contains $_.ProcessId })
+
+$allProcs = @(@($procs) + @($portProcs)) | Sort-Object ProcessId -Unique
+foreach($p in $allProcs){
   try { Stop-Process -Id $p.ProcessId -Force -ErrorAction Stop; Write-Output ("stopped pid " + $p.ProcessId) } catch {}
+}
+foreach($portPid in $portPids){
+  try { Stop-Process -Id $portPid -Force -ErrorAction Stop; Write-Output ("stopped port pid " + $portPid) } catch {}
 }
 
 Start-Sleep -Seconds 2

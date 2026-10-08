@@ -2876,6 +2876,20 @@ def send_snapshot():
 
         img_path = generate_snapshot(pair_data)
 
+        def _log_snapshot_event(component, error=None):
+            try:
+                supabase_retry(
+                    lambda: supabase.table("engine_logs").insert({
+                        "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+                        "component": component,
+                        "duration": 0,
+                        "error": error,
+                    }).execute(),
+                    label=component
+                )
+            except Exception as log_err:
+                print(f"[SNAPSHOT LOG ERROR] {component}: {log_err}")
+
         sent_ok, response = _send_telegram_photo(
             img_path,
             build_snapshot_caption(buy_count, sell_count, yellow_count, white_count),
@@ -2883,36 +2897,30 @@ def send_snapshot():
         )
         if sent_ok:
             telegram_circuit.success()
-            try:
-                supabase_retry(
-                    lambda: supabase.table("engine_logs").insert({
-                        "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
-                        "component": "telegram_snapshot_ok", "duration": 0, "error": None,
-                    }).execute(),
-                    label="SnapshotLog"
-                )
-            except: pass
+            _log_snapshot_event("telegram_snapshot_ok")
             try:
                 adv_path = generate_adv_scorecard(data)
-                _send_telegram_photo(
+                adv_ok, adv_response = _send_telegram_photo(
                     adv_path,
                     f"PANDA ADV SCORECARD\n{datetime.now().strftime('%Y-%m-%d %H:%M')}\nRaw + ADV D1/H4/H1",
                     component="ADV scorecard",
                 )
+                if adv_ok:
+                    _log_snapshot_event("telegram_adv_scorecard_ok")
+                else:
+                    _log_snapshot_event(
+                        "telegram_adv_scorecard_fail",
+                        adv_response.text[:500] if adv_response else "no response",
+                    )
             except Exception as adv_err:
                 print(f"[ADV SNAPSHOT ERROR]: {adv_err}")
+                _log_snapshot_event("telegram_adv_scorecard_exception", str(adv_err)[:500])
         else:
             telegram_circuit.failure()
-            try:
-                supabase_retry(
-                    lambda: supabase.table("engine_logs").insert({
-                        "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
-                        "component": "telegram_snapshot_fail", "duration": 0,
-                        "error": response.text[:500] if response else "no response",
-                    }).execute(),
-                    label="SnapshotErrLog"
-                )
-            except: pass
+            _log_snapshot_event(
+                "telegram_snapshot_fail",
+                response.text[:500] if response else "no response",
+            )
     except Exception as e:
         print("[TELEGRAM ERROR]:", e)
         telegram_circuit.failure()
