@@ -28,6 +28,7 @@ import re
 import requests
 import time
 import threading
+import textwrap
 from datetime import datetime, timezone, timedelta
 from PIL import Image, ImageDraw, ImageFont
 from dotenv import load_dotenv
@@ -97,6 +98,10 @@ SNAPSHOT_HOUR_MARK_FILE = os.environ.get(
     "PANDA_SNAPSHOT_MARK_FILE",
     os.path.join(MT4_PATH, "panda_snapshot_hour.txt"),
 )
+MARKET_DESK_WEEK_MARK_FILE = os.environ.get(
+    "PANDA_MARKET_DESK_MARK_FILE",
+    os.path.join(MT4_PATH, "panda_market_desk_week.txt"),
+)
 
 PAIRS = [
     "AUDJPY","AUDCAD","AUDNZD","AUDUSD","CADJPY",
@@ -107,6 +112,7 @@ PAIRS = [
 
 LAST_QUARTER_MARK = None
 LAST_HOUR_MARK    = None
+LAST_MARKET_DESK_WEEK = None
 LAST_NEWS_MARK    = None
 PREV_MOMENTUM     = {}
 PREV_GAP          = {}
@@ -2675,6 +2681,262 @@ def generate_adv_scorecard(rows):
     img.save("snapshot_adv.png", quality=95)
     return "snapshot_adv.png"
 
+def _desk_score_read(values):
+    vals = [int(v or 0) for v in values]
+    strongest_pos = max((v for v in vals if v > 0), default=0)
+    strongest_neg = min((v for v in vals if v < 0), default=0)
+    if abs(strongest_pos) == abs(strongest_neg) and strongest_pos != 0:
+        return 0
+    return strongest_neg if abs(strongest_neg) > abs(strongest_pos) else strongest_pos
+
+def _desk_score_class(score):
+    if score >= 4:
+        return "STRONG"
+    if score <= -4:
+        return "WEAK"
+    return "NEUTRAL"
+
+def _desk_fmt_score(score):
+    score = int(score or 0)
+    return f"{score:+d}" if score else "0"
+
+def _market_desk_currency_rows(rows):
+    by_cur = {}
+    for r in rows:
+        symbol = r.get("symbol") or ""
+        for side, prefix in (("base", "base"), ("quote", "quote")):
+            cur = r.get(f"{prefix}_currency") or (symbol[:3] if side == "base" else symbol[3:6])
+            if not cur:
+                continue
+            d1 = int(r.get(f"{prefix}_d1") or 0)
+            h4 = int(r.get(f"{prefix}_h4") or 0)
+            h1 = int(r.get(f"{prefix}_h1") or 0)
+            explicit_score = r.get(f"{prefix}_score")
+            score = int(explicit_score) if explicit_score is not None else _desk_score_read([d1, h4, h1])
+            existing = by_cur.get(cur)
+            if existing is None or abs(score) > abs(existing["score"]):
+                by_cur[cur] = {"cur": cur, "d1": d1, "h4": h4, "h1": h1, "score": score}
+    out = []
+    for cur in sorted(by_cur):
+        item = by_cur[cur]
+        score = item["score"]
+        cls = _desk_score_class(score)
+        if cls == "STRONG":
+            note = "score strength catalyst"
+        elif cls == "WEAK":
+            note = "score weakness catalyst"
+        else:
+            note = "mixed or neutral read"
+        out.append([
+            cur,
+            _desk_fmt_score(item["d1"]),
+            _desk_fmt_score(item["h4"]),
+            _desk_fmt_score(item["h1"]),
+            _desk_fmt_score(score),
+            cls,
+            note,
+        ])
+    return out
+
+def _market_desk_pair_rows(rows):
+    candidates = []
+    for r in rows:
+        symbol = r.get("symbol") or ""
+        gap = r.get("gap") or 0
+        bias = r.get("bias") or "INVALID"
+        if r.get("hard_invalid") or bias not in ("BUY", "SELL") or abs(gap) < 5:
+            continue
+        base_cur = r.get("base_currency") or symbol[:3]
+        quote_cur = r.get("quote_currency") or symbol[3:6]
+        base_score = r.get("base_score")
+        quote_score = r.get("quote_score")
+        if base_score is None:
+            base_score = _desk_score_read([r.get("base_d1"), r.get("base_h4"), r.get("base_h1")])
+        if quote_score is None:
+            quote_score = _desk_score_read([r.get("quote_d1"), r.get("quote_h4"), r.get("quote_h1")])
+        pl_zone = r.get("pl_zone") or "-"
+        pl_ok = (bias == "BUY" and pl_zone == "ABOVE") or (bias == "SELL" and pl_zone == "BELOW")
+        if abs(gap) >= 9 and pl_ok:
+            quality = "CLEAN"
+        elif abs(gap) >= 9:
+            quality = "WATCH"
+        else:
+            quality = "CAUTION"
+        direction = "bullish" if bias == "BUY" else "bearish"
+        if pl_ok:
+            plan = f"{direction.capitalize()} bias. Wait for structure continuation and risk check."
+        else:
+            plan = f"{direction.capitalize()} watch only. Need structure + Panda Line/G1 confirmation."
+        context = (
+            f"{base_cur} {_desk_fmt_score(base_score)} {_desk_score_class(int(base_score))} "
+            f"vs {quote_cur} {_desk_fmt_score(quote_score)} {_desk_score_class(int(quote_score))}"
+        )
+        candidates.append({
+            "symbol": symbol,
+            "gap": gap,
+            "bias": bias,
+            "quality": quality,
+            "context": context,
+            "plan": plan,
+        })
+    candidates.sort(key=lambda r: (0 if r["quality"] == "CLEAN" else 1, -abs(r["gap"]), r["symbol"]))
+    out = []
+    for idx, r in enumerate(candidates[:6], start=1):
+        out.append([
+            str(idx),
+            r["symbol"],
+            r["context"],
+            f"{r['bias']} {r['gap']:+.0f}",
+            r["quality"],
+            r["plan"],
+        ])
+    if not out:
+        out.append(["-", "NO SETUP", "No clean score gap >= 5", "WAIT", "NONE", "Stand down until score + structure align."])
+    return out
+
+def generate_market_desk_report(rows):
+    rows = rows or []
+    width, height = 1700, 2100
+    margin = 70
+    page_bg = (255, 255, 255)
+    black = (20, 20, 20)
+    grid = (170, 170, 170)
+    head = (218, 218, 218)
+    soft = (242, 242, 242)
+    sell_fill = (248, 224, 228)
+    watch_fill = (255, 244, 205)
+
+    img = Image.new("RGB", (width, height), page_bg)
+    draw = ImageDraw.Draw(img)
+    font_title = _load_snapshot_font("arialbd.ttf", 62)
+    font_sub = _load_snapshot_font("arialbd.ttf", 30)
+    font_h = _load_snapshot_font("arialbd.ttf", 32)
+    font_th = _load_snapshot_font("arialbd.ttf", 23)
+    font = _load_snapshot_font("arial.ttf", 23)
+    font_b = _load_snapshot_font("arialbd.ttf", 23)
+    font_sm = _load_snapshot_font("arial.ttf", 19)
+
+    def _wrap_text(text, px_width):
+        chars = max(6, int(px_width / 12.5))
+        return textwrap.wrap(str(text), width=chars) or [""]
+
+    def _section(y, title):
+        draw.text((margin, y), title, fill=black, font=font_h)
+        return y + 46
+
+    def _table(y, headers, table_rows, widths, row_h=50, fills=None):
+        x = margin
+        draw.rectangle([margin, y, width - margin, y + row_h], fill=head, outline=grid)
+        for i, header in enumerate(headers):
+            draw.text((x + 8, y + 13), header, fill=black, font=font_th)
+            draw.line([x, y, x, y + row_h], fill=grid, width=1)
+            x += widths[i]
+        draw.line([width - margin, y, width - margin, y + row_h], fill=grid, width=1)
+        y += row_h
+        for ridx, row in enumerate(table_rows):
+            wrapped = [_wrap_text(cell, widths[i] - 16) for i, cell in enumerate(row)]
+            max_lines = max(len(lines) for lines in wrapped)
+            h = max(row_h, 30 + max_lines * 27)
+            fill = fills[ridx] if fills else ((255, 255, 255) if ridx % 2 == 0 else soft)
+            draw.rectangle([margin, y, width - margin, y + h], fill=fill, outline=grid)
+            x = margin
+            for i, lines in enumerate(wrapped):
+                draw.line([x, y, x, y + h], fill=grid, width=1)
+                use_font = font_b if i in (1, 4) and len(row) > 4 else font
+                for line_idx, line in enumerate(lines[:5]):
+                    draw.text((x + 8, y + 11 + line_idx * 27), line, fill=black, font=use_font)
+                x += widths[i]
+            draw.line([width - margin, y, width - margin, y + h], fill=grid, width=1)
+            y += h
+        return y + 28
+
+    y = 58
+    draw.text((width // 2, y), "PANDA MARKET DESK", fill=black, font=font_title, anchor="ma")
+    y += 72
+    draw.text((width // 2, y), "WEEKLY SCORE -> FUNDAMENTALS -> STRUCTURE MAP", fill=black, font=font_sub, anchor="ma")
+    y += 44
+    draw.text((width // 2, y), "CONDITIONAL WATCHLIST - NOT SIGNALS", fill=black, font=font_th, anchor="ma")
+    y += 36
+    draw.line([margin, y, width - margin, y], fill=black, width=2)
+    y += 22
+
+    y = _section(y, "1. LATEST PANDA CURRENCY READ")
+    y = _table(
+        y,
+        ["CUR", "D1", "H4", "H1", "READ", "CLASS", "NOTE"],
+        _market_desk_currency_rows(rows),
+        [105, 95, 95, 95, 115, 165, 890],
+        row_h=46,
+    )
+
+    pair_rows = _market_desk_pair_rows(rows)
+    row_fills = []
+    for row in pair_rows:
+        if "SELL" in row[3]:
+            row_fills.append(sell_fill)
+        elif row[4] in ("CAUTION", "WATCH"):
+            row_fills.append(watch_fill)
+        else:
+            row_fills.append((218, 242, 226))
+    y = _section(y, "2. TOP WATCHLIST - CONDITIONAL, NOT SIGNALS")
+    y = _table(
+        y,
+        ["PRI", "PAIR", "SCORE CONTEXT", "BIAS", "QUALITY", "PLAN"],
+        pair_rows,
+        [75, 145, 430, 115, 155, 640],
+        row_h=50,
+        fills=row_fills,
+    )
+
+    y = _section(y, "3. EXECUTION ROUTINE")
+    y = _table(
+        y,
+        ["STEP", "RULE"],
+        [
+            ["1. SCORE", "Classify currencies by strongest score: +4 to +6 STRONG, -4 to -6 WEAK, everything else NEUTRAL."],
+            ["2. MAP", "Pair strongest vs weakest. Gap is base score minus quote score; no D1/H4/H1 summing."],
+            ["3. FILTER", "Remove hard invalid, same-side conflict, neutral-vs-neutral, and unclear gap."],
+            ["4. STRUCTURE", "Require market structure, Panda Line zone, and G1 confirmation before execution."],
+            ["5. RISK", "News, spread, session timing, and invalidation come before any entry."],
+        ],
+        [215, 1345],
+        row_h=48,
+    )
+
+    y = _section(y, "4. FUNDAMENTAL CATALYST CHECKLIST")
+    y = _table(
+        y,
+        ["DRIVER", "WHAT TO MONITOR", "WHY IT MATTERS"],
+        [
+            ["USD", "Fed speakers, CPI/PPI, labor data", "Can confirm or weaken USD strength."],
+            ["CAD", "Oil, BoC tone, Canada employment/inflation", "Can support or invalidate CAD bias."],
+            ["AUD/NZD", "China data, commodities, risk sentiment", "Risk appetite can reverse weak/neutral reads."],
+            ["JPY", "Intervention headlines, yields, safe-haven flows", "Can override score advantage quickly."],
+        ],
+        [200, 630, 730],
+        row_h=48,
+    )
+
+    y += 12
+    box_h = 132
+    draw.rectangle([margin, y, width - margin, y + box_h], fill=soft, outline=grid)
+    draw.text((margin + 18, y + 18), "PANDA DESK READ:", fill=black, font=font_b)
+    note = (
+        "Score finds the bias catalyst. Fundamentals explain the driver. "
+        "Structure confirms the setup. This report ranks what to watch; it is not a standalone trade signal."
+    )
+    for idx, line in enumerate(textwrap.wrap(note, width=112)):
+        draw.text((margin + 260, y + 18 + idx * 29), line, fill=black, font=font)
+    y += box_h + 42
+
+    draw.text((width // 2, y), "STRUCTURE FIRST. SCORE IS THE FILTER.", fill=black, font=font_sub, anchor="ma")
+    y += 48
+    draw.text((margin, y), f"PANDA ENGINE v3.0 | {datetime.now().strftime('%Y-%m-%d %H:%M')}", fill=black, font=font_sm)
+
+    path = "panda_market_desk.png"
+    img.save(path, quality=95)
+    return path
+
 def _send_telegram_photo(path, caption, component="telegram_photo"):
     max_h = 4096
     send_path = path
@@ -2723,6 +2985,56 @@ def build_snapshot_caption(buy_count, sell_count, yellow_count, white_count, now
         f"BUY: {buy_count} | SELL: {sell_count}\n"
         f"Watch: {yellow_count} | Idle: {white_count}"
     )
+
+def send_weekly_market_desk():
+    if not telegram_circuit.allow():
+        print(f"[MARKET DESK BLOCKED] Circuit breaker locked — failures: {telegram_circuit.failures}")
+        return False
+    try:
+        res = supabase.table("dashboard").select("*").execute()
+        data = res.data or []
+        if not data:
+            print("[MARKET DESK] No dashboard rows available")
+            return False
+        report_path = generate_market_desk_report(data)
+        ok, response = _send_telegram_photo(
+            report_path,
+            f"PANDA MARKET DESK\n{datetime.now().strftime('%Y-%m-%d %H:%M')}\nWeekly score -> fundamentals -> structure map",
+            component="Market Desk",
+        )
+        try:
+            supabase_retry(
+                lambda: supabase.table("engine_logs").insert({
+                    "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+                    "component": "telegram_market_desk_ok" if ok else "telegram_market_desk_fail",
+                    "duration": 0,
+                    "error": None if ok else (response.text[:500] if response else "no response"),
+                }).execute(),
+                label="MarketDeskLog"
+            )
+        except Exception as log_err:
+            print(f"[MARKET DESK LOG ERROR] {log_err}")
+        if ok:
+            telegram_circuit.success()
+        else:
+            telegram_circuit.failure()
+        return ok
+    except Exception as e:
+        print(f"[MARKET DESK ERROR] {e}")
+        telegram_circuit.failure()
+        try:
+            supabase_retry(
+                lambda: supabase.table("engine_logs").insert({
+                    "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+                    "component": "telegram_market_desk_exception",
+                    "duration": 0,
+                    "error": str(e)[:500],
+                }).execute(),
+                label="MarketDeskExcLog"
+            )
+        except Exception:
+            pass
+        return False
 
 # ================= TELEGRAM SNAPSHOT =================
 def send_snapshot():
@@ -3209,6 +3521,18 @@ def hourly_snapshot_due(now, last_hour_mark):
         return False, last_hour_mark
     return True, hour_mark
 
+def weekly_market_desk_due(now, last_week_mark):
+    """
+    Send one Panda Market Desk report each Sunday. The scheduler checks this
+    inside the hourly block so it rides the same MAIN Telegram route as snapshots.
+    """
+    if now.weekday() != 6 or now.hour < 9:
+        return False, last_week_mark
+    week_mark = now.date().isoformat()
+    if last_week_mark == week_mark:
+        return False, last_week_mark
+    return True, week_mark
+
 def load_snapshot_hour_mark():
     try:
         with open(SNAPSHOT_HOUR_MARK_FILE, "r", encoding="utf-8") as f:
@@ -3218,6 +3542,16 @@ def load_snapshot_hour_mark():
         return None
     except Exception as e:
         print(f"[HOURLY] Could not load snapshot hour mark: {e}")
+        return None
+
+def load_market_desk_week_mark():
+    try:
+        with open(MARKET_DESK_WEEK_MARK_FILE, "r", encoding="utf-8") as f:
+            return f.read().strip() or None
+    except FileNotFoundError:
+        return None
+    except Exception as e:
+        print(f"[MARKET DESK] Could not load weekly mark: {e}")
         return None
 
 def persist_snapshot_hour_mark(hour_mark):
@@ -3230,6 +3564,17 @@ def persist_snapshot_hour_mark(hour_mark):
         os.replace(tmp_path, SNAPSHOT_HOUR_MARK_FILE)
     except Exception as e:
         print(f"[HOURLY] Could not persist snapshot hour mark: {e}")
+
+def persist_market_desk_week_mark(week_mark):
+    if not week_mark:
+        return
+    try:
+        tmp_path = f"{MARKET_DESK_WEEK_MARK_FILE}.tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            f.write(str(week_mark))
+        os.replace(tmp_path, MARKET_DESK_WEEK_MARK_FILE)
+    except Exception as e:
+        print(f"[MARKET DESK] Could not persist weekly mark: {e}")
 
 async def run_scheduler_step(label, *steps):
     """Run blocking engine work outside FastAPI's event loop."""
@@ -3564,10 +3909,12 @@ def daily_cleanup():
     print(f"[CLEANUP] Daily cleanup complete — {total_deleted}/{len(cleanup_targets)} tables cleaned")
 
 async def master_scheduler():
-    global LAST_QUARTER_MARK, LAST_HOUR_MARK, LAST_NEWS_MARK
+    global LAST_QUARTER_MARK, LAST_HOUR_MARK, LAST_MARKET_DESK_WEEK, LAST_NEWS_MARK
     await asyncio.sleep(5)
     if LAST_HOUR_MARK is None:
         LAST_HOUR_MARK = load_snapshot_hour_mark()
+    if LAST_MARKET_DESK_WEEK is None:
+        LAST_MARKET_DESK_WEEK = load_market_desk_week_mark()
     print("[SCHEDULER] Started — waiting for next 15-min mark...")
 
     while True:
@@ -3614,6 +3961,16 @@ async def master_scheduler():
                             telegram_circuit.failures = 0
                             telegram_circuit.locked_until = 0
                         await run_scheduler_step("hourly-ai-update", send_ai_snapshot)
+                        weekly_due, week_mark = weekly_market_desk_due(now, LAST_MARKET_DESK_WEEK)
+                        if weekly_due:
+                            if not telegram_circuit.allow():
+                                print("[MARKET DESK] Circuit breaker was locked — auto-resetting for weekly report")
+                                telegram_circuit.failures = 0
+                                telegram_circuit.locked_until = 0
+                            market_desk_ok = await asyncio.to_thread(send_weekly_market_desk)
+                            if market_desk_ok:
+                                persist_market_desk_week_mark(week_mark)
+                                LAST_MARKET_DESK_WEEK = week_mark
                         await run_scheduler_step("hourly-cleanup", daily_cleanup)
                         maybe_run_nightly_analyst(now)
                     except Exception as e:
@@ -3727,6 +4084,21 @@ def telegram_reset():
         return {"status": "Circuit breaker reset + snapshot sent"}
     except Exception as e:
         return {"status": "Circuit reset OK but snapshot failed", "error": str(e)}
+
+@app.get("/weekly-market-desk")
+def weekly_market_desk():
+    """Force-send the Panda Market Desk report to the main Telegram snapshot group."""
+    telegram_circuit.failures = 0
+    telegram_circuit.locked_until = 0
+    ok = send_weekly_market_desk()
+    if ok:
+        now = datetime.now()
+        if now.weekday() == 6:
+            week_mark = now.date().isoformat()
+            persist_market_desk_week_mark(week_mark)
+            global LAST_MARKET_DESK_WEEK
+            LAST_MARKET_DESK_WEEK = week_mark
+    return {"status": "sent" if ok else "failed"}
 
 @app.get("/force")
 def force_run():
