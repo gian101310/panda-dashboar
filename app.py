@@ -3523,10 +3523,11 @@ def hourly_snapshot_due(now, last_hour_mark):
 
 def weekly_market_desk_due(now, last_week_mark):
     """
-    Send one Panda Market Desk report each Sunday. The scheduler checks this
-    inside the hourly block so it rides the same MAIN Telegram route as snapshots.
+    Send one Panda Market Desk report each Sunday at 10 PM Dubai time. The
+    scheduler checks this inside the hourly block, so the send lands around
+    22:01 with the same MAIN Telegram route as snapshots.
     """
-    if now.weekday() != 6 or now.hour < 9:
+    if now.weekday() != 6 or now.hour < 22:
         return False, last_week_mark
     week_mark = now.date().isoformat()
     if last_week_mark == week_mark:
