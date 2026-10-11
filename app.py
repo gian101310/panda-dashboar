@@ -98,7 +98,7 @@ SNAPSHOT_HOUR_MARK_FILE = os.environ.get(
     "PANDA_SNAPSHOT_MARK_FILE",
     os.path.join(MT4_PATH, "panda_snapshot_hour.txt"),
 )
-MARKET_DESK_WEEK_MARK_FILE = os.environ.get(
+MARKET_DESK_DAY_MARK_FILE = os.environ.get(
     "PANDA_MARKET_DESK_MARK_FILE",
     os.path.join(MT4_PATH, "panda_market_desk_week.txt"),
 )
@@ -112,7 +112,7 @@ PAIRS = [
 
 LAST_QUARTER_MARK = None
 LAST_HOUR_MARK    = None
-LAST_MARKET_DESK_WEEK = None
+LAST_MARKET_DESK_DAY = None
 LAST_NEWS_MARK    = None
 PREV_MOMENTUM     = {}
 PREV_GAP          = {}
@@ -2754,32 +2754,45 @@ def _market_desk_pair_rows(rows):
             base_score = _desk_score_read([r.get("base_d1"), r.get("base_h4"), r.get("base_h1")])
         if quote_score is None:
             quote_score = _desk_score_read([r.get("quote_d1"), r.get("quote_h4"), r.get("quote_h1")])
+        base_cls = _desk_score_class(int(base_score))
+        quote_cls = _desk_score_class(int(quote_score))
+        strong_vs_weak = {base_cls, quote_cls} == {"STRONG", "WEAK"}
+        directional_catalyst = (
+            (bias == "BUY" and (base_cls == "STRONG" or quote_cls == "WEAK")) or
+            (bias == "SELL" and (base_cls == "WEAK" or quote_cls == "STRONG"))
+        )
+        if not directional_catalyst:
+            continue
         pl_zone = r.get("pl_zone") or "-"
         pl_ok = (bias == "BUY" and pl_zone == "ABOVE") or (bias == "SELL" and pl_zone == "BELOW")
-        if abs(gap) >= 9 and pl_ok:
-            quality = "CLEAN"
-        elif abs(gap) >= 9:
-            quality = "WATCH"
+        if strong_vs_weak:
+            catalyst = "STRONG"
         else:
-            quality = "CAUTION"
+            catalyst = "SECONDARY"
         direction = "bullish" if bias == "BUY" else "bearish"
-        if pl_ok:
-            plan = f"{direction.capitalize()} bias. Wait for structure continuation and risk check."
+        if strong_vs_weak and pl_ok:
+            plan = f"{direction.capitalize()} strong-score catalyst. Wait for structure continuation and risk check."
+        elif strong_vs_weak:
+            plan = f"{direction.capitalize()} strong-score watch. Need structure + Panda Line/G1 confirmation."
+        elif pl_ok:
+            plan = f"{direction.capitalize()} one-sided score catalyst. Structure confirmed; still treat as secondary."
         else:
-            plan = f"{direction.capitalize()} watch only. Need structure + Panda Line/G1 confirmation."
+            plan = f"{direction.capitalize()} secondary watch only. Need structure + Panda Line/G1 confirmation."
         context = (
-            f"{base_cur} {_desk_fmt_score(base_score)} {_desk_score_class(int(base_score))} "
-            f"vs {quote_cur} {_desk_fmt_score(quote_score)} {_desk_score_class(int(quote_score))}"
+            f"{base_cur} {_desk_fmt_score(base_score)} {base_cls} "
+            f"vs {quote_cur} {_desk_fmt_score(quote_score)} {quote_cls}"
         )
         candidates.append({
             "symbol": symbol,
             "gap": gap,
             "bias": bias,
-            "quality": quality,
+            "catalyst": catalyst,
+            "rank_group": 0 if strong_vs_weak else 1,
+            "pl_ok": pl_ok,
             "context": context,
             "plan": plan,
         })
-    candidates.sort(key=lambda r: (0 if r["quality"] == "CLEAN" else 1, -abs(r["gap"]), r["symbol"]))
+    candidates.sort(key=lambda r: (r["rank_group"], 0 if r["pl_ok"] else 1, -abs(r["gap"]), r["symbol"]))
     out = []
     for idx, r in enumerate(candidates[:6], start=1):
         out.append([
@@ -2787,7 +2800,7 @@ def _market_desk_pair_rows(rows):
             r["symbol"],
             r["context"],
             f"{r['bias']} {r['gap']:+.0f}",
-            r["quality"],
+            r["catalyst"],
             r["plan"],
         ])
     if not out:
@@ -2853,9 +2866,9 @@ def generate_market_desk_report(rows):
     y = 58
     draw.text((width // 2, y), "PANDA MARKET DESK", fill=black, font=font_title, anchor="ma")
     y += 72
-    draw.text((width // 2, y), "WEEKLY SCORE -> FUNDAMENTALS -> STRUCTURE MAP", fill=black, font=font_sub, anchor="ma")
+    draw.text((width // 2, y), "DAILY PRE-MARKET SCORE -> STRUCTURE MAP", fill=black, font=font_sub, anchor="ma")
     y += 44
-    draw.text((width // 2, y), "CONDITIONAL WATCHLIST - NOT SIGNALS", fill=black, font=font_th, anchor="ma")
+    draw.text((width // 2, y), "2 AM DUBAI WATCHLIST - CONDITIONAL, NOT SIGNALS", fill=black, font=font_th, anchor="ma")
     y += 36
     draw.line([margin, y, width - margin, y], fill=black, width=2)
     y += 22
@@ -2874,16 +2887,16 @@ def generate_market_desk_report(rows):
     for row in pair_rows:
         if "SELL" in row[3]:
             row_fills.append(sell_fill)
-        elif row[4] in ("CAUTION", "WATCH"):
+        elif row[4] in ("SECONDARY", "CAUTION", "WATCH"):
             row_fills.append(watch_fill)
         else:
             row_fills.append((218, 242, 226))
     y = _section(y, "2. TOP WATCHLIST - CONDITIONAL, NOT SIGNALS")
     y = _table(
         y,
-        ["PRI", "PAIR", "SCORE CONTEXT", "BIAS", "QUALITY", "PLAN"],
+        ["RANK", "PAIR", "SCORE CONTEXT", "BIAS", "CATALYST", "PLAN"],
         pair_rows,
-        [75, 145, 430, 115, 155, 640],
+        [90, 145, 430, 115, 155, 625],
         row_h=50,
         fills=row_fills,
     )
@@ -2986,7 +2999,7 @@ def build_snapshot_caption(buy_count, sell_count, yellow_count, white_count, now
         f"Watch: {yellow_count} | Idle: {white_count}"
     )
 
-def send_weekly_market_desk():
+def send_daily_market_desk():
     if not telegram_circuit.allow():
         print(f"[MARKET DESK BLOCKED] Circuit breaker locked — failures: {telegram_circuit.failures}")
         return False
@@ -2999,7 +3012,7 @@ def send_weekly_market_desk():
         report_path = generate_market_desk_report(data)
         ok, response = _send_telegram_photo(
             report_path,
-            f"PANDA MARKET DESK\n{datetime.now().strftime('%Y-%m-%d %H:%M')}\nWeekly score -> fundamentals -> structure map",
+            f"PANDA MARKET DESK\n{datetime.now().strftime('%Y-%m-%d %H:%M')}\nDaily 2 AM pre-market score -> structure map",
             component="Market Desk",
         )
         try:
@@ -3521,18 +3534,20 @@ def hourly_snapshot_due(now, last_hour_mark):
         return False, last_hour_mark
     return True, hour_mark
 
-def weekly_market_desk_due(now, last_week_mark):
+def daily_market_desk_due(now, last_day_mark):
     """
-    Send one Panda Market Desk report each Sunday at 10 PM Dubai time. The
-    scheduler checks this inside the hourly block, so the send lands around
-    22:01 with the same MAIN Telegram route as snapshots.
+    Send one Panda Market Desk report daily at 2 AM Dubai time on trading days.
+    The scheduler checks this inside the hourly block, so the send lands around
+    02:01 with the same MAIN Telegram route as snapshots.
     """
-    if now.weekday() != 6 or now.hour < 22:
-        return False, last_week_mark
-    week_mark = now.date().isoformat()
-    if last_week_mark == week_mark:
-        return False, last_week_mark
-    return True, week_mark
+    if is_market_closed():
+        return False, last_day_mark
+    if now.hour < 2:
+        return False, last_day_mark
+    day_mark = now.date().isoformat()
+    if last_day_mark == day_mark:
+        return False, last_day_mark
+    return True, day_mark
 
 def load_snapshot_hour_mark():
     try:
@@ -3545,14 +3560,14 @@ def load_snapshot_hour_mark():
         print(f"[HOURLY] Could not load snapshot hour mark: {e}")
         return None
 
-def load_market_desk_week_mark():
+def load_market_desk_day_mark():
     try:
-        with open(MARKET_DESK_WEEK_MARK_FILE, "r", encoding="utf-8") as f:
+        with open(MARKET_DESK_DAY_MARK_FILE, "r", encoding="utf-8") as f:
             return f.read().strip() or None
     except FileNotFoundError:
         return None
     except Exception as e:
-        print(f"[MARKET DESK] Could not load weekly mark: {e}")
+        print(f"[MARKET DESK] Could not load daily mark: {e}")
         return None
 
 def persist_snapshot_hour_mark(hour_mark):
@@ -3566,16 +3581,16 @@ def persist_snapshot_hour_mark(hour_mark):
     except Exception as e:
         print(f"[HOURLY] Could not persist snapshot hour mark: {e}")
 
-def persist_market_desk_week_mark(week_mark):
-    if not week_mark:
+def persist_market_desk_day_mark(day_mark):
+    if not day_mark:
         return
     try:
-        tmp_path = f"{MARKET_DESK_WEEK_MARK_FILE}.tmp"
+        tmp_path = f"{MARKET_DESK_DAY_MARK_FILE}.tmp"
         with open(tmp_path, "w", encoding="utf-8") as f:
-            f.write(str(week_mark))
-        os.replace(tmp_path, MARKET_DESK_WEEK_MARK_FILE)
+            f.write(str(day_mark))
+        os.replace(tmp_path, MARKET_DESK_DAY_MARK_FILE)
     except Exception as e:
-        print(f"[MARKET DESK] Could not persist weekly mark: {e}")
+        print(f"[MARKET DESK] Could not persist daily mark: {e}")
 
 async def run_scheduler_step(label, *steps):
     """Run blocking engine work outside FastAPI's event loop."""
@@ -3910,12 +3925,12 @@ def daily_cleanup():
     print(f"[CLEANUP] Daily cleanup complete — {total_deleted}/{len(cleanup_targets)} tables cleaned")
 
 async def master_scheduler():
-    global LAST_QUARTER_MARK, LAST_HOUR_MARK, LAST_MARKET_DESK_WEEK, LAST_NEWS_MARK
+    global LAST_QUARTER_MARK, LAST_HOUR_MARK, LAST_MARKET_DESK_DAY, LAST_NEWS_MARK
     await asyncio.sleep(5)
     if LAST_HOUR_MARK is None:
         LAST_HOUR_MARK = load_snapshot_hour_mark()
-    if LAST_MARKET_DESK_WEEK is None:
-        LAST_MARKET_DESK_WEEK = load_market_desk_week_mark()
+    if LAST_MARKET_DESK_DAY is None:
+        LAST_MARKET_DESK_DAY = load_market_desk_day_mark()
     print("[SCHEDULER] Started — waiting for next 15-min mark...")
 
     while True:
@@ -3962,16 +3977,16 @@ async def master_scheduler():
                             telegram_circuit.failures = 0
                             telegram_circuit.locked_until = 0
                         await run_scheduler_step("hourly-ai-update", send_ai_snapshot)
-                        weekly_due, week_mark = weekly_market_desk_due(now, LAST_MARKET_DESK_WEEK)
-                        if weekly_due:
+                        daily_desk_due, day_mark = daily_market_desk_due(now, LAST_MARKET_DESK_DAY)
+                        if daily_desk_due:
                             if not telegram_circuit.allow():
-                                print("[MARKET DESK] Circuit breaker was locked — auto-resetting for weekly report")
+                                print("[MARKET DESK] Circuit breaker was locked — auto-resetting for daily report")
                                 telegram_circuit.failures = 0
                                 telegram_circuit.locked_until = 0
-                            market_desk_ok = await asyncio.to_thread(send_weekly_market_desk)
+                            market_desk_ok = await asyncio.to_thread(send_daily_market_desk)
                             if market_desk_ok:
-                                persist_market_desk_week_mark(week_mark)
-                                LAST_MARKET_DESK_WEEK = week_mark
+                                persist_market_desk_day_mark(day_mark)
+                                LAST_MARKET_DESK_DAY = day_mark
                         await run_scheduler_step("hourly-cleanup", daily_cleanup)
                         maybe_run_nightly_analyst(now)
                     except Exception as e:
@@ -4091,15 +4106,18 @@ def weekly_market_desk():
     """Force-send the Panda Market Desk report to the main Telegram snapshot group."""
     telegram_circuit.failures = 0
     telegram_circuit.locked_until = 0
-    ok = send_weekly_market_desk()
+    ok = send_daily_market_desk()
     if ok:
         now = datetime.now()
-        if now.weekday() == 6:
-            week_mark = now.date().isoformat()
-            persist_market_desk_week_mark(week_mark)
-            global LAST_MARKET_DESK_WEEK
-            LAST_MARKET_DESK_WEEK = week_mark
+        day_mark = now.date().isoformat()
+        persist_market_desk_day_mark(day_mark)
+        global LAST_MARKET_DESK_DAY
+        LAST_MARKET_DESK_DAY = day_mark
     return {"status": "sent" if ok else "failed"}
+
+@app.get("/market-desk")
+def market_desk():
+    return weekly_market_desk()
 
 @app.get("/force")
 def force_run():
