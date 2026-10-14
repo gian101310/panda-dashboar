@@ -3672,6 +3672,119 @@ def build_news_alert_key(ev, threshold_label):
     title = (ev.get("title") or "").strip()[:40]
     return f"{currency}_{ev.get('date','')}_{ev.get('time','')}_{title}_{threshold_label}"
 
+def _news_parse_number(value):
+    raw = (value or "").strip()
+    if not raw:
+        return None
+    cleaned = raw.replace("%", "").replace(",", "").replace("+", "").strip()
+    if cleaned.startswith("(") and cleaned.endswith(")"):
+        cleaned = "-" + cleaned[1:-1]
+    try:
+        return float(cleaned)
+    except Exception:
+        return None
+
+def _news_metric_profile(title):
+    t = (title or "").lower()
+    if any(k in t for k in ("unemployment", "jobless", "claimant", "claims")):
+        return "inverse", "labor risk"
+    if any(k in t for k in ("cpi", "ppi", "pce", "inflation", "earnings", "wage")):
+        return "inflation", "inflation/rate expectations"
+    if any(k in t for k in ("employment", "non-farm", "nonfarm", "payroll", "jobs")):
+        return "positive", "labor strength"
+    if any(k in t for k in ("retail", "sales", "gdp", "pmi", "ism", "production", "confidence")):
+        return "positive", "growth momentum"
+    if any(k in t for k in ("rate", "statement", "minutes", "press conference", "speech")):
+        return "policy", "central-bank guidance"
+    return "positive", "macro momentum"
+
+def build_news_forecast_read(title, currency, forecast, previous):
+    f_val = _news_parse_number(forecast)
+    p_val = _news_parse_number(previous)
+    profile, driver = _news_metric_profile(title)
+    if f_val is None or p_val is None:
+        return {
+            "bias": "NEUTRAL",
+            "summary": "No clean forecast-vs-previous edge.",
+            "detail": "Forecast/previous data is incomplete, so treat this as volatility risk only.",
+            "driver": driver,
+        }
+
+    if abs(f_val - p_val) < 1e-9:
+        return {
+            "bias": "NEUTRAL",
+            "summary": f"{currency} forecast is in line with previous.",
+            "detail": "No directional fundamental edge before the actual result.",
+            "driver": driver,
+        }
+
+    hotter = f_val > p_val
+    if profile == "inverse":
+        supportive = not hotter
+        direction_text = "lower than previous" if supportive else "higher than previous"
+        detail = "Lower labor-risk data can support the currency." if supportive else "Higher labor-risk data can weigh on the currency."
+    elif profile == "policy":
+        supportive = None
+        direction_text = "different from previous"
+        detail = "Policy events need the actual wording/tone; forecast alone is not enough."
+    else:
+        supportive = hotter
+        direction_text = "higher than previous" if hotter else "lower than previous"
+        if profile == "inflation":
+            detail = "Hotter inflation can support the currency through rate expectations, but actual/core details matter."
+        else:
+            detail = "Stronger growth/labor data can support the currency if actual confirms."
+
+    if supportive is True:
+        bias = "SUPPORT"
+        summary = f"{currency} forecast is {direction_text} - possible {currency} support."
+    elif supportive is False:
+        bias = "RISK"
+        summary = f"{currency} forecast is {direction_text} - possible {currency} risk."
+    else:
+        bias = "NEUTRAL"
+        summary = f"{currency} forecast is {direction_text} - wait for actual tone."
+
+    return {"bias": bias, "summary": summary, "detail": detail, "driver": driver}
+
+def build_news_panda_alignment(currency, affected, catalyst_bias):
+    if catalyst_bias not in ("SUPPORT", "RISK"):
+        return "Panda alignment: wait for actual result; no clean pre-news directional edge."
+    try:
+        res = supabase.table("dashboard").select(
+            "symbol,gap,bias,base_currency,quote_currency"
+        ).execute()
+        rows = [r for r in (res.data or []) if r.get("symbol") in affected]
+    except Exception as e:
+        print(f"[NEWS ALERT] Panda alignment lookup failed: {e}")
+        return "Panda alignment: unavailable right now."
+
+    aligned = []
+    conflict = []
+    for r in rows:
+        symbol = r.get("symbol") or ""
+        bias = r.get("bias") or "WAIT"
+        gap = float(r.get("gap") or 0)
+        if bias not in ("BUY", "SELL") or abs(gap) < 5:
+            continue
+        base = r.get("base_currency") or symbol[:3]
+        quote = r.get("quote_currency") or symbol[3:6]
+        supports_currency = (currency == base and bias == "BUY") or (currency == quote and bias == "SELL")
+        risks_currency = (currency == base and bias == "SELL") or (currency == quote and bias == "BUY")
+        item = f"{symbol} {bias} gap {gap:+.0f}"
+        if catalyst_bias == "SUPPORT" and supports_currency:
+            aligned.append(item)
+        elif catalyst_bias == "RISK" and risks_currency:
+            aligned.append(item)
+        elif supports_currency or risks_currency:
+            conflict.append(item)
+
+    if aligned:
+        return "Panda alignment: " + ", ".join(aligned[:3]) + " agrees with the forecast read."
+    if conflict:
+        return "Panda alignment: " + ", ".join(conflict[:2]) + " conflicts with the forecast read; wait for actual."
+    return "Panda alignment: no valid gap >= 5 is clearly aligned yet."
+
 def check_news_alerts():
     """
     Check ForexFactory for HIGH impact events in the next 15-60 minutes.
@@ -3720,29 +3833,38 @@ def check_news_alerts():
             dubai_time = event_dt.astimezone(timezone(timedelta(hours=4))).strftime("%Y-%m-%d %H:%M")
             forecast = (ev.get("forecast") or "").strip()
             previous = (ev.get("previous") or "").strip()
+            forecast_read = build_news_forecast_read(title, currency, forecast, previous)
+            alignment_line = build_news_panda_alignment(currency, affected, forecast_read["bias"])
             data_line = ""
             if forecast or previous:
                 data_line = f"\nForecast: <b>{forecast or '-'}</b> | Previous: <b>{previous or '-'}</b>\n"
-            msg = (
-                f"📰 <b>HIGH IMPACT NEWS ALERT</b>\n"
-                f"━━━━━━━━━━━━━━━━━━━━━\n"
-                f"📌 <b>{title}</b>\n"
-                f"💱 Currency: <b>{currency}</b>\n"
-                f"⏱️ In approx. <b>{int(mins_away)} minutes</b>\n\n"
-                f"⚡ Affected pairs:\n<b>{pairs_str}</b>\n\n"
-                f"<i>⚠️ High volatility expected. Currency bias data only — not financial advice.</i>\n"
-                f"🐼 PANDA ENGINE"
-            )
+            title_safe = html.escape(title)
+            currency_safe = html.escape(currency)
+            pairs_safe = html.escape(pairs_str)
+            forecast_safe = html.escape(forecast or "-")
+            previous_safe = html.escape(previous or "-")
+            summary_safe = html.escape(forecast_read["summary"])
+            detail_safe = html.escape(forecast_read["detail"])
+            driver_safe = html.escape(forecast_read["driver"])
+            alignment_safe = html.escape(alignment_line)
+            if forecast or previous:
+                data_line = f"\nForecast: <b>{forecast_safe}</b> | Previous: <b>{previous_safe}</b>\n"
             msg = (
                 f"<b>HIGH IMPACT NEWS IN {news_alert_label(threshold_label)}</b>\n"
                 f"---------------------\n"
-                f"<b>{title}</b>\n"
-                f"Currency: <b>{currency}</b>\n"
+                f"<b>{title_safe}</b>\n"
+                f"Currency: <b>{currency_safe}</b>\n"
                 f"Countdown: <b>{max(0, int(mins_away))} minutes</b>\n"
                 f"Dubai time: <b>{dubai_time}</b>\n"
                 f"{data_line}\n"
-                f"Affected pairs:\n<b>{pairs_str}</b>\n\n"
-                f"<i>High volatility expected. Currency bias data only - not financial advice.</i>\n"
+                f"<b>Forecast read:</b>\n"
+                f"{summary_safe}\n"
+                f"Driver: {driver_safe}\n"
+                f"{detail_safe}\n\n"
+                f"<b>Panda context:</b>\n"
+                f"{alignment_safe}\n\n"
+                f"Affected pairs:\n<b>{pairs_safe}</b>\n\n"
+                f"<i>Forecast context only. Actual result + structure confirms or cancels. Not financial advice.</i>\n"
                 f"PANDA ENGINE"
             )
             r = requests.post(
