@@ -133,6 +133,7 @@ NEWS_ALERT_THRESHOLDS = (
     (180, "3H", "3 HOURS"),
     (240, "4H", "4 HOURS"),
 )
+NEWS_RESULT_WINDOW_MINUTES = 240
 
 # ---- Currency → pairs mapping for news alert ----
 CURRENCY_TO_PAIRS = {
@@ -3679,8 +3680,13 @@ def _news_parse_number(value):
     cleaned = raw.replace("%", "").replace(",", "").replace("+", "").strip()
     if cleaned.startswith("(") and cleaned.endswith(")"):
         cleaned = "-" + cleaned[1:-1]
+    multiplier = 1.0
+    suffix = cleaned[-1:].upper()
+    if suffix in ("K", "M", "B"):
+        cleaned = cleaned[:-1].strip()
+        multiplier = {"K": 1_000.0, "M": 1_000_000.0, "B": 1_000_000_000.0}[suffix]
     try:
-        return float(cleaned)
+        return float(cleaned) * multiplier
     except Exception:
         return None
 
@@ -3747,6 +3753,100 @@ def build_news_forecast_read(title, currency, forecast, previous):
 
     return {"bias": bias, "summary": summary, "detail": detail, "driver": driver}
 
+def _news_bias_from_move(title, currency, actual_value, reference_value, reference_label):
+    profile, driver = _news_metric_profile(title)
+    if actual_value is None or reference_value is None:
+        return {
+            "bias": "NEUTRAL",
+            "summary": "Actual result has no clean numeric comparison.",
+            "detail": "Treat this as volatility context and wait for structure.",
+            "driver": driver,
+        }
+    if abs(actual_value - reference_value) < 1e-9:
+        return {
+            "bias": "NEUTRAL",
+            "summary": f"Actual matched {reference_label}.",
+            "detail": "No clean surprise from the headline number.",
+            "driver": driver,
+        }
+
+    higher = actual_value > reference_value
+    if profile == "inverse":
+        supportive = not higher
+        direction_text = f"lower than {reference_label}" if supportive else f"higher than {reference_label}"
+        detail = "Lower labor-risk data can support the currency." if supportive else "Higher labor-risk data can weigh on the currency."
+    elif profile == "policy":
+        supportive = None
+        direction_text = f"different from {reference_label}"
+        detail = "Policy events need the actual wording/tone; headline comparison is not enough."
+    else:
+        supportive = higher
+        direction_text = f"higher than {reference_label}" if higher else f"lower than {reference_label}"
+        if profile == "inflation":
+            detail = "Hotter inflation can support the currency through rate expectations; cooler inflation can weigh on it."
+        else:
+            detail = "Stronger growth/labor data can support the currency; weaker data can weigh on it."
+
+    if supportive is True:
+        bias = "SUPPORT"
+        summary = f"Actual came {direction_text} - {currency} supportive."
+    elif supportive is False:
+        bias = "RISK"
+        summary = f"Actual came {direction_text} - {currency} risk."
+    else:
+        bias = "NEUTRAL"
+        summary = f"Actual came {direction_text} - read the policy tone."
+
+    return {"bias": bias, "summary": summary, "detail": detail, "driver": driver}
+
+def build_news_actual_read(title, currency, actual, forecast, previous):
+    actual_value = _news_parse_number(actual)
+    forecast_value = _news_parse_number(forecast)
+    previous_value = _news_parse_number(previous)
+    forecast_read = build_news_forecast_read(title, currency, forecast, previous)
+
+    if actual_value is None:
+        return {
+            "bias": "NEUTRAL",
+            "summary": "Actual printed, but it is not a clean numeric value.",
+            "detail": "Use the event wording, price reaction, and structure before reading the result.",
+            "driver": _news_metric_profile(title)[1],
+            "result": "Actual did not create a clean numeric catalyst.",
+            "forecast_summary": forecast_read["summary"],
+        }
+
+    if forecast_value is not None:
+        actual_read = _news_bias_from_move(title, currency, actual_value, forecast_value, "forecast")
+    elif previous_value is not None:
+        actual_read = _news_bias_from_move(title, currency, actual_value, previous_value, "previous")
+    else:
+        actual_read = {
+            "bias": "NEUTRAL",
+            "summary": "Actual printed, but no forecast/previous comparison is available.",
+            "detail": "Use price reaction and structure before reading the event.",
+            "driver": _news_metric_profile(title)[1],
+        }
+
+    forecast_bias = forecast_read["bias"]
+    actual_bias = actual_read["bias"]
+    if forecast_bias in ("SUPPORT", "RISK") and actual_bias == forecast_bias:
+        result = "Actual confirmed the pre-news forecast read."
+    elif forecast_bias in ("SUPPORT", "RISK") and actual_bias in ("SUPPORT", "RISK"):
+        result = "Actual cancelled the pre-news forecast read."
+    elif actual_bias in ("SUPPORT", "RISK"):
+        result = "Actual created a fresh directional catalyst."
+    else:
+        result = "Actual did not create a clean directional catalyst."
+
+    return {
+        "bias": actual_bias,
+        "summary": actual_read["summary"],
+        "detail": actual_read["detail"],
+        "driver": actual_read["driver"],
+        "result": result,
+        "forecast_summary": forecast_read["summary"],
+    }
+
 def build_news_panda_alignment(currency, affected, catalyst_bias):
     if catalyst_bias not in ("SUPPORT", "RISK"):
         return "Panda alignment: wait for actual result; no clean pre-news directional edge."
@@ -3799,6 +3899,7 @@ def check_news_alerts():
         events = fetch_news_feed()
         now_utc = datetime.now(timezone.utc)
         alerted_this_run = []
+        result_this_run = []
 
         for ev in events:
             impact = (ev.get("impact") or "").strip()
@@ -3814,16 +3915,24 @@ def check_news_alerts():
             if not event_dt:
                 continue
             mins_away = (event_dt - now_utc).total_seconds() / 60
+            # Determine affected pairs from our 21
+            affected = [p for p in CURRENCY_TO_PAIRS.get(currency,[]) if p in PAIRS]
+            if not affected:
+                continue
+
+            actual = (ev.get("actual") or "").strip()
+            if actual and -NEWS_RESULT_WINDOW_MINUTES <= mins_away <= 0:
+                result_key = build_news_alert_key(ev, "RESULT")
+                if result_key not in NEWS_ALERTED:
+                    NEWS_ALERTED.add(result_key)
+                    result_this_run.append((title, currency, mins_away, affected, event_dt, ev))
+
             threshold = select_news_alert_threshold(mins_away)
             if not threshold:
                 continue
             _, threshold_label = threshold
             event_key = build_news_alert_key(ev, threshold_label)
             if event_key in NEWS_ALERTED:
-                continue
-            # Determine affected pairs from our 21
-            affected = [p for p in CURRENCY_TO_PAIRS.get(currency,[]) if p in PAIRS]
-            if not affected:
                 continue
             NEWS_ALERTED.add(event_key)
             alerted_this_run.append((title, currency, mins_away, affected, event_dt, threshold_label, ev))
@@ -3874,6 +3983,64 @@ def check_news_alerts():
             )
             status = "✓" if r.status_code == 200 else "✗"
             print(f"[NEWS ALERT] {status} {currency} — {title} in {int(mins_away)}min → {pairs_str}")
+            if r.status_code == 200:
+                telegram_circuit.success()
+            else:
+                telegram_circuit.failure()
+
+        for title, currency, mins_away, affected, event_dt, ev in result_this_run:
+            pairs_str = ", ".join(affected[:6])
+            dubai_time = event_dt.astimezone(timezone(timedelta(hours=4))).strftime("%Y-%m-%d %H:%M")
+            actual = (ev.get("actual") or "").strip()
+            forecast = (ev.get("forecast") or "").strip()
+            previous = (ev.get("previous") or "").strip()
+            actual_read = build_news_actual_read(title, currency, actual, forecast, previous)
+            if not actual_read:
+                continue
+            alignment_line = build_news_panda_alignment(currency, affected, actual_read["bias"])
+
+            title_safe = html.escape(title)
+            currency_safe = html.escape(currency)
+            pairs_safe = html.escape(pairs_str)
+            actual_safe = html.escape(actual or "-")
+            forecast_safe = html.escape(forecast or "-")
+            previous_safe = html.escape(previous or "-")
+            forecast_summary_safe = html.escape(actual_read["forecast_summary"])
+            result_safe = html.escape(actual_read["result"])
+            summary_safe = html.escape(actual_read["summary"])
+            detail_safe = html.escape(actual_read["detail"])
+            driver_safe = html.escape(actual_read["driver"])
+            alignment_safe = html.escape(alignment_line)
+            released_mins = max(0, int(abs(mins_away)))
+
+            msg = (
+                f"<b>HIGH IMPACT NEWS RESULT</b>\n"
+                f"---------------------\n"
+                f"<b>{title_safe}</b>\n"
+                f"Currency: <b>{currency_safe}</b>\n"
+                f"Released: <b>{released_mins} minutes ago</b>\n"
+                f"Dubai time: <b>{dubai_time}</b>\n\n"
+                f"Actual: <b>{actual_safe}</b> | Forecast: <b>{forecast_safe}</b> | Previous: <b>{previous_safe}</b>\n\n"
+                f"<b>Before news:</b>\n"
+                f"{forecast_summary_safe}\n\n"
+                f"<b>After actual:</b>\n"
+                f"{result_safe}\n"
+                f"{summary_safe}\n"
+                f"Driver: {driver_safe}\n"
+                f"{detail_safe}\n\n"
+                f"<b>Panda context:</b>\n"
+                f"{alignment_safe}\n\n"
+                f"Affected pairs:\n<b>{pairs_safe}</b>\n\n"
+                f"<i>Actual result context only. Structure confirms or cancels. Not financial advice.</i>\n"
+                f"PANDA ENGINE"
+            )
+            r = requests.post(
+                f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+                data={"chat_id": TELEGRAM_CHAT_ID, "text": msg, "parse_mode": "HTML"},
+                timeout=10
+            )
+            status = "✓" if r.status_code == 200 else "✗"
+            print(f"[NEWS RESULT] {status} {currency} — {title} {released_mins}min ago → {pairs_str}")
             if r.status_code == 200:
                 telegram_circuit.success()
             else:
