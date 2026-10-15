@@ -302,13 +302,13 @@ namespace cAlgo
                 if(Math.Abs(rr.EntryPrice-_plan.Entry)>Symbol.TickSize/2)rr.EntryPrice=_plan.Entry;
                 rr.StopLossPrice=_plan.Stop;rr.TakeProfitPrice=_plan.Target;
                 rr.Time1=_plan.AnchorStart;rr.Time2=_plan.AnchorEnd;
-                rr.RiskColor=_plan.Invalid?Color.FromHex("#ffaa44"):Color.FromArgb(ShowShading?90:35,255,77,109);
-                rr.RewardColor=_plan.Invalid?Color.FromHex("#ffaa44"):Color.FromArgb(ShowShading?70:25,0,255,159);
+                rr.RiskColor=_plan.Invalid?Color.FromHex("#ffaa44"):Color.FromArgb(ShowShading?180:35,255,77,109);
+                rr.RewardColor=_plan.Invalid?Color.FromHex("#ffaa44"):Color.FromArgb(ShowShading?180:25,0,255,159);
                 rr.IsInteractive=true;rr.IsLocked=false;rr.Comment="Panda Trade Plan preview; "+_plan.EntryLabel;
                 if(ShowGuides&&_plan.Target2.HasValue)DrawLevel("tp2",_plan.Target2.Value,"TP2",Green);else RemoveLevel("tp2");
                 if(ShowGuides&&_plan.Target3.HasValue)DrawLevel("tp3",_plan.Target3.Value,"TP3",Green);else RemoveLevel("tp3");
                 var label=Chart.DrawText(_prefix+"source",(_plan.Invalid?"INVALID | ":"")+_plan.EntryLabel,_plan.AnchorStart,_plan.Entry,_plan.Invalid?Red:Blue);
-                label.FontSize=10;label.IsInteractive=false;
+                label.FontSize=11;label.IsBold=true;label.IsInteractive=false;
                 _fields["Entry"].Text=Price(_plan.Entry);_fields["Stop loss"].Text=Price(_plan.Stop);_fields["TP1"].Text=Price(_plan.Target);
                 _fields["TP2 guide"].Text=_plan.Target2.HasValue?Price(_plan.Target2.Value):"-";
                 _fields["TP3 guide"].Text=_plan.Target3.HasValue?Price(_plan.Target3.Value):"-";
@@ -318,11 +318,11 @@ namespace cAlgo
         private void DrawLevel(string key,double price,string label,Color color)
         {
             var line=Chart.FindObject(_prefix+key) as ChartTrendLine;
-            if(line==null)line=Chart.DrawTrendLine(_prefix+key,_plan.AnchorStart,price,_plan.AnchorEnd,price,color,1,LineStyle.Lines);
+            if(line==null)line=Chart.DrawTrendLine(_prefix+key,_plan.AnchorStart,price,_plan.AnchorEnd,price,color,2,LineStyle.Lines);
             else {line.Y1=price;line.Y2=price;line.Time1=_plan.AnchorStart;line.Time2=_plan.AnchorEnd;}
             line.ExtendToInfinity=false;line.Color=_plan.Invalid?Color.FromHex("#ffaa44"):color;line.IsInteractive=true;line.IsLocked=false;
             var text=Chart.DrawText(_prefix+key+"Label",label+" "+Price(price),_plan.AnchorEnd,price,line.Color);
-            text.FontSize=10;text.IsInteractive=false;
+            text.FontSize=11;text.IsBold=true;text.IsInteractive=false;
         }
         private void RemoveLevel(string key){Chart.RemoveObject(_prefix+key);Chart.RemoveObject(_prefix+key+"Label");}
         private void FitPlan()

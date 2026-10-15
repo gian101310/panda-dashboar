@@ -45,7 +45,8 @@ Built for the existing 21 Panda forex pairs; H1 context is used on any chart tim
 Entry/SL/TP1 use cTrader's **native risk/reward drawing**, rather than full-chart
 horizontal lines. Its initial width is 12 bars and can be resized with the native
 handles. TP2/TP3 use short bounded guide segments. Their R-multiple calculations
-are unchanged. Native preview volume starts at the broker minimum; this indicator
+are unchanged. Risk and reward shading use 71% opacity for visibility, with thicker
+optional guides and bold source/target labels. Native preview volume starts at the broker minimum; this indicator
 does not calculate position sizing or submit the native tool's order action.
 
 The panel is draggable, saves its position, and has a **minus/plus shrink button**.
