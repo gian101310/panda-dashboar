@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-10-16 (Panda Trade Plan for cTrader)
+
+- Added a separate visual pullback planner using personal cTrader Panda scoring,
+  previous day/week/month/year levels and Panda Box entry references. It displays
+  editable entry/SL/TP levels and risk metrics without placing orders.
+- Default retention is manual clear only. Bias changes flag invalid plans while
+  preserving prices; optional expiry/deletion settings remain available.
+- Uses native cTrader risk/reward drawings with short optional target guides,
+  a draggable/minimizable panel, Fit plan, and a 50-pip minimum suggested TP1.
+- Suggested SL derives from TP distance: <100 /2, <200 /3, <300 /4, >=300 /5.
+- Includes isolated plan-rule tests, the compiled `.algo`, and installation notes.
+
 ## 2026-10-15 (PPI result delivery)
 
 - Recover missing US headline/core PPI actuals from the dated official BLS release

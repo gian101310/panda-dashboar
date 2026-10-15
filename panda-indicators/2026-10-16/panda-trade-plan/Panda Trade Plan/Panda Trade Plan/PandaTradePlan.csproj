@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AssemblyName>PandaTradePlan</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../PandaTradePlan.cs" Link="PandaTradePlan.cs"/>
+    <Compile Include="../../PandaTradePlan.Context.cs" Link="PandaTradePlan.Context.cs"/>
+    <Compile Include="../../TradePlanRules.cs" Link="TradePlanRules.cs"/>
+    <PackageReference Include="cTrader.Automate" Version="1.0.17"/>
+  </ItemGroup>
+</Project>
