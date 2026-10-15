@@ -49,3 +49,7 @@ guardian-watchdog.log
 
 # Local agent runtime state
 .superpowers/
+
+# Successful news-result deliveries (local engine runtime state)
+news_result_marks.json
+news_result_marks.tmp

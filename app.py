@@ -33,6 +33,7 @@ from datetime import datetime, timezone, timedelta
 from PIL import Image, ImageDraw, ImageFont
 from dotenv import load_dotenv
 from supabase import create_client
+from news_results import resolve_news_actual, load_sent_results, mark_result_sent
 
 load_dotenv()
 
@@ -133,7 +134,7 @@ NEWS_ALERT_THRESHOLDS = (
     (180, "3H", "3 HOURS"),
     (240, "4H", "4 HOURS"),
 )
-NEWS_RESULT_WINDOW_MINUTES = 240
+NEWS_RESULT_WINDOW_MINUTES = 24 * 60  # recover missed results after downtime
 
 # ---- Currency → pairs mapping for news alert ----
 CURRENCY_TO_PAIRS = {
@@ -3887,8 +3888,8 @@ def build_news_panda_alignment(currency, affected, catalyst_bias):
 
 def check_news_alerts():
     """
-    Check ForexFactory for HIGH impact events in the next 15-60 minutes.
-    Sends Telegram alert once per event. Runs every engine cycle.
+    Check high-impact warnings and released results every scheduler minute.
+    US PPI actuals fall back to the dated official release when absent in FF.
     """
     if is_market_closed():
         print(f"[NEWS ALERT] Market closed - skipped ({market_time_label()})")
@@ -3897,6 +3898,7 @@ def check_news_alerts():
         return
     try:
         events = fetch_news_feed()
+        NEWS_ALERTED.update(load_sent_results())
         now_utc = datetime.now(timezone.utc)
         alerted_this_run = []
         result_this_run = []
@@ -3920,12 +3922,12 @@ def check_news_alerts():
             if not affected:
                 continue
 
-            actual = (ev.get("actual") or "").strip()
-            if actual and -NEWS_RESULT_WINDOW_MINUTES <= mins_away <= 0:
+            if -NEWS_RESULT_WINDOW_MINUTES <= mins_away <= 0:
                 result_key = build_news_alert_key(ev, "RESULT")
                 if result_key not in NEWS_ALERTED:
-                    NEWS_ALERTED.add(result_key)
-                    result_this_run.append((title, currency, mins_away, affected, event_dt, ev))
+                    result_ev = resolve_news_actual(ev, event_dt)
+                    if str(result_ev.get("actual") or "").strip():
+                        result_this_run.append((title, currency, mins_away, affected, event_dt, result_ev))
 
             threshold = select_news_alert_threshold(mins_away)
             if not threshold:
@@ -3998,6 +4000,9 @@ def check_news_alerts():
             if not actual_read:
                 continue
             alignment_line = build_news_panda_alignment(currency, affected, actual_read["bias"])
+            alignment_line = alignment_line.replace("forecast read", "actual result").replace("wait for actual", "wait for structure")
+            source = ev.get("actual_source") or ""
+            source_line = f'Source: <a href="{html.escape(source, quote=True)}">Official BLS / DOL release</a>\n\n' if source else ""
 
             title_safe = html.escape(title)
             currency_safe = html.escape(currency)
@@ -4021,6 +4026,7 @@ def check_news_alerts():
                 f"Released: <b>{released_mins} minutes ago</b>\n"
                 f"Dubai time: <b>{dubai_time}</b>\n\n"
                 f"Actual: <b>{actual_safe}</b> | Forecast: <b>{forecast_safe}</b> | Previous: <b>{previous_safe}</b>\n\n"
+                f"{source_line}"
                 f"<b>Before news:</b>\n"
                 f"{forecast_summary_safe}\n\n"
                 f"<b>After actual:</b>\n"
@@ -4034,15 +4040,28 @@ def check_news_alerts():
                 f"<i>Actual result context only. Structure confirms or cancels. Not financial advice.</i>\n"
                 f"PANDA ENGINE"
             )
-            r = requests.post(
-                f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
-                data={"chat_id": TELEGRAM_CHAT_ID, "text": msg, "parse_mode": "HTML"},
-                timeout=10
-            )
-            status = "✓" if r.status_code == 200 else "✗"
-            print(f"[NEWS RESULT] {status} {currency} — {title} {released_mins}min ago → {pairs_str}")
-            if r.status_code == 200:
+            try:
+                r = requests.post(
+                    f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+                    data={"chat_id": TELEGRAM_CHAT_ID, "text": msg, "parse_mode": "HTML"},
+                    timeout=10
+                )
+                payload = r.json() if r.status_code == 200 else {}
+                delivered = r.status_code == 200 and payload.get("ok") is True
+            except Exception as exc:
+                print(f"[NEWS RESULT] Delivery failed ({type(exc).__name__}); will retry")
+                telegram_circuit.failure()
+                continue
+            status = "OK" if delivered else "FAILED"
+            print(f"[NEWS RESULT] {status} {currency} - {title} {released_mins}min ago -> {pairs_str}")
+            if delivered:
                 telegram_circuit.success()
+                result_key = build_news_alert_key(ev, "RESULT")
+                NEWS_ALERTED.add(result_key)
+                try:
+                    mark_result_sent(result_key, (payload.get("result") or {}).get("message_id"))
+                except Exception as exc:
+                    print(f"[NEWS RESULT] Delivery mark failed ({type(exc).__name__})")
             else:
                 telegram_circuit.failure()
     except Exception as e:

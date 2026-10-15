@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-10-15 (PPI result delivery)
+
+- Recover missing US headline/core PPI actuals from the dated official BLS release
+  hosted by the Department of Labor. Validate the embargo date and exact total/core
+  series before comparing with calendar forecasts; include the source in Telegram.
+- Retry failed result deliveries, persist successful Telegram message IDs across
+  engine restarts, and allow 24-hour catch-up. Other news still requires actuals
+  from its feed; this fallback specifically covers US PPI.
+- Engine PDF dependencies: `py -3.11 -m pip install -r requirements-news.txt`.
+
 ## 2026-07-25 (Dashboard left-sidebar navigation)
 
 - Redesigned dashboard.js navigation: the 14 tabs (plus admin ENGINE) moved from
