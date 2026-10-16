@@ -48,7 +48,7 @@ namespace cAlgo
             if(rr==null||!double.TryParse(_lots.Text,NumberStyles.Float,CultureInfo.InvariantCulture,out lots))return;
             double units=Symbol.QuantityToVolumeInUnits(lots);
             if(Rules.Finite(units)&&units>=Symbol.VolumeInUnitsMin&&units<=Symbol.VolumeInUnitsMax&&
-                Math.Abs(units/Symbol.VolumeInUnitsStep-Math.Round(units/Symbol.VolumeInUnitsStep))<.000001)rr.VolumeInUnits=units;
+                Math.Abs(units/Symbol.VolumeInUnitsStep-Math.Round(units/Symbol.VolumeInUnitsStep))<.000001)RiskRewardPreview.SetFixedVolume(rr,units);
         }
         private OrderTicket PrepareOrder(out string reason)
         {

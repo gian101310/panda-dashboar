@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-10-17 (Trade Plan fixed-size runtime crash)
+
+- Fixed the live `Can't set volume when type is FixedSize` exception: update the
+  risk/reward Type descriptor instead of its forbidden generic volume setter.
+- Added an SDK regression that reproduces the exact exception and validates the
+  corrected production helper; initialization and restore errors now log clearly.
+- Confirmed the reloaded USDCAD panel contains Entry/SL/TP1 and native RR pip/lot
+  values. Screenshot/coordinate capture remains unavailable, so drag is unverified.
+
 ## 2026-10-17 (Visible draggable plan levels)
 
 - Added explicit short Entry/SL/TP1 handles over native risk/reward shading in

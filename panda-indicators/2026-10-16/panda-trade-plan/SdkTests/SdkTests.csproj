@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net6.0</TargetFramework></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../RiskRewardPreview.cs" Link="RiskRewardPreview.cs"/>
+    <PackageReference Include="cTrader.Automate" Version="1.0.17" ExcludeAssets="build;buildTransitive"/>
+  </ItemGroup>
+</Project>

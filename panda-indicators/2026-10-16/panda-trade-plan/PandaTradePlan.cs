@@ -120,6 +120,7 @@ namespace cAlgo
 
         protected override void Initialize()
         {
+            Print("Panda Trade Plan: fixed-size volume revision initializing");
             Guid storedId;
             var storedPrefix=LocalStorage.GetString("Drawing prefix",LocalStorageScope.Instance);
             if(!Guid.TryParseExact(storedPrefix,"N",out storedId))storedId=Guid.NewGuid();
@@ -130,6 +131,7 @@ namespace cAlgo
             // this instance's namespace and remove only its old drawings.
             RemoveDrawings();
             InitializeContext();
+            Print("Panda Trade Plan: context initialized");
             BuildPanel();
             Chart.ObjectsUpdated+=OnObjectsUpdated;
             Timer.TimerTick+=Tick;
@@ -149,9 +151,10 @@ namespace cAlgo
                     Render();
                 }
             }
-            catch {_plan=null;}
+            catch(Exception ex){Print("Panda Trade Plan restore/render failed: "+ex);_plan=null;}
             LocalStorage.SetString("Drawing width",DrawingWidth.ToString(CultureInfo.InvariantCulture),LocalStorageScope.Instance);
             Tick();
+            Print("Panda Trade Plan: initialized; panel Entry="+_fields["Entry"].Text+", SL="+_fields["Stop loss"].Text+", TP1="+_fields["TP1"].Text);
         }
         public override void Calculate(int index)
         {

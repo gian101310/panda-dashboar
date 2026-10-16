@@ -192,3 +192,27 @@ Entry/SL/TP1/TP2/TP3 through the data window/API without drawing extra visible l
   market quotes, order-type geometry, broker distance units, breakout references
   and duplicate-click gating. Release compile succeeds. No broker order was
   submitted in verification; live execution and Mac UI remain unverified.
+
+## Fixed-size runtime crash correction
+
+The live cTrader log revealed `InvalidOperationException: Can't set volume when
+type is FixedSize.` The generic `ChartRiskReward.VolumeInUnits` setter must not
+be used on this preview type. Volume changes now replace `rr.Type` with a new
+`ChartRiskRewardFixedSizeType(units)` only when the requested size differs.
+The previous crash occurred before price fields and explicit drawing handles
+were populated. Initialization milestones and restore/render errors now appear
+in the local indicator log rather than a swallowed restore exception.
+
+Run the SDK regression with:
+`dotnet run --project SdkTests/SdkTests.csproj -c Release`.
+It exercises the production helper against a proxy that throws the exact live
+exception for the prohibited setter, and verifies changed/unchanged lot updates.
+The existing 118 pure planning assertions remain separate.
+
+Live verification on USDCAD H1: corrected initialization completed; accessibility
+reported Entry 1.41696, SL 1.42569 and TP1 1.40823 in panel fields, with native
+risk/reward pip, lot and ratio values present. These are a retained plan snapshot,
+not current trading advice or a fresh rules calculation. No new runtime exception
+appeared in that verification window. Screenshot capture still times out and
+coordinate input is unavailable, so chart drag/visual placement remains unverified.
+No broker orders were placed or modified during these checks.

@@ -27,7 +27,7 @@ Windows control plugin returning HTTP 404. Do not treat API attachment as visual
 2. Open `dist/Panda Trade Plan.algo` in cTrader Mac and attach Panda Trade Plan
    to a supported forex chart. Check Algo logs for actual API/runtime errors.
 3. If a rebuild is needed, open the included csproj in cTrader Algo or build it
-   with a compatible .NET SDK. It links the five source files two folders above.
+   with a compatible .NET SDK. It links the six source files two folders above.
    Do not hardcode Windows paths or change the core scoring/placement rules.
 4. Wait for all 21 histories; verify broker symbol suffixes resolve. A scoring-aligned
    plan should appear automatically when eligible and retry while no setup is ready.
@@ -78,3 +78,11 @@ Explicit-handle revision: native RR shading now has short Entry/SL/TP1 overlay
 segments with always-visible price, pip and TP1 R labels. Drag either endpoint to
 update panel/native RR values. Test in both Limit and Stop; companion objects
 must not undo a drag. Market Entry remains quote-controlled and locked.
+
+Critical runtime fix: never assign ChartRiskReward.VolumeInUnits when Type is
+FixedSize. Update rr.Type = new ChartRiskRewardFixedSizeType(units) only on an
+actual lot change. That forbidden setter caused initialization/events to crash
+before panel fields and handles appeared. RiskRewardPreview.cs contains the fix;
+SdkTests reproduces the live exception and verifies the corrected path. Windows
+live accessibility now confirms populated Entry/SL/TP1 and native RR pip/lot values.
+Visual drag confirmation is still outstanding due to capture/input limitations.
