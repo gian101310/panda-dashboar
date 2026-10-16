@@ -8,7 +8,8 @@ planning plus grouped drawing/panel/placement inputs. The current package is in 
 
 The indicator uses managed C# / net6.0 and the cTrader Automate API, with
 AccessRights.None. There are no Windows paths, native DLLs, P/Invoke, MT4 files,
-engine connection, credentials or order execution calls in this indicator.
+engine connection or credentials. Explicit user-click trading calls now require
+native TradingPermission; automatic planning never submits orders.
 It computes its own context from the broker's 21 forex H1 histories.
 
 cTrader documents custom indicators and native risk/reward for Mac:
@@ -26,7 +27,7 @@ Windows control plugin returning HTTP 404. Do not treat API attachment as visual
 2. Open `dist/Panda Trade Plan.algo` in cTrader Mac and attach Panda Trade Plan
    to a supported forex chart. Check Algo logs for actual API/runtime errors.
 3. If a rebuild is needed, open the included csproj in cTrader Algo or build it
-   with a compatible .NET SDK. It links the three source files two folders above.
+   with a compatible .NET SDK. It links the five source files two folders above.
    Do not hardcode Windows paths or change the core scoring/placement rules.
 4. Wait for all 21 histories; verify broker symbol suffixes resolve. A scoring-aligned
    plan should appear automatically when eligible and retry while no setup is ready.
@@ -40,7 +41,11 @@ Windows control plugin returning HTTP 404. Do not treat API attachment as visual
    the same price/edit/retention behaviour and be described honestly.
 7. Show the chart and report the actual Mac version, compile result and checks.
    Never submit an order while testing. Native risk/reward itself exposes cTrader
-   order actions; the indicator does not call them.
+   order actions; the panel now also provides an explicit Place order button.
+   Verify Limit / Stop / Market, lots default 0.01, broker-step validation and
+   fresh quote handling offline. Do not click Place order or grant trading
+   permission during agent testing. Verify API support for Indicator trading,
+   TradingPermission and ExecuteMarketRangeOrder on the installed Mac version.
 
 ## Preserve these user decisions
 
@@ -60,5 +65,5 @@ gap -7 and no neutral-matchup invalidation. Verify Show score diagnostics displa
 the real broker timeframe splits and the exact HARD_INVALID reason. Broker data
 can still differ from MT4; do not force a valid bias when raw conflicts are present.
 
-Rule tests: `dotnet run --project Tests/Tests.csproj -c Release` (67 assertions).
+Rule tests: `dotnet run --project Tests/Tests.csproj -c Release` (100 assertions).
 Release project: `Panda Trade Plan/Panda Trade Plan/PandaTradePlan.csproj`.

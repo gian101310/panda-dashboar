@@ -73,6 +73,7 @@ class Program
         Check(Rules.InvalidationReason("USD","CAD",true,false,0,3).Contains("USD"),"conflict reason names base currency");
         Check(Rules.InvalidationReason("USD","CAD",false,true,-4,0).Contains("CAD"),"conflict reason names quote currency");
         Check(Rules.InvalidationReason("USD","CAD",false,false,-3,3).Contains("neutral"),"neutral reason distinct from conflict");
+        checks+=ExecutionCases.Run();
         Console.WriteLine("PASS: "+checks+" trade-plan assertions");
     }
 }

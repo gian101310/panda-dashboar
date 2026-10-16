@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-10-17 (Trade Plan explicit execution panel)
+
+- Added Limit / Stop / Market selection and editable lots, default 0.01. Stop
+  planning uses breakout references; Market uses live quotes and the existing SL/TP rules.
+- Explicit Place order attaches SL/TP1, validates fresh bias/quotes/broker limits,
+  requests native trading permission on click only, and prevents duplicate plan
+  submissions. Automatic planning never trades; successful submission pauses auto.
+- 100 offline assertions and clean release compile. No broker orders submitted
+  in verification; live execution and Mac presentation remain unconfirmed.
+
 ## 2026-10-17 (Trade Plan dominant scoring and invalidation diagnostics)
 
 - Corrected the planner's inherited net-vote aggregation to retain positive and

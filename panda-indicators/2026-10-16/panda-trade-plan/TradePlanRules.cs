@@ -10,6 +10,7 @@ namespace PandaPlanning
     public enum EntryReference { PreviousLevelsAndBoxes, PreviousPeriodLevels, PandaBoxes }
     public sealed class PlanSettings
     {
+        public ExecutionKind Kind;
         public double MinimumTargetPips=50, MaxTargetPips, MaxEntryPips;
         public double StopUnder100=2, StopUnder200=3, StopUnder300=4, StopFrom300=5;
     }
@@ -20,8 +21,9 @@ namespace PandaPlanning
     }
     public sealed class Plan
     {
-        public string Side, EntryLabel, TargetLabel, Reference, InvalidReason, Settings;
+        public string Side, EntryLabel, TargetLabel, Reference, InvalidReason, Settings, SubmissionId;
         public PlanMode Mode;
+        public ExecutionKind Kind;
         public int RuleVersion;
         public double Entry, Stop, Target, ClearTarget;
         public double? Target2, Target3;
@@ -59,12 +61,13 @@ namespace PandaPlanning
             double minimum=Math.Max(50,settings.MinimumTargetPips);
             var all=levels.Where(EligibleReference).ToArray();
             var refs=(entryReferences??all).Where(EligibleReference);
-            var entries=refs.Where(l=>(buy?l.Price<price:l.Price>price) &&
+            var entries=refs.Where(l=>(settings.Kind==ExecutionKind.Stop?(buy?l.Price>price:l.Price<price):(buy?l.Price<price:l.Price>price)) &&
                 (settings.MaxEntryPips<=0||Math.Abs(l.Price-price)/pip<=settings.MaxEntryPips+0.000001)).OrderBy(l=>Math.Abs(l.Price-price));
+            if(settings.Kind==ExecutionKind.Market)entries=new[]{new Level("Live market",price)}.OrderBy(l=>0);
             var targets=all.Where(l=>buy?l.Price>price:l.Price<price).OrderBy(l=>Math.Abs(l.Price-price)).ToArray();
             foreach(var entry in entries)
             {
-                var clear=targets.Where(t=>Math.Abs(t.Price-entry.Price)/pip>=minimum-0.000001 &&
+                var clear=targets.Where(t=>(buy?t.Price>entry.Price:t.Price<entry.Price) && Math.Abs(t.Price-entry.Price)/pip>=minimum-0.000001 &&
                     (settings.MaxTargetPips<=0||Math.Abs(t.Price-entry.Price)/pip<=settings.MaxTargetPips+0.000001)).ToArray();
                 if(clear.Length==0)continue;
                 var target=clear.First();
@@ -75,7 +78,7 @@ namespace PandaPlanning
                 if(!Finite(divisor)||divisor<=0)continue;
                 double stop=Math.Round(entryPrice+(buy?-1:1)*distance/divisor,digits);
                 if(!ValidGeometry(side,entryPrice,stop,tp)||!MeetsTargetMinimum(entryPrice,tp,pip,minimum))continue;
-                var result=new Plan {Side=side,Mode=mode,RuleVersion=4,EntryLabel=entry.Name,TargetLabel=target.Name,
+                var result=new Plan {Side=side,Mode=mode,RuleVersion=5,Kind=settings.Kind,EntryLabel=entry.Name,TargetLabel=target.Name,
                     Entry=entryPrice,Stop=stop,Target=tp,ClearTarget=clear.Last().Price};
                 double risk=Math.Abs(result.Entry-result.Stop),baseR=Math.Abs(result.Target-result.Entry)/risk,sign=buy?1:-1;
                 double t2=Math.Round(result.Entry+sign*risk*(baseR+1),digits),t3=Math.Round(result.Entry+sign*risk*(baseR+2),digits);

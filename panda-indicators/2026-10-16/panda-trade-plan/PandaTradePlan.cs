@@ -8,7 +8,7 @@ using PandaPlanning;
 
 namespace cAlgo
 {
-    // Personal visual planner. No account/trading API, credentials or network.
+    // Visual planning plus explicit user-click execution. Automatic refresh never trades.
     [Indicator(IsOverlay=true, TimeZone=TimeZones.UTC, AccessRights=AccessRights.None)]
     public partial class PandaTradePlan : Indicator
     {
@@ -112,9 +112,9 @@ namespace cAlgo
         private string _message="Waiting for scoring and an eligible pullback";
         private string StoreKey {get{return "PandaTradePlan v1 "+SymbolName;}}
         private double Scale(double value){return value*PanelScale/100.0;}
-        private string SettingsKey {get{return string.Join("|",Mode,Reference,UseDay,UseWeek,UseMonth,UseH1Box,UseH4Box,UseD1Box,
+        private string SettingsKey {get{return string.Join("|",_orderKind,Mode,Reference,UseDay,UseWeek,UseMonth,UseH1Box,UseH4Box,UseD1Box,
             MinTargetPips,MaxEntryPips,MaxTargetPips,StopUnder100,StopUnder200,StopUnder300,StopFrom300);}}
-        private PlanSettings PlacementSettings {get{return new PlanSettings {MinimumTargetPips=MinTargetPips,MaxEntryPips=MaxEntryPips,MaxTargetPips=MaxTargetPips,
+        private PlanSettings PlacementSettings {get{return new PlanSettings {Kind=_orderKind,MinimumTargetPips=MinTargetPips,MaxEntryPips=MaxEntryPips,MaxTargetPips=MaxTargetPips,
             StopUnder100=StopUnder100,StopUnder200=StopUnder200,StopUnder300=StopUnder300,StopFrom300=StopFrom300};}}
 
         protected override void Initialize()
@@ -142,7 +142,7 @@ namespace cAlgo
                 if(_plan!=null)
                 {
                     _message="Saved plan restored";
-                    _refreshReference=!_plan.Manual && (_plan.RuleVersion!=4 || _plan.Settings!=SettingsKey || !Rules.MeetsTargetMinimum(_plan.Entry,_plan.Target,Symbol.PipSize));
+                    _refreshReference=!_plan.Manual && (_plan.RuleVersion!=5 || _plan.Settings!=SettingsKey || !Rules.MeetsTargetMinimum(_plan.Entry,_plan.Target,Symbol.PipSize));
                     string width=DrawingWidth.ToString(CultureInfo.InvariantCulture);
                     if(LocalStorage.GetString("Drawing width",LocalStorageScope.Instance)!=width){_plan.AnchorStart=DateTime.MinValue;_plan.AnchorEnd=DateTime.MinValue;}
                     Render();
@@ -169,6 +169,11 @@ namespace cAlgo
         private void Tick()
         {
             RefreshContext();
+            if(_plan!=null&&_plan.Kind==ExecutionKind.Market&&string.IsNullOrEmpty(_plan.SubmissionId))
+            {
+                double quote=_plan.Side=="BUY"?Symbol.Ask:Symbol.Bid;
+                if(Rules.Finite(quote)&&quote>0){_plan.Entry=quote;_fields["Entry"].Text=Price(quote);}
+            }
             // Also reconcile shared-chart edits made by another chart tool.
             // Some cTrader/plugin edits do not raise ObjectsUpdated here.
             if(_plan!=null&&!_hidden)ReadLineEdits(Chart.Objects);
@@ -216,11 +221,11 @@ namespace cAlgo
             if(candidate==null)
             {
                 _message=reason;
-                if(_plan!=null&&(_plan.RuleVersion!=4||_plan.Settings!=SettingsKey))
+                if(_plan!=null&&(_plan.RuleVersion!=5||_plan.Settings!=SettingsKey))
                 {_plan.Invalid=true;_plan.InvalidReason="no eligible plan under revised references/settings";_refreshReference=automatic;Save();Render();}
                 UpdateStatus();return;
             }
-            if(automatic&&_plan!=null&&_plan.RuleVersion==4&&_plan.Settings==SettingsKey&&_plan.Side==candidate.Side&&
+            if(automatic&&_plan!=null&&_plan.RuleVersion==5&&_plan.Settings==SettingsKey&&_plan.Side==candidate.Side&&
                 _plan.Entry==candidate.Entry&&_plan.Stop==candidate.Stop&&_plan.Target==candidate.Target&&_plan.Target2==candidate.Target2&&_plan.Target3==candidate.Target3)return;
             var previousPlan=_plan;
             candidate.CreatedUtc=automatic&&previousPlan!=null?previousPlan.CreatedUtc:DateTime.UtcNow;
@@ -255,12 +260,13 @@ namespace cAlgo
             _compact=Text(SymbolName+" | PLAN",Blue,10);_compact.IsVisible=_minimized;_panelRoot.AddChild(_compact);
             var panel=new StackPanel {Orientation=Orientation.Vertical,IsVisible=!_minimized};
             _panelBody=panel;_panelRoot.AddChild(panel);
-            panel.AddChild(Text("PREVIEW ONLY  |  H1 PULLBACK",Blue,10));
+            panel.AddChild(Text("H1 PLAN | CLICK TO EXECUTE",Blue,10));
             _context=Text("Loading context...",Grey,11);panel.AddChild(_context);
             double full=PanelWidth-18,half=(full-8)/2;
             var directions=new StackPanel {Orientation=Orientation.Horizontal,Margin=Scale(3)};
-            var buy=Button("BUY LIMIT",Blue,half);buy.Click+=e=>CreatePlan("BUY");
-            var sell=Button("SELL LIMIT",Red,half);sell.Click+=e=>CreatePlan("SELL");
+            BuildExecutionPanel(panel,full,half);
+            var buy=Button("Plan BUY",Blue,half);buy.Click+=e=>CreatePlan("BUY");
+            var sell=Button("Plan SELL",Red,half);sell.Click+=e=>CreatePlan("SELL");
             directions.AddChild(buy);directions.AddChild(sell);panel.AddChild(directions);
             foreach(var key in new[]{"Entry","Stop loss","TP1","TP2 guide","TP3 guide"})
             {
@@ -269,7 +275,9 @@ namespace cAlgo
                 var field=new TextBox {Text="-",Width=Scale(half),Height=Scale(26),FontSize=Math.Max(8,Scale(12)),BackgroundColor=Color.FromHex("#1b2430"),ForegroundColor=Color.White,Margin=Scale(2)};
                 _fields[key]=field;row.AddChild(field,0,1);panel.AddChild(row);
             }
+            _fields["Entry"].IsReadOnly=_orderKind==ExecutionKind.Market;
             var apply=Button("Apply edited prices",Grey,full);apply.Click+=e=>ApplyEdits();panel.AddChild(apply);
+            _place=Button("Place order",Green,full);_place.Click+=e=>PlaceOrder();panel.AddChild(_place);
             _metrics=Text("SL - pips  |  TP1 - R",Color.White,12,true);panel.AddChild(_metrics);
             _status=Text("",Blue,11);panel.AddChild(_status);
             _note=Text("",Grey,10);panel.AddChild(_note);
@@ -284,7 +292,7 @@ namespace cAlgo
             };panel.AddChild(_autoButton);
             var clear=Button("Clear plan",Grey,full);clear.Click+=e=>{_autoPaused=true;ClearPlan();_message="Cleared - Auto paused; click Resume auto to start again";UpdateStatus();};panel.AddChild(clear);
             var fit=Button("Fit plan",Grey,full);fit.Click+=e=>FitPlan();panel.AddChild(fit);
-            panel.AddChild(Text("Drag lines or edit prices. No orders placed.",Grey,10));
+            panel.AddChild(Text("Auto only plans. Place order submits SL + TP1.",Grey,10));
             _panel=Chart.Draggables.Add();_panel.ShowGrip=true;_panel.Child=_panelRoot;
             double x,y;
             string positionConfig=PanelX+"|"+PanelY+"|"+RememberPosition;
@@ -319,7 +327,7 @@ namespace cAlgo
         private void ApplyEdits()
         {
             if(_plan==null){_message="Create a valid rule plan first";UpdateStatus();return;}
-            double entry=Field("Entry"),stop=Field("Stop loss"),target=Field("TP1");
+            double entry=_plan.Kind==ExecutionKind.Market?(_plan.Side=="BUY"?Symbol.Ask:Symbol.Bid):Field("Entry"),stop=Field("Stop loss"),target=Field("TP1");
             if(!Rules.ValidGeometry(_plan.Side,entry,stop,target)){_message="Invalid prices: check SL/entry/TP direction";UpdateStatus();return;}
             if(!Rules.MeetsTargetMinimum(entry,target,Symbol.PipSize,MinTargetPips)){_message="TP1 must be at least "+MinTargetPips.ToString("0.#",CultureInfo.InvariantCulture)+" pips from entry";UpdateStatus();return;}
             double t2=Field("TP2 guide"),t3=Field("TP3 guide");
@@ -344,7 +352,7 @@ namespace cAlgo
                 var rr=obj as ChartRiskReward;
                 if(rr!=null&&obj.Name==_prefix+"rr")
                 {
-                    double entry=Math.Round(rr.EntryPrice,Symbol.Digits),stop=Math.Round(rr.StopLossPrice,Symbol.Digits),target=Math.Round(rr.TakeProfitPrice,Symbol.Digits);
+                    double entry=_plan.Kind==ExecutionKind.Market?_plan.Entry:Math.Round(rr.EntryPrice,Symbol.Digits),stop=Math.Round(rr.StopLossPrice,Symbol.Digits),target=Math.Round(rr.TakeProfitPrice,Symbol.Digits);
                     if(Rules.ValidGeometry(_plan.Side,entry,stop,target) &&
                        (Math.Abs(entry-_plan.Entry)>Symbol.TickSize/2 || Math.Abs(stop-_plan.Stop)>Symbol.TickSize/2 || Math.Abs(target-_plan.Target)>Symbol.TickSize/2 || rr.Time1!=_plan.AnchorStart || rr.Time2!=_plan.AnchorEnd))
                     {
@@ -382,8 +390,10 @@ namespace cAlgo
                 // A real native cTrader risk/reward object provides its own
                 // entry/SL/TP handles, short bounded edges, and price labels.
                 var rr=Chart.FindObject(_prefix+"rr") as ChartRiskReward;
+                if(rr!=null&&(rr.OrderType!=NativeOrderType||rr.TradeType!=(_plan.Side=="BUY"?TradeType.Buy:TradeType.Sell))){Chart.RemoveObject(_prefix+"rr");rr=null;}
                 if(rr==null)rr=Chart.DrawRiskReward(_prefix+"rr",_plan.AnchorStart,_plan.AnchorEnd,_plan.Entry,
-                    OrderType.Limit,_plan.Side=="BUY"?TradeType.Buy:TradeType.Sell,new ChartRiskRewardFixedSizeType(Symbol.VolumeInUnitsMin));
+                    NativeOrderType,_plan.Side=="BUY"?TradeType.Buy:TradeType.Sell,new ChartRiskRewardFixedSizeType(Symbol.VolumeInUnitsMin));
+                UpdatePreviewVolume();
                 rr.IsFixedRatio=false;
                 if(Math.Abs(rr.EntryPrice-_plan.Entry)>Symbol.TickSize/2)rr.EntryPrice=_plan.Entry;
                 rr.StopLossPrice=_plan.Stop;rr.TakeProfitPrice=_plan.Target;
@@ -446,6 +456,7 @@ namespace cAlgo
             _compact.Text=SymbolName+" | "+(_plan==null?_pandaBias:_plan.Invalid?"INVALID":_plan.Side+" PLAN");
             _context.Text=SymbolName+" | Bias "+_pandaBias+" | Gap "+_pandaGap+" | "+_readyPairs+"/21";
             if(ShowScoreDiagnostics&&!string.IsNullOrEmpty(_scoreDetails))_context.Text+="\n"+_scoreDetails;
+            _place.Text="Place "+(_plan==null?_pandaBias:_plan.Side)+" "+_orderKind;
             _hide.Text=_hidden?"Show plan":"Hide plan";
             _autoButton.Text=!AutoPlan?"Auto disabled (settings)":_autoPaused?"Resume auto":"Pause auto";
             _status.ForegroundColor=(_plan!=null&&_plan.Invalid)||(_scoreReady&&_hardInvalid)?Red:Blue;
@@ -453,7 +464,7 @@ namespace cAlgo
             if(_scoreReady&&_hardInvalid)_status.Text=_scoreInvalidReason;
             if(_plan==null){_metrics.Text="SL - pips | TP1 - R";_note.Text="Rules: "+Mode+"\nReference: "+Reference+"\nExpiry: "+Expiry;return;}
             double risk=Math.Abs(_plan.Entry-_plan.Stop),rr=risk>0?Math.Abs(_plan.Target-_plan.Entry)/risk:0;
-            if(_plan.RuleVersion!=4){_status.Text="Older plan retained; Refresh plan applies revised scoring/references";_status.ForegroundColor=Red;}
+            if(_plan.RuleVersion!=5){_status.Text="Older plan retained; Refresh plan applies revised scoring/references";_status.ForegroundColor=Red;}
             bool geometry=Rules.ValidGeometry(_plan.Side,_plan.Entry,_plan.Stop,_plan.Target);
             if(!geometry){_status.Text="INVALID geometry - edit SL/entry/TP";_status.ForegroundColor=Red;}
             else if(!Rules.MeetsTargetMinimum(_plan.Entry,_plan.Target,Symbol.PipSize,MinTargetPips))
@@ -461,9 +472,9 @@ namespace cAlgo
             else if(!Rules.ValidGuides(_plan.Side,_plan.Target,_plan.Target2,_plan.Target3))
             {_status.Text="INVALID guides - targets must follow TP1";_status.ForegroundColor=Red;}
             _metrics.Text="SL "+(risk/Symbol.PipSize).ToString("0.0",CultureInfo.InvariantCulture)+"p | TP1 "+(Math.Abs(_plan.Target-_plan.Entry)/Symbol.PipSize).ToString("0.0",CultureInfo.InvariantCulture)+"p | "+rr.ToString("0.00",CultureInfo.InvariantCulture)+"R";
-            bool limitSide=_plan.Side=="BUY"?_plan.Entry<Symbol.Ask:_plan.Entry>Symbol.Bid;
+            bool limitSide=_plan.Kind==ExecutionKind.Market||(_plan.Kind==ExecutionKind.Stop?(_plan.Side=="BUY"?_plan.Entry>Symbol.Ask:_plan.Entry<Symbol.Bid):(_plan.Side=="BUY"?_plan.Entry<Symbol.Ask:_plan.Entry>Symbol.Bid));
             _note.Text=(_plan.Manual?"MANUAL: levels stay fixed":"Entry: "+_plan.EntryLabel+" | "+_plan.Mode)+
-                "\n"+(!limitSide?"Entry crossed: no longer a limit placement\n":"")+
+                "\n"+(!limitSide?"Entry crossed: refresh or adjust this pending plan\n":"")+
                 (!_scoreReady?"Context unavailable; recheck before use\n":"")+"Expiry: "+Expiry+" | TP2/3 optional guides";
         }
         protected override void OnDestroy()
