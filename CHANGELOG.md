@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-10-17 (Automatic Panda Trade Plan and appearance controls)
+
+- Excluded previous-year references from suggested entries, targets and optional
+  guide bounds. Existing unedited plans recalculate with day/week/month and Box refs.
+- Enabled automatic creation/retry/refresh by default, while preserving manual
+  edits and retained invalid plans. Clear pauses automatic recreation until Resume.
+- Added grouped reference, distance, TP-minimum/SL-divisor, line-thickness/opacity,
+  label-size and panel scale/width/opacity/position controls. Panel defaults to 80%.
+- Kept the engine and original indicators unchanged; updated the Mac handoff.
+
 ## 2026-10-16 (Dominant timeframe score display)
 
 - Corrected split score parsing for base/quote and ADV timeframe fields:

@@ -26,8 +26,60 @@ namespace cAlgo
         public bool ShowShading {get;set;}
         [Parameter("Drawing width (bars)",DefaultValue=12,MinValue=4,MaxValue=50)]
         public int DrawingWidth {get;set;}
-        [Parameter("Create plan on attach",DefaultValue=false)]
-        public bool CreateOnAttach {get;set;}
+        [Parameter("Automatic planning",Group="Automation",DefaultValue=true)]
+        public bool AutoPlan {get;set;}
+        [Parameter("Refresh interval (seconds)",Group="Automation",DefaultValue=15,MinValue=5,MaxValue=300)]
+        public int RefreshSeconds {get;set;}
+        [Parameter("Previous day levels",Group="References (no year)",DefaultValue=true)]
+        public bool UseDay {get;set;}
+        [Parameter("Previous week levels",Group="References (no year)",DefaultValue=true)]
+        public bool UseWeek {get;set;}
+        [Parameter("Previous month levels",Group="References (no year)",DefaultValue=true)]
+        public bool UseMonth {get;set;}
+        [Parameter("H1 Panda Box",Group="References (no year)",DefaultValue=true)]
+        public bool UseH1Box {get;set;}
+        [Parameter("H4 Panda Box",Group="References (no year)",DefaultValue=true)]
+        public bool UseH4Box {get;set;}
+        [Parameter("D1 Panda Box",Group="References (no year)",DefaultValue=true)]
+        public bool UseD1Box {get;set;}
+        [Parameter("Minimum TP1 (pips)",Group="Placement",DefaultValue=50,MinValue=50)]
+        public double MinTargetPips {get;set;}
+        [Parameter("Max entry distance (pips, 0=off)",Group="Placement",DefaultValue=0,MinValue=0)]
+        public double MaxEntryPips {get;set;}
+        [Parameter("Max TP distance (pips, 0=off)",Group="Placement",DefaultValue=0,MinValue=0)]
+        public double MaxTargetPips {get;set;}
+        [Parameter("SL divisor: TP below 100p",Group="Placement",DefaultValue=2,MinValue=1,MaxValue=20)]
+        public double StopUnder100 {get;set;}
+        [Parameter("SL divisor: TP 100-199p",Group="Placement",DefaultValue=3,MinValue=1,MaxValue=20)]
+        public double StopUnder200 {get;set;}
+        [Parameter("SL divisor: TP 200-299p",Group="Placement",DefaultValue=4,MinValue=1,MaxValue=20)]
+        public double StopUnder300 {get;set;}
+        [Parameter("SL divisor: TP 300p+",Group="Placement",DefaultValue=5,MinValue=1,MaxValue=20)]
+        public double StopFrom300 {get;set;}
+        [Parameter("Risk/reward line thickness",Group="Appearance",DefaultValue=2,MinValue=1,MaxValue=8)]
+        public int LineThickness {get;set;}
+        [Parameter("TP2/3 guide thickness",Group="Appearance",DefaultValue=2,MinValue=1,MaxValue=8)]
+        public int GuideThickness {get;set;}
+        [Parameter("Drawing opacity (%)",Group="Appearance",DefaultValue=71,MinValue=0,MaxValue=100)]
+        public int DrawingOpacity {get;set;}
+        [Parameter("Guide opacity (%)",Group="Appearance",DefaultValue=100,MinValue=0,MaxValue=100)]
+        public int GuideOpacity {get;set;}
+        [Parameter("Label font size",Group="Appearance",DefaultValue=11,MinValue=8,MaxValue=24)]
+        public int LabelFontSize {get;set;}
+        [Parameter("Panel scale (%)",Group="Panel",DefaultValue=80,MinValue=60,MaxValue=150)]
+        public int PanelScale {get;set;}
+        [Parameter("Panel base width",Group="Panel",DefaultValue=280,MinValue=250,MaxValue=600)]
+        public int PanelWidth {get;set;}
+        [Parameter("Panel background opacity (%)",Group="Panel",DefaultValue=96,MinValue=0,MaxValue=100)]
+        public int PanelOpacity {get;set;}
+        [Parameter("Panel X (-1=right)",Group="Panel",DefaultValue=-1,MinValue=-1)]
+        public int PanelX {get;set;}
+        [Parameter("Panel Y",Group="Panel",DefaultValue=20,MinValue=0)]
+        public int PanelY {get;set;}
+        [Parameter("Remember dragged position",Group="Panel",DefaultValue=true)]
+        public bool RememberPosition {get;set;}
+        [Parameter("Start collapsed",Group="Panel",DefaultValue=false)]
+        public bool StartCollapsed {get;set;}
 
         // Transparent price outputs expose the current plan in cTrader's data
         // window / indicator API without adding a second set of visible lines.
@@ -51,11 +103,17 @@ namespace cAlgo
         private TextBlock _compact;
         private bool _minimized;
         private TextBlock _status,_context,_metrics,_note;
-        private Button _hide;
+        private Button _hide,_autoButton;
         private Plan _plan;
-        private bool _hidden,_rendering,_autoPending,_refreshReference;
-        private string _message="Choose BUY LIMIT or SELL LIMIT";
+        private bool _hidden,_rendering,_autoPaused,_refreshReference;
+        private DateTime _lastAutoRefresh=DateTime.MinValue;
+        private string _message="Waiting for scoring and an eligible pullback";
         private string StoreKey {get{return "PandaTradePlan v1 "+SymbolName;}}
+        private double Scale(double value){return value*PanelScale/100.0;}
+        private string SettingsKey {get{return string.Join("|",Mode,Reference,UseDay,UseWeek,UseMonth,UseH1Box,UseH4Box,UseD1Box,
+            MinTargetPips,MaxEntryPips,MaxTargetPips,StopUnder100,StopUnder200,StopUnder300,StopFrom300);}}
+        private PlanSettings PlacementSettings {get{return new PlanSettings {MinimumTargetPips=MinTargetPips,MaxEntryPips=MaxEntryPips,MaxTargetPips=MaxTargetPips,
+            StopUnder100=StopUnder100,StopUnder200=StopUnder200,StopUnder300=StopUnder300,StopFrom300=StopFrom300};}}
 
         protected override void Initialize()
         {
@@ -73,7 +131,7 @@ namespace cAlgo
             Chart.ObjectsUpdated+=OnObjectsUpdated;
             Timer.TimerTick+=Tick;
             Timer.Start(1);
-            _autoPending=CreateOnAttach;
+            _autoPaused=LocalStorage.GetString("Auto paused",LocalStorageScope.Instance)=="1";
             try
             {
                 var raw=LocalStorage.GetString(StoreKey,LocalStorageScope.Instance);
@@ -81,12 +139,15 @@ namespace cAlgo
                 if(_plan!=null && Rules.Expired(_plan.CreatedUtc,DateTime.UtcNow,Expiry))_plan=null;
                 if(_plan!=null)
                 {
-                    _autoPending=false;_message="Saved plan restored";
-                    _refreshReference=!_plan.Manual && (_plan.RuleVersion!=2 || _plan.Reference!=Reference.ToString() || !Rules.MeetsTargetMinimum(_plan.Entry,_plan.Target,Symbol.PipSize));
+                    _message="Saved plan restored";
+                    _refreshReference=!_plan.Manual && (_plan.RuleVersion!=3 || _plan.Settings!=SettingsKey || !Rules.MeetsTargetMinimum(_plan.Entry,_plan.Target,Symbol.PipSize));
+                    string width=DrawingWidth.ToString(CultureInfo.InvariantCulture);
+                    if(LocalStorage.GetString("Drawing width",LocalStorageScope.Instance)!=width){_plan.AnchorStart=DateTime.MinValue;_plan.AnchorEnd=DateTime.MinValue;}
                     Render();
                 }
             }
             catch {_plan=null;}
+            LocalStorage.SetString("Drawing width",DrawingWidth.ToString(CultureInfo.InvariantCulture),LocalStorageScope.Instance);
             Tick();
         }
         public override void Calculate(int index)
@@ -116,60 +177,67 @@ namespace cAlgo
             if(_plan!=null && _scoreReady && Rules.BiasInvalid(_plan.Side,_pandaBias,_hardInvalid))
             {
                 if(BiasAction==BiasChange.DeletePlan){ClearPlan();_message="Plan cleared: bias changed";}
-                else if(!_plan.Invalid){_plan.Invalid=true;_plan.InvalidReason="bias changed";_message="INVALID: bias changed - reset to recheck";Save();Render();}
+                else if(!_plan.Invalid){_plan.Invalid=true;_plan.InvalidReason="bias changed";_message="INVALID: bias changed - plan retained";Save();Render();}
             }
-            if(_autoPending && _scoreReady){_autoPending=false;CreatePlan(_pandaBias);}
-            if(_refreshReference && _scoreReady && _plan!=null){_refreshReference=false;CreatePlan(_plan.Side);}
+            bool migrate=_refreshReference&&_plan!=null&&!_plan.Manual;
+            if((Rules.ShouldAutoPlan(_plan,AutoPlan,_autoPaused,_scoreReady)||(migrate&&AutoPlan&&_scoreReady&&!_autoPaused)) &&
+                DateTime.UtcNow-_lastAutoRefresh>=TimeSpan.FromSeconds(RefreshSeconds))
+            {_lastAutoRefresh=DateTime.UtcNow;_refreshReference=false;CreatePlan(migrate?_plan.Side:_pandaBias,true);}
             UpdateStatus();
         }
         private IEnumerable<Level> PreviousLevels()
         {
-            if(_dailyLevels.Count>1){yield return new Level("PDH",_dailyLevels.HighPrices.Last(1));yield return new Level("PDL",_dailyLevels.LowPrices.Last(1));}
-            if(_weeklyLevels.Count>1){yield return new Level("PWH",_weeklyLevels.HighPrices.Last(1));yield return new Level("PWL",_weeklyLevels.LowPrices.Last(1));}
-            if(_monthlyLevels.Count>1){yield return new Level("PMH",_monthlyLevels.HighPrices.Last(1));yield return new Level("PML",_monthlyLevels.LowPrices.Last(1));}
-            int year=Server.TimeInUtc.Year-1;
-            var indices=Enumerable.Range(0,_monthlyLevels.Count).Where(i=>_monthlyLevels.OpenTimes[i].Year==year).ToArray();
-            if(indices.Length==12)
-            {
-                yield return new Level("PYH",indices.Max(i=>_monthlyLevels.HighPrices[i]));
-                yield return new Level("PYL",indices.Min(i=>_monthlyLevels.LowPrices[i]));
-            }
+            if(UseDay&&_dailyLevels.Count>1){yield return new Level("PDH",_dailyLevels.HighPrices.Last(1));yield return new Level("PDL",_dailyLevels.LowPrices.Last(1));}
+            if(UseWeek&&_weeklyLevels.Count>1){yield return new Level("PWH",_weeklyLevels.HighPrices.Last(1));yield return new Level("PWL",_weeklyLevels.LowPrices.Last(1));}
+            if(UseMonth&&_monthlyLevels.Count>1){yield return new Level("PMH",_monthlyLevels.HighPrices.Last(1));yield return new Level("PML",_monthlyLevels.LowPrices.Last(1));}
         }
-        private void CreatePlan(string side)
+        private void CreatePlan(string side,bool automatic=false)
         {
             if(!_scoreReady){_message="Waiting for all 21 pair histories";UpdateStatus();return;}
-            if(side!=_pandaBias || (side!="BUY"&&side!="SELL")){_message="No "+side+" setup: bias is "+_pandaBias;UpdateStatus();return;}
+            if(side!=_pandaBias || (side!="BUY"&&side!="SELL")){_message=automatic?"Waiting for valid BUY/SELL scoring bias":"No "+side+" setup: bias is "+_pandaBias;UpdateStatus();return;}
             int closed=_contextBars.Count-2;
             if(closed<21){_message="Waiting for confirmed H1 context";UpdateStatus();return;}
             string zone=PandaLineStatusAt(closed);
             bool valid=zone==(side=="BUY"?"ABOVE":"BELOW");
             var previous=PreviousLevels().ToArray();
-            var boxes=new[]{new Level("H1 Box High",_activeSlot.ShortHigh),new Level("H1 Box Low",_activeSlot.ShortLow),
-                new Level("H4 Box High",_activeSlot.MediumHigh),new Level("H4 Box Low",_activeSlot.MediumLow),
-                new Level("D1 Box High",_activeSlot.LongHigh),new Level("D1 Box Low",_activeSlot.LongLow)};
+            var boxList=new List<Level>();
+            if(UseH1Box){boxList.Add(new Level("H1 Box High",_activeSlot.ShortHigh));boxList.Add(new Level("H1 Box Low",_activeSlot.ShortLow));}
+            if(UseH4Box){boxList.Add(new Level("H4 Box High",_activeSlot.MediumHigh));boxList.Add(new Level("H4 Box Low",_activeSlot.MediumLow));}
+            if(UseD1Box){boxList.Add(new Level("D1 Box High",_activeSlot.LongHigh));boxList.Add(new Level("D1 Box Low",_activeSlot.LongLow));}
+            var boxes=boxList.ToArray();
             var refs=Reference==EntryReference.PandaBoxes?boxes:
                 Reference==EntryReference.PreviousPeriodLevels?previous:previous.Concat(boxes).ToArray();
             var targetLevels=Reference==EntryReference.PreviousPeriodLevels?previous:previous.Concat(boxes).ToArray();
             string reason;
             var candidate=Rules.Build(side,_pandaGap,_hardInvalid,zone,valid,side=="BUY"?Symbol.Ask:Symbol.Bid,
-                Symbol.PipSize,Symbol.Digits,targetLevels,Mode,out reason,refs);
+                Symbol.PipSize,Symbol.Digits,targetLevels,Mode,out reason,refs,PlacementSettings);
             if(candidate==null)
             {
                 _message=reason;
-                if(_plan!=null&&_plan.Reference!=Reference.ToString())
-                {_plan.Invalid=true;_plan.InvalidReason="entry references changed";Save();Render();}
+                if(_plan!=null&&(_plan.RuleVersion!=3||_plan.Settings!=SettingsKey))
+                {_plan.Invalid=true;_plan.InvalidReason="no eligible plan under revised references/settings";_refreshReference=automatic;Save();Render();}
                 UpdateStatus();return;
             }
-            candidate.CreatedUtc=DateTime.UtcNow;
+            if(automatic&&_plan!=null&&_plan.RuleVersion==3&&_plan.Settings==SettingsKey&&_plan.Side==candidate.Side&&
+                _plan.Entry==candidate.Entry&&_plan.Stop==candidate.Stop&&_plan.Target==candidate.Target&&_plan.Target2==candidate.Target2&&_plan.Target3==candidate.Target3)return;
+            var previousPlan=_plan;
+            candidate.CreatedUtc=automatic&&previousPlan!=null?previousPlan.CreatedUtc:DateTime.UtcNow;
             candidate.Reference=Reference.ToString();
-            _plan=candidate;_hidden=false;_message="Rule plan - drag levels to adjust";
-            Save();FitPlan();UpdateStatus();
+            candidate.Settings=SettingsKey;
+            if(automatic&&previousPlan!=null){candidate.AnchorStart=previousPlan.AnchorStart;candidate.AnchorEnd=previousPlan.AnchorEnd;}
+            _plan=candidate;if(!automatic)_hidden=false;_message="Rule plan - drag levels to adjust";
+            if(!automatic){_autoPaused=false;}
+            Save();if(previousPlan==null||!automatic)FitPlan();else Render();UpdateStatus();
         }
         private void BuildPanel()
         {
-            _minimized=LocalStorage.GetString("Panel minimized",LocalStorageScope.Instance)=="1";
-            _panelRoot=new StackPanel {Orientation=Orientation.Vertical,Width=_minimized?190:286,BackgroundColor=Color.FromArgb(244,16,22,31),Margin=3};
-            var header=new Grid(1,2){Margin=2};
+            string collapsedConfig=StartCollapsed.ToString();
+            bool restoreCollapse=LocalStorage.GetString("Collapse input",LocalStorageScope.Instance)==collapsedConfig;
+            _minimized=restoreCollapse?LocalStorage.GetString("Panel minimized",LocalStorageScope.Instance)=="1":StartCollapsed;
+            LocalStorage.SetString("Collapse input",collapsedConfig,LocalStorageScope.Instance);
+            LocalStorage.SetString("Panel minimized",_minimized?"1":"0",LocalStorageScope.Instance);
+            _panelRoot=new StackPanel {Orientation=Orientation.Vertical,Width=Scale(_minimized?190:PanelWidth),BackgroundColor=Color.FromArgb((int)Math.Round(255*PanelOpacity/100.0),16,22,31),Margin=Scale(3)};
+            var header=new Grid(1,2){Margin=Scale(2)};
             var heading=Text(_minimized?"PANDA PLAN":"PANDA TRADE PLAN",Color.White,12,true);
             header.AddChild(heading,0,0);
             var shrink=Button(_minimized?"+":"-",Grey,25);
@@ -177,7 +245,7 @@ namespace cAlgo
             shrink.Click+=e=>
             {
                 _minimized=!_minimized;_panelBody.IsVisible=!_minimized;_compact.IsVisible=_minimized;
-                _panelRoot.Width=_minimized?190:286;shrink.Text=_minimized?"+":"-";
+                _panelRoot.Width=Scale(_minimized?190:PanelWidth);shrink.Text=_minimized?"+":"-";
                 heading.Text=_minimized?"PANDA PLAN":"PANDA TRADE PLAN";
                 LocalStorage.SetString("Panel minimized",_minimized?"1":"0",LocalStorageScope.Instance);LocalStorage.Flush(LocalStorageScope.Instance);
             };
@@ -187,34 +255,50 @@ namespace cAlgo
             _panelBody=panel;_panelRoot.AddChild(panel);
             panel.AddChild(Text("PREVIEW ONLY  |  H1 PULLBACK",Blue,10));
             _context=Text("Loading context...",Grey,11);panel.AddChild(_context);
-            var directions=new StackPanel {Orientation=Orientation.Horizontal,Margin=5};
-            var buy=Button("BUY LIMIT",Blue,130);buy.Click+=e=>CreatePlan("BUY");
-            var sell=Button("SELL LIMIT",Red,130);sell.Click+=e=>CreatePlan("SELL");
+            double full=PanelWidth-18,half=(full-8)/2;
+            var directions=new StackPanel {Orientation=Orientation.Horizontal,Margin=Scale(3)};
+            var buy=Button("BUY LIMIT",Blue,half);buy.Click+=e=>CreatePlan("BUY");
+            var sell=Button("SELL LIMIT",Red,half);sell.Click+=e=>CreatePlan("SELL");
             directions.AddChild(buy);directions.AddChild(sell);panel.AddChild(directions);
             foreach(var key in new[]{"Entry","Stop loss","TP1","TP2 guide","TP3 guide"})
             {
-                var row=new Grid(1,2){Margin=4};
+                var row=new Grid(1,2){Margin=Scale(2)};
                 row.AddChild(Text(key,key=="Entry"?Blue:key=="Stop loss"?Red:Green,12),0,0);
-                var field=new TextBox {Text="-",Width=134,Height=26,BackgroundColor=Color.FromHex("#1b2430"),ForegroundColor=Color.White,Margin=2};
+                var field=new TextBox {Text="-",Width=Scale(half),Height=Scale(26),FontSize=Math.Max(8,Scale(12)),BackgroundColor=Color.FromHex("#1b2430"),ForegroundColor=Color.White,Margin=Scale(2)};
                 _fields[key]=field;row.AddChild(field,0,1);panel.AddChild(row);
             }
-            var apply=Button("Apply edited prices",Grey,268);apply.Click+=e=>ApplyEdits();panel.AddChild(apply);
+            var apply=Button("Apply edited prices",Grey,full);apply.Click+=e=>ApplyEdits();panel.AddChild(apply);
             _metrics=Text("SL - pips  |  TP1 - R",Color.White,12,true);panel.AddChild(_metrics);
             _status=Text("",Blue,11);panel.AddChild(_status);
             _note=Text("",Grey,10);panel.AddChild(_note);
-            var actions=new StackPanel {Orientation=Orientation.Horizontal,Margin=5};
-            var reset=Button("Reset to rules",Grey,130);reset.Click+=e=>CreatePlan(_plan==null?_pandaBias:_plan.Side);
-            _hide=Button("Hide plan",Grey,130);_hide.Click+=e=>{_hidden=!_hidden;if(_hidden)RemoveDrawings();else Render();UpdateStatus();};
+            var actions=new StackPanel {Orientation=Orientation.Horizontal,Margin=Scale(3)};
+            var reset=Button("Refresh plan",Grey,half);reset.Click+=e=>CreatePlan(_pandaBias);
+            _hide=Button("Hide plan",Grey,half);_hide.Click+=e=>{_hidden=!_hidden;if(_hidden)RemoveDrawings();else Render();UpdateStatus();};
             actions.AddChild(reset);actions.AddChild(_hide);panel.AddChild(actions);
-            var clear=Button("Clear plan",Grey,268);clear.Click+=e=>{ClearPlan();_message="Plan cleared";UpdateStatus();};panel.AddChild(clear);
-            var fit=Button("Fit plan",Grey,268);fit.Click+=e=>FitPlan();panel.AddChild(fit);
+            _autoButton=Button("Auto",Blue,full);_autoButton.Click+=e=>
+            {
+                if(!AutoPlan){_message="Enable Automatic planning in indicator settings";UpdateStatus();return;}
+                _autoPaused=!_autoPaused;_lastAutoRefresh=DateTime.MinValue;_message=_autoPaused?"Automatic refresh paused":"Automatic refresh resumed";Save();Tick();
+            };panel.AddChild(_autoButton);
+            var clear=Button("Clear plan",Grey,full);clear.Click+=e=>{_autoPaused=true;ClearPlan();_message="Cleared - Auto paused; click Resume auto to start again";UpdateStatus();};panel.AddChild(clear);
+            var fit=Button("Fit plan",Grey,full);fit.Click+=e=>FitPlan();panel.AddChild(fit);
             panel.AddChild(Text("Drag lines or edit prices. No orders placed.",Grey,10));
             _panel=Chart.Draggables.Add();_panel.ShowGrip=true;_panel.Child=_panelRoot;
             double x,y;
-            _panel.X=double.TryParse(LocalStorage.GetString("Panel X",LocalStorageScope.Instance),NumberStyles.Float,CultureInfo.InvariantCulture,out x)?Math.Max(0,Math.Min(x,Chart.Width-190)):Math.Max(0,Chart.Width-310);
-            _panel.Y=double.TryParse(LocalStorage.GetString("Panel Y",LocalStorageScope.Instance),NumberStyles.Float,CultureInfo.InvariantCulture,out y)?Math.Max(0,Math.Min(y,Chart.Height-60)):20;
+            string positionConfig=PanelX+"|"+PanelY+"|"+RememberPosition;
+            bool restorePosition=RememberPosition&&LocalStorage.GetString("Position inputs",LocalStorageScope.Instance)==positionConfig;
+            _panel.X=restorePosition&&double.TryParse(LocalStorage.GetString("Panel X",LocalStorageScope.Instance),NumberStyles.Float,CultureInfo.InvariantCulture,out x)?Math.Max(0,Math.Min(x,Chart.Width-_panelRoot.Width)):PanelX<0?Math.Max(0,Chart.Width-_panelRoot.Width-20):Math.Max(0,Math.Min(PanelX,Chart.Width-_panelRoot.Width));
+            _panel.Y=restorePosition&&double.TryParse(LocalStorage.GetString("Panel Y",LocalStorageScope.Instance),NumberStyles.Float,CultureInfo.InvariantCulture,out y)?Math.Max(0,Math.Min(y,Chart.Height-60)):Math.Max(0,Math.Min(PanelY,Chart.Height-60));
+            LocalStorage.SetString("Position inputs",positionConfig,LocalStorageScope.Instance);
+            if(RememberPosition)
+            {
+                LocalStorage.SetString("Panel X",_panel.X.ToString(CultureInfo.InvariantCulture),LocalStorageScope.Instance);
+                LocalStorage.SetString("Panel Y",_panel.Y.ToString(CultureInfo.InvariantCulture),LocalStorageScope.Instance);
+            }
+            LocalStorage.Flush(LocalStorageScope.Instance);
             _panel.LocationChanged+=e=>
             {
+                if(!RememberPosition)return;
                 LocalStorage.SetString("Panel X",e.Draggable.X.ToString(CultureInfo.InvariantCulture),LocalStorageScope.Instance);
                 LocalStorage.SetString("Panel Y",e.Draggable.Y.ToString(CultureInfo.InvariantCulture),LocalStorageScope.Instance);
                 LocalStorage.Flush(LocalStorageScope.Instance);
@@ -222,11 +306,11 @@ namespace cAlgo
         }
         private TextBlock Text(string value,Color color,double size,bool bold=false)
         {
-            return new TextBlock {Text=value,ForegroundColor=color,FontSize=size,FontWeight=bold?FontWeight.Bold:FontWeight.Normal,Margin=6,TextWrapping=TextWrapping.Wrap};
+            return new TextBlock {Text=value,ForegroundColor=color,FontSize=Math.Max(8,Scale(size)),FontWeight=bold?FontWeight.Bold:FontWeight.Normal,Margin=Scale(3),TextWrapping=TextWrapping.Wrap};
         }
-        private Button Button(string value,Color color,int width)
+        private Button Button(string value,Color color,double width)
         {
-            return new Button {Text=value,Width=width,Height=29,Margin=2,ForegroundColor=color,BackgroundColor=Color.FromHex("#202c3a")};
+            return new Button {Text=value,Width=Scale(width),Height=Scale(27),FontSize=Math.Max(8,Scale(12)),Margin=Scale(2),ForegroundColor=color,BackgroundColor=Color.FromHex("#202c3a")};
         }
         private string Price(double price) {return price.ToString("F"+Symbol.Digits,CultureInfo.InvariantCulture);}
         private double Field(string key) {double n;return double.TryParse(_fields[key].Text,NumberStyles.Float,CultureInfo.InvariantCulture,out n)?Math.Round(n,Symbol.Digits):double.NaN;}
@@ -235,7 +319,7 @@ namespace cAlgo
             if(_plan==null){_message="Create a valid rule plan first";UpdateStatus();return;}
             double entry=Field("Entry"),stop=Field("Stop loss"),target=Field("TP1");
             if(!Rules.ValidGeometry(_plan.Side,entry,stop,target)){_message="Invalid prices: check SL/entry/TP direction";UpdateStatus();return;}
-            if(!Rules.MeetsTargetMinimum(entry,target,Symbol.PipSize)){_message="TP1 must be at least 50 pips from entry";UpdateStatus();return;}
+            if(!Rules.MeetsTargetMinimum(entry,target,Symbol.PipSize,MinTargetPips)){_message="TP1 must be at least "+MinTargetPips.ToString("0.#",CultureInfo.InvariantCulture)+" pips from entry";UpdateStatus();return;}
             double t2=Field("TP2 guide"),t3=Field("TP3 guide");
             if((Rules.Finite(t2)&&(_plan.Side=="BUY"?t2<=target:t2>=target)) ||
                (Rules.Finite(t3)&&(!Rules.Finite(t2)||(_plan.Side=="BUY"?t3<=t2:t3>=t2))))
@@ -302,13 +386,16 @@ namespace cAlgo
                 if(Math.Abs(rr.EntryPrice-_plan.Entry)>Symbol.TickSize/2)rr.EntryPrice=_plan.Entry;
                 rr.StopLossPrice=_plan.Stop;rr.TakeProfitPrice=_plan.Target;
                 rr.Time1=_plan.AnchorStart;rr.Time2=_plan.AnchorEnd;
-                rr.RiskColor=_plan.Invalid?Color.FromHex("#ffaa44"):Color.FromArgb(ShowShading?180:35,255,77,109);
-                rr.RewardColor=_plan.Invalid?Color.FromHex("#ffaa44"):Color.FromArgb(ShowShading?180:25,0,255,159);
+                int alpha=(int)Math.Round(255*DrawingOpacity/100.0);
+                if(!ShowShading)alpha=Math.Min(alpha,35);
+                rr.RiskColor=_plan.Invalid?Color.FromArgb(alpha,255,170,68):Color.FromArgb(alpha,255,77,109);
+                rr.RewardColor=_plan.Invalid?Color.FromArgb(alpha,255,170,68):Color.FromArgb(alpha,0,255,159);
+                rr.RiskThickness=LineThickness;rr.RewardThickness=LineThickness;
                 rr.IsInteractive=true;rr.IsLocked=false;rr.Comment="Panda Trade Plan preview; "+_plan.EntryLabel;
                 if(ShowGuides&&_plan.Target2.HasValue)DrawLevel("tp2",_plan.Target2.Value,"TP2",Green);else RemoveLevel("tp2");
                 if(ShowGuides&&_plan.Target3.HasValue)DrawLevel("tp3",_plan.Target3.Value,"TP3",Green);else RemoveLevel("tp3");
                 var label=Chart.DrawText(_prefix+"source",(_plan.Invalid?"INVALID | ":"")+_plan.EntryLabel,_plan.AnchorStart,_plan.Entry,_plan.Invalid?Red:Blue);
-                label.FontSize=11;label.IsBold=true;label.IsInteractive=false;
+                label.FontSize=LabelFontSize;label.IsBold=true;label.IsInteractive=false;
                 _fields["Entry"].Text=Price(_plan.Entry);_fields["Stop loss"].Text=Price(_plan.Stop);_fields["TP1"].Text=Price(_plan.Target);
                 _fields["TP2 guide"].Text=_plan.Target2.HasValue?Price(_plan.Target2.Value):"-";
                 _fields["TP3 guide"].Text=_plan.Target3.HasValue?Price(_plan.Target3.Value):"-";
@@ -320,9 +407,11 @@ namespace cAlgo
             var line=Chart.FindObject(_prefix+key) as ChartTrendLine;
             if(line==null)line=Chart.DrawTrendLine(_prefix+key,_plan.AnchorStart,price,_plan.AnchorEnd,price,color,2,LineStyle.Lines);
             else {line.Y1=price;line.Y2=price;line.Time1=_plan.AnchorStart;line.Time2=_plan.AnchorEnd;}
-            line.ExtendToInfinity=false;line.Color=_plan.Invalid?Color.FromHex("#ffaa44"):color;line.IsInteractive=true;line.IsLocked=false;
+            line.Thickness=GuideThickness;line.ExtendToInfinity=false;
+            var guideColor=_plan.Invalid?Color.FromHex("#ffaa44"):color;
+            line.Color=Color.FromArgb((int)Math.Round(255*GuideOpacity/100.0),guideColor);line.IsInteractive=true;line.IsLocked=false;
             var text=Chart.DrawText(_prefix+key+"Label",label+" "+Price(price),_plan.AnchorEnd,price,line.Color);
-            text.FontSize=11;text.IsBold=true;text.IsInteractive=false;
+            text.FontSize=LabelFontSize;text.IsBold=true;text.IsInteractive=false;
         }
         private void RemoveLevel(string key){Chart.RemoveObject(_prefix+key);Chart.RemoveObject(_prefix+key+"Label");}
         private void FitPlan()
@@ -345,6 +434,7 @@ namespace cAlgo
         private void ClearPlan(){RemoveDrawings();_plan=null;_hidden=false;_refreshReference=false;Save();foreach(var field in _fields.Values)field.Text="-";}
         private void Save()
         {
+            LocalStorage.SetString("Auto paused",_autoPaused?"1":"0",LocalStorageScope.Instance);
             LocalStorage.SetString(StoreKey,_plan==null?"":JsonSerializer.Serialize(_plan,_json),LocalStorageScope.Instance);
             LocalStorage.Flush(LocalStorageScope.Instance);
         }
@@ -354,15 +444,16 @@ namespace cAlgo
             _compact.Text=SymbolName+" | "+(_plan==null?_pandaBias:_plan.Invalid?"INVALID":_plan.Side+" PLAN");
             _context.Text=SymbolName+" | Bias "+_pandaBias+" | Gap "+_pandaGap+" | "+_readyPairs+"/21";
             _hide.Text=_hidden?"Show plan":"Hide plan";
+            _autoButton.Text=!AutoPlan?"Auto disabled (settings)":_autoPaused?"Resume auto":"Pause auto";
             _status.ForegroundColor=_plan!=null&&_plan.Invalid?Red:Blue;
-            _status.Text=_plan!=null&&_plan.Invalid?"INVALID - "+(_plan.InvalidReason??"bias changed")+"; reset to recheck":_message;
+            _status.Text=_plan!=null&&_plan.Invalid?"INVALID - "+(_plan.InvalidReason??"bias changed")+"; plan retained":_message;
             if(_plan==null){_metrics.Text="SL - pips | TP1 - R";_note.Text="Rules: "+Mode+"\nReference: "+Reference+"\nExpiry: "+Expiry;return;}
             double risk=Math.Abs(_plan.Entry-_plan.Stop),rr=risk>0?Math.Abs(_plan.Target-_plan.Entry)/risk:0;
-            if(_plan.RuleVersion!=2){_status.Text="Older plan: Reset to apply TP/SL tiers";_status.ForegroundColor=Red;}
+            if(_plan.RuleVersion!=3){_status.Text="Older manual plan retained; Refresh plan applies revised references";_status.ForegroundColor=Red;}
             bool geometry=Rules.ValidGeometry(_plan.Side,_plan.Entry,_plan.Stop,_plan.Target);
             if(!geometry){_status.Text="INVALID geometry - edit SL/entry/TP";_status.ForegroundColor=Red;}
-            else if(!Rules.MeetsTargetMinimum(_plan.Entry,_plan.Target,Symbol.PipSize))
-            {_status.Text="TP1 below 50-pip minimum - adjust target";_status.ForegroundColor=Red;}
+            else if(!Rules.MeetsTargetMinimum(_plan.Entry,_plan.Target,Symbol.PipSize,MinTargetPips))
+            {_status.Text="TP1 below configured minimum - adjust target";_status.ForegroundColor=Red;}
             else if(!Rules.ValidGuides(_plan.Side,_plan.Target,_plan.Target2,_plan.Target3))
             {_status.Text="INVALID guides - targets must follow TP1";_status.ForegroundColor=Red;}
             _metrics.Text="SL "+(risk/Symbol.PipSize).ToString("0.0",CultureInfo.InvariantCulture)+"p | TP1 "+(Math.Abs(_plan.Target-_plan.Entry)/Symbol.PipSize).ToString("0.0",CultureInfo.InvariantCulture)+"p | "+rr.ToString("0.00",CultureInfo.InvariantCulture)+"R";

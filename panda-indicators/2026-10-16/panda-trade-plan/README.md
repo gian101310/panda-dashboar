@@ -1,20 +1,22 @@
 # Panda Trade Plan — personal cTrader indicator
 
-Visual, on-demand pullback planning. It never places, modifies, or cancels orders.
+Visual pullback planning, automatic by default. It never places, modifies, or cancels orders.
 Built for the existing 21 Panda forex pairs; H1 context is used on any chart timeframe.
 
 ## Agreed behaviour
 
 - Direction: the existing personal cTrader XTF scoring calculation, including
   gap >= 5 / <= -5 and hard-invalid checks. All 21 histories must be ready.
-- Default entry references: previous **day/week/month/year** highs and lows plus
+- Default entry references: previous **day/week/month** highs and lows plus
   **H1/H4/D1 Panda Box edges**, choosing the nearest eligible level on the
   pullback side. Follow Line and SuperTrend are not entry candidates.
+- Previous-year highs/lows are excluded from entries, targets and optional-guide
+  range limits. No yearly fallback is used when nearer references are unavailable.
 - The entry label identifies the selected reference, such as PDL or H1 Box Low.
 - Default mode: ScoringBias. Entry follows scoring direction and the nearest
   eligible entry reference; TP1 uses the nearest eligible forward reference at
   least **50 pips from entry**. No forecast or fixed-distance entry is invented.
-- SL distance is derived from Entry-to-TP1 distance: under 100 pips / 2;
+- Default SL distance is derived from Entry-to-TP1 distance: under 100 pips / 2;
   100 to under 200 / 3; 200 to under 300 / 4; 300+ / 5 (existing project tier).
   Round the resulting stop to the broker's price precision. SuperTrend/Follow
   Line are not entry or SL placement references in this final version.
@@ -30,17 +32,43 @@ Built for the existing 21 Panda forex pairs; H1 context is used on any chart tim
   A bias change marks the plan INVALID and preserves its prices. Day/24-hour
   expiry and deletion on bias change are optional settings, off by default.
 - Saved plans are restored for the same cTrader indicator instance. Changing
-  reference settings refreshes unedited rule plans; manual plans need Reset.
+  reference settings refreshes unedited rule plans; manual plans stay fixed until
+  explicitly refreshed. Old unedited plans migrate to the non-yearly rule version.
+- Automatic planning retries while data/bias/references are unavailable and
+  refreshes unedited valid plans every 15 seconds by default. It keeps manual
+  edits and bias-invalid plans rather than silently replacing them. Automatic
+  refresh does not move the chart view or change a hidden plan's visibility.
 
 ## Use
 
 1. Attach **Panda Trade Plan** to a supported forex chart.
-2. Wait for the panel's 21/21 histories. Click BUY LIMIT or SELL LIMIT in the
-   scoring-bias direction. A missing/invalid setup shows a reason, not invented prices.
+2. Wait for the panel's 21/21 histories. An eligible scoring-aligned plan appears
+   automatically. Missing setups show a reason and retry without Reset. BUY LIMIT,
+   SELL LIMIT and Refresh plan remain available for explicit recalculation.
 3. Drag Entry/SL/TP lines, or edit the price fields and click Apply edited prices.
    Invalid geometry is flagged. SL pips and actual displayed R update accordingly.
-4. Reset to rules recalculates. Hide plan hides drawings while retaining the plan;
-   Show plan restores it. Clear plan deletes this indicator's plan and saved state.
+4. Refresh plan recalculates and releases manual price locking. Hide/Show retains
+   the plan. Clear deletes the plan and pauses auto creation, including across
+   reloads; Resume auto starts it again. Pause auto freezes automatic refresh.
+
+## Adjustable inputs
+
+All settings are in the indicator's cTrader Parameters dialog, grouped by purpose.
+
+| Group | Controls |
+|---|---|
+| Automation | Automatic planning on/off; refresh interval (5-300 seconds) |
+| References (no year) | Previous day/week/month and H1/H4/D1 Box toggles; entry-reference selector |
+| Placement | Minimum TP1 (at least 50 pips); maximum entry and target distance (0 disables a cap); four SL divisors, default 2/3/4/5 |
+| Appearance | Risk/reward and guide thickness; drawing/guide opacity; label font size; drawing width; shading and guide visibility |
+| Panel | Scale (default 80%); base width (280, giving 224px at 80%); background opacity; X/Y; remember dragged position; start collapsed |
+
+Optional maximum distances constrain generated plans; manual edits remain possible.
+Changing X/Y overrides the remembered drag position; subsequent dragging is saved
+when Remember dragged position is enabled. Scale changes fonts, fields, margins and
+button heights as well as width. The panel retains its minus/plus collapse control.
+Defaults exclude yearly levels but do not invent a maximum distance for other levels;
+set the distance caps if a remaining weekly/monthly reference is still too far away.
 
 Entry/SL/TP1 use cTrader's **native risk/reward drawing**, rather than full-chart
 horizontal lines. Its initial width is 12 bars and can be resized with the native
@@ -61,8 +89,8 @@ names prevent duplicates during parameter reloads. No API token is required.
 
 Scoring and Panda Lines calculations are reused from the existing personal XTF/BOS
 source in `2026-07-18/ctrader-panda-xtf-bos`; the original is unchanged. Native broker
-H1 data, periods and prices may differ from the engine's MT4 feed. Previous-year
-levels are offered only when a full prior year's monthly candles are available.
+H1 data, periods and prices may differ from the engine's MT4 feed. Yearly levels
+are not used in this revision.
 The planner's H1 context does not switch to M5 when attached on an M5 chart.
 
 ## Build and tests
@@ -85,7 +113,7 @@ Entry/SL/TP1/TP2/TP3 through the data window/API without drawing extra visible l
 
 ## Session verification and limits
 
-- C# release build: zero errors and zero warnings. Plan rules: 36 assertions pass,
+- C# release build: zero errors and zero warnings. Plan rules: 55 assertions pass,
   including exact 50/99/100/199/200/250/300-pip target and SL boundaries.
 - Duplicate checker and Next.js production build pass.
 - Existing JS suite: 216/218 pass. Unchanged failures are `active application

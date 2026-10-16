@@ -8,6 +8,11 @@ namespace PandaPlanning
     public enum PlanExpiry { NextDubaiDay, After24Hours, ManualOnly }
     public enum BiasChange { MarkInvalid, DeletePlan }
     public enum EntryReference { PreviousLevelsAndBoxes, PreviousPeriodLevels, PandaBoxes }
+    public sealed class PlanSettings
+    {
+        public double MinimumTargetPips=50, MaxTargetPips, MaxEntryPips;
+        public double StopUnder100=2, StopUnder200=3, StopUnder300=4, StopFrom300=5;
+    }
     public sealed class Level
     {
         public string Name; public double Price;
@@ -15,7 +20,7 @@ namespace PandaPlanning
     }
     public sealed class Plan
     {
-        public string Side, EntryLabel, TargetLabel, Reference, InvalidReason;
+        public string Side, EntryLabel, TargetLabel, Reference, InvalidReason, Settings;
         public PlanMode Mode;
         public int RuleVersion;
         public double Entry, Stop, Target, ClearTarget;
@@ -27,7 +32,7 @@ namespace PandaPlanning
     public static class Rules
     {
         public static Plan Build(string side,double gap,bool hardInvalid,string zone,bool linesValid,
-            double price,double pip,int digits,IEnumerable<Level> levels,PlanMode mode,out string reason,IEnumerable<Level> entryReferences=null)
+            double price,double pip,int digits,IEnumerable<Level> levels,PlanMode mode,out string reason,IEnumerable<Level> entryReferences=null,PlanSettings settings=null)
         {
             reason="No valid pullback setup";
             if(hardInvalid || (side!="BUY" && side!="SELL") || Math.Abs(gap)<5 || (side=="BUY"?gap<5:gap> -5))return null;
@@ -35,22 +40,27 @@ namespace PandaPlanning
             if(mode==PlanMode.PandaLinesConfirmed && (!linesValid||zone!=(buy?"ABOVE":"BELOW")))
             {reason="Panda Lines not confirmed";return null;}
             if(!Finite(price)||!Finite(pip)||pip<=0)return null;
-            var all=levels.Where(l=>Finite(l.Price)&&l.Price>0).ToArray();
-            var refs=(entryReferences??all).Where(l=>Finite(l.Price)&&l.Price>0);
-            var entries=refs.Where(l=>buy?l.Price<price:l.Price>price).OrderBy(l=>Math.Abs(l.Price-price));
+            settings=settings??new PlanSettings();
+            double minimum=Math.Max(50,settings.MinimumTargetPips);
+            var all=levels.Where(EligibleReference).ToArray();
+            var refs=(entryReferences??all).Where(EligibleReference);
+            var entries=refs.Where(l=>(buy?l.Price<price:l.Price>price) &&
+                (settings.MaxEntryPips<=0||Math.Abs(l.Price-price)/pip<=settings.MaxEntryPips+0.000001)).OrderBy(l=>Math.Abs(l.Price-price));
             var targets=all.Where(l=>buy?l.Price>price:l.Price<price).OrderBy(l=>Math.Abs(l.Price-price)).ToArray();
             foreach(var entry in entries)
             {
-                var clear=targets.Where(t=>Math.Abs(t.Price-entry.Price)/pip>=50-0.000001).ToArray();
+                var clear=targets.Where(t=>Math.Abs(t.Price-entry.Price)/pip>=minimum-0.000001 &&
+                    (settings.MaxTargetPips<=0||Math.Abs(t.Price-entry.Price)/pip<=settings.MaxTargetPips+0.000001)).ToArray();
                 if(clear.Length==0)continue;
                 var target=clear.First();
                 double entryPrice=Math.Round(entry.Price,digits),tp=Math.Round(target.Price,digits);
                 double distance=Math.Abs(tp-entryPrice);
                 double targetPips=Math.Round(distance/pip,6);
-                int divisor=targetPips>=300?5:targetPips>=200?4:targetPips>=100?3:2;
+                double divisor=targetPips>=300?settings.StopFrom300:targetPips>=200?settings.StopUnder300:targetPips>=100?settings.StopUnder200:settings.StopUnder100;
+                if(!Finite(divisor)||divisor<=0)continue;
                 double stop=Math.Round(entryPrice+(buy?-1:1)*distance/divisor,digits);
-                if(!ValidGeometry(side,entryPrice,stop,tp)||!MeetsTargetMinimum(entryPrice,tp,pip))continue;
-                var result=new Plan {Side=side,Mode=mode,RuleVersion=2,EntryLabel=entry.Name,TargetLabel=target.Name,
+                if(!ValidGeometry(side,entryPrice,stop,tp)||!MeetsTargetMinimum(entryPrice,tp,pip,minimum))continue;
+                var result=new Plan {Side=side,Mode=mode,RuleVersion=3,EntryLabel=entry.Name,TargetLabel=target.Name,
                     Entry=entryPrice,Stop=stop,Target=tp,ClearTarget=clear.Last().Price};
                 double risk=Math.Abs(result.Entry-result.Stop),baseR=Math.Abs(result.Target-result.Entry)/risk,sign=buy?1:-1;
                 double t2=Math.Round(result.Entry+sign*risk*(baseR+1),digits),t3=Math.Round(result.Entry+sign*risk*(baseR+2),digits);
@@ -58,8 +68,13 @@ namespace PandaPlanning
                 if(buy?t3<=result.ClearTarget:t3>=result.ClearTarget)result.Target3=t3;
                 reason="Ready";return result;
             }
-            reason="No eligible reference with a TP1 at least 50 pips away";return null;
+            reason="No eligible reference within entry/TP limits (TP1 minimum "+minimum.ToString("0.#",System.Globalization.CultureInfo.InvariantCulture)+" pips)";return null;
         }
+        public static bool EligibleReference(Level level)
+        {return level!=null&&Finite(level.Price)&&level.Price>0 &&
+            !string.Equals(level.Name,"PYH",StringComparison.OrdinalIgnoreCase)&&!string.Equals(level.Name,"PYL",StringComparison.OrdinalIgnoreCase);}
+        public static bool ShouldAutoPlan(Plan plan,bool enabled,bool paused,bool ready)
+        {return enabled&&!paused&&ready&&(plan==null||(!plan.Manual&&!plan.Invalid));}
         public static bool Finite(double x) {return !double.IsNaN(x)&&!double.IsInfinity(x);}
         public static bool ValidGeometry(string side,double entry,double stop,double target)
         {
@@ -67,8 +82,8 @@ namespace PandaPlanning
                 (side=="BUY"?stop<entry&&target>entry:side=="SELL"&&stop>entry&&target<entry);
         }
         public static bool BiasInvalid(string planned,string current,bool hardInvalid) {return hardInvalid || planned!=current;}
-        public static bool MeetsTargetMinimum(double entry,double target,double pip)
-        {return Finite(entry)&&Finite(target)&&Finite(pip)&&pip>0&&Math.Abs(target-entry)/pip>=50-0.000001;}
+        public static bool MeetsTargetMinimum(double entry,double target,double pip,double minimum=50)
+        {return Finite(entry)&&Finite(target)&&Finite(pip)&&pip>0&&Math.Abs(target-entry)/pip>=Math.Max(50,minimum)-0.000001;}
         public static bool ValidGuides(string side,double target,double? target2,double? target3)
         {
             if(target2.HasValue && (!Finite(target2.Value)||(side=="BUY"?target2.Value<=target:target2.Value>=target)))return false;

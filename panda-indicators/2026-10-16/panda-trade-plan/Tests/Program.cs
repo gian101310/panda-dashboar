@@ -36,6 +36,28 @@ class Program
         Check(!Rules.Expired(now,now.AddSeconds(30),PlanExpiry.NextDubaiDay),"same Dubai day");Check(Rules.Expired(now,now.AddMinutes(2),PlanExpiry.NextDubaiDay),"Dubai midnight");
         Check(!Rules.Expired(now,now.AddHours(23),PlanExpiry.After24Hours),"23 hours");Check(Rules.Expired(now,now.AddHours(24),PlanExpiry.After24Hours),"24 hours");Check(!Rules.Expired(now,now.AddDays(4),PlanExpiry.ManualOnly),"manual retention");
         Check(Rules.BiasInvalid("BUY","SELL",false),"opposite bias");Check(Rules.BiasInvalid("BUY","WAIT",false),"WAIT invalid");Check(!Rules.BiasInvalid("BUY","BUY",false),"same bias");
+        var yearly=new[]{new Level("PYL",1.1019),new Level("PDL",1.1),new Level("PYH",1.11),new Level("PWH",1.12)};
+        var noYear=Rules.Build("BUY",7,false,"ABOVE",true,1.102,.0001,5,yearly,PlanMode.ScoringBias,out reason);
+        Near(noYear.Entry,1.1,"year entry excluded");Near(noYear.Target,1.12,"year target excluded");
+        Check(Rules.Build("BUY",7,false,"ABOVE",true,1.102,.0001,5,new[]{new Level("PDL",1.1),new Level("PYH",1.11)},PlanMode.ScoringBias,out reason)==null,"no yearly fallback");
+        var limited=Rules.Build("BUY",7,false,"ABOVE",true,1.102,.0001,5,yearly,PlanMode.ScoringBias,out reason,settings:new PlanSettings {MaxTargetPips=100});
+        Check(limited==null,"optional target distance cap");
+        Check(Rules.Build("BUY",7,false,"ABOVE",true,1.102,.0001,5,levels,PlanMode.ScoringBias,out reason,settings:new PlanSettings {MaxEntryPips=10})==null,"optional entry distance cap");
+        var custom=Rules.Build("BUY",7,false,"ABOVE",true,1.102,.0001,5,new[]{new Level("PDL",1.1),new Level("PDH",1.105)},PlanMode.ScoringBias,out reason,settings:new PlanSettings {StopUnder100=4});
+        Near(custom.Stop,1.09875,"editable SL divisor");
+        Check(Rules.ShouldAutoPlan(null,true,false,true),"auto retries empty ready chart");
+        Check(!Rules.ShouldAutoPlan(null,true,false,false),"auto waits for histories");
+        Check(!Rules.ShouldAutoPlan(null,true,true,true),"Clear pauses auto recreation");
+        Check(!Rules.ShouldAutoPlan(null,false,false,true),"auto disabled");
+        Check(Rules.ShouldAutoPlan(p50,true,false,true),"auto can refresh unedited plan");
+        p50.Manual=true;Check(!Rules.ShouldAutoPlan(p50,true,false,true),"auto preserves manual prices");
+        p50.Manual=false;p50.Invalid=true;Check(!Rules.ShouldAutoPlan(p50,true,false,true),"auto retains invalid plan until user clears");
+        Check(Rules.Build("BUY",7,false,"ABOVE",true,1.102,.0001,5,new[]{new Level("PDL",1.1),new Level("PDH",1.105)},PlanMode.ScoringBias,out reason,settings:new PlanSettings {MinimumTargetPips=80})==null,"larger configured target minimum");
+        Check(!Rules.MeetsTargetMinimum(1.1,1.105,.0001,80),"manual target respects configured minimum");
+        Check(!Rules.MeetsTargetMinimum(1.1,1.104,.0001,10),"configured minimum never bypasses 50 pips");
+        var sellNoYear=Rules.Build("SELL",-8,false,"BELOW",true,1.275,.0001,5,new[]{new Level("PYH",1.2751),new Level("PDH",1.28),new Level("PYL",1.26),new Level("PDL",1.25)},PlanMode.ScoringBias,out reason);
+        Near(sellNoYear.Entry,1.28,"SELL yearly entry excluded");Near(sellNoYear.Target,1.25,"SELL yearly target excluded");
+        Check(Rules.Build("BUY",7,false,"ABOVE",true,1.102,.0001,5,yearly,PlanMode.ScoringBias,out reason,new[]{new Level("PYL",1.1019)})==null,"explicit yearly entry reference excluded");
         Console.WriteLine("PASS: "+checks+" trade-plan assertions");
     }
 }
