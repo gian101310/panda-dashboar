@@ -7,6 +7,15 @@ Built for the existing 21 Panda forex pairs; H1 context is used on any chart tim
 
 - Direction: the existing personal cTrader XTF scoring calculation, including
   gap >= 5 / <= -5 and hard-invalid checks. All 21 histories must be ready.
+- Currency votes are kept as separate positive/negative counts per timeframe.
+  The dominant side is used (`+3/-1 -> +3`), rather than netting opposing votes.
+  The strongest raw component across all timeframes determines currency strength;
+  equal opposing strongest magnitudes give zero. Any raw positive extreme >=4
+  alongside a negative extreme <=-4 invalidates that currency. Both currencies
+  below magnitude 4 is a separate neutral-matchup invalidation. These match the
+  engine's extraction rules, using cTrader's own broker candles and box levels.
+- Show score diagnostics (on by default) displays actual D1/H4/H1 vote splits;
+  HARD_INVALID names the currency conflict or explains the neutral matchup.
 - Default entry references: previous **day/week/month** highs and lows plus
   **H1/H4/D1 Panda Box edges**, choosing the nearest eligible level on the
   pullback side. Follow Line and SuperTrend are not entry candidates.
@@ -87,8 +96,9 @@ names prevent duplicates during parameter reloads. No API token is required.
 
 ## Data boundaries
 
-Scoring and Panda Lines calculations are reused from the existing personal XTF/BOS
-source in `2026-07-18/ctrader-panda-xtf-bos`; the original is unchanged. Native broker
+Period/Box and Panda Lines calculations are reused from the existing personal XTF/BOS
+source in `2026-07-18/ctrader-panda-xtf-bos`; the original is unchanged. This planner's
+aggregation has been corrected from net votes to dominant components. Native broker
 H1 data, periods and prices may differ from the engine's MT4 feed. Yearly levels
 are not used in this revision.
 The planner's H1 context does not switch to M5 when attached on an M5 chart.
@@ -113,8 +123,11 @@ Entry/SL/TP1/TP2/TP3 through the data window/API without drawing extra visible l
 
 ## Session verification and limits
 
-- C# release build: zero errors and zero warnings. Plan rules: 55 assertions pass,
+- C# release build: zero errors and zero warnings. Plan rules: 67 assertions pass,
   including exact 50/99/100/199/200/250/300-pip target and SL boundaries.
+- A USDCAD regression uses USD `D1:+2 H4:+1/-1 H1:+1/-4` and CAD
+  `D1:+2 H4:+2 H1:+3/-1`: USD=-4, CAD=+3, gap=-7, without HARD_INVALID.
+  This demonstrates the fix; it is not a claim about current live cTrader scores.
 - Duplicate checker and Next.js production build pass.
 - Existing JS suite: 216/218 pass. Unchanged failures are `active application
   surfaces no longer advertise Guardian or Hermes` and `Pine source contains the

@@ -80,6 +80,8 @@ namespace cAlgo
         public bool RememberPosition {get;set;}
         [Parameter("Start collapsed",Group="Panel",DefaultValue=false)]
         public bool StartCollapsed {get;set;}
+        [Parameter("Show score diagnostics",Group="Panel",DefaultValue=true)]
+        public bool ShowScoreDiagnostics {get;set;}
 
         // Transparent price outputs expose the current plan in cTrader's data
         // window / indicator API without adding a second set of visible lines.
@@ -140,7 +142,7 @@ namespace cAlgo
                 if(_plan!=null)
                 {
                     _message="Saved plan restored";
-                    _refreshReference=!_plan.Manual && (_plan.RuleVersion!=3 || _plan.Settings!=SettingsKey || !Rules.MeetsTargetMinimum(_plan.Entry,_plan.Target,Symbol.PipSize));
+                    _refreshReference=!_plan.Manual && (_plan.RuleVersion!=4 || _plan.Settings!=SettingsKey || !Rules.MeetsTargetMinimum(_plan.Entry,_plan.Target,Symbol.PipSize));
                     string width=DrawingWidth.ToString(CultureInfo.InvariantCulture);
                     if(LocalStorage.GetString("Drawing width",LocalStorageScope.Instance)!=width){_plan.AnchorStart=DateTime.MinValue;_plan.AnchorEnd=DateTime.MinValue;}
                     Render();
@@ -214,11 +216,11 @@ namespace cAlgo
             if(candidate==null)
             {
                 _message=reason;
-                if(_plan!=null&&(_plan.RuleVersion!=3||_plan.Settings!=SettingsKey))
+                if(_plan!=null&&(_plan.RuleVersion!=4||_plan.Settings!=SettingsKey))
                 {_plan.Invalid=true;_plan.InvalidReason="no eligible plan under revised references/settings";_refreshReference=automatic;Save();Render();}
                 UpdateStatus();return;
             }
-            if(automatic&&_plan!=null&&_plan.RuleVersion==3&&_plan.Settings==SettingsKey&&_plan.Side==candidate.Side&&
+            if(automatic&&_plan!=null&&_plan.RuleVersion==4&&_plan.Settings==SettingsKey&&_plan.Side==candidate.Side&&
                 _plan.Entry==candidate.Entry&&_plan.Stop==candidate.Stop&&_plan.Target==candidate.Target&&_plan.Target2==candidate.Target2&&_plan.Target3==candidate.Target3)return;
             var previousPlan=_plan;
             candidate.CreatedUtc=automatic&&previousPlan!=null?previousPlan.CreatedUtc:DateTime.UtcNow;
@@ -443,13 +445,15 @@ namespace cAlgo
             PublishPlan();
             _compact.Text=SymbolName+" | "+(_plan==null?_pandaBias:_plan.Invalid?"INVALID":_plan.Side+" PLAN");
             _context.Text=SymbolName+" | Bias "+_pandaBias+" | Gap "+_pandaGap+" | "+_readyPairs+"/21";
+            if(ShowScoreDiagnostics&&!string.IsNullOrEmpty(_scoreDetails))_context.Text+="\n"+_scoreDetails;
             _hide.Text=_hidden?"Show plan":"Hide plan";
             _autoButton.Text=!AutoPlan?"Auto disabled (settings)":_autoPaused?"Resume auto":"Pause auto";
-            _status.ForegroundColor=_plan!=null&&_plan.Invalid?Red:Blue;
+            _status.ForegroundColor=(_plan!=null&&_plan.Invalid)||(_scoreReady&&_hardInvalid)?Red:Blue;
             _status.Text=_plan!=null&&_plan.Invalid?"INVALID - "+(_plan.InvalidReason??"bias changed")+"; plan retained":_message;
+            if(_scoreReady&&_hardInvalid)_status.Text=_scoreInvalidReason;
             if(_plan==null){_metrics.Text="SL - pips | TP1 - R";_note.Text="Rules: "+Mode+"\nReference: "+Reference+"\nExpiry: "+Expiry;return;}
             double risk=Math.Abs(_plan.Entry-_plan.Stop),rr=risk>0?Math.Abs(_plan.Target-_plan.Entry)/risk:0;
-            if(_plan.RuleVersion!=3){_status.Text="Older manual plan retained; Refresh plan applies revised references";_status.ForegroundColor=Red;}
+            if(_plan.RuleVersion!=4){_status.Text="Older plan retained; Refresh plan applies revised scoring/references";_status.ForegroundColor=Red;}
             bool geometry=Rules.ValidGeometry(_plan.Side,_plan.Entry,_plan.Stop,_plan.Target);
             if(!geometry){_status.Text="INVALID geometry - edit SL/entry/TP";_status.ForegroundColor=Red;}
             else if(!Rules.MeetsTargetMinimum(_plan.Entry,_plan.Target,Symbol.PipSize,MinTargetPips))

@@ -58,6 +58,21 @@ class Program
         var sellNoYear=Rules.Build("SELL",-8,false,"BELOW",true,1.275,.0001,5,new[]{new Level("PYH",1.2751),new Level("PDH",1.28),new Level("PYL",1.26),new Level("PDL",1.25)},PlanMode.ScoringBias,out reason);
         Near(sellNoYear.Entry,1.28,"SELL yearly entry excluded");Near(sellNoYear.Target,1.25,"SELL yearly target excluded");
         Check(Rules.Build("BUY",7,false,"ABOVE",true,1.102,.0001,5,yearly,PlanMode.ScoringBias,out reason,new[]{new Level("PYL",1.1019)})==null,"explicit yearly entry reference excluded");
+        bool conflict;
+        int usd=Rules.CurrencyScore(new[]{2,1,1},new[]{0,-1,-4},out conflict);
+        Check(usd==-4&&!conflict,"USD retains -4 extreme instead of net -3");
+        int cad=Rules.CurrencyScore(new[]{2,2,3},new[]{0,0,-1},out conflict);
+        Check(cad==3&&!conflict,"CAD uses dominant +3 instead of net +2");
+        Check(usd-cad==-7,"USDCAD dominant score gap -7");
+        Check(Rules.InvalidationReason("USD","CAD",false,false,usd,cad)=="","USDCAD is not neutral/invalid with USD -4 CAD +3");
+        Check(Rules.Dominant(3,-1)==3,"positive dominant display");
+        Check(Rules.Dominant(1,-4)==-4,"negative dominant display");
+        Rules.CurrencyScore(new[]{4,0,0},new[]{-4,0,0},out conflict);Check(conflict,"opposing extremes in same TF remain invalid");
+        Rules.CurrencyScore(new[]{4,0,0},new[]{0,-5,0},out conflict);Check(conflict,"opposing extremes across TF remain invalid");
+        Check(Rules.CurrencyScore(new[]{2,1,0},new[]{-2,0,0},out conflict)==0&&!conflict,"raw tie across all components remains zero");
+        Check(Rules.InvalidationReason("USD","CAD",true,false,0,3).Contains("USD"),"conflict reason names base currency");
+        Check(Rules.InvalidationReason("USD","CAD",false,true,-4,0).Contains("CAD"),"conflict reason names quote currency");
+        Check(Rules.InvalidationReason("USD","CAD",false,false,-3,3).Contains("neutral"),"neutral reason distinct from conflict");
         Console.WriteLine("PASS: "+checks+" trade-plan assertions");
     }
 }

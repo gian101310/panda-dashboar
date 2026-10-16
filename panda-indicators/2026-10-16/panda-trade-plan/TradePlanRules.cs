@@ -31,6 +31,21 @@ namespace PandaPlanning
     }
     public static class Rules
     {
+        public static int Dominant(int positive,int negative)
+        {return positive == -negative ? 0 : positive > -negative ? positive : negative;}
+        public static int CurrencyScore(IEnumerable<int> positives,IEnumerable<int> negatives,out bool conflict)
+        {
+            var raw=positives.Concat(negatives).ToArray();
+            conflict=raw.Any(v=>v>=4)&&raw.Any(v=>v<=-4);
+            if(conflict)return 0;
+            return Dominant(raw.Where(v=>v>0).DefaultIfEmpty(0).Max(),raw.Where(v=>v<0).DefaultIfEmpty(0).Min());
+        }
+        public static string InvalidationReason(string baseCurrency,string quoteCurrency,bool baseConflict,bool quoteConflict,int baseScore,int quoteScore)
+        {
+            if(baseConflict||quoteConflict)return (baseConflict?baseCurrency:"")+(baseConflict&&quoteConflict?" / ":"")+
+                (quoteConflict?quoteCurrency:"")+": opposing extremes (+4 or higher and -4 or lower)";
+            return Math.Abs(baseScore)<4&&Math.Abs(quoteScore)<4?baseCurrency+" / "+quoteCurrency+": both currencies neutral (no extreme >=4)":"";
+        }
         public static Plan Build(string side,double gap,bool hardInvalid,string zone,bool linesValid,
             double price,double pip,int digits,IEnumerable<Level> levels,PlanMode mode,out string reason,IEnumerable<Level> entryReferences=null,PlanSettings settings=null)
         {
@@ -60,7 +75,7 @@ namespace PandaPlanning
                 if(!Finite(divisor)||divisor<=0)continue;
                 double stop=Math.Round(entryPrice+(buy?-1:1)*distance/divisor,digits);
                 if(!ValidGeometry(side,entryPrice,stop,tp)||!MeetsTargetMinimum(entryPrice,tp,pip,minimum))continue;
-                var result=new Plan {Side=side,Mode=mode,RuleVersion=3,EntryLabel=entry.Name,TargetLabel=target.Name,
+                var result=new Plan {Side=side,Mode=mode,RuleVersion=4,EntryLabel=entry.Name,TargetLabel=target.Name,
                     Entry=entryPrice,Stop=stop,Target=tp,ClearTarget=clear.Last().Price};
                 double risk=Math.Abs(result.Entry-result.Stop),baseR=Math.Abs(result.Target-result.Entry)/risk,sign=buy?1:-1;
                 double t2=Math.Round(result.Entry+sign*risk*(baseR+1),digits),t3=Math.Round(result.Entry+sign*risk*(baseR+2),digits);

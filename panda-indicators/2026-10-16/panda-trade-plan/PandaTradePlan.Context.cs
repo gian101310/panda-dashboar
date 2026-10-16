@@ -6,6 +6,7 @@ using System.Globalization;
 using System.Linq;
 using cAlgo.API;
 using cAlgo.API.Internals;
+using PandaPlanning;
 namespace cAlgo
 {
     public partial class PandaTradePlan
@@ -112,6 +113,10 @@ namespace cAlgo
         private readonly int[] _scoresH1 = new int[7];
         private readonly int[] _scoresH4 = new int[7];
         private readonly int[] _scoresD1 = new int[7];
+        private readonly int[] _positiveH1=new int[7],_negativeH1=new int[7];
+        private readonly int[] _positiveH4=new int[7],_negativeH4=new int[7];
+        private readonly int[] _positiveD1=new int[7],_negativeD1=new int[7];
+        private string _scoreDetails="",_scoreInvalidReason="";
         private PairSlot _activeSlot;
         private string _chartPair = "";
         private int _baseIndex = -1;
@@ -254,29 +259,28 @@ namespace cAlgo
             if (double.IsNaN(price) || double.IsNaN(boxHigh) || double.IsNaN(boxLow)) return 0;
             return price > boxHigh ? 1 : price < boxLow ? -1 : 0;
         }
-        private static void AddVote(int[] target, string currency, int vote)
+        private static void AddVote(int[] positive,int[] negative,string currency,int vote)
         {
             var index = CurrencyIndex(currency);
-            if (index >= 0) target[index] += vote;
+            if(index<0)return;
+            if(vote>0)positive[index]+=vote;else if(vote<0)negative[index]+=vote;
         }
-        private static void AddPairVote(int[] target, string pair, int vote)
+        private static void AddPairVote(int[] positive,int[] negative,string pair,int vote)
         {
-            AddVote(target, pair.Substring(0, 3), vote);
-            AddVote(target, pair.Substring(3, 3), -vote);
+            AddVote(positive,negative,pair.Substring(0,3),vote);
+            AddVote(positive,negative,pair.Substring(3,3),-vote);
         }
-        private static int Strongest(int d1, int h4, int h1)
+        private int ScoreCurrency(int index,out bool conflict)
         {
-            var positive = Math.Max(0, Math.Max(d1, Math.Max(h4, h1)));
-            var negative = Math.Min(0, Math.Min(d1, Math.Min(h4, h1)));
-            if (Math.Abs(positive) == Math.Abs(negative)) return 0;
-            return Math.Abs(negative) > Math.Abs(positive) ? negative : positive;
+            return Rules.CurrencyScore(new[]{_positiveD1[index],_positiveH4[index],_positiveH1[index]},
+                new[]{_negativeD1[index],_negativeH4[index],_negativeH1[index]},out conflict);
         }
-        private static bool Conflicted(int d1, int h4, int h1)
+        private static string VoteCell(int positive,int negative)
         {
-            var hasPositive = d1 >= PandaSignificant || h4 >= PandaSignificant || h1 >= PandaSignificant;
-            var hasNegative = d1 <= -PandaSignificant || h4 <= -PandaSignificant || h1 <= -PandaSignificant;
-            return hasPositive && hasNegative;
+            return positive>0&&negative<0?SignedScore(positive)+"/"+SignedScore(negative):SignedScore(Rules.Dominant(positive,negative));
         }
+        private string ScoreDetails(int index,string currency)
+        {return currency+" D1 "+VoteCell(_positiveD1[index],_negativeD1[index])+" H4 "+VoteCell(_positiveH4[index],_negativeH4[index])+" H1 "+VoteCell(_positiveH1[index],_negativeH1[index]);}
         private static string BoxTrend(double formerHigh, double formerLow, double latterHigh, double latterLow)
         {
             if (double.IsNaN(formerHigh) || double.IsNaN(formerLow) || double.IsNaN(latterHigh) || double.IsNaN(latterLow)) return "UNKNOWN";
@@ -320,15 +324,22 @@ namespace cAlgo
             Array.Clear(_scoresH1, 0, 7);
             Array.Clear(_scoresH4, 0, 7);
             Array.Clear(_scoresD1, 0, 7);
+            foreach(var counts in new[]{_positiveD1,_negativeD1,_positiveH4,_negativeH4,_positiveH1,_negativeH1})Array.Clear(counts,0,7);
             _readyPairs = 0;
             foreach (var slot in _slots)
             {
                 if (!slot.Ready || slot.Bars == null || slot.Bars.Count == 0) continue;
                 _readyPairs++;
                 var price = slot.Bars.LastBar.Close;
-                AddPairVote(_scoresH1, slot.Pair, Vote(price, slot.ShortHigh, slot.ShortLow));
-                AddPairVote(_scoresH4, slot.Pair, Vote(price, slot.MediumHigh, slot.MediumLow));
-                AddPairVote(_scoresD1, slot.Pair, Vote(price, slot.LongHigh, slot.LongLow));
+                AddPairVote(_positiveH1,_negativeH1,slot.Pair,Vote(price,slot.ShortHigh,slot.ShortLow));
+                AddPairVote(_positiveH4,_negativeH4,slot.Pair,Vote(price,slot.MediumHigh,slot.MediumLow));
+                AddPairVote(_positiveD1,_negativeD1,slot.Pair,Vote(price,slot.LongHigh,slot.LongLow));
+            }
+            for(int i=0;i<7;i++)
+            {
+                _scoresD1[i]=Rules.Dominant(_positiveD1[i],_negativeD1[i]);
+                _scoresH4[i]=Rules.Dominant(_positiveH4[i],_negativeH4[i]);
+                _scoresH1[i]=Rules.Dominant(_positiveH1[i],_negativeH1[i]);
             }
 
             var supported = _chartPair != "";
@@ -343,13 +354,15 @@ namespace cAlgo
                 _baseXtfText = "—";
                 _quoteXtfText = "—";
                 _xtfSummaryText = "—";
+                _scoreDetails="";_scoreInvalidReason="";
                 return;
             }
 
-            var baseStrong = Strongest(_scoresD1[_baseIndex], _scoresH4[_baseIndex], _scoresH1[_baseIndex]);
-            var quoteStrong = Strongest(_scoresD1[_quoteIndex], _scoresH4[_quoteIndex], _scoresH1[_quoteIndex]);
-            var baseConflict = Conflicted(_scoresD1[_baseIndex], _scoresH4[_baseIndex], _scoresH1[_baseIndex]);
-            var quoteConflict = Conflicted(_scoresD1[_quoteIndex], _scoresH4[_quoteIndex], _scoresH1[_quoteIndex]);
+            bool baseConflict,quoteConflict;
+            var baseStrong=ScoreCurrency(_baseIndex,out baseConflict);
+            var quoteStrong=ScoreCurrency(_quoteIndex,out quoteConflict);
+            _scoreDetails=ScoreDetails(_baseIndex,_chartPair.Substring(0,3))+"\n"+ScoreDetails(_quoteIndex,_chartPair.Substring(3,3));
+            _scoreInvalidReason=Rules.InvalidationReason(_chartPair.Substring(0,3),_chartPair.Substring(3,3),baseConflict,quoteConflict,baseStrong,quoteStrong);
             var neutralMatchup = Math.Abs(baseStrong) < PandaSignificant && Math.Abs(quoteStrong) < PandaSignificant;
             _hardInvalid = baseConflict || quoteConflict || neutralMatchup;
             _pandaGap = _hardInvalid ? 0 : baseStrong - quoteStrong;

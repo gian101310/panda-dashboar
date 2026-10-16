@@ -54,5 +54,11 @@ Windows control plugin returning HTTP 404. Do not treat API attachment as visual
 - Keep plans until Clear plan. Bias changes mark INVALID without deleting/moving.
 - Separate visual planner; no automatic execution or engine strategy changes.
 
-Rule tests: `dotnet run --project Tests/Tests.csproj -c Release` (55 assertions).
+Scoring revision: retain separate positive/negative currency vote counts and use
+dominant components, not net sums. Test USDCAD's raw USD -4 / CAD +3 example ->
+gap -7 and no neutral-matchup invalidation. Verify Show score diagnostics displays
+the real broker timeframe splits and the exact HARD_INVALID reason. Broker data
+can still differ from MT4; do not force a valid bias when raw conflicts are present.
+
+Rule tests: `dotnet run --project Tests/Tests.csproj -c Release` (67 assertions).
 Release project: `Panda Trade Plan/Panda Trade Plan/PandaTradePlan.csproj`.

@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-10-17 (Trade Plan dominant scoring and invalidation diagnostics)
+
+- Corrected the planner's inherited net-vote aggregation to retain positive and
+  negative components separately. It now follows the confirmed dominant-side rule,
+  preserving raw extreme conflicts and strongest-component ties.
+- Added per-currency timeframe splits and specific HARD_INVALID reasons to the
+  panel, with an optional diagnostics toggle. A USD -4 / CAD +3 regression remains
+  valid with gap -7 instead of being flattened into a neutral matchup.
+- Engine scoring and original indicators are unchanged. Live cTrader confirmation
+  remains blocked by the control connection returning HTTP 404.
+
 ## 2026-10-17 (Automatic Panda Trade Plan and appearance controls)
 
 - Excluded previous-year references from suggested entries, targets and optional
