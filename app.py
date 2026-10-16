@@ -34,6 +34,7 @@ from PIL import Image, ImageDraw, ImageFont
 from dotenv import load_dotenv
 from supabase import create_client
 from news_results import resolve_news_actual, load_sent_results, mark_result_sent
+from news_speeches import is_fed_chair_speech, resolve_speech_summary, speech_api_key
 
 load_dotenv()
 
@@ -3902,6 +3903,7 @@ def check_news_alerts():
         now_utc = datetime.now(timezone.utc)
         alerted_this_run = []
         result_this_run = []
+        speech_this_run = []
 
         for ev in events:
             impact = (ev.get("impact") or "").strip()
@@ -3923,6 +3925,14 @@ def check_news_alerts():
                 continue
 
             if -NEWS_RESULT_WINDOW_MINUTES <= mins_away <= 0:
+                if is_fed_chair_speech(ev):
+                    speech_key = build_news_alert_key(ev, "SPEECH")
+                    if speech_key not in NEWS_ALERTED and mins_away <= -15:
+                        report = resolve_speech_summary(ev, event_dt, speech_api_key(OPENAI_API_KEY), now_utc)
+                        stage = "SPEECH" if report["status"] == "ready" else "SPEECH_PENDING"
+                        if build_news_alert_key(ev, stage) not in NEWS_ALERTED:
+                            speech_this_run.append((ev, event_dt, report, stage))
+                    continue
                 result_key = build_news_alert_key(ev, "RESULT")
                 if result_key not in NEWS_ALERTED:
                     result_ev = resolve_news_actual(ev, event_dt)
@@ -3989,6 +3999,39 @@ def check_news_alerts():
                 telegram_circuit.success()
             else:
                 telegram_circuit.failure()
+
+        for ev, event_dt, report, stage in speech_this_run:
+            title_safe = html.escape(ev.get("title") or "Fed chair speech")
+            dubai_time = event_dt.astimezone(timezone(timedelta(hours=4))).strftime("%Y-%m-%d %H:%M")
+            if stage == "SPEECH":
+                body = "\n".join("• " + html.escape(point) for point in report["bullets"])
+                sources = "\n".join(f'<a href="{html.escape(url, quote=True)}">Source {i+1}</a>' for i, url in enumerate(report["sources"]))
+                msg = (f"<b>FED CHAIR — POST-EVENT SUMMARY</b>\n{title_safe}\n"
+                       f"Event Dubai time: {dubai_time}\n\n{body}\n\n{sources}\n\n"
+                       "<i>AI summary of linked reporting, not an official transcript. "
+                       "A speech is not a numeric release or rate decision. Context only.</i>\nPANDA ENGINE")
+            else:
+                msg = (f"<b>FED CHAIR — SUMMARY PENDING</b>\n{title_safe}\n"
+                       f"Event Dubai time: {dubai_time}\n\n"
+                       "The scheduled start has passed. No source-linked summary is available yet. "
+                       "This event has no numeric actual value. Checking again every 30 minutes "
+                       "for up to 24 hours after the event.\nPANDA ENGINE")
+            try:
+                r = requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+                                  data={"chat_id": TELEGRAM_CHAT_ID, "text": msg, "parse_mode": "HTML"}, timeout=10)
+                payload = r.json() if r.status_code == 200 else {}
+                if r.status_code == 200 and payload.get("ok") is True:
+                    key = build_news_alert_key(ev, stage)
+                    mark_result_sent(key, (payload.get("result") or {}).get("message_id"))
+                    NEWS_ALERTED.add(key)
+                    telegram_circuit.success()
+                    print(f"[NEWS SPEECH] {stage} delivered: {ev.get('title')}")
+                else:
+                    telegram_circuit.failure()
+                    print("[NEWS SPEECH] Delivery failed; will retry")
+            except Exception as exc:
+                telegram_circuit.failure()
+                print(f"[NEWS SPEECH] Delivery failed ({type(exc).__name__}); will retry")
 
         for title, currency, mins_away, affected, event_dt, ev in result_this_run:
             pairs_str = ", ".join(affected[:6])

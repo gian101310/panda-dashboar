@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-10-16 (Fed-chair post-event summaries)
+
+- Added a separate speech-summary path for high-impact USD Fed-chair speeches;
+  speeches do not need a numeric actual value. Source-linked reporting is checked
+  from 15 minutes after the event, with 30-minute search retries and 24-hour catch-up.
+- Send one pending notice when remarks are unavailable, retry failed Telegram sends,
+  and persist separate pending/summary delivery marks across restarts.
+- Use this engine's configured file key for speech research rather than an unrelated
+  inherited desktop key. Locked scoring and strategy functions are unchanged.
+
 ## 2026-10-16 (Panda Trade Plan for cTrader)
 
 - Added a separate visual pullback planner using personal cTrader Panda scoring,
