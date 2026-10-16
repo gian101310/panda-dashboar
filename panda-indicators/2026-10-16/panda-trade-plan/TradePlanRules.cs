@@ -112,6 +112,18 @@ namespace PandaPlanning
             {plan.Draft=false;if(plan.EntryLabel=="MANUAL STOP DRAFT")plan.EntryLabel="Manual stop entry";}
             return true;
         }
+        public static double HandlePrice(double y1,double y2,double rendered)
+        {return Math.Abs(y2-rendered)>Math.Abs(y1-rendered)?y2:y1;}
+        public static bool ApplyDrawingHandle(Plan plan,string key,double observed,double rendered,double tick,double pip,double minimum)
+        {
+            // Compare to the last rendered value, not the already edited plan:
+            // unchanged companion objects must not undo a native RR drag.
+            if(plan==null||!Finite(observed)||Math.Abs(observed-rendered)<=tick/2)return false;
+            if(key=="entry"&&plan.Kind==ExecutionKind.Market)return false;
+            if(key!="entry"&&key!="sl"&&key!="tp1")return false;
+            return ApplyDrawingPrices(plan,key=="entry"?observed:plan.Entry,key=="sl"?observed:plan.Stop,
+                key=="tp1"?observed:plan.Target,tick,pip,minimum);
+        }
         public static bool EligibleReference(Level level)
         {return level!=null&&Finite(level.Price)&&level.Price>0 &&
             !string.Equals(level.Name,"PYH",StringComparison.OrdinalIgnoreCase)&&!string.Equals(level.Name,"PYL",StringComparison.OrdinalIgnoreCase);}

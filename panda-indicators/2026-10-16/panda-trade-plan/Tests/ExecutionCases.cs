@@ -65,6 +65,16 @@ static class ExecutionCases
         var shortDraft=Rules.StopDraft("SELL",1.102,.0001,5,new PlanSettings {MinimumTargetPips=100});
         Check(shortDraft.Entry<1.102&&Rules.MeetsTargetMinimum(shortDraft.Entry,shortDraft.Target,.0001,100),"SELL Stop draft below bid respects configured TP");
         Check(Rules.ApplyDrawingPrices(shortDraft,1.101,1.104,1.1,.00001,.0001,100)&&shortDraft.Draft,"below-minimum drag remains draft");
+        p=Limit();
+        Check(Rules.ApplyDrawingHandle(p,"entry",1.101,1.1,.00001,.0001,50)&&p.Entry==1.101,"explicit Entry handle updates plan/panel data");
+        p.Target=1.11;
+        Check(!Rules.ApplyDrawingHandle(p,"tp1",1.105,1.105,.00001,.0001,50)&&p.Target==1.11,"unchanged overlay cannot undo a native TP drag");
+        Check(Rules.ApplyDrawingHandle(p,"sl",1.099,1.0975,.00001,.0001,50)&&p.Stop==1.099,"explicit SL handle updates data");
+        Check(Rules.ApplyDrawingHandle(p,"tp1",1.112,1.105,.00001,.0001,50)&&p.Target==1.112,"explicit TP1 handle updates data");
+        Check(Rules.HandlePrice(1.1,1.103,1.1)==1.103,"dragging right endpoint updates horizontal level");
+        Check(Rules.HandlePrice(1.104,1.1,1.1)==1.104,"dragging left endpoint updates horizontal level");
+        p.Kind=ExecutionKind.Market;
+        Check(!Rules.ApplyDrawingHandle(p,"entry",1.12,1.101,.00001,.0001,50),"Market entry stays quote-controlled");
         var gate=new SubmissionGate();var now=DateTime.UtcNow;
         Check(gate.Enter(now),"explicit submission enters gate");Check(!gate.Enter(now.AddSeconds(5)),"inflight duplicate blocked");
         gate.Complete();Check(!gate.Enter(now.AddSeconds(1)),"rapid repeated click blocked");Check(gate.Enter(now.AddSeconds(3)),"later deliberate submission allowed");gate.Complete();

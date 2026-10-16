@@ -98,6 +98,7 @@ namespace cAlgo
 
         private static readonly Color Blue=Color.FromHex("#00b4ff"),Green=Color.FromHex("#00ff9f"),Red=Color.FromHex("#ff4d6d"),Grey=Color.FromHex("#9aa4b2");
         private string _prefix;
+        private readonly Dictionary<string,double> _renderedLevels=new Dictionary<string,double>();
         private readonly Dictionary<string,TextBox> _fields=new Dictionary<string,TextBox>();
         private readonly JsonSerializerOptions _json=new JsonSerializerOptions {IncludeFields=true};
         private ChartDraggable _panel;
@@ -351,7 +352,7 @@ namespace cAlgo
         {
             if(_rendering||_plan==null)return;
             bool changed=false;
-            foreach(var obj in objects.ToArray())
+            foreach(var obj in objects.OrderBy(o=>o is ChartRiskReward?0:1).ToArray())
             {
                 if(!obj.Name.StartsWith(_prefix,StringComparison.Ordinal))continue;
                 var rr=obj as ChartRiskReward;
@@ -366,9 +367,16 @@ namespace cAlgo
                 var line=obj as ChartTrendLine;
                 if(line==null)continue;
                 string key=line.Name.Substring(_prefix.Length);
+                double rendered;
+                if(!_renderedLevels.TryGetValue(key,out rendered))continue;
+                double y=Math.Round(Rules.HandlePrice(line.Y1,line.Y2,rendered),Symbol.Digits);
+                if(key=="entry"||key=="sl"||key=="tp1")
+                {
+                    if(Rules.ApplyDrawingHandle(_plan,key,y,rendered,Symbol.TickSize,Symbol.PipSize,MinTargetPips))changed=true;
+                    continue;
+                }
                 if(key!="tp2"&&key!="tp3")continue;
-                double previous=key=="tp2"?(_plan.Target2??double.NaN):(_plan.Target3??double.NaN);
-                double y=Math.Round(line.Y1,Symbol.Digits);
+                double previous=rendered;
                 if(!Rules.Finite(y)||y<=0||Math.Abs(y-previous)<Symbol.TickSize/2)continue;
                 if(key=="tp2")_plan.Target2=y;else _plan.Target3=y;
                 changed=true;
@@ -406,6 +414,13 @@ namespace cAlgo
                 rr.RewardColor=_plan.Invalid?Color.FromArgb(alpha,255,170,68):Color.FromArgb(alpha,0,255,159);
                 rr.RiskThickness=LineThickness;rr.RewardThickness=LineThickness;
                 rr.IsInteractive=true;rr.IsLocked=false;rr.Comment="Panda Trade Plan preview; "+_plan.EntryLabel;
+                // Explicit handles/labels stay visible even when cTrader shows
+                // only the native RR fills while that object is deselected.
+                double risk=Math.Abs(_plan.Entry-_plan.Stop)/Symbol.PipSize;
+                double reward=Math.Abs(_plan.Target-_plan.Entry)/Symbol.PipSize;
+                DrawLevel("entry",_plan.Entry,"ENTRY "+_plan.Kind.ToString().ToUpperInvariant(),Blue,true);
+                DrawLevel("sl",_plan.Stop,"SL ["+risk.ToString("0.0",CultureInfo.InvariantCulture)+"p]",Red,true);
+                DrawLevel("tp1",_plan.Target,"TP1 ["+reward.ToString("0.0",CultureInfo.InvariantCulture)+"p | "+(risk>0?reward/risk:0).ToString("0.00",CultureInfo.InvariantCulture)+"R]",Green,true);
                 if(ShowGuides&&_plan.Target2.HasValue)DrawLevel("tp2",_plan.Target2.Value,"TP2",Green);else RemoveLevel("tp2");
                 if(ShowGuides&&_plan.Target3.HasValue)DrawLevel("tp3",_plan.Target3.Value,"TP3",Green);else RemoveLevel("tp3");
                 var label=Chart.DrawText(_prefix+"source",(_plan.Invalid?"INVALID | ":_plan.Draft?"DRAFT | ":"")+_plan.EntryLabel,_plan.AnchorStart,_plan.Entry,_plan.Invalid?Red:Blue);
@@ -416,18 +431,19 @@ namespace cAlgo
             }
             finally {_rendering=false;}
         }
-        private void DrawLevel(string key,double price,string label,Color color)
+        private void DrawLevel(string key,double price,string label,Color color,bool primary=false)
         {
             var line=Chart.FindObject(_prefix+key) as ChartTrendLine;
             if(line==null)line=Chart.DrawTrendLine(_prefix+key,_plan.AnchorStart,price,_plan.AnchorEnd,price,color,2,LineStyle.Lines);
             else {line.Y1=price;line.Y2=price;line.Time1=_plan.AnchorStart;line.Time2=_plan.AnchorEnd;}
-            line.Thickness=GuideThickness;line.ExtendToInfinity=false;
+            line.Thickness=primary?LineThickness:GuideThickness;line.LineStyle=primary?LineStyle.Solid:LineStyle.Lines;line.ExtendToInfinity=false;
             var guideColor=_plan.Invalid?Color.FromHex("#ffaa44"):color;
-            line.Color=Color.FromArgb((int)Math.Round(255*GuideOpacity/100.0),guideColor);line.IsInteractive=true;line.IsLocked=false;
+            line.Color=Color.FromArgb((int)Math.Round(255*(primary?100:GuideOpacity)/100.0),guideColor);line.IsInteractive=key!="entry"||_plan.Kind!=ExecutionKind.Market;line.IsLocked=!line.IsInteractive;
+            _renderedLevels[key]=price;
             var text=Chart.DrawText(_prefix+key+"Label",label+" "+Price(price),_plan.AnchorEnd,price,line.Color);
             text.FontSize=LabelFontSize;text.IsBold=true;text.IsInteractive=false;
         }
-        private void RemoveLevel(string key){Chart.RemoveObject(_prefix+key);Chart.RemoveObject(_prefix+key+"Label");}
+        private void RemoveLevel(string key){_renderedLevels.Remove(key);Chart.RemoveObject(_prefix+key);Chart.RemoveObject(_prefix+key+"Label");}
         private void FitPlan()
         {
             if(_plan==null)return;

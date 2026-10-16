@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-17 (Visible draggable plan levels)
+
+- Added explicit short Entry/SL/TP1 handles over native risk/reward shading in
+  Limit and Stop modes, with always-visible prices, pip distances and TP1 R.
+- Either line endpoint updates the panel and native drawing. Last-rendered
+  values prevent unchanged companion objects from undoing a drag.
+- 118 offline assertions and clean C# build; live chart interaction unverified.
+
 ## 2026-10-17 (Stop risk/reward drawing and panel drag sync)
 
 - Selecting Stop reveals/fits the native risk/reward drawing. Missing eligible

@@ -118,8 +118,15 @@ button heights as well as width. The panel retains its minus/plus collapse contr
 Defaults exclude yearly levels but do not invent a maximum distance for other levels;
 set the distance caps if a remaining weekly/monthly reference is still too far away.
 
-Entry/SL/TP1 use cTrader's **native risk/reward drawing**, rather than full-chart
-horizontal lines. Its initial width is 12 bars and can be resized with the native
+Entry/SL/TP1 use cTrader's **native risk/reward drawing** for shading, with
+explicit short draggable horizontal segments and always-visible price labels.
+Blue ENTRY, red SL and green TP1 labels show prices; SL/TP1 include pip distances
+and TP1 includes the reward/risk ratio. Both endpoints can move the price, then
+the segment is kept horizontal. These handles remain visible when the native
+object is deselected and cTrader would otherwise show only its red/green fills.
+They update the panel and native drawing together in both Limit and Stop modes.
+Market entry follows the quote; its Entry segment is locked. These are bounded
+segments, rather than full-chart horizontal lines. Its initial width is 12 bars and can be resized with the native
 handles. TP2/TP3 use short bounded guide segments. Their R-multiple calculations
 are unchanged. Risk and reward shading use 71% opacity for visibility, with thicker
 optional guides and bold source/target labels. Native preview volume follows valid panel lots. The panel submits only when
@@ -162,7 +169,7 @@ Entry/SL/TP1/TP2/TP3 through the data window/API without drawing extra visible l
 
 ## Session verification and limits
 
-- C# release build: zero errors and zero warnings. Plan rules: 111 assertions pass,
+- C# release build: zero errors and zero warnings. Plan rules: 118 assertions pass,
   including exact 50/99/100/199/200/250/300-pip target and SL boundaries.
 - A USDCAD regression uses USD `D1:+2 H4:+1/-1 H1:+1/-4` and CAD
   `D1:+2 H4:+2 H1:+3/-1`: USD=-4, CAD=+3, gap=-7, without HARD_INVALID.
@@ -181,7 +188,7 @@ Entry/SL/TP1/TP2/TP3 through the data window/API without drawing extra visible l
   folder, but final native drawing/drag/shrink behaviour needs live confirmation
   after the control plugin is available again. API attachment is not visual review.
 
-- Execution revision: 111 offline assertions cover lot conversion/limits, fresh
+- Execution revision: 118 offline assertions cover lot conversion/limits, fresh
   market quotes, order-type geometry, broker distance units, breakout references
   and duplicate-click gating. Release compile succeeds. No broker order was
   submitted in verification; live execution and Mac UI remain unverified.
