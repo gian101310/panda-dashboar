@@ -252,16 +252,20 @@ def get_session():
 # ================= MT4 FILE PARSER (reads mt4_SYMBOL.txt) =================
 
 def parse_tf_score(s):
-    """Parse score string like '+3/-1', '+6', '-2' -> dominant int value (sum of parts)."""
-    s = s.strip()
-    if "/" in s:
-        total = 0
-        for p in s.split("/"):
-            try: total += int(p.strip())
-            except: pass
-        return total
-    try: return int(s)
-    except: return 0
+    """Display the dominant split component (+3/-1 -> +3), never its net sum.
+
+    Equal opposing magnitudes display zero, matching strongest-score tie handling.
+    Raw lines remain intact for the locked scorer's separate conflict checks.
+    """
+    values = []
+    for part in s.strip().split("/"):
+        try: values.append(int(part.strip()))
+        except ValueError: pass
+    positive = max((v for v in values if v > 0), default=0)
+    negative = min((v for v in values if v < 0), default=0)
+    if positive == -negative:
+        return 0
+    return positive if positive > -negative else negative
 
 def parse_mt4_file(symbol, _incomplete_attempt=0):
     """

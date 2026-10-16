@@ -64,6 +64,49 @@ def _load_app():
 
 
 class Mt4FileParseTests(unittest.TestCase):
+    def test_split_timeframe_display_uses_dominant_component_not_net(self):
+        app = _load_app()
+        for raw, expected in [("+3/-1", 3), ("+1/-3", -3), ("+5/-1", 5),
+                              ("-5/+1", -5), ("+2/-2", 0), ("+6", 6),
+                              ("-2", -2), ("0", 0), ("", 0)]:
+            with self.subTest(raw=raw):
+                self.assertEqual(app.parse_tf_score(raw), expected)
+
+    def test_split_audcad_display_agrees_with_unchanged_gap_scorer(self):
+        app = _load_app()
+        complete = (
+            "AUD : D1 : +1 | H4 : -1 | H1 : -5\n"
+            "CAD : D1 : +2 | H4 : +2 | H1 : +3/-1\n"
+            "ADV : AUD : D1 : +1/-3 | H4 : 0 | H1 : -5/+1\n"
+            "ADV : CAD : D1 : +3/-1 | H4 : +2 | H1 : +2/-2\n"
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            Path(temp_dir, 'mt4_audcad.txt').write_text(complete, encoding='utf-8')
+            app.MT4_PATH = temp_dir
+            result = app.parse_mt4_file('AUDCAD')
+        score = app.compute_scores_all_pairs({'AUDCAD': result})['AUDCAD']
+        self.assertEqual(result['quote_h1'], 3)
+        self.assertEqual(result['adv_base_d1'], -3)
+        self.assertEqual(result['adv_base_h1'], -5)
+        self.assertEqual(result['adv_quote_d1'], 3)
+        self.assertEqual(result['adv_quote_h1'], 0)
+        self.assertIn('+3/-1', result['raw_quote_line'])
+        self.assertEqual(score['base_score'], -5)
+        self.assertEqual(score['quote_score'], 3)
+        self.assertEqual(score['gap'], -8)
+
+    def test_raw_opposing_extremes_still_invalidate_after_display_parsing(self):
+        app = _load_app()
+        complete = 'AUD D1:+5/-4 H4:-1 H1:-5\nCAD D1:+2 H4:+2 H1:+3/-1\n'
+        with tempfile.TemporaryDirectory() as temp_dir:
+            Path(temp_dir, 'mt4_audcad.txt').write_text(complete, encoding='utf-8')
+            app.MT4_PATH = temp_dir
+            result = app.parse_mt4_file('AUDCAD')
+        self.assertEqual(result['base_d1'], 5)
+        score = app.compute_scores_all_pairs({'AUDCAD': result})['AUDCAD']
+        self.assertTrue(score['hard_invalid'])
+        self.assertEqual(score['gap'], 0)
+
     def test_parses_current_mt4_whitespace_format(self):
         app = _load_app()
         complete = (

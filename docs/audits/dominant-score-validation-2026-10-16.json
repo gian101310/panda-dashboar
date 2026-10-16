@@ -1,0 +1,342 @@
+{
+  "checked_pairs": 21,
+  "checked_base_quote_tf_fields": 126,
+  "rows": [
+    {
+      "symbol": "AUDJPY",
+      "gap": -3,
+      "base": [
+        1,
+        -2,
+        -6
+      ],
+      "quote": [
+        2,
+        0,
+        -3
+      ],
+      "raw_base": "AUD : D1 : +1    | H4 : -2    | H1 : -6",
+      "raw_quote": "JPY : D1 : +2    | H4 :  0    | H1 : +1/-3"
+    },
+    {
+      "symbol": "AUDCAD",
+      "gap": -9,
+      "base": [
+        1,
+        -2,
+        -6
+      ],
+      "quote": [
+        2,
+        2,
+        3
+      ],
+      "raw_base": "AUD : D1 : +1    | H4 : -2    | H1 : -6",
+      "raw_quote": "CAD : D1 : +2    | H4 : +2    | H1 : +3"
+    },
+    {
+      "symbol": "AUDNZD",
+      "gap": 0,
+      "base": [
+        1,
+        -2,
+        -6
+      ],
+      "quote": [
+        -5,
+        1,
+        4
+      ],
+      "raw_base": "AUD : D1 : +1    | H4 : -2    | H1 : -6",
+      "raw_quote": "NZD : D1 : -5    | H4 : +1    | H1 : +4"
+    },
+    {
+      "symbol": "AUDUSD",
+      "gap": -2,
+      "base": [
+        1,
+        -2,
+        -6
+      ],
+      "quote": [
+        2,
+        0,
+        -4
+      ],
+      "raw_base": "AUD : D1 : +1    | H4 : -2    | H1 : -6",
+      "raw_quote": "USD : D1 : +2    | H4 :  0    | H1 : +1/-4"
+    },
+    {
+      "symbol": "CADJPY",
+      "gap": 0,
+      "base": [
+        2,
+        2,
+        3
+      ],
+      "quote": [
+        2,
+        0,
+        -3
+      ],
+      "raw_base": "CAD : D1 : +2    | H4 : +2    | H1 : +3",
+      "raw_quote": "JPY : D1 : +2    | H4 :  0    | H1 : +1/-3"
+    },
+    {
+      "symbol": "EURAUD",
+      "gap": 2,
+      "base": [
+        -4,
+        -3,
+        2
+      ],
+      "quote": [
+        1,
+        -2,
+        -6
+      ],
+      "raw_base": "EUR : D1 : -4    | H4 : -3    | H1 : +2/-1",
+      "raw_quote": "AUD : D1 : +1    | H4 : -2    | H1 : -6"
+    },
+    {
+      "symbol": "EURCAD",
+      "gap": -7,
+      "base": [
+        -4,
+        -3,
+        2
+      ],
+      "quote": [
+        2,
+        2,
+        3
+      ],
+      "raw_base": "EUR : D1 : -4    | H4 : -3    | H1 : +2/-1",
+      "raw_quote": "CAD : D1 : +2    | H4 : +2    | H1 : +3"
+    },
+    {
+      "symbol": "EURGBP",
+      "gap": -7,
+      "base": [
+        -4,
+        -3,
+        2
+      ],
+      "quote": [
+        2,
+        2,
+        3
+      ],
+      "raw_base": "EUR : D1 : -4    | H4 : -3    | H1 : +2/-1",
+      "raw_quote": "GBP : D1 : +2    | H4 : +2    | H1 : +3"
+    },
+    {
+      "symbol": "EURJPY",
+      "gap": -1,
+      "base": [
+        -4,
+        -3,
+        2
+      ],
+      "quote": [
+        2,
+        0,
+        -3
+      ],
+      "raw_base": "EUR : D1 : -4    | H4 : -3    | H1 : +2/-1",
+      "raw_quote": "JPY : D1 : +2    | H4 :  0    | H1 : +1/-3"
+    },
+    {
+      "symbol": "EURNZD",
+      "gap": 0,
+      "base": [
+        -4,
+        -3,
+        2
+      ],
+      "quote": [
+        -5,
+        1,
+        4
+      ],
+      "raw_base": "EUR : D1 : -4    | H4 : -3    | H1 : +2/-1",
+      "raw_quote": "NZD : D1 : -5    | H4 : +1    | H1 : +4"
+    },
+    {
+      "symbol": "EURUSD",
+      "gap": 0,
+      "base": [
+        -4,
+        -3,
+        2
+      ],
+      "quote": [
+        2,
+        0,
+        -4
+      ],
+      "raw_base": "EUR : D1 : -4    | H4 : -3    | H1 : +2/-1",
+      "raw_quote": "USD : D1 : +2    | H4 :  0    | H1 : +1/-4"
+    },
+    {
+      "symbol": "GBPAUD",
+      "gap": 9,
+      "base": [
+        2,
+        2,
+        3
+      ],
+      "quote": [
+        1,
+        -2,
+        -6
+      ],
+      "raw_base": "GBP : D1 : +2    | H4 : +2    | H1 : +3",
+      "raw_quote": "AUD : D1 : +1    | H4 : -2    | H1 : -6"
+    },
+    {
+      "symbol": "GBPCAD",
+      "gap": 0,
+      "base": [
+        2,
+        2,
+        3
+      ],
+      "quote": [
+        2,
+        2,
+        3
+      ],
+      "raw_base": "GBP : D1 : +2    | H4 : +2    | H1 : +3",
+      "raw_quote": "CAD : D1 : +2    | H4 : +2    | H1 : +3"
+    },
+    {
+      "symbol": "GBPJPY",
+      "gap": 0,
+      "base": [
+        2,
+        2,
+        3
+      ],
+      "quote": [
+        2,
+        0,
+        -3
+      ],
+      "raw_base": "GBP : D1 : +2    | H4 : +2    | H1 : +3",
+      "raw_quote": "JPY : D1 : +2    | H4 :  0    | H1 : +1/-3"
+    },
+    {
+      "symbol": "GBPNZD",
+      "gap": 0,
+      "base": [
+        2,
+        2,
+        3
+      ],
+      "quote": [
+        -5,
+        1,
+        4
+      ],
+      "raw_base": "GBP : D1 : +2    | H4 : +2    | H1 : +3",
+      "raw_quote": "NZD : D1 : -5    | H4 : +1    | H1 : +4"
+    },
+    {
+      "symbol": "GBPUSD",
+      "gap": 7,
+      "base": [
+        2,
+        2,
+        3
+      ],
+      "quote": [
+        2,
+        0,
+        -4
+      ],
+      "raw_base": "GBP : D1 : +2    | H4 : +2    | H1 : +3",
+      "raw_quote": "USD : D1 : +2    | H4 :  0    | H1 : +1/-4"
+    },
+    {
+      "symbol": "NZDCAD",
+      "gap": 0,
+      "base": [
+        -5,
+        1,
+        4
+      ],
+      "quote": [
+        2,
+        2,
+        3
+      ],
+      "raw_base": "NZD : D1 : -5    | H4 : +1    | H1 : +4",
+      "raw_quote": "CAD : D1 : +2    | H4 : +2    | H1 : +3"
+    },
+    {
+      "symbol": "NZDJPY",
+      "gap": 0,
+      "base": [
+        -5,
+        1,
+        4
+      ],
+      "quote": [
+        2,
+        0,
+        -3
+      ],
+      "raw_base": "NZD : D1 : -5    | H4 : +1    | H1 : +4",
+      "raw_quote": "JPY : D1 : +2    | H4 :  0    | H1 : +1/-3"
+    },
+    {
+      "symbol": "NZDUSD",
+      "gap": 0,
+      "base": [
+        -5,
+        1,
+        4
+      ],
+      "quote": [
+        2,
+        0,
+        -4
+      ],
+      "raw_base": "NZD : D1 : -5    | H4 : +1    | H1 : +4",
+      "raw_quote": "USD : D1 : +2    | H4 :  0    | H1 : +1/-4"
+    },
+    {
+      "symbol": "USDCAD",
+      "gap": -7,
+      "base": [
+        2,
+        0,
+        -4
+      ],
+      "quote": [
+        2,
+        2,
+        3
+      ],
+      "raw_base": "USD : D1 : +2    | H4 :  0    | H1 : +1/-4",
+      "raw_quote": "CAD : D1 : +2    | H4 : +2    | H1 : +3"
+    },
+    {
+      "symbol": "USDJPY",
+      "gap": -1,
+      "base": [
+        2,
+        0,
+        -4
+      ],
+      "quote": [
+        2,
+        0,
+        -3
+      ],
+      "raw_base": "USD : D1 : +2    | H4 :  0    | H1 : +1/-4",
+      "raw_quote": "JPY : D1 : +2    | H4 :  0    | H1 : +1/-3"
+    }
+  ]
+}

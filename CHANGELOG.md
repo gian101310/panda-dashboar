@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-10-16 (Dominant timeframe score display)
+
+- Corrected split score parsing for base/quote and ADV timeframe fields:
+  `+3/-1` displays +3, not the former summed +2. Equal opposing magnitudes
+  remain zero. This aligns Telegram scorecards and dashboard data with the
+  dominant-component rule confirmed by Boss-G.
+- Preserved raw lines and the locked gap/conflict/BB/INTRA logic. AUD -5 minus
+  CAD +3 remains gap -8; the misleading CAD display cell is corrected.
+- Added regression coverage and retained the same-time 21-pair audit evidence.
+
 ## 2026-10-16 (Fed-chair post-event summaries)
 
 - Added a separate speech-summary path for high-impact USD Fed-chair speeches;
