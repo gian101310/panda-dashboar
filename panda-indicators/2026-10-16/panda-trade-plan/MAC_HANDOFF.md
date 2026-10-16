@@ -65,5 +65,11 @@ gap -7 and no neutral-matchup invalidation. Verify Show score diagnostics displa
 the real broker timeframe splits and the exact HARD_INVALID reason. Broker data
 can still differ from MT4; do not force a valid bias when raw conflicts are present.
 
-Rule tests: `dotnet run --project Tests/Tests.csproj -c Release` (100 assertions).
+Rule tests: `dotnet run --project Tests/Tests.csproj -c Release` (111 assertions).
 Release project: `Panda Trade Plan/Panda Trade Plan/PandaTradePlan.csproj`.
+
+Stop drawing revision: selecting Stop unhides/fits the native risk/reward tool.
+Without eligible breakout references, a valid scoring bias gets a MANUAL STOP
+DRAFT; it remains unexecutable until a valid price drag or Apply confirmation.
+Verify dragging Entry, SL and TP updates all panel values, even while temporarily
+invalid, and manual drags survive auto refresh. Tests now cover these transitions.

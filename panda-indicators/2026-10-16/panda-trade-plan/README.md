@@ -66,6 +66,18 @@ Built for the existing 21 Panda forex pairs; H1 context is used on any chart tim
 - Select **Limit**, **Stop**, or **Market**. Limit uses pullback references; Stop
   uses the nearest eligible breakout reference beyond the live price; Market
   uses the current buy ask / sell bid. All retain scoring alignment and SL tiers.
+- Selecting Stop unhides and fits its native risk/reward drawing. Once scoring
+  context has a BUY/SELL bias, missing eligible breakout references show a clearly
+  marked **MANUAL STOP DRAFT**, rather than leaving a Limit drawing or no drawing.
+  Its initial 2-pip entry offset and minimum-distance TP are editable placeholders,
+  not reference-based suggestions. Drag valid prices or Apply edited prices to
+  confirm the draft; unconfirmed drafts cannot submit orders. An untouched draft
+  can refresh into a rule-based setup when references become eligible.
+- Dragging any native Entry/SL/TP handle updates the panel prices and risk metrics
+  through chart events, with a one-second polling fallback. Temporarily invalid
+  geometry also updates the fields and is flagged; it is never silently ignored.
+  Manual drags freeze automatic price changes. Invalid geometry/TP minimum still
+  block execution. No order is placed or modified by dragging.
 - Enter **Lots**, default **0.01**. Broker minimum/step are shown. Invalid sizes
   are rejected rather than silently rounded or increased. Valid sizes update the
   native risk/reward volume preview. Default lots/type can be set in Parameters.
@@ -150,7 +162,7 @@ Entry/SL/TP1/TP2/TP3 through the data window/API without drawing extra visible l
 
 ## Session verification and limits
 
-- C# release build: zero errors and zero warnings. Plan rules: 100 assertions pass,
+- C# release build: zero errors and zero warnings. Plan rules: 111 assertions pass,
   including exact 50/99/100/199/200/250/300-pip target and SL boundaries.
 - A USDCAD regression uses USD `D1:+2 H4:+1/-1 H1:+1/-4` and CAD
   `D1:+2 H4:+2 H1:+3/-1`: USD=-4, CAD=+3, gap=-7, without HARD_INVALID.
@@ -169,7 +181,7 @@ Entry/SL/TP1/TP2/TP3 through the data window/API without drawing extra visible l
   folder, but final native drawing/drag/shrink behaviour needs live confirmation
   after the control plugin is available again. API attachment is not visual review.
 
-- Execution revision: 100 offline assertions cover lot conversion/limits, fresh
+- Execution revision: 111 offline assertions cover lot conversion/limits, fresh
   market quotes, order-type geometry, broker distance units, breakout references
   and duplicate-click gating. Release compile succeeds. No broker order was
   submitted in verification; live execution and Mac UI remain unverified.

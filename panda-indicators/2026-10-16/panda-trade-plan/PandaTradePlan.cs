@@ -218,6 +218,11 @@ namespace cAlgo
             string reason;
             var candidate=Rules.Build(side,_pandaGap,_hardInvalid,zone,valid,side=="BUY"?Symbol.Ask:Symbol.Bid,
                 Symbol.PipSize,Symbol.Digits,targetLevels,Mode,out reason,refs,PlacementSettings);
+            if(candidate==null&&_orderKind==ExecutionKind.Stop)
+            {
+                candidate=Rules.StopDraft(side,side=="BUY"?Symbol.Ask:Symbol.Bid,Symbol.PipSize,Symbol.Digits,PlacementSettings);
+                if(candidate!=null)candidate.Mode=Mode;
+            }
             if(candidate==null)
             {
                 _message=reason;
@@ -232,7 +237,7 @@ namespace cAlgo
             candidate.Reference=Reference.ToString();
             candidate.Settings=SettingsKey;
             if(automatic&&previousPlan!=null){candidate.AnchorStart=previousPlan.AnchorStart;candidate.AnchorEnd=previousPlan.AnchorEnd;}
-            _plan=candidate;if(!automatic)_hidden=false;_message="Rule plan - drag levels to adjust";
+            _plan=candidate;if(!automatic)_hidden=false;_message=candidate.Draft?"MANUAL STOP DRAFT - no eligible rule setup; drag levels or Apply to confirm":"Rule plan - drag levels to adjust";
             if(!automatic){_autoPaused=false;}
             Save();if(previousPlan==null||!automatic)FitPlan();else Render();UpdateStatus();
         }
@@ -336,7 +341,7 @@ namespace cAlgo
             {_message="Optional targets must follow TP1 in order";UpdateStatus();return;}
             _plan.Entry=entry;_plan.Stop=stop;_plan.Target=target;
             _plan.Target2=Rules.Finite(t2)?t2:(double?)null;_plan.Target3=Rules.Finite(t3)?t3:(double?)null;
-            _plan.Manual=true;_message="Manual edits fixed - reset to recalculate";Save();Render();UpdateStatus();
+            _plan.Manual=true;_plan.Draft=false;if(_plan.EntryLabel=="MANUAL STOP DRAFT")_plan.EntryLabel="Manual stop entry";_message="Manual edits fixed - refresh to recalculate";Save();Render();UpdateStatus();
         }
         private void OnObjectsUpdated(ChartObjectsUpdatedEventArgs args)
         {
@@ -353,12 +358,9 @@ namespace cAlgo
                 if(rr!=null&&obj.Name==_prefix+"rr")
                 {
                     double entry=_plan.Kind==ExecutionKind.Market?_plan.Entry:Math.Round(rr.EntryPrice,Symbol.Digits),stop=Math.Round(rr.StopLossPrice,Symbol.Digits),target=Math.Round(rr.TakeProfitPrice,Symbol.Digits);
-                    if(Rules.ValidGeometry(_plan.Side,entry,stop,target) &&
-                       (Math.Abs(entry-_plan.Entry)>Symbol.TickSize/2 || Math.Abs(stop-_plan.Stop)>Symbol.TickSize/2 || Math.Abs(target-_plan.Target)>Symbol.TickSize/2 || rr.Time1!=_plan.AnchorStart || rr.Time2!=_plan.AnchorEnd))
-                    {
-                        _plan.Entry=entry;_plan.Stop=stop;_plan.Target=target;
-                        _plan.AnchorStart=rr.Time1;_plan.AnchorEnd=rr.Time2;changed=true;
-                    }
+                    if(Rules.ApplyDrawingPrices(_plan,entry,stop,target,Symbol.TickSize,Symbol.PipSize,MinTargetPips))changed=true;
+                    if(rr.Time1!=_plan.AnchorStart||rr.Time2!=_plan.AnchorEnd)
+                    {_plan.AnchorStart=rr.Time1;_plan.AnchorEnd=rr.Time2;changed=true;}
                     continue;
                 }
                 var line=obj as ChartTrendLine;
@@ -406,7 +408,7 @@ namespace cAlgo
                 rr.IsInteractive=true;rr.IsLocked=false;rr.Comment="Panda Trade Plan preview; "+_plan.EntryLabel;
                 if(ShowGuides&&_plan.Target2.HasValue)DrawLevel("tp2",_plan.Target2.Value,"TP2",Green);else RemoveLevel("tp2");
                 if(ShowGuides&&_plan.Target3.HasValue)DrawLevel("tp3",_plan.Target3.Value,"TP3",Green);else RemoveLevel("tp3");
-                var label=Chart.DrawText(_prefix+"source",(_plan.Invalid?"INVALID | ":"")+_plan.EntryLabel,_plan.AnchorStart,_plan.Entry,_plan.Invalid?Red:Blue);
+                var label=Chart.DrawText(_prefix+"source",(_plan.Invalid?"INVALID | ":_plan.Draft?"DRAFT | ":"")+_plan.EntryLabel,_plan.AnchorStart,_plan.Entry,_plan.Invalid?Red:Blue);
                 label.FontSize=LabelFontSize;label.IsBold=true;label.IsInteractive=false;
                 _fields["Entry"].Text=Price(_plan.Entry);_fields["Stop loss"].Text=Price(_plan.Stop);_fields["TP1"].Text=Price(_plan.Target);
                 _fields["TP2 guide"].Text=_plan.Target2.HasValue?Price(_plan.Target2.Value):"-";
@@ -473,7 +475,7 @@ namespace cAlgo
             {_status.Text="INVALID guides - targets must follow TP1";_status.ForegroundColor=Red;}
             _metrics.Text="SL "+(risk/Symbol.PipSize).ToString("0.0",CultureInfo.InvariantCulture)+"p | TP1 "+(Math.Abs(_plan.Target-_plan.Entry)/Symbol.PipSize).ToString("0.0",CultureInfo.InvariantCulture)+"p | "+rr.ToString("0.00",CultureInfo.InvariantCulture)+"R";
             bool limitSide=_plan.Kind==ExecutionKind.Market||(_plan.Kind==ExecutionKind.Stop?(_plan.Side=="BUY"?_plan.Entry>Symbol.Ask:_plan.Entry<Symbol.Bid):(_plan.Side=="BUY"?_plan.Entry<Symbol.Ask:_plan.Entry>Symbol.Bid));
-            _note.Text=(_plan.Manual?"MANUAL: levels stay fixed":"Entry: "+_plan.EntryLabel+" | "+_plan.Mode)+
+            _note.Text=(_plan.Draft?"DRAFT: drag prices or Apply to confirm":_plan.Manual?"MANUAL: levels stay fixed":"Entry: "+_plan.EntryLabel+" | "+_plan.Mode)+
                 "\n"+(!limitSide?"Entry crossed: refresh or adjust this pending plan\n":"")+
                 (!_scoreReady?"Context unavailable; recheck before use\n":"")+"Expiry: "+Expiry+" | TP2/3 optional guides";
         }

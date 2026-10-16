@@ -30,6 +30,7 @@ namespace cAlgo
             {
                 _orderKind=(ExecutionKind)kind.SelectedIndex;
                 _fields["Entry"].IsReadOnly=_orderKind==ExecutionKind.Market;
+                _hidden=false;
                 CreatePlan(_pandaBias);
             };
             row.AddChild(kind,0,1);panel.AddChild(row);

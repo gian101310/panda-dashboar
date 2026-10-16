@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-10-17 (Stop risk/reward drawing and panel drag sync)
+
+- Selecting Stop reveals/fits the native risk/reward drawing. Missing eligible
+  breakout references show a clearly marked manual Stop draft once bias is ready;
+  valid manual price edits or Apply are required before a draft can submit.
+- Native Entry/SL/TP drags synchronize panel fields even through temporarily
+  invalid geometry. Validation blocks invalid execution while preserving edits.
+- 111 offline assertions and clean C# release build. Live chart drag verification
+  remains unavailable: the cTrader control connector returns HTTP 404.
+
 ## 2026-10-17 (Trade Plan explicit execution panel)
 
 - Added Limit / Stop / Market selection and editable lots, default 0.01. Stop

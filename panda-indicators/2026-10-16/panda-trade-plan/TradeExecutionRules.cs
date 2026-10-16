@@ -15,6 +15,7 @@ namespace PandaPlanning
             double lots,double lotUnits,double minUnits,double maxUnits,double step,bool ready,string bias,bool hardInvalid,out string reason)
         {
             reason="Refresh a valid plan with the selected order type first";
+            if(plan!=null&&plan.Draft){reason="Manual Stop draft: drag valid levels or click Apply edited prices to confirm";return null;}
             if(plan==null||plan.Invalid||!string.IsNullOrEmpty(plan.SubmissionId)||!Enum.IsDefined(typeof(ExecutionKind),kind)||plan.Kind!=kind||!ready||hardInvalid||plan.Side!=bias)return null;
             reason="Invalid live quote";
             if(!Rules.Finite(bid)||!Rules.Finite(ask)||bid<=0||ask<bid||!Rules.Finite(pip)||pip<=0)return null;

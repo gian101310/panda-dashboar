@@ -29,7 +29,7 @@ namespace PandaPlanning
         public double? Target2, Target3;
         public DateTime CreatedUtc;
         public DateTime AnchorStart, AnchorEnd;
-        public bool Manual, Invalid;
+        public bool Manual, Invalid, Draft;
     }
     public static class Rules
     {
@@ -87,6 +87,30 @@ namespace PandaPlanning
                 reason="Ready";return result;
             }
             reason="No eligible reference within entry/TP limits (TP1 minimum "+minimum.ToString("0.#",System.Globalization.CultureInfo.InvariantCulture)+" pips)";return null;
+        }
+        // A workspace for manual placement, never a reference-based suggestion.
+        // Execution remains blocked until a valid drag or Apply confirms it.
+        public static Plan StopDraft(string side,double quote,double pip,int digits,PlanSettings settings)
+        {
+            if((side!="BUY"&&side!="SELL")||!Finite(quote)||quote<=0||!Finite(pip)||pip<=0)return null;
+            double sign=side=="BUY"?1:-1,minimum=Math.Max(50,settings.MinimumTargetPips);
+            double entry=Math.Round(quote+sign*Math.Max(2*pip,2*Math.Pow(10,-digits)),digits);
+            double target=Math.Round(entry+sign*minimum*pip,digits);
+            double divisor=minimum>=300?settings.StopFrom300:minimum>=200?settings.StopUnder300:minimum>=100?settings.StopUnder200:settings.StopUnder100;
+            if(!Finite(divisor)||divisor<=0)return null;
+            double stop=Math.Round(entry-sign*minimum*pip/divisor,digits);
+            if(!ValidGeometry(side,entry,stop,target))return null;
+            return new Plan {Side=side,Kind=ExecutionKind.Stop,RuleVersion=5,Draft=true,
+                Entry=entry,Stop=stop,Target=target,EntryLabel="MANUAL STOP DRAFT",TargetLabel="Manual TP1"};
+        }
+        public static bool ApplyDrawingPrices(Plan plan,double entry,double stop,double target,double tick,double pip,double minimum)
+        {
+            if(plan==null||!Finite(entry)||!Finite(stop)||!Finite(target)||entry<=0||stop<=0||target<=0)return false;
+            if(Math.Abs(entry-plan.Entry)<=tick/2&&Math.Abs(stop-plan.Stop)<=tick/2&&Math.Abs(target-plan.Target)<=tick/2)return false;
+            plan.Entry=entry;plan.Stop=stop;plan.Target=target;plan.Manual=true;
+            if(ValidGeometry(plan.Side,entry,stop,target)&&MeetsTargetMinimum(entry,target,pip,minimum))
+            {plan.Draft=false;if(plan.EntryLabel=="MANUAL STOP DRAFT")plan.EntryLabel="Manual stop entry";}
+            return true;
         }
         public static bool EligibleReference(Level level)
         {return level!=null&&Finite(level.Price)&&level.Price>0 &&
