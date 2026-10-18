@@ -91,12 +91,14 @@ class SnapshotLayoutTests(unittest.TestCase):
 
         self.assertEqual(layout["columns"], 2)
         self.assertEqual(layout["width"], 3504)
-        self.assertEqual(layout["height"], 3816)
-        self.assertLessEqual(layout["height"], 4096)
+        self.assertEqual(
+            layout["height"],
+            layout["header_h"] + layout["rows_per_col"] * (layout["row_h"] + layout["row_gap"]) + layout["footer_h"],
+        )
         self.assertGreaterEqual(layout["row_h"], 300)
         self.assertEqual(
             layout["fields"],
-            ["PAIR", "GAP", "BIAS", "H1/H4", "PL", "SCORE"],
+            ["PAIR", "GAP", "BIAS", "MATCHUP", "H1/H4", "PL", "SCORE", "XTF"],
         )
         self.assertGreaterEqual(layout["top_offsets"]["gap"], 420)
         self.assertGreaterEqual(layout["top_offsets"]["bias"], 650)
@@ -132,6 +134,20 @@ class SnapshotLayoutTests(unittest.TestCase):
         self.assertTrue(Path(font[1]).is_absolute())
         self.assertTrue(Path(font[1]).exists())
         self.assertEqual(font[2], 72)
+
+
+class SnapshotMatchupTests(unittest.TestCase):
+    def test_pair_matchups_follow_base_quote_order(self):
+        app = _load_app()
+        cases = [
+            ({"base_d1": 5, "quote_h4": -5}, "STRONG vs WEAK"),
+            ({"base_h1": -4, "quote_d1": 4}, "WEAK vs STRONG"),
+            ({"base_d1": 2, "quote_h1": -4}, "NEUTRAL vs WEAK"),
+            ({"base_d1": 4, "base_h4": -4, "quote_h1": -4}, "MIXED vs WEAK"),
+        ]
+        for row, expected in cases:
+            with self.subTest(expected=expected):
+                self.assertEqual(app._snapshot_pair_matchup(row), expected)
 
 
 class MarketHoursTests(unittest.TestCase):

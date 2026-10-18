@@ -2412,7 +2412,7 @@ def build_snapshot_layout(pair_count):
     return {
         "columns": columns,
         "rows_per_col": rows_per_col,
-        "fields": ["PAIR", "GAP", "BIAS", "H1/H4", "PL", "SCORE", "XTF"],
+        "fields": ["PAIR", "GAP", "BIAS", "MATCHUP", "H1/H4", "PL", "SCORE", "XTF"],
         "width": width,
         "height": height,
         "card_w": card_w,
@@ -2423,7 +2423,7 @@ def build_snapshot_layout(pair_count):
         "row_h": row_h,
         "row_gap": row_gap,
         "accent_w": 18,
-        "top_offsets": {"gap": 430, "bias": 680},
+        "top_offsets": {"gap": 430, "bias": 680, "matchup": 1080},
         "line_offsets": {"box": 112, "metrics": 198, "xtf": 284},
         "bottom_offsets": {"box": 0, "fl_st": 0, "score": 650},
     }
@@ -2483,7 +2483,7 @@ def generate_snapshot(pair_data):
     draw.rectangle([0, 0, width, HEADER_H], fill=BG_CARD)
     draw.rectangle([0, HEADER_H - 4, width, HEADER_H], fill=ACCENT)
     draw.text((MARGIN, 40), "PANDA ENGINE v3.0", fill=TEXT_HEAD, font=font_title)
-    draw.text((MARGIN, 120), "PAIR  GAP  BIAS    H1/H4 BOX + PDR    PL  ACTION  SCORE",
+    draw.text((MARGIN, 120), "PAIR  GAP  BIAS  MATCHUP  H1/H4  PDR  PL  ACTION  SCORE",
               fill=TEXT_HEAD, font=font_hdr)
 
     # ---- Data rows ----
@@ -2535,6 +2535,8 @@ def generate_snapshot(pair_data):
             draw.text((x + TOP_OFFSETS["bias"], top_y + 5), bias_text, fill=tc, font=font_bold)
         else:
             draw.text((x + TOP_OFFSETS["bias"], top_y - 2), bias_text, fill=tc, font=font_bias)
+        draw.text((x + TOP_OFFSETS["matchup"], top_y + 26), str(p.get("matchup") or "-"),
+                  fill=tc, font=font_sm)
 
         draw.text((x + BOTTOM_OFFSETS["box"], box_y), f"H1/H4 {p.get('box_badge', '-')}",
                   fill=tc, font=font_data)
@@ -2702,6 +2704,18 @@ def _desk_score_class(score):
     if score <= -4:
         return "WEAK"
     return "NEUTRAL"
+
+def _snapshot_pair_matchup(row):
+    def classify(prefix):
+        values = [row.get(f"{prefix}_{tf}") for tf in ("d1", "h4", "h1")]
+        if all(value is None for value in values):
+            return "NO DATA"
+        if any((value or 0) >= 4 for value in values) and any((value or 0) <= -4 for value in values):
+            return "MIXED"
+        score = row.get(f"{prefix}_score")
+        return _desk_score_class(int(score) if score is not None else _desk_score_read(values))
+
+    return f"{classify('base')} vs {classify('quote')}"
 
 def _desk_fmt_score(score):
     score = int(score or 0)
@@ -3188,6 +3202,7 @@ def send_snapshot():
                 "score": conf_display,
                 "category": category,
                 "xtf": xtf_str,
+                "matchup": _snapshot_pair_matchup(r),
             })
 
         # Sort alphabetically by symbol
