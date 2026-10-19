@@ -71,6 +71,39 @@ test('rejects malformed platform accounts and unknown products', () => {
   assert.deepEqual(unknown, { ok: false, error: 'Unknown indicator product' });
 });
 
+test('trade plan needs only a name and cTrader account, other products still need contact', () => {
+  const parsed = validateIndicatorRequest({
+    customer_name: 'Client One',
+    trading_account_number: '2243677',
+    product_code: 'ctrader_trade_plan_v13',
+  });
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.value.contact, '');
+  assert.equal(parsed.value.platform, 'CTRADER');
+  assert.equal(validateIndicatorRequest({
+    customer_name: 'Client One',
+    trading_account_number: '2243677',
+    product_code: 'ctrader_dashboard_overlay',
+  }).error, 'Contact is required');
+});
+
+test('trade-plan name-and-account request creates a pending license', async () => {
+  let inserted;
+  const handler = createIndicatorLicenseRequestHandler({
+    findExisting: async () => null,
+    insertRequest: async (row) => { inserted = row; return { id: 'trade-plan-request', status: row.status }; },
+    notify: async () => {},
+  });
+  const res = await invoke(handler, {
+    method: 'POST',
+    body: { customer_name: 'Client One', trading_account_number: '2243677', product_code: 'ctrader_trade_plan_v13' },
+  });
+  assert.equal(res.statusCode, 200);
+  assert.equal(inserted.contact, '');
+  assert.equal(inserted.status, 'PENDING');
+  assert.equal(inserted.product_code, 'ctrader_trade_plan_v13');
+});
+
 test('request workflow scopes duplicate lookup to product platform and account', async () => {
   let lookup;
   let inserted;

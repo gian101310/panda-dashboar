@@ -33,6 +33,8 @@ namespace PandaPlanning
     }
     public static class Rules
     {
+        public static int DominantVote(int positive,int negative)
+        {return positive>=-negative?positive:negative;}
         public static int Dominant(int positive,int negative)
         {return positive == -negative ? 0 : positive > -negative ? positive : negative;}
         public static int CurrencyScore(IEnumerable<int> positives,IEnumerable<int> negatives,out bool conflict)
@@ -64,11 +66,12 @@ namespace PandaPlanning
             var entries=refs.Where(l=>(settings.Kind==ExecutionKind.Stop?(buy?l.Price>price:l.Price<price):(buy?l.Price<price:l.Price>price)) &&
                 (settings.MaxEntryPips<=0||Math.Abs(l.Price-price)/pip<=settings.MaxEntryPips+0.000001)).OrderBy(l=>Math.Abs(l.Price-price));
             if(settings.Kind==ExecutionKind.Market)entries=new[]{new Level("Live market",price)}.OrderBy(l=>0);
-            var targets=all.Where(l=>buy?l.Price>price:l.Price<price).OrderBy(l=>Math.Abs(l.Price-price)).ToArray();
+            var targets=all;
             foreach(var entry in entries)
             {
                 var clear=targets.Where(t=>(buy?t.Price>entry.Price:t.Price<entry.Price) && Math.Abs(t.Price-entry.Price)/pip>=minimum-0.000001 &&
-                    (settings.MaxTargetPips<=0||Math.Abs(t.Price-entry.Price)/pip<=settings.MaxTargetPips+0.000001)).ToArray();
+                    (settings.MaxTargetPips<=0||Math.Abs(t.Price-entry.Price)/pip<=settings.MaxTargetPips+0.000001))
+                    .OrderBy(t=>Math.Abs(t.Price-entry.Price)).ToArray();
                 if(clear.Length==0)continue;
                 var target=clear.First();
                 double entryPrice=Math.Round(entry.Price,digits),tp=Math.Round(target.Price,digits);

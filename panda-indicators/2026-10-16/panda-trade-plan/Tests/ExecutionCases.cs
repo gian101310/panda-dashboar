@@ -78,6 +78,10 @@ static class ExecutionCases
         var gate=new SubmissionGate();var now=DateTime.UtcNow;
         Check(gate.Enter(now),"explicit submission enters gate");Check(!gate.Enter(now.AddSeconds(5)),"inflight duplicate blocked");
         gate.Complete();Check(!gate.Enter(now.AddSeconds(1)),"rapid repeated click blocked");Check(gate.Enter(now.AddSeconds(3)),"later deliberate submission allowed");gate.Complete();
+        Check(ExecutionRules.BiasLost(true,false,"BUY","WAIT"),"WAIT cancels owned pending orders");
+        Check(ExecutionRules.BiasLost(true,false,"BUY","SELL"),"opposite bias cancels owned pending orders");
+        Check(ExecutionRules.BiasLost(false,false,"BUY","BUY"),"missing data cancels owned pending orders");
+        Check(!ExecutionRules.BiasLost(true,false,"BUY","BUY"),"matching bias retains owned pending orders");
         return checks;
     }
 }

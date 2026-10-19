@@ -9,7 +9,13 @@ using cAlgo.API.Internals;
 using PandaPlanning;
 namespace cAlgo
 {
+#if TRADE_PLAN_V13
+    public partial class PandaTradePlanV13
+#elif TRADE_PLAN_V12
+    public partial class PandaTradePlanV12
+#else
     public partial class PandaTradePlan
+#endif
     {
         private const int PandaGapThreshold=5, PandaSignificant=4;
         private const int SuperTrendPeriod=10, FollowBbPeriod=21, FollowAtrPeriod=5;
@@ -49,7 +55,7 @@ namespace cAlgo
             {
                 var slot=new PairSlot {Pair=pair};
                 var name=ResolveSymbolName(pair);
-                try {if(name!=null)slot.Bars=MarketData.GetBars(TimeFrame.Hour,name);else slot.Missing=true;}
+                try {if(name!=null){slot.Bars=MarketData.GetBars(TimeFrame.Hour,name);slot.Quote=Symbols.GetSymbol(name);}else slot.Missing=true;}
                 catch {slot.Missing=true;}
                 _slots.Add(slot);if(pair==_chartPair)_activeSlot=slot;
             }
@@ -59,10 +65,10 @@ namespace cAlgo
             foreach(var slot in _slots)
             {
                 if(slot.Bars==null||slot.Bars.Count==0)continue;
-                if(slot.LastCount!=slot.Bars.Count||slot.LastBarTime!=slot.Bars.LastBar.OpenTime)
+                if(slot.LastCount!=slot.Bars.Count||slot.LastBarTime!=slot.Bars.LastBar.OpenTime||slot.LastWindowDay!=Server.Time.Date)
                 {
-                    slot.LastCount=slot.Bars.Count;slot.LastBarTime=slot.Bars.LastBar.OpenTime;
-                    slot.Ready=ApplySnapshot(slot);
+                    slot.LastCount=slot.Bars.Count;slot.LastBarTime=slot.Bars.LastBar.OpenTime;slot.LastWindowDay=Server.Time.Date;
+                    slot.Ready=ApplySnapshot(slot,Server.Time);
                 }
             }
             // Load at most one missing history block per tick to keep the chart responsive.
@@ -93,23 +99,20 @@ namespace cAlgo
 
         private static readonly string[] PandaCurrencies = { "AUD", "CAD", "EUR", "GBP", "JPY", "NZD", "USD" };
 
-        private sealed class PeriodRange
-        {
-            public DateTime Start;
-            public double High;
-            public double Low;
-        }
         private sealed class PairSlot
         {
             public string Pair;
             public Bars Bars;
+            public Symbol Quote;
             public bool Missing;
             public int LastCount = -1;
             public DateTime LastBarTime = DateTime.MinValue;
+            public DateTime LastWindowDay = DateTime.MinValue;
             public bool Ready;
             public double ShortHigh, ShortLow, MediumHigh, MediumLow, LongHigh, LongLow;
             public DateTime ShortStart, ShortEnd, MediumStart, MediumEnd, LongStart, LongEnd;
-        }        private readonly List<PairSlot> _slots = new List<PairSlot>();
+        }
+        private readonly List<PairSlot> _slots = new List<PairSlot>();
         private readonly int[] _scoresH1 = new int[7];
         private readonly int[] _scoresH4 = new int[7];
         private readonly int[] _scoresD1 = new int[7];
@@ -186,72 +189,35 @@ namespace cAlgo
         {
             return Array.IndexOf(PandaCurrencies, currency);
         }
-        private static DateTime DayKey(DateTime time)
+        private static bool TryBounds(Bars bars,DateTime start,DateTime end,out double high,out double low)
         {
-            return time.Date;
-        }
-        private static DateTime WeekKey(DateTime time)
-        {
-            var date = time.Date;
-            return date.AddDays(-(((int)date.DayOfWeek + 6) % 7));
-        }
-        private static DateTime MonthKey(DateTime time)
-        {
-            return new DateTime(time.Year, time.Month, 1);
-        }
-        private static List<PeriodRange> BuildPeriods(Bars bars, Func<DateTime, DateTime> keyOf)
-        {
-            var periods = new List<PeriodRange>();
-            var currentKey = DateTime.MinValue;
-            PeriodRange current = null;
-            for (int i = 0; i < bars.Count; i++)
+            high=double.MinValue;low=double.MaxValue;
+            if(bars.Count==0||bars.OpenTimes[0]>start)return false;
+            for(int index=bars.Count-1;index>=0;index--)
             {
-                var key = keyOf(bars.OpenTimes[i]);
-                if (current == null || key != currentKey)
-                {
-                    current = new PeriodRange { Start = bars.OpenTimes[i], High = bars.HighPrices[i], Low = bars.LowPrices[i] };
-                    periods.Add(current);
-                    currentKey = key;
-                }
-                else
-                {
-                    current.High = Math.Max(current.High, bars.HighPrices[i]);
-                    current.Low = Math.Min(current.Low, bars.LowPrices[i]);
-                }
+                var time=bars.OpenTimes[index];
+                if(time>=end)continue;
+                if(time<start)break;
+                var barHigh=bars.HighPrices[index];
+                var barLow=bars.LowPrices[index];
+                if(!Rules.Finite(barHigh)||!Rules.Finite(barLow)||barHigh<=0||barLow<=0)continue;
+                high=Math.Max(high,barHigh);
+                low=Math.Min(low,barLow);
             }
-            return periods;
+            return high!=double.MinValue;
         }
-        private static bool ApplySnapshot(PairSlot slot)
+        private static bool ApplySnapshot(PairSlot slot,DateTime now)
         {
             var bars = slot.Bars;
-            var days = BuildPeriods(bars, DayKey);
-            var weeks = BuildPeriods(bars, WeekKey);
-            var months = BuildPeriods(bars, MonthKey);
-            if (days.Count < 4 || weeks.Count < 4 || months.Count < 4) return false;
-
-            var d1 = days[days.Count - 2];
-            var d2 = days[days.Count - 3];
-            var d3 = days[days.Count - 4];
-            slot.ShortHigh = Math.Max(d2.High, d3.High);
-            slot.ShortLow = Math.Min(d2.Low, d3.Low);
-            slot.ShortStart = d3.Start;
-            slot.ShortEnd = d1.Start;
-
-            var w1 = weeks[weeks.Count - 2];
-            var w2 = weeks[weeks.Count - 3];
-            var w3 = weeks[weeks.Count - 4];
-            slot.MediumHigh = Math.Max(w2.High, w3.High);
-            slot.MediumLow = Math.Min(w2.Low, w3.Low);
-            slot.MediumStart = w3.Start;
-            slot.MediumEnd = w1.Start;
-
-            var m1 = months[months.Count - 2];
-            var m2 = months[months.Count - 3];
-            var m3 = months[months.Count - 4];
-            slot.LongHigh = Math.Max(m2.High, m3.High);
-            slot.LongLow = Math.Min(m2.Low, m3.Low);
-            slot.LongStart = m3.Start;
-            slot.LongEnd = m1.Start;
+            var shortWindow=ScoreWindows.Short(now);
+            var mediumWindow=ScoreWindows.Weekly(now);
+            var longWindow=ScoreWindows.Monthly(now);
+            if(!TryBounds(bars,shortWindow.Start,shortWindow.End,out slot.ShortHigh,out slot.ShortLow)||
+               !TryBounds(bars,mediumWindow.Start,mediumWindow.End,out slot.MediumHigh,out slot.MediumLow)||
+               !TryBounds(bars,longWindow.Start,longWindow.End,out slot.LongHigh,out slot.LongLow))return false;
+            slot.ShortStart=shortWindow.Start;slot.ShortEnd=shortWindow.End;
+            slot.MediumStart=mediumWindow.Start;slot.MediumEnd=mediumWindow.End;
+            slot.LongStart=longWindow.Start;slot.LongEnd=longWindow.End;
             return true;
         }
         private static int Vote(double price, double boxHigh, double boxLow)
@@ -277,7 +243,7 @@ namespace cAlgo
         }
         private static string VoteCell(int positive,int negative)
         {
-            return positive>0&&negative<0?SignedScore(positive)+"/"+SignedScore(negative):SignedScore(Rules.Dominant(positive,negative));
+            return positive>0&&negative<0?SignedScore(positive)+"/"+SignedScore(negative):SignedScore(Rules.DominantVote(positive,negative));
         }
         private string ScoreDetails(int index,string currency)
         {return currency+" D1 "+VoteCell(_positiveD1[index],_negativeD1[index])+" H4 "+VoteCell(_positiveH4[index],_negativeH4[index])+" H1 "+VoteCell(_positiveH1[index],_negativeH1[index]);}
@@ -329,17 +295,18 @@ namespace cAlgo
             foreach (var slot in _slots)
             {
                 if (!slot.Ready || slot.Bars == null || slot.Bars.Count == 0) continue;
+                var price = slot.Quote==null?double.NaN:slot.Quote.Bid;
+                if(!Rules.Finite(price)||price<=0)continue;
                 _readyPairs++;
-                var price = slot.Bars.LastBar.Close;
                 AddPairVote(_positiveH1,_negativeH1,slot.Pair,Vote(price,slot.ShortHigh,slot.ShortLow));
                 AddPairVote(_positiveH4,_negativeH4,slot.Pair,Vote(price,slot.MediumHigh,slot.MediumLow));
                 AddPairVote(_positiveD1,_negativeD1,slot.Pair,Vote(price,slot.LongHigh,slot.LongLow));
             }
             for(int i=0;i<7;i++)
             {
-                _scoresD1[i]=Rules.Dominant(_positiveD1[i],_negativeD1[i]);
-                _scoresH4[i]=Rules.Dominant(_positiveH4[i],_negativeH4[i]);
-                _scoresH1[i]=Rules.Dominant(_positiveH1[i],_negativeH1[i]);
+                _scoresD1[i]=Rules.DominantVote(_positiveD1[i],_negativeD1[i]);
+                _scoresH4[i]=Rules.DominantVote(_positiveH4[i],_negativeH4[i]);
+                _scoresH1[i]=Rules.DominantVote(_positiveH1[i],_negativeH1[i]);
             }
 
             var supported = _chartPair != "";

@@ -25,7 +25,8 @@ Built for the existing 21 Panda forex pairs; H1 context is used on any chart tim
 - The entry label identifies the selected reference, such as PDL or H1 Box Low.
 - Default mode: ScoringBias. Entry follows scoring direction and the nearest
   eligible entry reference; TP1 uses the nearest eligible forward reference at
-  least **50 pips from entry**. No forecast or fixed-distance entry is invented.
+  least **50 pips from entry**, even when that level lies between the current
+  quote and a pending limit entry. No forecast or fixed-distance entry is invented.
 - Default SL distance is derived from Entry-to-TP1 distance: under 100 pips / 2;
   100 to under 200 / 3; 200 to under 300 / 4; 300+ / 5 (existing project tier).
   Round the resulting stop to the broker's price precision. SuperTrend/Follow
@@ -134,8 +135,11 @@ Place order is clicked; cTrader's own drawing action remains a separate native c
 
 The panel is draggable, saves its position, and has a **minus/plus shrink button**.
 Shrinking leaves a compact header/status chip while the drawing remains on chart.
-**Fit plan** repositions the drawing near the latest candles and fits the price
-scale to include the plan. New plans are fitted automatically; prices are unchanged.
+New plans render without forcing a price-range fit, and the indicator's
+transparent outputs no longer rescale the candle chart. **Fit plan** still
+repositions the drawing and explicitly fits the plan levels when requested.
+If a previous fit left cTrader's price scale fixed, restore its Auto scale
+setting once in the chart controls. Plan prices are unchanged.
 Existing chart drawings and indicators are preserved.
 On indicator removal, its own interactive drawings are cleaned up. Stable instance
 names prevent duplicates during parameter reloads. No API token is required.
@@ -143,10 +147,15 @@ names prevent duplicates during parameter reloads. No API token is required.
 ## Data boundaries
 
 Period/Box and Panda Lines calculations are reused from the existing personal XTF/BOS
-source in `2026-07-18/ctrader-panda-xtf-bos`; the original is unchanged. This planner's
-aggregation has been corrected from net votes to dominant components. Native broker
-H1 data, periods and prices may differ from the engine's MT4 feed. Yearly levels
-are not used in this revision.
+source in `2026-07-18/ctrader-panda-xtf-bos`; the original is unchanged. Scoring
+is self-contained: it calculates each of the 21 pair votes from cTrader H1 box
+history and live Bid prices using the MT4 Panda Scoring v1.2 calendar windows,
+dominant-side totals and conflict rules. No MT4 export file, MCP bridge or
+FullAccess permission is needed. All 21 quotes and sufficient broker history
+must be available before a new plan or automatic order can be created.
+MT4 and cTrader values can still differ when broker quotes, H1 candles or
+server-time boundaries differ; matching the rules is not live score parity.
+Yearly levels are excluded.
 The planner's H1 context does not switch to M5 when attached on an M5 chart.
 
 ## Build and tests
@@ -161,15 +170,94 @@ folder. `dist/Panda Trade Plan.algo` is the distributable. Tests exercise plan m
 BUY/SELL geometry, JPY pip size, eligibility, reference selection, target/SL tiers,
 optional guides, bias invalidation and retention boundaries.
 
+### Panda Trade Plan v1.2
+
+`Panda Trade Plan v1.2/Panda Trade Plan v1.2/Panda Trade Plan v1.2.csproj`
+builds a separate indicator; it does not replace the original Panda Trade Plan.
+The same draggable panel has **Show dashboard** and **Show trade plan** views.
+Minimizing the plan with `-` automatically shows the dashboard rows; `+`
+restores the prior expanded view without clearing the plan drawing.
+The dashboard view combines the overlay score and bias (for example `+8 BUY`)
+above BASE/QUOTE XTF, H4/H1
+box trends, Panda Lines, XTF and feed status. Its compact summary remains visible
+in the plan view. The dashboard keeps the compact panel width and rows, with
+brighter, bolder text. The plan view shows its own cTrader score and bias together.
+BUY uses a darker green; SELL uses red. The feed refreshes at most once per 60 seconds.
+The BUY/SELL plan buttons are omitted in v1.2 because they cannot override the
+calculated bias; **Refresh plan** rebuilds the plan for the current bias.
+
+Paste the existing Personal overlay operator token into `Operator token`; the
+old indicator's saved parameter cannot be copied automatically. This v1.2
+build is Personal-only; a separate licensed build would be needed for customer
+distribution. Tokens are never embedded in the build. The
+dashboard feed is **display-only**: plans and orders still use the cTrader-native
+score labelled in the plan view, not the dashboard score. Feed errors cannot
+authorize orders. The v1.2 indicator starts with auto orders off, dry run on,
+and allowed account 0. It uses separate plan storage; existing plans and pending
+orders are not migrated or cancelled when switching indicators.
+
+### Panda Trade Plan v1.3
+
+`Panda Trade Plan v1.3/Panda Trade Plan v1.3/Panda Trade Plan v1.3.csproj`
+builds a separate indicator with the same planning, dashboard, and drawing
+behavior as v1.2. Its only exposed parameter groups are **Execution** and
+**Auto orders**. The dashboard feed no longer needs an operator token: it uses
+the active cTrader account number and requires a separate approved
+  `ctrader_trade_plan_v13` license from the Panda licensing page. A customer
+  requests approval with only their name and cTrader account number; the operator
+  approves the pending request in License Admin. No contact detail or operator
+  token is required for this version. All other settings are fixed at the v1.2
+  defaults: automatic planning on, 15-second refresh, all previous-level
+and Panda Box references on, minimum TP1 50 pips, and the compact panel at
+80% scale. The on-panel Auto, Refresh plan, Hide plan, and manual edit controls
+still work. Auto orders remain off, dry run remains on, and the allowed account
+remains 0 until explicitly changed. Without a current approval, v1.3 hides its
+plan drawings, blocks planning and all order submissions, and returns no ready
+plan outputs. It rechecks approval about once a minute and fails closed if the
+feed or license check becomes unavailable. Existing broker pending orders are
+not cancelled by a license failure. v1.3 stores plans separately per account;
+it does not migrate plans or cancel pending orders from v1.2. Remove a prior indicator
+instance before enabling live auto orders on v1.3 to avoid duplicate automation.
+
 The local cTrader MCP connection at port 9876 can attach it using
 `addChartIndicator(typeName: "Panda Trade Plan")`. Enum parameters passed through
 that connector require numeric values: retention ManualOnly=2; bias MarkInvalid=0;
 references PreviousLevelsAndBoxes=0. Transparent price outputs expose planned
 Entry/SL/TP1/TP2/TP3 through the data window/API without drawing extra visible lines.
 
+The next two transparent outputs expose Limit order readiness (1 or 0) and
+validated volume in units. They use the same `PrepareOrder` checks as the Place
+button but do not submit an order. Run the read-only one-pair MCP probe with
+`node tools/trade-plan-mcp-dry-run.mjs --symbol=EURGBP --account=YOUR_LIVE_LOGIN` after
+opening that pair's chart. The probe never calls a trading tool. It fails closed
+when the indicator is not ready, the live account is offline, or the symbol has
+an existing order or position. MCP cannot currently prove which account is
+selected for order placement, so this probe is not authorization for live trading.
+
+## Optional native auto-limit orders
+
+The indicator already plots plans automatically on its attached chart. One
+running instance is needed for each symbol you want it to trade; each instance
+loads the 21-pair scoring context itself. `Auto-place valid limits` defaults to
+off, `Dry run only` defaults to on, and `Allowed account number` defaults to 0
+(disabled). Live placement requires all three settings to be deliberately set,
+trading permission already granted, a fresh valid Limit plan, and no existing
+order or position on that symbol. The auto path reuses the Place button's
+validation and never requests permission or places Stop/Market orders.
+
+An auto order carries an instance-specific `PandaAuto-` label. The indicator
+does not amend it after placement, so user edits in cTrader remain untouched.
+When its scoring bias becomes unavailable, invalid, `WAIT`, or opposite, it
+cancels only its own still-pending orders; it never closes filled positions or
+touches manual orders. Dry-run mode logs the proposed placement/cancellation
+but never sends broker actions. If dry run is turned on after a live auto order
+was placed, its cancellation is also dry-run only; inspect and cancel that
+pending order manually if needed. A cancelled order is not recreated from the
+same saved plan. Refreshing the plan is an explicit rearm action.
+
 ## Session verification and limits
 
-- C# release build: zero errors and zero warnings. Plan rules: 118 assertions pass,
+- C# release build: zero errors and zero warnings. Plan rules: 134 assertions pass,
   including exact 50/99/100/199/200/250/300-pip target and SL boundaries.
 - A USDCAD regression uses USD `D1:+2 H4:+1/-1 H1:+1/-4` and CAD
   `D1:+2 H4:+2 H1:+3/-1`: USD=-4, CAD=+3, gap=-7, without HARD_INVALID.

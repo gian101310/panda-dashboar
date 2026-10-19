@@ -406,14 +406,14 @@ export default function LicenseAdminPage() {
                   <label style={{ fontFamily: mono, fontSize: 8, color: '#445566', letterSpacing: 1, display: 'block', marginBottom: 4 }}>NAME *</label>
                   <input value={form.customer_name} onChange={(e) => setForm({ ...form, customer_name: e.target.value })} placeholder="Client name" style={{ ...input, width: '100%' }} required />
                 </div>
-                <div>
+                {form.product_code !== 'ctrader_trade_plan_v13' && <div>
                   <label style={{ fontFamily: mono, fontSize: 8, color: '#445566', letterSpacing: 1, display: 'block', marginBottom: 4 }}>CONTACT (EMAIL/PHONE)</label>
                   <input value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} placeholder="email or phone" style={{ ...input, width: '100%' }} />
-                </div>
-                <div>
+                </div>}
+                {form.product_code !== 'ctrader_trade_plan_v13' && <div>
                   <label style={{ fontFamily: mono, fontSize: 8, color: '#445566', letterSpacing: 1, display: 'block', marginBottom: 4 }}>TELEGRAM</label>
                   <input value={form.telegram_username} onChange={(e) => setForm({ ...form, telegram_username: e.target.value })} placeholder="@username" style={{ ...input, width: '100%' }} />
-                </div>
+                </div>}
                 <div>
                   <label style={{ fontFamily: mono, fontSize: 8, color: '#445566', letterSpacing: 1, display: 'block', marginBottom: 4 }}>{form.platform === 'CTRADER' ? 'CTRADER ACCOUNT NUMBER *' : form.platform === 'MT5' ? 'MT5 ACCOUNT NUMBER *' : form.product_code === 'mt4_dashboard_overlay' ? 'MT4 ACCOUNT NUMBER *' : 'MT4 ACCOUNT ID *'}</label>
                   <input value={usesTradingAccount(form.platform, form.product_code) ? form.trading_account_number : form.mt4_account_id} onChange={(e) => setForm(usesTradingAccount(form.platform, form.product_code) ? { ...form, trading_account_number: e.target.value } : { ...form, mt4_account_id: e.target.value })} placeholder="e.g. 3242354235" style={{ ...input, width: '100%' }} required />

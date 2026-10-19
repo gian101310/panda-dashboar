@@ -9,9 +9,18 @@ using PandaPlanning;
 namespace cAlgo
 {
     // Visual planning plus explicit user-click execution. Automatic refresh never trades.
-    [Indicator(IsOverlay=true, TimeZone=TimeZones.UTC, AccessRights=AccessRights.None)]
+#if TRADE_PLAN_V13
+    [Indicator(IsOverlay=true, TimeZone=TimeZones.UTC, AutoRescale=false, AccessRights=AccessRights.None)]
+    public partial class PandaTradePlanV13 : Indicator
+#elif TRADE_PLAN_V12
+    [Indicator(IsOverlay=true, TimeZone=TimeZones.UTC, AutoRescale=false, AccessRights=AccessRights.None)]
+    public partial class PandaTradePlanV12 : Indicator
+#else
+    [Indicator(IsOverlay=true, TimeZone=TimeZones.UTC, AutoRescale=false, AccessRights=AccessRights.None)]
     public partial class PandaTradePlan : Indicator
+#endif
     {
+#if !TRADE_PLAN_V13
         [Parameter("Pullback rules",DefaultValue=PlanMode.ScoringBias)]
         public PlanMode Mode {get;set;}
         [Parameter("Entry reference",DefaultValue=EntryReference.PreviousLevelsAndBoxes)]
@@ -82,6 +91,7 @@ namespace cAlgo
         public bool StartCollapsed {get;set;}
         [Parameter("Show score diagnostics",Group="Panel",DefaultValue=true)]
         public bool ShowScoreDiagnostics {get;set;}
+#endif
 
         // Transparent price outputs expose the current plan in cTrader's data
         // window / indicator API without adding a second set of visible lines.
@@ -95,6 +105,10 @@ namespace cAlgo
         public IndicatorDataSeries PlannedTarget2 {get;set;}
         [Output("Optional TP3",LineColor="#00000000",IsLastValueVisibleInTitle=false,IsColorCustomizable=false)]
         public IndicatorDataSeries PlannedTarget3 {get;set;}
+        [Output("Limit order ready",LineColor="#00000000",IsLastValueVisibleInTitle=false,IsColorCustomizable=false)]
+        public IndicatorDataSeries LimitOrderReady {get;set;}
+        [Output("Planned volume units",LineColor="#00000000",IsLastValueVisibleInTitle=false,IsColorCustomizable=false)]
+        public IndicatorDataSeries PlannedVolumeUnits {get;set;}
 
         private static readonly Color Blue=Color.FromHex("#00b4ff"),Green=Color.FromHex("#00ff9f"),Red=Color.FromHex("#ff4d6d"),Grey=Color.FromHex("#9aa4b2");
         private string _prefix;
@@ -109,9 +123,18 @@ namespace cAlgo
         private Button _hide,_autoButton;
         private Plan _plan;
         private bool _hidden,_rendering,_autoPaused,_refreshReference;
+        private string _lastReadinessReason;
         private DateTime _lastAutoRefresh=DateTime.MinValue;
         private string _message="Waiting for scoring and an eligible pullback";
-        private string StoreKey {get{return "PandaTradePlan v1 "+SymbolName;}}
+        private string StoreKey {get{return "PandaTradePlan "+
+#if TRADE_PLAN_V13
+            "v13 "+Account.Number.ToString(CultureInfo.InvariantCulture)+" "+
+#elif TRADE_PLAN_V12
+            "v12 "+
+#else
+            "v1 "+
+#endif
+            SymbolName;}}
         private double Scale(double value){return value*PanelScale/100.0;}
         private string SettingsKey {get{return string.Join("|",_orderKind,Mode,Reference,UseDay,UseWeek,UseMonth,UseH1Box,UseH4Box,UseD1Box,
             MinTargetPips,MaxEntryPips,MaxTargetPips,StopUnder100,StopUnder200,StopUnder300,StopFrom300);}}
@@ -132,6 +155,10 @@ namespace cAlgo
             RemoveDrawings();
             InitializeContext();
             Print("Panda Trade Plan: context initialized");
+#if TRADE_PLAN_V12 || TRADE_PLAN_V13
+            try {InitializeDashboard();}
+            catch(Exception ex){_dashboardStatus="ERROR";Print("Panda dashboard setup failed: "+ex.GetType().Name);}
+#endif
             BuildPanel();
             Chart.ObjectsUpdated+=OnObjectsUpdated;
             Timer.TimerTick+=Tick;
@@ -164,15 +191,36 @@ namespace cAlgo
         private void PublishPlan()
         {
             int index=Bars.Count-1;if(index<0)return;
+#if TRADE_PLAN_V13
+            if(!LicenseActive)
+            {
+                PlannedEntry[index]=double.NaN;PlannedStop[index]=double.NaN;PlannedTarget[index]=double.NaN;
+                PlannedTarget2[index]=double.NaN;PlannedTarget3[index]=double.NaN;
+                LimitOrderReady[index]=0;PlannedVolumeUnits[index]=double.NaN;
+                return;
+            }
+#endif
             PlannedEntry[index]=_plan==null?double.NaN:_plan.Entry;
             PlannedStop[index]=_plan==null?double.NaN:_plan.Stop;
             PlannedTarget[index]=_plan==null?double.NaN:_plan.Target;
             PlannedTarget2[index]=_plan==null?double.NaN:(_plan.Target2??double.NaN);
             PlannedTarget3[index]=_plan==null?double.NaN:(_plan.Target3??double.NaN);
+            string reason=_plan==null?"No plan":"Order type is not Limit";
+            var ticket=_plan!=null&&_orderKind==ExecutionKind.Limit?PrepareOrder(out reason,false):null;
+            LimitOrderReady[index]=ticket==null?0:1;
+            PlannedVolumeUnits[index]=ticket==null?double.NaN:ticket.VolumeUnits;
+            if(reason!=_lastReadinessReason){_lastReadinessReason=reason;Print("Panda Trade Plan dry-run readiness: "+reason);}
         }
         private void Tick()
         {
+#if TRADE_PLAN_V13
+            RefreshDashboard();
+            if(!LicenseActive){UpdateStatus();return;}
+#endif
             RefreshContext();
+#if TRADE_PLAN_V12
+            RefreshDashboard();
+#endif
             if(_plan!=null&&_plan.Kind==ExecutionKind.Market&&string.IsNullOrEmpty(_plan.SubmissionId))
             {
                 double quote=_plan.Side=="BUY"?Symbol.Ask:Symbol.Bid;
@@ -194,6 +242,7 @@ namespace cAlgo
             if((Rules.ShouldAutoPlan(_plan,AutoPlan,_autoPaused,_scoreReady)||(migrate&&AutoPlan&&_scoreReady&&!_autoPaused)) &&
                 DateTime.UtcNow-_lastAutoRefresh>=TimeSpan.FromSeconds(RefreshSeconds))
             {_lastAutoRefresh=DateTime.UtcNow;_refreshReference=false;CreatePlan(migrate?_plan.Side:_pandaBias,true);}
+            ReconcileAutoLimitOrder();
             UpdateStatus();
         }
         private IEnumerable<Level> PreviousLevels()
@@ -204,7 +253,10 @@ namespace cAlgo
         }
         private void CreatePlan(string side,bool automatic=false)
         {
-            if(!_scoreReady){_message="Waiting for all 21 pair histories";UpdateStatus();return;}
+#if TRADE_PLAN_V13
+            if(!LicenseActive){UpdateStatus();return;}
+#endif
+            if(!_scoreReady){_message="Waiting for all 21 pair histories and quotes";UpdateStatus();return;}
             if(side!=_pandaBias || (side!="BUY"&&side!="SELL")){_message=automatic?"Waiting for valid BUY/SELL scoring bias":"No "+side+" setup: bias is "+_pandaBias;UpdateStatus();return;}
             int closed=_contextBars.Count-2;
             if(closed<21){_message="Waiting for confirmed H1 context";UpdateStatus();return;}
@@ -243,7 +295,7 @@ namespace cAlgo
             if(automatic&&previousPlan!=null){candidate.AnchorStart=previousPlan.AnchorStart;candidate.AnchorEnd=previousPlan.AnchorEnd;}
             _plan=candidate;if(!automatic)_hidden=false;_message=candidate.Draft?"MANUAL STOP DRAFT - no eligible rule setup; drag levels or Apply to confirm":"Rule plan - drag levels to adjust";
             if(!automatic){_autoPaused=false;}
-            Save();if(previousPlan==null||!automatic)FitPlan();else Render();UpdateStatus();
+            Save();Render();UpdateStatus();
         }
         private void BuildPanel()
         {
@@ -252,31 +304,73 @@ namespace cAlgo
             _minimized=restoreCollapse?LocalStorage.GetString("Panel minimized",LocalStorageScope.Instance)=="1":StartCollapsed;
             LocalStorage.SetString("Collapse input",collapsedConfig,LocalStorageScope.Instance);
             LocalStorage.SetString("Panel minimized",_minimized?"1":"0",LocalStorageScope.Instance);
-            _panelRoot=new StackPanel {Orientation=Orientation.Vertical,Width=Scale(_minimized?190:PanelWidth),BackgroundColor=Color.FromArgb((int)Math.Round(255*PanelOpacity/100.0),16,22,31),Margin=Scale(3)};
+            _panelRoot=new StackPanel {Orientation=Orientation.Vertical,Width=(
+#if TRADE_PLAN_V12 || TRADE_PLAN_V13
+                Scale(PanelWidth)
+#else
+                Scale(_minimized?190:PanelWidth)
+#endif
+            ),BackgroundColor=Color.FromArgb((int)Math.Round(255*PanelOpacity/100.0),16,22,31),Margin=Scale(3)};
             var header=new Grid(1,2){Margin=Scale(2)};
-            var heading=Text(_minimized?"PANDA PLAN":"PANDA TRADE PLAN",Color.White,12,true);
+            var heading=Text(
+#if TRADE_PLAN_V12 || TRADE_PLAN_V13
+                _minimized?"PANDA DASHBOARD":TradePlanTitle,
+#else
+                _minimized?"PANDA PLAN":"PANDA TRADE PLAN",
+#endif
+                Color.White,12,true);
             header.AddChild(heading,0,0);
             var shrink=Button(_minimized?"+":"-",Grey,25);
             shrink.HorizontalAlignment=HorizontalAlignment.Right;
             shrink.Click+=e=>
             {
-                _minimized=!_minimized;_panelBody.IsVisible=!_minimized;_compact.IsVisible=_minimized;
-                _panelRoot.Width=Scale(_minimized?190:PanelWidth);shrink.Text=_minimized?"+":"-";
+                _minimized=!_minimized;
+#if TRADE_PLAN_V12 || TRADE_PLAN_V13
+                _panelBody.IsVisible=!_minimized&&!_dashboardView;
+                _dashboardBody.IsVisible=_minimized||_dashboardView;
+                _dashboardSummary.IsVisible=!_minimized&&!_dashboardView;
+                _dashboardSwitch.IsVisible=!_minimized;
+                _compact.IsVisible=false;
+                heading.Text=_minimized?"PANDA DASHBOARD":TradePlanTitle;
+#else
+                _panelBody.IsVisible=!_minimized;
+                _compact.IsVisible=_minimized;
+                _panelRoot.Width=Scale(_minimized?190:PanelWidth);
                 heading.Text=_minimized?"PANDA PLAN":"PANDA TRADE PLAN";
+#endif
+                shrink.Text=_minimized?"+":"-";
                 LocalStorage.SetString("Panel minimized",_minimized?"1":"0",LocalStorageScope.Instance);LocalStorage.Flush(LocalStorageScope.Instance);
             };
             header.AddChild(shrink,0,1);_panelRoot.AddChild(header);
-            _compact=Text(SymbolName+" | PLAN",Blue,10);_compact.IsVisible=_minimized;_panelRoot.AddChild(_compact);
-            var panel=new StackPanel {Orientation=Orientation.Vertical,IsVisible=!_minimized};
+            _compact=Text(SymbolName+" | PLAN",Blue,10);
+#if TRADE_PLAN_V12 || TRADE_PLAN_V13
+            _compact.IsVisible=false;
+#else
+            _compact.IsVisible=_minimized;
+#endif
+            _panelRoot.AddChild(_compact);
+#if TRADE_PLAN_V12 || TRADE_PLAN_V13
+            AddDashboardSwitch();
+#endif
+            var panel=new StackPanel {Orientation=Orientation.Vertical,IsVisible=!_minimized
+#if TRADE_PLAN_V12 || TRADE_PLAN_V13
+                &&!_dashboardView
+#endif
+            };
             _panelBody=panel;_panelRoot.AddChild(panel);
             panel.AddChild(Text("H1 PLAN | CLICK TO EXECUTE",Blue,10));
+#if TRADE_PLAN_V12 || TRADE_PLAN_V13
+            _planScoreBias=Text("—",Grey,18,true);panel.AddChild(_planScoreBias);
+#endif
             _context=Text("Loading context...",Grey,11);panel.AddChild(_context);
             double full=PanelWidth-18,half=(full-8)/2;
-            var directions=new StackPanel {Orientation=Orientation.Horizontal,Margin=Scale(3)};
             BuildExecutionPanel(panel,full,half);
+#if !TRADE_PLAN_V12 && !TRADE_PLAN_V13
+            var directions=new StackPanel {Orientation=Orientation.Horizontal,Margin=Scale(3)};
             var buy=Button("Plan BUY",Blue,half);buy.Click+=e=>CreatePlan("BUY");
             var sell=Button("Plan SELL",Red,half);sell.Click+=e=>CreatePlan("SELL");
             directions.AddChild(buy);directions.AddChild(sell);panel.AddChild(directions);
+#endif
             foreach(var key in new[]{"Entry","Stop loss","TP1","TP2 guide","TP3 guide"})
             {
                 var row=new Grid(1,2){Margin=Scale(2)};
@@ -335,6 +429,9 @@ namespace cAlgo
         private double Field(string key) {double n;return double.TryParse(_fields[key].Text,NumberStyles.Float,CultureInfo.InvariantCulture,out n)?Math.Round(n,Symbol.Digits):double.NaN;}
         private void ApplyEdits()
         {
+#if TRADE_PLAN_V13
+            if(!LicenseActive){UpdateStatus();return;}
+#endif
             if(_plan==null){_message="Create a valid rule plan first";UpdateStatus();return;}
             double entry=_plan.Kind==ExecutionKind.Market?(_plan.Side=="BUY"?Symbol.Ask:Symbol.Bid):Field("Entry"),stop=Field("Stop loss"),target=Field("TP1");
             if(!Rules.ValidGeometry(_plan.Side,entry,stop,target)){_message="Invalid prices: check SL/entry/TP direction";UpdateStatus();return;}
@@ -353,6 +450,9 @@ namespace cAlgo
         }
         private void ReadLineEdits(IEnumerable<ChartObject> objects)
         {
+#if TRADE_PLAN_V13
+            if(!LicenseActive)return;
+#endif
             if(_rendering||_plan==null)return;
             bool changed=false;
             foreach(var obj in objects.OrderBy(o=>o is ChartRiskReward?0:1).ToArray())
@@ -388,6 +488,9 @@ namespace cAlgo
         }
         private void Render()
         {
+#if TRADE_PLAN_V13
+            if(!LicenseActive)return;
+#endif
             if(_plan==null||_hidden)return;
             _rendering=true;
             try
@@ -449,6 +552,9 @@ namespace cAlgo
         private void RemoveLevel(string key){_renderedLevels.Remove(key);Chart.RemoveObject(_prefix+key);Chart.RemoveObject(_prefix+key+"Label");}
         private void FitPlan()
         {
+#if TRADE_PLAN_V13
+            if(!LicenseActive){UpdateStatus();return;}
+#endif
             if(_plan==null)return;
             _hidden=false;_plan.AnchorStart=DateTime.MinValue;_plan.AnchorEnd=DateTime.MinValue;
             Render();
@@ -474,14 +580,38 @@ namespace cAlgo
         private void UpdateStatus()
         {
             PublishPlan();
+#if TRADE_PLAN_V13
+            if(!LicenseActive)
+            {
+                _place.IsEnabled=false;
+                _planScoreBias.Text="LICENSE "+_licenseStatus;
+                _planScoreBias.ForegroundColor=Red;
+                _context.Text="Account "+Account.Number.ToString(CultureInfo.InvariantCulture);
+                _status.Text="Trade plan locked until this account is approved";
+                _status.ForegroundColor=Red;
+                _metrics.Text="SL - pips | TP1 - R";
+                _note.Text="Existing broker orders are not cancelled by license checks";
+                UpdateDashboardPanel();
+                return;
+            }
+            _place.IsEnabled=true;
+#endif
             _compact.Text=SymbolName+" | "+(_plan==null?_pandaBias:_plan.Invalid?"INVALID":_plan.Side+" PLAN");
-            _context.Text=SymbolName+" | Bias "+_pandaBias+" | Gap "+_pandaGap+" | "+_readyPairs+"/21";
+#if TRADE_PLAN_V12 || TRADE_PLAN_V13
+            UpdateDashboardPanel();
+            _planScoreBias.Text=(_scoreReady?_pandaGap.ToString("+0;-0;0",CultureInfo.InvariantCulture):"—")+" "+_pandaBias;
+            _planScoreBias.ForegroundColor=BiasDashboardColor(_pandaBias);
+            _context.Text=SymbolName+" | "+_readyPairs+"/21 cTrader";
+#else
+            _context.Text=SymbolName+" | Bias "+_pandaBias+" | Gap "+_pandaGap+" | "+_readyPairs+"/21 cTrader";
+#endif
             if(ShowScoreDiagnostics&&!string.IsNullOrEmpty(_scoreDetails))_context.Text+="\n"+_scoreDetails;
             _place.Text="Place "+(_plan==null?_pandaBias:_plan.Side)+" "+_orderKind;
             _hide.Text=_hidden?"Show plan":"Hide plan";
             _autoButton.Text=!AutoPlan?"Auto disabled (settings)":_autoPaused?"Resume auto":"Pause auto";
             _status.ForegroundColor=(_plan!=null&&_plan.Invalid)||(_scoreReady&&_hardInvalid)?Red:Blue;
             _status.Text=_plan!=null&&_plan.Invalid?"INVALID - "+(_plan.InvalidReason??"bias changed")+"; plan retained":_message;
+            if(!_scoreReady&&_plan==null)_status.Text="Waiting for all 21 pair histories and quotes";
             if(_scoreReady&&_hardInvalid)_status.Text=_scoreInvalidReason;
             if(_plan==null){_metrics.Text="SL - pips | TP1 - R";_note.Text="Rules: "+Mode+"\nReference: "+Reference+"\nExpiry: "+Expiry;return;}
             double risk=Math.Abs(_plan.Entry-_plan.Stop),rr=risk>0?Math.Abs(_plan.Target-_plan.Entry)/risk:0;
@@ -496,11 +626,15 @@ namespace cAlgo
             bool limitSide=_plan.Kind==ExecutionKind.Market||(_plan.Kind==ExecutionKind.Stop?(_plan.Side=="BUY"?_plan.Entry>Symbol.Ask:_plan.Entry<Symbol.Bid):(_plan.Side=="BUY"?_plan.Entry<Symbol.Ask:_plan.Entry>Symbol.Bid));
             _note.Text=(_plan.Draft?"DRAFT: drag prices or Apply to confirm":_plan.Manual?"MANUAL: levels stay fixed":"Entry: "+_plan.EntryLabel+" | "+_plan.Mode)+
                 "\n"+(!limitSide?"Entry crossed: refresh or adjust this pending plan\n":"")+
-                (!_scoreReady?"Context unavailable; recheck before use\n":"")+"Expiry: "+Expiry+" | TP2/3 optional guides";
+                (!_scoreReady?"Context unavailable; recheck before use\n":"")+"Expiry: "+Expiry+" | TP2/3 optional guides"+
+                "\nAuto orders: "+(AutoPlaceLimits?(AutoOrderDryRun?"DRY RUN":"LIVE ARMED"):"OFF");
         }
         protected override void OnDestroy()
         {
             Timer.Stop();Timer.TimerTick-=Tick;Chart.ObjectsUpdated-=OnObjectsUpdated;
+#if TRADE_PLAN_V12 || TRADE_PLAN_V13
+            _dashboardDisposed=true;
+#endif
             RemoveDrawings();if(_panel!=null)Chart.Draggables.Remove(_panel);
         }
     }

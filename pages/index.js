@@ -3,6 +3,7 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import {
   PUBLIC_INDICATOR_PRODUCTS as LEGACY_INDICATOR_PRODUCTS,
+  CTRADER_TRADE_PLAN_V13_PRODUCT_CODE,
 } from '../lib/indicatorProducts.mjs';
 import { mergePublicOverlayProducts } from '../lib/indicatorStore.mjs';
 import { curSym, mapDbTiers, FALLBACK_TIERS } from '../lib/pricingClient';
@@ -164,6 +165,7 @@ export default function LandingPage() {
   }
 
   const requestPlatform = licenseModal?.platform || 'MT4';
+  const simpleTradePlanRequest = licenseModal?.code === CTRADER_TRADE_PLAN_V13_PRODUCT_CODE;
   const requestAccountLabel = requestPlatform === 'CTRADER'
     ? 'cTrader account number'
     : `${requestPlatform} account number`;
@@ -658,7 +660,7 @@ export default function LandingPage() {
                   <div style={{ fontFamily: mono, fontSize: 10, letterSpacing: 4, color: '#00ff9f', marginBottom: 10 }}>REQUEST SENT</div>
                   <h3 style={{ fontFamily: orb, fontSize: 20, margin: '0 0 12px' }}>{licenseModal.name}</h3>
                   <p style={{ fontFamily: raj, fontSize: 14, color: '#8899bb', lineHeight: 1.55, marginBottom: 20 }}>
-                    Your request is pending. The installed indicator will activate after approval. Panda will contact you about payment when applicable.
+                    {simpleTradePlanRequest ? 'Your request is pending. Trade Plan v1.3 will activate on this cTrader account after approval.' : 'Your request is pending. The installed indicator will activate after approval. Panda will contact you about payment when applicable.'}
                   </p>
                   <button onClick={() => setLicenseModal(null)} style={{ width: '100%', background: '#00ff9f', border: 'none', borderRadius: 8, color: '#050810', fontFamily: orb, fontSize: 11, fontWeight: 800, letterSpacing: 2, padding: 12, cursor: 'pointer' }}>CLOSE</button>
                 </div>
@@ -667,12 +669,12 @@ export default function LandingPage() {
                   <div style={{ fontFamily: mono, fontSize: 10, letterSpacing: 4, color: '#00b4ff', marginBottom: 8 }}>ACTIVATE INDICATOR</div>
                   <h3 style={{ fontFamily: orb, fontSize: 21, margin: '0 0 8px' }}>{licenseModal.name}</h3>
                   <p style={{ fontFamily: raj, fontSize: 13, color: '#6b7fa8', lineHeight: 1.5, marginBottom: 18 }}>
-                    Enter your {requestAccountLabel}. Add your Telegram username for faster activation updates.
+                    {simpleTradePlanRequest ? 'Enter your name and cTrader account number to request approval.' : `Enter your ${requestAccountLabel}. Add your Telegram username for faster activation updates.`}
                   </p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     <input value={licenseForm.customer_name} onChange={(e) => setLicenseForm((f) => ({ ...f, customer_name: e.target.value }))} placeholder="Your name" style={{ background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '12px 14px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, outline: 'none' }} />
-                    <input value={licenseForm.contact} onChange={(e) => setLicenseForm((f) => ({ ...f, contact: e.target.value }))} placeholder="Email address" style={{ background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '12px 14px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, outline: 'none' }} />
-                    <input value={licenseForm.telegram_username} onChange={(e) => setLicenseForm((f) => ({ ...f, telegram_username: e.target.value }))} placeholder="Telegram username (optional — for faster delivery)" style={{ background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '12px 14px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, outline: 'none' }} />
+                    {!simpleTradePlanRequest && <input value={licenseForm.contact} onChange={(e) => setLicenseForm((f) => ({ ...f, contact: e.target.value }))} placeholder="Email address" style={{ background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '12px 14px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, outline: 'none' }} />}
+                    {!simpleTradePlanRequest && <input value={licenseForm.telegram_username} onChange={(e) => setLicenseForm((f) => ({ ...f, telegram_username: e.target.value }))} placeholder="Telegram username (optional — for faster delivery)" style={{ background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '12px 14px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, outline: 'none' }} />}
                     <input value={licenseForm.trading_account_number} onChange={(e) => setLicenseForm((f) => ({ ...f, trading_account_number: e.target.value }))} placeholder={`${requestAccountLabel}, numbers only`} inputMode="numeric" style={{ background: '#05080f', border: '1px solid #1a2540', borderRadius: 6, padding: '12px 14px', color: '#e8eaf0', fontFamily: raj, fontSize: 14, outline: 'none' }} />
                   </div>
                   {licenseErr && <div style={{ fontFamily: mono, fontSize: 10, color: '#ff4d6d', marginTop: 12 }}>{licenseErr}</div>}

@@ -108,7 +108,7 @@ namespace cAlgo
         public static void Request(Http http, string endpoint, string headerName, string credential,
             string deviceId, string deviceToken, Action<FeedResult> callback)
         {
-            var key = headerName + ":" + credential + ":" + deviceId + ":" + deviceToken;
+            var key = endpoint + ":" + headerName + ":" + credential + ":" + deviceId + ":" + deviceToken;
             CacheEntry entry;
             lock (Gate)
             {
@@ -134,7 +134,8 @@ namespace cAlgo
             request.Headers.Add(headerName, credential);
             if (!string.IsNullOrWhiteSpace(deviceId)) request.Headers.Add("x-panda-device-id", deviceId);
             if (!string.IsNullOrWhiteSpace(deviceToken)) request.Headers.Add("x-panda-device-token", deviceToken);
-            http.SendAsync(request, response => Complete(key, response));
+            try { http.SendAsync(request, response => Complete(key, response)); }
+            catch { Complete(key, null); }
         }
 
         private static void Complete(string key, HttpResponse response)
@@ -164,7 +165,7 @@ namespace cAlgo
             {
                 var entry = Entries[key];
                 entry.RequestInFlight = false;
-                if (result.Success) entry.LastResult = result;
+                entry.LastResult = result.Success ? result : null;
                 callbacks = entry.Callbacks.ToList();
                 entry.Callbacks.Clear();
             }

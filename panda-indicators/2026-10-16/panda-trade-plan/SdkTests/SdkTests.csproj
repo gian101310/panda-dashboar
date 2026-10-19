@@ -2,6 +2,7 @@
   <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net6.0</TargetFramework></PropertyGroup>
   <ItemGroup>
     <Compile Include="../RiskRewardPreview.cs" Link="RiskRewardPreview.cs"/>
+    <Compile Include="../../../2026-07-14/ctrader-dashboard-overlay/PandaDashboardOverlay.Core.cs" Link="PandaDashboardOverlay.Core.cs"/>
     <PackageReference Include="cTrader.Automate" Version="1.0.17" ExcludeAssets="build;buildTransitive"/>
   </ItemGroup>
 </Project>

@@ -8,6 +8,7 @@
     <Compile Include="../../PandaTradePlan.cs" Link="PandaTradePlan.cs"/>
     <Compile Include="../../PandaTradePlan.Context.cs" Link="PandaTradePlan.Context.cs"/>
     <Compile Include="../../TradePlanRules.cs" Link="TradePlanRules.cs"/>
+    <Compile Include="../../ScoreWindows.cs" Link="ScoreWindows.cs"/>
     <Compile Include="../../TradeExecutionRules.cs" Link="TradeExecutionRules.cs"/>
     <Compile Include="../../RiskRewardPreview.cs" Link="RiskRewardPreview.cs"/>
     <Compile Include="../../PandaTradePlan.Execution.cs" Link="PandaTradePlan.Execution.cs"/>

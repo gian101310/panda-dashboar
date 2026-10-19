@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AssemblyName>PandaTradePlanV13</AssemblyName>
+    <DefineConstants>TRADE_PLAN_V13</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../PandaTradePlan.cs" Link="PandaTradePlan.cs"/>
+    <Compile Include="../../PandaTradePlan.Context.cs" Link="PandaTradePlan.Context.cs"/>
+    <Compile Include="../../PandaTradePlan.Execution.cs" Link="PandaTradePlan.Execution.cs"/>
+    <Compile Include="../../PandaTradePlan.Dashboard.cs" Link="PandaTradePlan.Dashboard.cs"/>
+    <Compile Include="../../PandaTradePlan.V13Defaults.cs" Link="PandaTradePlan.V13Defaults.cs"/>
+    <Compile Include="../../PandaTradePlan.V13License.cs" Link="PandaTradePlan.V13License.cs"/>
+    <Compile Include="../../TradePlanRules.cs" Link="TradePlanRules.cs"/>
+    <Compile Include="../../ScoreWindows.cs" Link="ScoreWindows.cs"/>
+    <Compile Include="../../TradeExecutionRules.cs" Link="TradeExecutionRules.cs"/>
+    <Compile Include="../../RiskRewardPreview.cs" Link="RiskRewardPreview.cs"/>
+    <Compile Include="../../../../2026-07-14/ctrader-dashboard-overlay/PandaDashboardOverlay.Core.cs" Link="PandaDashboardOverlay.Core.cs"/>
+    <PackageReference Include="cTrader.Automate" Version="1.0.17"/>
+  </ItemGroup>
+</Project>

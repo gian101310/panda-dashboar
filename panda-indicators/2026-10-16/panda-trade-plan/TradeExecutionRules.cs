@@ -11,6 +11,8 @@ namespace PandaPlanning
     }
     public static class ExecutionRules
     {
+        public static bool BiasLost(bool ready,bool hardInvalid,string plannedSide,string currentBias)
+        {return !ready||hardInvalid||(plannedSide!="BUY"&&plannedSide!="SELL")||plannedSide!=currentBias;}
         public static OrderTicket Prepare(Plan plan,ExecutionKind kind,double bid,double ask,double pip,double minimum,
             double lots,double lotUnits,double minUnits,double maxUnits,double step,bool ready,string bias,bool hardInvalid,out string reason)
         {

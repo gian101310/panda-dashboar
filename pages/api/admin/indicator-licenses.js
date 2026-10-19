@@ -69,13 +69,13 @@ export default async function handler(req, res) {
     const product = getIndicatorProduct(productCode);
     if (!product) return res.status(400).json({ error: 'invalid product' });
     const platform = product.platform || normalizeIndicatorPlatform(req.body?.platform);
-    const account = productCode.endsWith('_dashboard_overlay')
+    const account = product.platform === 'CTRADER' || product.platform === 'MT5' || productCode.endsWith('_dashboard_overlay')
       ? normalizeTradingAccountNumber(trading_account_number || mt4_account_id)
       : normalizeMt4AccountId(mt4_account_id);
     if (!customer_name || !account) return res.status(400).json({ error: 'name, account_id, product required' });
     const row = {
       customer_name: String(customer_name).trim(),
-      contact: String(contact || '').trim() || null,
+      contact: String(contact || '').trim(),
       telegram_username: String(telegram_username || '').trim().replace(/^@/, '') || null,
       mt4_account_id: account,
       trading_account_number: account,
