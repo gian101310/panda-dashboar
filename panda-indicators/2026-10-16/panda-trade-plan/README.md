@@ -203,11 +203,13 @@ builds a separate indicator with the same planning, dashboard, and drawing
 behavior as v1.2. Its only exposed parameter groups are **Execution** and
 **Auto orders**. The dashboard feed no longer needs an operator token: it uses
 the active cTrader account number and requires a separate approved
-  `ctrader_trade_plan_v13` license from the Panda licensing page. A customer
-  requests approval with only their name and cTrader account number; the operator
-  approves the pending request in License Admin. No contact detail or operator
-  token is required for this version. All other settings are fixed at the v1.2
-  defaults: automatic planning on, 15-second refresh, all previous-level
+`ctrader_trade_plan_v13` license. The operator downloads the `.algo` from
+License Admin's private Storage-backed download, sends it to the client, and
+creates a manual license using the client's name and cTrader account number.
+The operator then approves it; approval also marks the license as paid. The
+trade-plan download is not public, and no contact detail or operator token is
+required. All other settings are fixed at the v1.2 defaults: automatic
+planning on, 15-second refresh, all previous-level
 and Panda Box references on, minimum TP1 50 pips, and the compact panel at
 80% scale. The on-panel Auto, Refresh plan, Hide plan, and manual edit controls
 still work. Auto orders remain off, dry run remains on, and the allowed account

@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-20 (Private Trade Plan v1.3 distribution)
+
+- Added an admin-only `.algo` download backed by private Storage, plus a
+  preselected manual license action on the Indicator License page.
+- Removed Trade Plan v1.3 from the public request catalog; clients receive the
+  file directly and the operator licenses their cTrader account manually.
+
 ## 2026-10-17 (Trade Plan fixed-size runtime crash)
 
 - Fixed the live `Can't set volume when type is FixedSize` exception: update the

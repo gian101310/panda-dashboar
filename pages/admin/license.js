@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Head from 'next/head';
-import { INDICATOR_PRODUCTS } from '../../lib/indicatorProducts.mjs';
+import { CTRADER_TRADE_PLAN_V13_PRODUCT_CODE, INDICATOR_PRODUCTS } from '../../lib/indicatorProducts.mjs';
 import { generateIndicatorToken } from '../../lib/indicatorTokenGenerator.mjs';
 
 const mono = "'Share Tech Mono', monospace";
@@ -137,6 +137,12 @@ export default function LicenseAdminPage() {
     setShowCreate(false);
     setCreating(false);
     await load();
+  }
+
+  function openTradePlanLicenseCreate() {
+    setForm({ customer_name: '', contact: '', telegram_username: '', mt4_account_id: '', trading_account_number: '', platform: 'CTRADER', product_code: CTRADER_TRADE_PLAN_V13_PRODUCT_CODE, paid_confirmed: false, price_override: '', notes: '' });
+    setShowCreate(true);
+    requestAnimationFrame(() => document.getElementById('manual-license-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   }
 
   async function generateActivateAndCopyOperatorToken() {
@@ -326,6 +332,16 @@ export default function LicenseAdminPage() {
 
           <section style={{ background: '#0e1525', border: '1px solid #1a2540', borderRadius: 10, padding: 16, marginBottom: 16 }}>
             <div style={{ fontFamily: orb, fontSize: 10, color: '#ffd166', letterSpacing: 2, marginBottom: 12 }}>INDICATOR DOWNLOADS</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', background: '#080c18', border: '1px solid #00b4ff55', borderRadius: 7, padding: 12, marginBottom: 12 }}>
+              <div>
+                <div style={{ fontFamily: orb, fontSize: 10, color: '#e8eaf0' }}>PANDA TRADE PLAN v1.3 · cTRADER</div>
+                <div style={{ fontFamily: raj, fontSize: 12, color: '#60708d', marginTop: 4 }}>Admin-only .algo. Send it to your client, then create and approve their account license.</div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <a href="/api/admin/trade-plan-download" download="Panda Trade Plan v1.3.algo" style={{ ...smallBtn('#00b4ff'), textDecoration: 'none' }}>DOWNLOAD .ALGO</a>
+                <button type="button" onClick={openTradePlanLicenseCreate} style={smallBtn('#00ff9f')}>CREATE LICENSE</button>
+              </div>
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', gap: 10 }}>
               {downloadStats.totals.map((stat) => (
                 <div key={stat.product_code} style={{ background: '#080c18', border: '1px solid #1a2540', borderRadius: 7, padding: 12 }}>
@@ -399,7 +415,7 @@ export default function LicenseAdminPage() {
           </div>
           {/* Manual Create Form */}
           {showCreate && (
-            <form onSubmit={createLicense} style={{ background: '#0e1525', border: '1px solid #1a2540', borderRadius: 10, padding: 20, marginBottom: 16 }}>
+            <form id="manual-license-form" onSubmit={createLicense} style={{ background: '#0e1525', border: '1px solid #1a2540', borderRadius: 10, padding: 20, marginBottom: 16 }}>
               <div style={{ fontFamily: orb, fontSize: 10, letterSpacing: 3, color: '#ffd166', marginBottom: 16 }}>CREATE MANUAL LICENSE</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 12 }}>
                 <div>

@@ -28,6 +28,8 @@ test('pricing surfaces cTrader, MT4 and MT5 with tracked download and activation
 test('license admin exposes download telemetry and recoverable active-token controls', () => {
   const admin = fs.readFileSync('pages/admin/license.js', 'utf8');
   assert.match(admin, /fetch\('\/api\/admin\/indicator-downloads'\)/);
+  assert.match(admin, /href="\/api\/admin\/trade-plan-download"/);
+  assert.match(admin, /CTRADER_TRADE_PLAN_V13_PRODUCT_CODE/);
   assert.match(admin, /DOWNLOADS RECORDED/);
   assert.match(admin, /method: 'POST'/);
   assert.match(admin, /action: 'reveal'/);

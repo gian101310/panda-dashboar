@@ -27,3 +27,8 @@ test('never exposes Personal artifacts through the public catalog', () => {
   assert.equal(fs.existsSync('public/downloads/PandaDashboardOverlayMT4-Personal.ex4'), false);
   assert.equal(fs.existsSync('public/downloads/PandaDashboardOverlayMT5-Personal.ex5'), false);
 });
+
+test('trade plan v1.3 is not in the public indicator or download catalog', () => {
+  assert.equal(productCatalog.PUBLIC_INDICATOR_PRODUCTS.some((product) => product.code === 'ctrader_trade_plan_v13'), false);
+  assert.equal(productCatalog.PUBLIC_DOWNLOAD_PRODUCTS.some((product) => product.code === 'ctrader_trade_plan_v13'), false);
+});

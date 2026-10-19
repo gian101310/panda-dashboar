@@ -71,15 +71,13 @@ test('rejects malformed platform accounts and unknown products', () => {
   assert.deepEqual(unknown, { ok: false, error: 'Unknown indicator product' });
 });
 
-test('trade plan needs only a name and cTrader account, other products still need contact', () => {
+test('trade plan is unavailable to public requests while other products still require contact', () => {
   const parsed = validateIndicatorRequest({
     customer_name: 'Client One',
     trading_account_number: '2243677',
     product_code: 'ctrader_trade_plan_v13',
   });
-  assert.equal(parsed.ok, true);
-  assert.equal(parsed.value.contact, '');
-  assert.equal(parsed.value.platform, 'CTRADER');
+  assert.deepEqual(parsed, { ok: false, error: 'Unknown indicator product' });
   assert.equal(validateIndicatorRequest({
     customer_name: 'Client One',
     trading_account_number: '2243677',
@@ -87,21 +85,19 @@ test('trade plan needs only a name and cTrader account, other products still nee
   }).error, 'Contact is required');
 });
 
-test('trade-plan name-and-account request creates a pending license', async () => {
-  let inserted;
+test('trade-plan public request cannot create a license', async () => {
+  let inserted = false;
   const handler = createIndicatorLicenseRequestHandler({
     findExisting: async () => null,
-    insertRequest: async (row) => { inserted = row; return { id: 'trade-plan-request', status: row.status }; },
+    insertRequest: async () => { inserted = true; },
     notify: async () => {},
   });
   const res = await invoke(handler, {
     method: 'POST',
     body: { customer_name: 'Client One', trading_account_number: '2243677', product_code: 'ctrader_trade_plan_v13' },
   });
-  assert.equal(res.statusCode, 200);
-  assert.equal(inserted.contact, '');
-  assert.equal(inserted.status, 'PENDING');
-  assert.equal(inserted.product_code, 'ctrader_trade_plan_v13');
+  assert.equal(res.statusCode, 400);
+  assert.equal(inserted, false);
 });
 
 test('request workflow scopes duplicate lookup to product platform and account', async () => {

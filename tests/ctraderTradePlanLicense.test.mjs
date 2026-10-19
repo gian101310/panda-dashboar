@@ -23,19 +23,18 @@ async function invoke(handler, headers = {}) {
   return res;
 }
 
-test('trade-plan product is a separate public cTrader license request', () => {
+test('trade-plan product is admin-only and supports manual cTrader licenses', () => {
   assert.equal(CTRADER_TRADE_PLAN_V13_PRODUCT_CODE, 'ctrader_trade_plan_v13');
   const product = getIndicatorProduct(CTRADER_TRADE_PLAN_V13_PRODUCT_CODE);
   assert.equal(product.platform, 'CTRADER');
-  assert.notEqual(product.adminOnly, true);
+  assert.equal(product.adminOnly, true);
+  assert.equal(product.requestable, false);
   const request = validateIndicatorRequest({
     customer_name: 'Client',
     trading_account_number: '2243677',
     product_code: CTRADER_TRADE_PLAN_V13_PRODUCT_CODE,
   });
-  assert.equal(request.ok, true);
-  assert.equal(request.value.contact, '');
-  assert.equal(request.value.trading_account_number, '2243677');
+  assert.deepEqual(request, { ok: false, error: 'Unknown indicator product' });
   const adminRoute = fs.readFileSync('pages/api/admin/indicator-licenses.js', 'utf8');
   assert.match(adminRoute, /product\.platform === 'CTRADER' \|\| product\.platform === 'MT5'/);
 });
