@@ -117,6 +117,10 @@ namespace cAlgo
         private readonly JsonSerializerOptions _json=new JsonSerializerOptions {IncludeFields=true};
         private ChartDraggable _panel;
         private StackPanel _panelRoot,_panelBody;
+#if TRADE_PLAN_V12 || TRADE_PLAN_V13
+        private StackPanel _dashboardRoot;
+        private Button _tradeShrink,_dashboardShrink;
+#endif
         private TextBlock _compact;
         private bool _minimized;
         private TextBlock _status,_context,_metrics,_note;
@@ -137,11 +141,14 @@ namespace cAlgo
             SymbolName;}}
         private double Scale(double value){return value*PanelScale/100.0;}
 #if TRADE_PLAN_V12 || TRADE_PLAN_V13
-        private void UpdatePanelWidth()
+        private void UpdatePanelHost()
         {
-            var width=PanelLayoutRules.Width(PanelWidth,190,_minimized,_dashboardView);
-            _panelRoot.Width=Scale(width);
-            if(_dashboardSwitch!=null)_dashboardSwitch.Width=Scale(width-18);
+            if(_panel==null||_dashboardRoot==null)return;
+            var dashboard=PanelLayoutRules.UseDashboardRoot(_minimized,_dashboardView);
+            _panel.Child=dashboard?_dashboardRoot:_panelRoot;
+            _dashboardSwitch.IsVisible=!_minimized;
+            _tradeShrink.Text=_minimized?"+":"-";
+            _dashboardShrink.Text=_minimized?"+":"-";
         }
 #endif
         private string SettingsKey {get{return string.Join("|",_orderKind,Mode,Reference,UseDay,UseWeek,UseMonth,UseH1Box,UseH4Box,UseD1Box,
@@ -314,7 +321,7 @@ namespace cAlgo
             LocalStorage.SetString("Panel minimized",_minimized?"1":"0",LocalStorageScope.Instance);
             _panelRoot=new StackPanel {Orientation=Orientation.Vertical,Width=(
 #if TRADE_PLAN_V12 || TRADE_PLAN_V13
-                Scale(PanelLayoutRules.Width(PanelWidth,190,_minimized,_dashboardView))
+                Scale(PanelWidth)
 #else
                 Scale(_minimized?190:PanelWidth)
 #endif
@@ -322,25 +329,22 @@ namespace cAlgo
             var header=new Grid(1,2){Margin=Scale(2)};
             var heading=Text(
 #if TRADE_PLAN_V12 || TRADE_PLAN_V13
-                _minimized?"PANDA DASHBOARD":TradePlanTitle,
+                TradePlanTitle,
 #else
                 _minimized?"PANDA PLAN":"PANDA TRADE PLAN",
 #endif
                 Color.White,12,true);
             header.AddChild(heading,0,0);
             var shrink=Button(_minimized?"+":"-",Grey,25);
+#if TRADE_PLAN_V12 || TRADE_PLAN_V13
+            _tradeShrink=shrink;
+#endif
             shrink.HorizontalAlignment=HorizontalAlignment.Right;
             shrink.Click+=e=>
             {
                 _minimized=!_minimized;
 #if TRADE_PLAN_V12 || TRADE_PLAN_V13
-                _panelBody.IsVisible=!_minimized&&!_dashboardView;
-                _dashboardBody.IsVisible=_minimized||_dashboardView;
-                _dashboardSummary.IsVisible=!_minimized&&!_dashboardView;
-                _dashboardSwitch.IsVisible=!_minimized;
-                _compact.IsVisible=false;
-                UpdatePanelWidth();
-                heading.Text=_minimized?"PANDA DASHBOARD":TradePlanTitle;
+                UpdatePanelHost();
 #else
                 _panelBody.IsVisible=!_minimized;
                 _compact.IsVisible=_minimized;
@@ -361,9 +365,9 @@ namespace cAlgo
 #if TRADE_PLAN_V12 || TRADE_PLAN_V13
             AddDashboardSwitch();
 #endif
-            var panel=new StackPanel {Orientation=Orientation.Vertical,IsVisible=!_minimized
-#if TRADE_PLAN_V12 || TRADE_PLAN_V13
-                &&!_dashboardView
+            var panel=new StackPanel {Orientation=Orientation.Vertical
+#if !TRADE_PLAN_V12 && !TRADE_PLAN_V13
+                ,IsVisible=!_minimized
 #endif
             };
             _panelBody=panel;_panelRoot.AddChild(panel);
@@ -405,11 +409,17 @@ namespace cAlgo
             var clear=Button("Clear plan",Grey,full);clear.Click+=e=>{_autoPaused=true;ClearPlan();_message="Cleared - Auto paused; click Resume auto to start again";UpdateStatus();};panel.AddChild(clear);
             var fit=Button("Fit plan",Grey,full);fit.Click+=e=>FitPlan();panel.AddChild(fit);
             panel.AddChild(Text("Auto only plans. Place order submits SL + TP1.",Grey,10));
-            _panel=Chart.Draggables.Add();_panel.ShowGrip=true;_panel.Child=_panelRoot;
+            _panel=Chart.Draggables.Add();_panel.ShowGrip=true;
+#if TRADE_PLAN_V12 || TRADE_PLAN_V13
+            _panel.Child=PanelLayoutRules.UseDashboardRoot(_minimized,_dashboardView)?_dashboardRoot:_panelRoot;
+#else
+            _panel.Child=_panelRoot;
+#endif
             double x,y;
             string positionConfig=PanelX+"|"+PanelY+"|"+RememberPosition;
             bool restorePosition=RememberPosition&&LocalStorage.GetString("Position inputs",LocalStorageScope.Instance)==positionConfig;
-            _panel.X=restorePosition&&double.TryParse(LocalStorage.GetString("Panel X",LocalStorageScope.Instance),NumberStyles.Float,CultureInfo.InvariantCulture,out x)?Math.Max(0,Math.Min(x,Chart.Width-_panelRoot.Width)):PanelX<0?Math.Max(0,Chart.Width-_panelRoot.Width-20):Math.Max(0,Math.Min(PanelX,Chart.Width-_panelRoot.Width));
+            var activePanelWidth=_panel.Child.Width;
+            _panel.X=restorePosition&&double.TryParse(LocalStorage.GetString("Panel X",LocalStorageScope.Instance),NumberStyles.Float,CultureInfo.InvariantCulture,out x)?Math.Max(0,Math.Min(x,Chart.Width-activePanelWidth)):PanelX<0?Math.Max(0,Chart.Width-activePanelWidth-20):Math.Max(0,Math.Min(PanelX,Chart.Width-activePanelWidth));
             _panel.Y=restorePosition&&double.TryParse(LocalStorage.GetString("Panel Y",LocalStorageScope.Instance),NumberStyles.Float,CultureInfo.InvariantCulture,out y)?Math.Max(0,Math.Min(y,Chart.Height-60)):Math.Max(0,Math.Min(PanelY,Chart.Height-60));
             LocalStorage.SetString("Position inputs",positionConfig,LocalStorageScope.Instance);
             if(RememberPosition)

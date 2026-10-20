@@ -105,25 +105,50 @@ namespace cAlgo
             _dashboardSummary=Text("Dashboard feed: connecting",Grey,10);
             _dashboardSummary.FontSize=11;
             _dashboardSummary.FontWeight=FontWeight.Bold;
-            _dashboardSummary.IsVisible=!_minimized&&!_dashboardView;
             _panelRoot.AddChild(_dashboardSummary);
-            var currentWidth=PanelLayoutRules.Width(PanelWidth,190,_minimized,_dashboardView);
-            _dashboardSwitch=Button(_dashboardView?"Show trade plan":"Show dashboard",Blue,currentWidth-18);
+            var showDashboard=Button("Show dashboard",Blue,PanelWidth-18);
+            showDashboard.Click+=e=>
+            {
+                _dashboardView=true;
+                UpdatePanelHost();
+                LocalStorage.SetString("Dashboard view","1",LocalStorageScope.Instance);
+                LocalStorage.Flush(LocalStorageScope.Instance);
+            };
+            _panelRoot.AddChild(showDashboard);
+
+            _dashboardRoot=new StackPanel
+            {
+                Orientation=Orientation.Vertical,
+                Width=Scale(190),
+                BackgroundColor=Color.FromArgb((int)Math.Round(255*PanelOpacity/100.0),16,22,31),
+                Margin=Scale(3)
+            };
+            var dashboardHeader=new Grid(1,2){Margin=Scale(2)};
+            dashboardHeader.AddChild(Text("PANDA DASHBOARD",Color.White,12,true),0,0);
+            _dashboardShrink=Button(_minimized?"+":"-",Grey,25);
+            _dashboardShrink.HorizontalAlignment=HorizontalAlignment.Right;
+            _dashboardShrink.Click+=e=>
+            {
+                _minimized=!_minimized;
+                UpdatePanelHost();
+                LocalStorage.SetString("Panel minimized",_minimized?"1":"0",LocalStorageScope.Instance);
+                LocalStorage.Flush(LocalStorageScope.Instance);
+            };
+            dashboardHeader.AddChild(_dashboardShrink,0,1);
+            _dashboardRoot.AddChild(dashboardHeader);
+
+            _dashboardSwitch=Button("Show trade plan",Blue,172);
             _dashboardSwitch.IsVisible=!_minimized;
             _dashboardSwitch.Click+=e=>
             {
-                _dashboardView=!_dashboardView;
-                _dashboardSwitch.Text=_dashboardView?"Show trade plan":"Show dashboard";
-                _dashboardBody.IsVisible=!_minimized&&_dashboardView;
-                _panelBody.IsVisible=!_minimized&&!_dashboardView;
-                _dashboardSummary.IsVisible=!_minimized&&!_dashboardView;
-                UpdatePanelWidth();
-                LocalStorage.SetString("Dashboard view",_dashboardView?"1":"0",LocalStorageScope.Instance);
+                _dashboardView=false;
+                UpdatePanelHost();
+                LocalStorage.SetString("Dashboard view","0",LocalStorageScope.Instance);
                 LocalStorage.Flush(LocalStorageScope.Instance);
             };
-            _panelRoot.AddChild(_dashboardSwitch);
-            _dashboardBody=new StackPanel {Orientation=Orientation.Vertical,IsVisible=_minimized||_dashboardView};
-            _panelRoot.AddChild(_dashboardBody);
+            _dashboardRoot.AddChild(_dashboardSwitch);
+            _dashboardBody=new StackPanel {Orientation=Orientation.Vertical};
+            _dashboardRoot.AddChild(_dashboardBody);
             AddDashboardRow("SCORE / BIAS",18);
             AddDashboardRow("BASE XTF",11);
             AddDashboardRow("QUOTE XTF",11);

@@ -2,10 +2,11 @@
 
 ## 2026-10-20 (Compact Trade Plan dashboards)
 
-- Made the Dashboard view use its own compact 190px base width in both Trade
-  Plan v1.2 and v1.3, while the Trade Plan view retains the configured width.
-- Resized the Dashboard/Trade Plan switch with the active view so it cannot
-  force the compact panel back to the full Trade Plan width.
+- Gave Dashboard and Trade Plan independent root controls in both v1.2 and
+  v1.3. Switching views now replaces the draggable child instead of asking one
+  shared Mac layout tree to shrink around hidden full-width controls.
+- Dashboard uses a clean 190px base-width root; Trade Plan retains the configured
+  width. Both roots keep their own heading, shrink button, and view switch.
 - Added layout regression coverage; both `.algo` packages compile and publish
   successfully on macOS.
 
