@@ -37,7 +37,7 @@ namespace cAlgo
 
         private readonly Dictionary<string,TextBlock> _dashboardValues=new Dictionary<string,TextBlock>();
         private StackPanel _dashboardBody;
-        private TextBlock _dashboardSummary,_dashboardFooter,_planScoreBias;
+        private TextBlock _dashboardSummary,_dashboardHeaderStatus,_dashboardCompact,_dashboardFooter,_planScoreBias;
         private Button _dashboardSwitch;
         private FeedResult _dashboardSnapshot;
         private string _dashboardStatus="CONNECTING";
@@ -119,13 +119,15 @@ namespace cAlgo
             _dashboardRoot=new StackPanel
             {
                 Orientation=Orientation.Vertical,
-                Width=Scale(190),
-                BackgroundColor=Color.FromArgb((int)Math.Round(255*PanelOpacity/100.0),16,22,31),
-                Margin=Scale(3)
+                Width=PanelLayoutRules.DashboardWidth(_minimized),
+                BackgroundColor=Color.FromArgb(230,9,15,25),
+                Margin=2
             };
-            var dashboardHeader=new Grid(1,2){Margin=Scale(2)};
-            dashboardHeader.AddChild(Text("PANDA DASHBOARD",Color.White,12,true),0,0);
-            _dashboardShrink=Button(_minimized?"+":"-",Grey,25);
+            var dashboardHeader=new Grid(1,3){Margin=7};
+            dashboardHeader.AddChild(DashboardText(_chartPair+" · PANDA",Color.White,11,true),0,0);
+            _dashboardHeaderStatus=DashboardText(_dashboardStatus,Color.Gold,9,true);
+            dashboardHeader.AddChild(_dashboardHeaderStatus,0,1);
+            _dashboardShrink=new Button {Text=_minimized?"+":"−",Width=28,Height=22,Margin=1};
             _dashboardShrink.HorizontalAlignment=HorizontalAlignment.Right;
             _dashboardShrink.Click+=e=>
             {
@@ -134,11 +136,11 @@ namespace cAlgo
                 LocalStorage.SetString("Panel minimized",_minimized?"1":"0",LocalStorageScope.Instance);
                 LocalStorage.Flush(LocalStorageScope.Instance);
             };
-            dashboardHeader.AddChild(_dashboardShrink,0,1);
+            dashboardHeader.AddChild(_dashboardShrink,0,2);
             _dashboardRoot.AddChild(dashboardHeader);
 
-            _dashboardSwitch=Button("Show trade plan",Blue,172);
-            _dashboardSwitch.IsVisible=!_minimized;
+            _dashboardSwitch=new Button {Text="Show trade plan",Width=242,Height=27,FontSize=12,Margin=2,ForegroundColor=Blue,BackgroundColor=Color.FromHex("#202c3a")};
+            _dashboardSwitch.IsVisible=PanelLayoutRules.ShowDashboardSwitch(_minimized);
             _dashboardSwitch.Click+=e=>
             {
                 _dashboardView=false;
@@ -147,33 +149,46 @@ namespace cAlgo
                 LocalStorage.Flush(LocalStorageScope.Instance);
             };
             _dashboardRoot.AddChild(_dashboardSwitch);
+            _dashboardCompact=DashboardText("—  —  "+_dashboardStatus,Grey,12,true);
+            _dashboardCompact.IsVisible=PanelLayoutRules.ShowDashboardCompact(_minimized);
+            _dashboardRoot.AddChild(_dashboardCompact);
             _dashboardBody=new StackPanel {Orientation=Orientation.Vertical};
+            _dashboardBody.IsVisible=PanelLayoutRules.ShowDashboardBody(_minimized);
             _dashboardRoot.AddChild(_dashboardBody);
-            AddDashboardRow("SCORE / BIAS",18);
-            AddDashboardRow("BASE XTF",11);
-            AddDashboardRow("QUOTE XTF",11);
+            AddDashboardRow("SCORE",22);
+            AddDashboardRow("BASE XTF",10);
+            AddDashboardRow("QUOTE XTF",10);
+            AddDashboardRow("BIAS",13);
             AddDashboardRow("BOX H4",11);
             AddDashboardRow("BOX H1",11);
             AddDashboardRow("PANDA LINES",11);
-            AddDashboardRow("XTF",11);
-            _dashboardFooter=Text("Dashboard sync · —",Grey,9);
-            _dashboardFooter.FontSize=10;
-            _dashboardFooter.FontWeight=FontWeight.Bold;
+            AddDashboardRow("XTF",10);
+            _dashboardFooter=DashboardText("Dashboard sync · —",Grey,9,false);
             _dashboardBody.AddChild(_dashboardFooter);
             UpdateDashboardPanel();
         }
 
         private void AddDashboardRow(string label,double size)
         {
-            var row=new Grid(1,2){Margin=Scale(2)};
-            var title=Text(label,Color.FromHex("#c5d5e1"),10,true);
-            title.FontSize=10;
+            var row=new Grid(1,2){Margin=new Thickness(8,2,8,2)};
+            var title=DashboardText(label,Color.Gray,9,false);
             row.AddChild(title,0,0);
-            var value=Text("—",Color.White,size,true);
-            value.FontSize=size;
+            var value=DashboardText("—",Color.White,size,true);
             _dashboardValues[label]=value;
             row.AddChild(value,0,1);
             _dashboardBody.AddChild(row);
+        }
+
+        private static TextBlock DashboardText(string value,Color color,double size,bool bold)
+        {
+            return new TextBlock
+            {
+                Text=value??"—",
+                ForegroundColor=color,
+                FontSize=size,
+                FontWeight=bold?FontWeight.ExtraBold:FontWeight.Normal,
+                Margin=new Thickness(4,2,4,2)
+            };
         }
 
         private OverlayPair DashboardPair()
@@ -197,9 +212,14 @@ namespace cAlgo
             var score=pair?.Gap.HasValue==true?FormatDashboardScore(pair.Gap.Value):"—";
             _dashboardSummary.Text="Dashboard "+score+" "+SafeDashboard(pair?.Bias)+" | "+status;
             _dashboardSummary.ForegroundColor=status=="LIVE"?BiasDashboardColor(pair?.Bias):Color.Gold;
-            SetDashboardValue("SCORE / BIAS",score+" "+SafeDashboard(pair?.Bias),BiasDashboardColor(pair?.Bias));
+            _dashboardHeaderStatus.Text=status;
+            _dashboardHeaderStatus.ForegroundColor=status=="LIVE"?Green:Color.Gold;
+            _dashboardCompact.Text=score+"  "+SafeDashboard(pair?.Bias)+"  "+status;
+            _dashboardCompact.ForegroundColor=BiasDashboardColor(pair?.Bias);
+            SetDashboardValue("SCORE",score,BiasDashboardColor(pair?.Bias));
             SetDashboardValue("BASE XTF",FormatDashboardExtremes(pair?.BaseCurrency,pair?.BaseScoreTf),Color.LightBlue);
             SetDashboardValue("QUOTE XTF",FormatDashboardExtremes(pair?.QuoteCurrency,pair?.QuoteScoreTf),Color.LightBlue);
+            SetDashboardValue("BIAS",SafeDashboard(pair?.Bias),BiasDashboardColor(pair?.Bias));
             SetDashboardValue("BOX H4",SafeDashboard(pair?.BoxH4Trend),TrendDashboardColor(pair?.BoxH4Trend));
             SetDashboardValue("BOX H1",SafeDashboard(pair?.BoxH1Trend),TrendDashboardColor(pair?.BoxH1Trend));
             SetDashboardValue("PANDA LINES",pair==null?"—":pair.PandaLinesValid?"CONFIRMED":SafeDashboard(pair.PandaLinesZone),

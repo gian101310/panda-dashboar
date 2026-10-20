@@ -11,6 +11,14 @@ class Program
         Check(PanelLayoutRules.UseDashboardRoot(false,true),"dashboard view selects separate compact root");
         Check(PanelLayoutRules.UseDashboardRoot(true,false),"minimize selects separate compact root");
         Check(!PanelLayoutRules.UseDashboardRoot(false,false),"trade-plan view selects full root");
+        Near(PanelLayoutRules.DashboardWidth(false),260,"expanded dashboard matches Panda overlay width");
+        Near(PanelLayoutRules.DashboardWidth(true),210,"minimized dashboard matches Panda overlay width");
+        Check(PanelLayoutRules.ShowDashboardBody(false),"expanded dashboard shows full rows");
+        Check(!PanelLayoutRules.ShowDashboardBody(true),"minimized dashboard hides full rows");
+        Check(!PanelLayoutRules.ShowDashboardCompact(false),"expanded dashboard hides compact line");
+        Check(PanelLayoutRules.ShowDashboardCompact(true),"minimized dashboard shows compact line");
+        Check(PanelLayoutRules.ShowDashboardSwitch(false),"expanded dashboard shows trade-plan switch");
+        Check(!PanelLayoutRules.ShowDashboardSwitch(true),"minimized dashboard hides trade-plan switch");
         string reason;
         var p50=Buy(1.105,out reason);Check(p50!=null,"50 pip plan");Near(p50.Entry,1.1,"entry prior low");Near(p50.Target,1.105,"TP1 reference");Near(p50.Stop,1.0975,"50 pip TP SL divided by 2");
         Near(Buy(1.1099,out reason).Stop,1.09505,"99 pip TP divided by 2");

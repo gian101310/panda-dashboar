@@ -145,8 +145,11 @@ namespace cAlgo
         {
             if(_panel==null||_dashboardRoot==null)return;
             var dashboard=PanelLayoutRules.UseDashboardRoot(_minimized,_dashboardView);
+            _dashboardRoot.Width=PanelLayoutRules.DashboardWidth(_minimized);
+            _dashboardBody.IsVisible=PanelLayoutRules.ShowDashboardBody(_minimized);
+            _dashboardCompact.IsVisible=PanelLayoutRules.ShowDashboardCompact(_minimized);
             _panel.Child=dashboard?_dashboardRoot:_panelRoot;
-            _dashboardSwitch.IsVisible=!_minimized;
+            _dashboardSwitch.IsVisible=PanelLayoutRules.ShowDashboardSwitch(_minimized);
             _tradeShrink.Text=_minimized?"+":"-";
             _dashboardShrink.Text=_minimized?"+":"-";
         }

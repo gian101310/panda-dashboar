@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-10-20 (Trade Plan v1.3 Dashboard collapse parity)
+
+- Matched the embedded v1.3 Dashboard panel to the standalone Panda Dashboard
+  Overlay: 260px expanded width, 210px compact width, symbol/status/toggle header,
+  identical row order, and a single score/bias/status line when minimized.
+- Fixed the minus button so the full Dashboard rows and Trade Plan switch are
+  hidden while compact, then restored when expanded.
+- Added source regression coverage for dashboard dimensions, visibility, compact
+  content, header structure, and row format. Native cTrader compilation remains
+  a Windows handoff check because this Mac session has no .NET SDK.
+
 ## 2026-10-20 (Compact Trade Plan dashboards)
 
 - Gave Dashboard and Trade Plan independent root controls in both v1.2 and
