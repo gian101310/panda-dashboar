@@ -4,11 +4,24 @@
 
 **Goal:** Make every alert sent to the dedicated Spike Alerts Telegram group durable, deduplicated, consolidated, and accurately observable.
 
-**Architecture:** Introduce a Supabase-backed alert outbox as the source of truth for idempotency, cooldowns, attempts, and confirmed delivery. Keep detection in `app.py`, but convert each detector into a candidate producer; a single dispatcher consolidates candidates per pair, writes idempotent outbox rows, sends pending messages, and records Telegram's response. Phase digests use the same delivery primitive while retaining their separate two-hour/change gate.
+**Architecture:** Introduce a Supabase-backed alert outbox as the source of truth for idempotency, cooldowns, attempts, and confirmed delivery. Keep detection in `app.py`, but convert each detector into a candidate producer; a single dispatcher consolidates candidates per pair, writes idempotent outbox rows, groups eligible pairs into one immediate Telegram message per cycle, and records Telegram's response. Momentum-only observations stay in the phase digest. Phase digests use the same delivery primitive while retaining their separate two-hour/change gate.
+
+## Review rulings (2026-10-20)
+
+- A Telegram timeout or a process death during `sendMessage` leaves an ambiguous result. The HTTP Bot API has no caller-supplied idempotency key. Mark the row `uncertain` and require inspection; do not promise exactly-once delivery or blindly retry it.
+- An atomic compare-and-set changes a due row from `pending` to `sending` before network I/O. A 90-second lease moves to `uncertain` after a crash, so the row is visible and never silently stuck.
+- A normal five-minute cycle sends at most one combined immediate group message. Split only if Telegram's message-length limit requires it. Momentum-only candidates do not trigger a standalone post.
+- Time-sensitive gap and early-entry alerts expire after four minutes; structure and Gold events have longer lifetimes. Retry only explicit Telegram rejections that may succeed later, and honor `retry_after`.
+- The phase digest excludes symbols queued for an immediate alert in that cycle and reads its last successful send from durable storage. Its copy describes observed conditions rather than issuing entry commands.
+- Keep the existing `PREV_GAP`/`gap_deltas` ordering and all locked scoring/strategy rules unchanged.
 
 **Tech Stack:** Python 3.11, `unittest`, `requests`, Supabase/Postgres, Telegram Bot API, Next.js 14 build verification.
 
 **Spec:** `docs/specs/spike-alert-group-reliability.md`
+
+## Implementation record (Windows, 2026-10-20)
+
+The schema was applied to the existing Supabase project and verified with service-role access and RLS checks. The implementation uses focused Python tests in `tests/test_signal_alert*.py`; the task checkboxes below remain the original planning outline rather than a deployment checklist. Production activation requires the managed engine restart, followed by heartbeat and outbox observation. The Spike Log remains an observation log; `signal_alert_outbox` is the delivery record.
 
 ## Global Constraints
 
@@ -24,7 +37,7 @@
 ## Review Focus
 
 - Telegram returns HTTP 200 with JSON `ok: false`: retain a failed attempt and do not mark delivered.
-- The process stops after Telegram accepts a message but before the database update: retry must reconcile by idempotency and avoid knowingly generating a second candidate.
+- The process stops after Telegram accepts a message but before the database update: the expired `sending` lease must become `uncertain`; it cannot be safely auto-retried through the HTTP Bot API.
 - Two scheduler paths enqueue the same pair/type close together: the database uniqueness constraint must admit only one row.
 - A pair recovers from stale or hard-invalid input: seed state without generating momentum, early-entry, or gap-zone noise on the first valid cycle.
 - One pair qualifies for structure, gap-zone, early-entry, and momentum simultaneously: emit one prioritized, non-contradictory message.
@@ -39,11 +52,11 @@
 
 **Interfaces:**
 - Consumes: Existing Supabase project `jxkelchxitwuilpbrwxk` and service-role writes from `app.py`.
-- Produces: `signal_alert_outbox` with `id`, `idempotency_key`, `alert_type`, `symbol`, `cycle_at`, `payload`, `status`, `attempt_count`, `next_attempt_at`, `last_error`, `telegram_message_id`, `created_at`, and `sent_at`.
+- Produces: `signal_alert_outbox` with `id`, `idempotency_key`, `alert_type`, `symbol`, `bias`, `cycle_at`, `payload`, `status`, `attempt_count`, `next_attempt_at`, `expires_at`, `lease_expires_at`, `last_error`, `telegram_message_id`, `created_at`, and `sent_at`.
 
 - [ ] **Step 1: Write the failing schema contract test**
 
-Create a source-contract test asserting that the migration defines the columns above, a unique constraint on `idempotency_key`, status validation for `pending/sending/sent/failed`, an index supporting pending retries, RLS enabled, and no anonymous policies.
+Create a source-contract test asserting that the migration defines the columns above, a unique constraint on `idempotency_key`, status validation for `pending/sending/sent/failed/uncertain/expired`, an index supporting pending retries, RLS enabled, and no anonymous policies.
 
 - [ ] **Step 2: Run the test to verify it fails**
 
@@ -145,7 +158,7 @@ Expected: FAIL because the repository module does not exist.
 
 - [ ] **Step 5: Implement the outbox repository and sender**
 
-Use insert-on-unique semantics for enqueue, claim only due `pending` rows, and use retry delays of 30, 120, and 300 seconds with a maximum of four total attempts. Never set cooldown/delivery state before confirmed Telegram success.
+Use insert-on-unique semantics for enqueue, atomically claim only due `pending` rows, and use retry delays of 30, 120, and 300 seconds with a maximum of four total attempts. The outbox records a pending candidate before network I/O; only the `sent` state and message ID require confirmed Telegram success. Leave ambiguous sends `uncertain`.
 
 - [ ] **Step 6: Route existing Signal-group senders through the delivery primitive**
 
@@ -181,7 +194,7 @@ Assert one pair produces one message, the primary reason is displayed first, sup
 
 - [ ] **Step 2: Write failing cycle-dispatch tests**
 
-Assert same-cycle overlap emits one outbox row per symbol, different symbols remain separate, and one symbol can alert again only after a genuinely new idempotency window and the applicable persisted cooldown.
+Assert same-cycle overlap emits one outbox row per symbol, different symbols share one Telegram post, and one symbol can alert again only after a genuinely new idempotency window and the applicable persisted cooldown.
 
 - [ ] **Step 3: Run tests to verify they fail**
 
@@ -190,7 +203,7 @@ Expected: FAIL because the consolidated builder/dispatcher does not exist.
 
 - [ ] **Step 4: Convert detectors to candidate producers**
 
-Momentum, gap-zone, early-entry, and structure detection append candidates rather than sending immediately. Gold remains a distinct symbol candidate. Replace imperative wording with observed state plus setup status derived from existing fields; do not introduce new trading rules.
+Momentum, gap-zone, early-entry, and structure detection append candidates rather than sending immediately. Gold remains a distinct symbol candidate. Momentum-only observations wait for the digest. Replace imperative wording with observed state plus setup status derived from existing fields; do not introduce new trading rules.
 
 - [ ] **Step 5: Consolidate and dispatch after pair processing**
 

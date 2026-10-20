@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-10-20 (Quieter, durable Spike Alerts group)
+
+- Added a service-role-only Signal alert outbox with durable idempotency keys,
+  confirmed Telegram message IDs, bounded retries, expiry, and visible uncertain
+  delivery state. Telegram flood-control `retry_after` is honored.
+- Consolidated overlapping pair events and grouped eligible pairs into one
+  immediate message per engine cycle. Momentum-only observations remain in the
+  two-hour phase digest; the digest excludes pairs already queued immediately.
+- Seeded MT4/Panda Lines state for two valid cycles after boot or invalid input
+  to avoid recovery spikes. The outbox retries pending rows every scheduler
+  minute. Scoring and BB/INTRA rules are unchanged.
+- Added focused tests for recovery, consolidation, confirmed delivery, retries,
+  uncertainty, and the engine candidate path. Windows engine restart and live
+  delivery observation are required after deployment.
+- Retries recheck current market hours and source state before sending. Recovery
+  counts distinct five-minute cycles; failed digests can be retried in a later
+  window, and Spike Log observations keep a persisted four-hour cooldown.
+
 ## 2026-10-20 (Trade Plan v1.3 Dashboard collapse parity)
 
 - Matched the embedded v1.3 Dashboard panel to the standalone Panda Dashboard

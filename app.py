@@ -35,6 +35,8 @@ from dotenv import load_dotenv
 from supabase import create_client
 from news_results import resolve_news_actual, load_sent_results, mark_result_sent
 from news_speeches import is_fed_chair_speech, resolve_speech_summary, speech_api_key
+from lib.signal_alerts import RecoveryGate, consolidate_candidates
+from lib.signal_alert_outbox import enqueue_alert, dispatch_pending
 
 load_dotenv()
 
@@ -195,9 +197,8 @@ class TelegramCircuitBreaker:
 telegram_circuit = TelegramCircuitBreaker()
 
 # ================= ALERT & HEAL STATE =================
-SPIKE_COOLDOWN = {}        # {symbol: last_spike_datetime}
-GAP_ALERT_COOLDOWN = {}    # {symbol: last_gap-alert_datetime} — gap 9-12 + valid PL
-EARLY_ENTRY_COOLDOWN = {}  # {symbol: last_early_alert_datetime} — fires on gap threshold crossover
+SIGNAL_RECOVERY = RecoveryGate()
+PL_RECOVERY = RecoveryGate()
 CONSECUTIVE_STALE = 0      # counter for auto-heal
 DUBAI_TZ = timezone(timedelta(hours=4))
 
@@ -1559,6 +1560,11 @@ def run_gap_once():
     spike_alerts        = []
     gap_alerts          = []   # pairs in 9-12 gap zone with valid Panda Lines
     early_alerts        = []   # pairs where gap just crossed into valid territory
+    structure_alerts    = []
+    signal_now          = datetime.now(timezone.utc)
+    signal_cycle_at     = signal_now.replace(
+        minute=signal_now.minute - signal_now.minute % 5, second=0, microsecond=0
+    ).isoformat()
     gap_deltas          = {}   # {symbol: current_gap - prev_gap} for snapshot logging
     stale_count         = 0
     hard_invalid_count  = 0
@@ -1566,15 +1572,20 @@ def run_gap_once():
     # ---- STEP 1: Parse ALL pairs first (needed for cross-pair conflict scan) ----
     all_parsed_map = {}
     all_pl_map    = {}
+    pl_ready_map  = {}
     for symbol in PAIRS:
         p = parse_mt4_file(symbol)
         if p is not None:
             all_parsed_map[symbol] = p
         else:
             stale_count += 1
+            SIGNAL_RECOVERY.mark(symbol, False)
+            PREV_ZONE.pop(symbol, None)
+            LAST_BOS_T.pop(symbol, None)
         pl = parse_pl_file(symbol)
         if pl is not None:
             all_pl_map[symbol] = pl
+        pl_ready_map[symbol] = PL_RECOVERY.mark(symbol, pl is not None, signal_cycle_at)
 
     # ---- STEP 2: Score ALL pairs (two-phase cBot-exact logic) ----
     all_scores = compute_scores_all_pairs(all_parsed_map)
@@ -1596,6 +1607,10 @@ def run_gap_once():
 
         if hard_invalid:
             hard_invalid_count += 1
+            SIGNAL_RECOVERY.mark(symbol, False)
+            PL_RECOVERY.mark(symbol, False)
+            PREV_ZONE.pop(symbol, None)
+            LAST_BOS_T.pop(symbol, None)
             print(f"[HARD_INVALID] {symbol} — {scores['conflict_detail']}")
             dashboard_payload.append({
                 "symbol":           symbol,
@@ -1655,6 +1670,8 @@ def run_gap_once():
             PREV_GAP[symbol]      = 0
             continue
 
+        signal_ready = SIGNAL_RECOVERY.mark(symbol, True, signal_cycle_at)
+
         # ---- STEP 3: Momentum from gap history ----
         history     = get_gap_history(symbol, n=26)
         delta_short = delta_mid = delta_long = accel = None
@@ -1706,12 +1723,16 @@ def run_gap_once():
             prev_mom not in ("SPARK", "BUILDING", "STRONG") and
             bias != "INVALID"
         )
-        if is_spike:
-            _now_spike = datetime.utcnow()
-            _last_spike = SPIKE_COOLDOWN.get(symbol)
-            _cooled = not _last_spike or (_now_spike - _last_spike).total_seconds() >= 14400
-            if abs(gap) >= 5 and _cooled:
-                SPIKE_COOLDOWN[symbol] = _now_spike
+        if is_spike and signal_ready and abs(gap) >= 5:
+            try:
+                recent_spike = (supabase.table("spike_events").select("id")
+                                .eq("symbol", symbol)
+                                .gte("fired_at", (datetime.now(timezone.utc) - timedelta(hours=4)).isoformat())
+                                .limit(1).execute().data or [])
+            except Exception as e:
+                print(f"[SPIKE] Cooldown check unavailable for {symbol}: {e}")
+                recent_spike = [True]  # avoid noisy duplicate observations on storage failure
+            if not recent_spike:
                 spike_alerts.append({
                     "symbol": symbol, "gap": gap, "bias": bias,
                     "momentum": momentum, "delta_short": delta_short,
@@ -1727,26 +1748,23 @@ def run_gap_once():
         _prev_gap_for_early = PREV_GAP.get(symbol, 0)
         _gap_just_crossed = (abs(_prev_gap_for_early) < 5 and abs(gap) >= 5 and bias != "INVALID")
         _gap_big_jump = (abs(gap) >= 5 and (delta_short or 0) != 0 and abs(delta_short or 0) >= 2 and bias != "INVALID")
-        if _gap_just_crossed or _gap_big_jump:
-            _now_early = datetime.utcnow()
-            _last_early = EARLY_ENTRY_COOLDOWN.get(symbol)
-            _early_cooled = not _last_early or (_now_early - _last_early).total_seconds() >= 7200
-            if _early_cooled:
-                EARLY_ENTRY_COOLDOWN[symbol] = _now_early
-                _reason = "GAP CROSSOVER" if _gap_just_crossed else "GAP SURGE"
-                early_alerts.append({
-                    "symbol": symbol, "gap": gap, "bias": bias,
-                    "reason": _reason, "delta_short": delta_short,
-                    "prev_gap": _prev_gap_for_early, "execution": execution,
-                    "confidence": confidence,
-                })
+        if signal_ready and (_gap_just_crossed or _gap_big_jump):
+            _reason = "GAP CROSSOVER" if _gap_just_crossed else "GAP SURGE"
+            early_alerts.append({
+                "symbol": symbol, "gap": gap, "bias": bias,
+                "reason": _reason, "delta_short": delta_short,
+                "prev_gap": _prev_gap_for_early, "execution": execution,
+                "confidence": confidence,
+            })
 
         # ---- Signal entry: dual strategy (BB + INTRA) ----
         pl_data = all_pl_map.get(symbol, {})
         check_bb_entry(symbol, gap, scores, pl_data, momentum, parsed)
         check_intra_entry(symbol, gap, scores, pl_data, momentum, parsed)
         check_shadow_entry(symbol, gap, scores, pl_data, momentum)  # write-only research logger
-        check_structure_alerts(symbol, pl_data)  # Panda Lines FLIP (zone cross) + H1 BOS Telegram alerts
+        structure_alerts.extend(check_structure_alerts(
+            symbol, pl_data, signal_cycle_at, signal_ready and pl_ready_map[symbol]
+        ))
 
         # ---- Gap Alert: abs(gap) 9–12 + valid Panda Lines ----
         _abs_gap = abs(gap)
@@ -1755,16 +1773,11 @@ def run_gap_once():
             _pl_zone is not None and
             ((gap > 0 and _pl_zone == "ABOVE") or (gap < 0 and _pl_zone == "BELOW"))
         )
-        if 9 <= _abs_gap <= 12 and _panda_valid:
-            _now_ga  = datetime.utcnow()
-            _last_ga = GAP_ALERT_COOLDOWN.get(symbol)
-            _ga_cooled = not _last_ga or (_now_ga - _last_ga).total_seconds() >= 14400
-            if _ga_cooled:
-                GAP_ALERT_COOLDOWN[symbol] = _now_ga
-                gap_alerts.append({
-                    "symbol": symbol, "gap": gap, "bias": bias,
-                    "pl_zone": _pl_zone, "execution": execution, "confidence": confidence,
-                })
+        if signal_ready and pl_ready_map[symbol] and 9 <= _abs_gap <= 12 and _panda_valid:
+            gap_alerts.append({
+                "symbol": symbol, "gap": gap, "bias": bias,
+                "pl_zone": _pl_zone, "execution": execution, "confidence": confidence,
+            })
 
         gap_deltas[symbol] = round(gap - PREV_GAP.get(symbol, gap), 2)
         PREV_GAP[symbol]      = gap  # MUST be AFTER signal checks so they see previous cycle's gap
@@ -1859,12 +1872,6 @@ def run_gap_once():
             print(f"[SUPABASE] Dashboard: {len(dashboard_payload)} pairs")
         except Exception as e:
             print("[SUPABASE ERROR] Dashboard:", e)
-
-        # ---- Phase digest to Telegram (2h min interval, only on change) ----
-        try:
-            send_phase_digest(dashboard_payload)
-        except Exception as e:
-            print(f"[PHASE DIGEST] wrapper error: {e}")
 
     # ---- STEP 4b: Write score files for MT4 panel ----
     for row in dashboard_payload:
@@ -2020,8 +2027,7 @@ def run_gap_once():
     except: pass
 
     if spike_alerts:
-        print(f"[SPIKE] {len(spike_alerts)} new momentum spikes!")
-        send_spike_alert(spike_alerts)
+        print(f"[SPIKE] {len(spike_alerts)} new momentum observations")
         for s in spike_alerts:
             try:
                 supabase_retry(
@@ -2038,7 +2044,7 @@ def run_gap_once():
                         "base_score":  s.get("base_score"),
                         "quote_score": s.get("quote_score"),
                         "fired_at":    datetime.utcnow().isoformat(),
-                        "notified":    True,
+                        "notified":    False,  # confirmed delivery is recorded in signal_alert_outbox
                     }).execute(),
                     label="SpikeEvent"
                 )
@@ -2046,12 +2052,7 @@ def run_gap_once():
                 print(f"[SPIKE EVENT ERROR]: {e}")
 
     if gap_alerts:
-        print(f"[GAP ALERT] {len(gap_alerts)} pair(s) in 9-12 gap zone with valid Panda Lines!")
-        send_gap_alert(gap_alerts)
-
-    if early_alerts:
-        print(f"[EARLY ENTRY] {len(early_alerts)} pair(s) just crossed into valid territory!")
-        send_early_entry_alert(early_alerts)
+        print(f"[GAP ALERT] {len(gap_alerts)} confirmed pair(s) eligible for Signal alert")
 
     # ---- Panda Gold add-on: SuperTrend flip + USD strength filter (separate from locked gap scorer) ----
     try:
@@ -2060,9 +2061,18 @@ def run_gap_once():
             print(f"[GOLD] {gold_signal.get('status')} {GOLD_SYMBOL} | USD {gold_signal.get('usd_strength', 0):+d} | {gold_signal.get('filter')}")
         else:
             print(f"[GOLD] OFFLINE {GOLD_SYMBOL}: {gold_signal.get('error')}")
-        send_gold_signal_alert(gold_signal)
     except Exception as e:
         print(f"[GOLD ERROR]: {e}")
+        gold_signal = None
+
+    queued_symbols = dispatch_signal_candidates(
+        signal_cycle_at, structure_alerts, gap_alerts, early_alerts, spike_alerts, gold_signal
+    )
+    try:
+        send_phase_digest(dashboard_payload, queued_symbols, signal_cycle_at)
+        dispatch_signal_outbox()
+    except Exception as e:
+        print(f"[SIGNAL OUTBOX] Dispatch error: {e}")
 
     # ---- Evaluate pending signal results (price-based) ----
     evaluate_pending_signals(all_scores, all_pl_map)
@@ -2096,9 +2106,6 @@ def run_gap_once():
     return dashboard_payload
 
 # ================= PHASE DIGEST (Telegram, grouped by action) =================
-PHASE_DIGEST_LAST_SENT = 0.0
-PHASE_DIGEST_LAST_SIG  = ""
-
 def classify_phase_server(row):
     """Server-side mirror of dashboard computePhase — view logic only, no locked formulas."""
     gap = row.get("gap") or 0
@@ -2171,23 +2178,37 @@ def verdict_action_word(row, c):
     return "PB WAIT"
 
 
-def send_phase_digest(dashboard_rows):
+def send_phase_digest(dashboard_rows, excluded_symbols, cycle_at):
     """Grouped action message to the SPIKE bot/group (SIGNAL_*).
-    Anti-spam: min 2h between sends AND content must have changed."""
-    global PHASE_DIGEST_LAST_SENT, PHASE_DIGEST_LAST_SIG
+    Anti-spam: persisted 2h minimum, changed content, and no immediate repeats."""
     # Phase digest now goes to the SPIKE bot/group (SIGNAL_*), not the main snapshot group.
     if not SIGNAL_BOT_TOKEN or not SIGNAL_CHAT_ID:
         return
     if is_market_closed():
         return
-    if not telegram_circuit.allow():
+    try:
+        recent = (supabase.table("signal_alert_outbox").select("payload,sent_at")
+                  .eq("alert_type", "digest").eq("status", "sent")
+                  .order("sent_at", desc=True).limit(1).execute().data or [])
+        unresolved = (supabase.table("signal_alert_outbox").select("id")
+                      .eq("alert_type", "digest")
+                      .in_("status", ["pending", "sending", "uncertain"])
+                      .gte("created_at", (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat())
+                      .limit(1).execute().data or [])
+    except Exception as e:
+        print(f"[PHASE DIGEST] Could not read delivery state: {e}")
         return
-    now_ts = time.time()
-    if now_ts - PHASE_DIGEST_LAST_SENT < 7200:
+    if unresolved:
         return
+    if recent and recent[0].get("sent_at"):
+        last = datetime.fromisoformat(recent[0]["sent_at"].replace("Z", "+00:00"))
+        if (datetime.now(timezone.utc) - last).total_seconds() < 7200:
+            return
 
     groups = {"EXEC": [], "PBNOW": [], "PBWAIT": [], "WATCH": [], "CLOSE": []}
     for r in dashboard_rows:
+        if r.get("symbol") in excluded_symbols:
+            continue
         c = classify_phase_server(r)
         if not c:
             continue
@@ -2201,7 +2222,7 @@ def send_phase_digest(dashboard_rows):
         else:                 groups["PBWAIT"].append(tag)
 
     sig = "|".join(",".join(sorted(v)) for v in groups.values())
-    if sig == PHASE_DIGEST_LAST_SIG or not any(groups.values()):
+    if (recent and sig == (recent[0].get("payload") or {}).get("signature")) or not any(groups.values()):
         return
 
     lines = ["🐼 <b>PANDA PHASE DIGEST</b>", datetime.now().strftime("%d %b %H:%M"), ""]
@@ -2213,26 +2234,18 @@ def send_phase_digest(dashboard_rows):
             lines.append(f"   {t}")
         lines.append(f"   <i>{hint}</i>")
         lines.append("")
-    _sec("🟢", "MARKET EXECUTE — GAP 9+ & PL CONFIRMED", groups["EXEC"], "market entry rule met — ★ = PDR bonus aligned")
-    _sec("🎯", "IN PULLBACK ZONE NOW — ENTER", groups["PBNOW"], "price is at the pullback area right now — enter with stop beyond the line")
-    _sec("🟡", "PULLBACK PLAY — WAIT FOR ZONE", groups["PBWAIT"], "bias confirmed — wait for 30-60% retrace or Panda Line tag")
-    _sec("⚠️", "WATCH OUT — LATE/EXHAUSTED", groups["WATCH"], "no new entries")
-    _sec("🔴", "CLOSE IF OPEN", groups["CLOSE"], "trend at risk — protect open trades")
+    _sec("🟢", "GAP 9+ & PL CONFIRMED", groups["EXEC"], "★ = PDR bonus aligned")
+    _sec("🎯", "IN PULLBACK AREA", groups["PBNOW"], "price is at the observed pullback area")
+    _sec("🟡", "PULLBACK ZONE PENDING", groups["PBWAIT"], "bias is confirmed; retrace has not arrived")
+    _sec("⚠️", "LATE OR EXHAUSTED", groups["WATCH"], "momentum requires caution")
+    _sec("🔴", "TREND RISK", groups["CLOSE"], "trend may be weakening")
     msg = "\n".join(lines).strip()
-
     try:
-        resp = requests.post(
-            f"https://api.telegram.org/bot{SIGNAL_BOT_TOKEN}/sendMessage",
-            data={"chat_id": SIGNAL_CHAT_ID, "text": msg, "parse_mode": "HTML"},
-            timeout=15)
-        if resp.status_code == 200:
-            PHASE_DIGEST_LAST_SENT = now_ts
-            PHASE_DIGEST_LAST_SIG  = sig
-            print(f"[PHASE DIGEST] Sent ({sum(len(v) for v in groups.values())} pairs)")
-        else:
-            print(f"[PHASE DIGEST] Telegram error {resp.status_code}: {resp.text[:120]}")
+        enqueue_alert(supabase, {"symbol": "DIGEST", "alert_type": "digest",
+                                 "cycle_at": cycle_at, "event_id": f"{sig}|{int(datetime.fromisoformat(cycle_at).timestamp() // 900)}", "text": msg,
+                                 "signature": sig}, ttl_seconds=240)
     except Exception as e:
-        print(f"[PHASE DIGEST] Send error: {e}")
+        print(f"[PHASE DIGEST] Queue error: {e}")
 
 
 # ================= NIGHTLY ANALYST (private — Boss-G only) =================
@@ -3296,38 +3309,16 @@ MOMENTUM_GUIDE = {
 }
 
 # ================= STRUCTURE ALERTS (Panda Lines FLIP + H1 BOS) =================
-def _send_structure_alert(text):
-    """Low-level sender for structure alerts — same bot/chat + circuit breaker as gap/spike alerts."""
-    if is_market_closed():
-        return
-    if not telegram_circuit.allow():
-        return
-    try:
-        body = (text + f"\n\n⏰ {datetime.now().strftime('%H:%M')}\n🐼 PANDA ENGINE v3.0")[:4000]
-        response = requests.post(
-            f"https://api.telegram.org/bot{SIGNAL_BOT_TOKEN}/sendMessage",
-            data={"chat_id": SIGNAL_CHAT_ID, "text": body, "parse_mode": "HTML"},
-            timeout=15
-        )
-        if response.status_code == 200:
-            telegram_circuit.success()
-        else:
-            print("[STRUCTURE ALERT ERROR]", response.text)
-            telegram_circuit.failure()
-    except Exception as e:
-        print("[STRUCTURE ALERT ERROR]:", e)
-        telegram_circuit.failure()
-
-
-def check_structure_alerts(pair, pl):
+def check_structure_alerts(pair, pl, cycle_at, ready):
     """
-    Fire Telegram on (1) Panda Lines FLIP — TBG_ZONE crossing ABOVE<->BELOW — and
-    (2) a new H1 Break of Structure, deduped on the break-bar time (TBG_BOS_T).
-    First sighting of a pair seeds state silently so there is no burst on engine restart.
-    Mutates module dicts PREV_ZONE / LAST_BOS_T in place (no rebinding — no `global` needed).
+    Return FLIP/BOS candidates. First sighting after boot or invalid data seeds silently.
+    Changed state is committed only after the candidate is queued durably.
     """
     if not pl:
-        return
+        PREV_ZONE.pop(pair, None)
+        LAST_BOS_T.pop(pair, None)
+        return []
+    candidates = []
     zone  = pl.get("pl_zone")
     bos   = (pl.get("pl_bos") or "NONE")
     bos_t = int(pl.get("pl_bos_t") or 0)
@@ -3335,181 +3326,133 @@ def check_structure_alerts(pair, pl):
     # ---- FLIP: TBG_ZONE crossing ABOVE <-> BELOW (BETWEEN = no side, no spam) ----
     prev = PREV_ZONE.get(pair)
     if zone in ("ABOVE", "BELOW"):
-        if prev in ("ABOVE", "BELOW") and prev != zone:
+        if ready and prev in ("ABOVE", "BELOW") and prev != zone:
             direction = "BULLISH" if zone == "ABOVE" else "BEARISH"
-            _send_structure_alert(
-                f"🐼 <b>PANDA LINES FLIP — {pair}</b>\n"
-                f"   {prev} → {zone}  (<b>{direction}</b>)"
-            )
-        PREV_ZONE[pair] = zone
+            candidates.append({"symbol": pair, "alert_type": "structure", "cycle_at": cycle_at,
+                               "detail": f"Panda Lines FLIP {prev} → {zone} ({direction})",
+                               "event_id": f"flip:{prev}:{zone}:{cycle_at}", "state_zone": zone,
+                               "bias": "BUY" if zone == "ABOVE" else "SELL"})
+        else:
+            PREV_ZONE[pair] = zone
     elif prev is None:
         PREV_ZONE[pair] = zone   # seed only (may be BETWEEN/None); a real side is set above
 
     # ---- BOS: new H1 break, deduped on break-bar time ----
-    if pair not in LAST_BOS_T:
+    if pair not in LAST_BOS_T or not ready:
         LAST_BOS_T[pair] = bos_t   # first-sighting seed — never alerts on a stale/boot value
     elif bos in ("BULLISH", "BEARISH") and bos_t > 0 and bos_t != LAST_BOS_T[pair]:
-        arrow = "🔼" if bos == "BULLISH" else "🔽"
-        _send_structure_alert(
-            f"🐼 <b>BREAK OF STRUCTURE — {pair} (H1)</b>\n"
-            f"   {bos} BOS confirmed {arrow}"
-        )
-        LAST_BOS_T[pair] = bos_t
+        candidates.append({"symbol": pair, "alert_type": "structure", "cycle_at": cycle_at,
+                           "detail": f"{bos} H1 BOS confirmed", "event_id": f"bos:{bos_t}",
+                           "state_bos_t": bos_t,
+                           "bias": "BUY" if bos == "BULLISH" else "SELL"})
+    return candidates
 
 
-def send_spike_alert(spikes):
-    if is_market_closed():
-        print(f"[SPIKE ALERT] Market closed - skipped ({market_time_label()})")
-        return
-    if not telegram_circuit.allow():
-        print(f"[SPIKE ALERT BLOCKED] Circuit breaker locked — failures: {telegram_circuit.failures}")
-        return
-    try:
-        lines = ["⚡ <b>MOMENTUM SPIKE DETECTED</b>\n"]
-        for s in spikes:
-            bias_icon = "📈" if s["bias"]=="BUY" else "📉"
-            mom_icon, action = MOMENTUM_GUIDE.get(s["momentum"], ("⚡", "MONITOR"))
-            lines.append(
-                f"{mom_icon} <b>{s['symbol']}</b>  {bias_icon} {s['bias']}\n"
-                f"   Gap: <b>{s['gap']:+.0f}</b>  |  {s['momentum']}\n"
-                f"   30min: {(s['delta_short'] or 0):+.1f}  2h: {(s['delta_mid'] or 0):+.1f}  Str: {s['strength']:.1f}\n"
-                f"   👉 <b>{action}</b>\n"
-            )
-        lines.append(f"\n⏰ {datetime.now().strftime('%H:%M')}\n🐼 PANDA ENGINE v3.0")
-        text = "\n".join(lines)[:4000]
-        response = requests.post(
-            f"https://api.telegram.org/bot{SIGNAL_BOT_TOKEN}/sendMessage",
-            data={"chat_id": SIGNAL_CHAT_ID, "text": text, "parse_mode": "HTML"},
-            timeout=15
-        )
-        if response.status_code == 200:
-            print(f"[SPIKE ALERT] Sent {len(spikes)} spike(s) → signals bot")
-            telegram_circuit.success()
-        else:
-            print("[SPIKE ALERT ERROR]", response.text)
-            telegram_circuit.failure()
-    except Exception as e:
-        print("[SPIKE ALERT ERROR]:", e)
-        telegram_circuit.failure()
+def dispatch_signal_candidates(cycle_at, structure, gaps, early, spikes, gold):
+    """Queue one prioritized event per pair; the outbox groups pairs on delivery."""
+    candidates = list(structure)
+    for item in gaps:
+        candidates.append({"symbol": item["symbol"], "alert_type": "gap_zone",
+                           "cycle_at": cycle_at, "gap": item["gap"], "bias": item["bias"],
+                           "detail": f"Panda Lines {item['pl_zone']} confirms gap zone"})
+    for item in early:
+        candidates.append({"symbol": item["symbol"], "alert_type": "early_entry",
+                           "cycle_at": cycle_at, "gap": item["gap"], "bias": item["bias"],
+                           "detail": f"{item['reason']} from gap {item['prev_gap']:+.0f}"})
+    for item in spikes:
+        candidates.append({"symbol": item["symbol"], "alert_type": "momentum",
+                           "cycle_at": cycle_at, "gap": item["gap"], "bias": item["bias"],
+                           "detail": f"Momentum {item['momentum']}"})
+    gold_mark = None
+    if gold and gold.get("new_signal") and gold.get("status") in ("LONG", "SHORT"):
+        gold_mark = f"{gold['status']}|{gold.get('signal_time') or ''}"
+        if gold_mark != _load_gold_mark():
+            levels = []
+            for label, key in (("Entry", "entry"), ("SL", "sl"), ("TP1", "tp1"),
+                               ("TP2", "tp2"), ("TP3", "tp3")):
+                value = gold.get(key)
+                if isinstance(value, (int, float)):
+                    levels.append(f"{label} {value:.2f}")
+            detail = "SuperTrend flip; " + " | ".join(levels)
+            detail += f"; USD strength {int(gold.get('usd_strength') or 0):+d}; filter {gold.get('filter') or 'CLEAR'}"
+            candidates.append({"symbol": GOLD_SYMBOL, "alert_type": "gold",
+                               "cycle_at": cycle_at, "event_id": gold_mark,
+                               "bias": gold["status"],
+                               "detail": detail})
+    queued = set()
+    for candidate in consolidate_candidates(candidates):
+        if candidate["alert_type"] == "momentum":
+            continue  # quiet observation; the phase digest carries it
+        kind = candidate["alert_type"]
+        cooldown = {"structure": 0, "gold": 0, "gap_zone": 14400, "early_entry": 7200}[kind]
+        ttl = 1800 if kind == "structure" else 3600 if kind == "gold" else 240
+        try:
+            row = enqueue_alert(supabase, candidate, cooldown_seconds=cooldown, ttl_seconds=ttl)
+        except Exception as e:
+            print(f"[SIGNAL OUTBOX] Could not queue {candidate['symbol']} {kind}: {e}")
+            continue
+        if row:
+            queued.add(candidate["symbol"])
+        for source in candidates:
+            if source["symbol"] != candidate["symbol"]:
+                continue
+            if source.get("state_zone"):
+                PREV_ZONE[source["symbol"]] = source["state_zone"]
+            if source.get("state_bos_t"):
+                LAST_BOS_T[source["symbol"]] = source["state_bos_t"]
+    return queued
 
-# ================= GAP ZONE ALERT =================
-def send_gap_alert(alerts):
-    """Send Telegram alert for pairs with abs(gap) 9–12 and valid Panda Lines (zone confirms bias)."""
-    if is_market_closed():
-        print(f"[GAP ALERT] Market closed - skipped ({market_time_label()})")
-        return
-    if not telegram_circuit.allow(): return
-    try:
-        lines = ["🐼 <b>GAP ZONE ALERT — Pairs Good to Ride!</b>\n"]
-        for a in alerts:
-            bias_icon = "📈" if a["gap"] > 0 else "📉"
-            sign = "+" if a["gap"] > 0 else ""
-            lines.append(
-                f"🐼 <b>{a['symbol']}</b> | Gap Score: <b>{sign}{int(a['gap'])}</b> | Panda Lines: Valid ✅\n"
-                f"   — Pair is good to ride! 🚀\n"
-                f"   {bias_icon} {a['bias']} | Execution: <b>{a['execution']}</b> | Conf: {a['confidence']}\n"
-            )
-        lines.append(f"\n⏰ {datetime.now().strftime('%H:%M')}\n🐼 PANDA ENGINE v3.0")
-        text = "\n".join(lines)[:4000]
-        response = requests.post(
-            f"https://api.telegram.org/bot{SIGNAL_BOT_TOKEN}/sendMessage",
-            data={"chat_id": SIGNAL_CHAT_ID, "text": text, "parse_mode": "HTML"},
-            timeout=15
-        )
-        if response.status_code == 200:
-            print(f"[GAP ALERT] Sent {len(alerts)} pair(s) in 9-12 gap zone → signals bot")
-            telegram_circuit.success()
-        else:
-            print("[GAP ALERT ERROR]", response.text)
-            telegram_circuit.failure()
-    except Exception as e:
-        print("[GAP ALERT ERROR]:", e)
-        telegram_circuit.failure()
 
-# ================= EARLY ENTRY ALERT =================
-def send_early_entry_alert(alerts):
-    """Fires BEFORE the rally — when gap first crosses into valid territory or surges."""
-    if is_market_closed():
-        print(f"[EARLY ENTRY] Market closed - skipped ({market_time_label()})")
-        return
-    if not telegram_circuit.allow(): return
-    try:
-        lines = ["🎯 <b>EARLY ENTRY — Move Starting NOW!</b>\n"]
-        for a in alerts:
-            bias_icon = "📈" if a["gap"] > 0 else "📉"
-            sign = "+" if a["gap"] > 0 else ""
-            lines.append(
-                f"🎯 <b>{a['symbol']}</b> {bias_icon} <b>{a['bias']}</b>\n"
-                f"   Gap: <b>{sign}{int(a['gap'])}</b> (was {int(a['prev_gap'])})\n"
-                f"   Trigger: <b>{a['reason']}</b> | 10min Δ: {(a['delta_short'] or 0):+.1f}\n"
-                f"   👉 <b>PREPARE ENTRY — Rally starting!</b>\n"
-            )
-        lines.append(f"\n⏰ {datetime.now().strftime('%H:%M')}\n🐼 PANDA ENGINE v3.0")
-        text = "\n".join(lines)[:4000]
-        response = requests.post(
-            f"https://api.telegram.org/bot{SIGNAL_BOT_TOKEN}/sendMessage",
-            data={"chat_id": SIGNAL_CHAT_ID, "text": text, "parse_mode": "HTML"},
-            timeout=15
-        )
-        if response.status_code == 200:
-            print(f"[EARLY ENTRY] Sent {len(alerts)} early alert(s) → signals bot")
-            telegram_circuit.success()
-        else:
-            print("[EARLY ENTRY ERROR]", response.text)
-            telegram_circuit.failure()
-    except Exception as e:
-        print("[EARLY ENTRY ERROR]:", e)
-        telegram_circuit.failure()
+def signal_outbox_relevant(row):
+    """Check live inputs again before a delayed Signal-group delivery."""
+    payload = row.get("payload") or {}
+    kind = row.get("alert_type") or payload.get("alert_type")
+    if kind == "digest":
+        return True
+    symbol = row.get("symbol") or payload.get("symbol")
+    if kind == "structure":
+        pl = parse_pl_file(symbol)
+        if not pl:
+            return None
+        if payload.get("state_zone") and pl.get("pl_zone") != payload["state_zone"]:
+            return False
+        if payload.get("state_bos_t") and int(pl.get("pl_bos_t") or 0) != payload["state_bos_t"]:
+            return False
+        if payload.get("state_bos_t") and pl.get("pl_bos") != ("BULLISH" if payload.get("bias") == "BUY" else "BEARISH"):
+            return False
+        return True
+    if kind == "gold":
+        parsed = {symbol: value for symbol in PAIRS if (value := parse_mt4_file(symbol)) is not None}
+        latest = build_gold_signal(parsed)
+        current_mark = f"{latest.get('status')}|{latest.get('signal_time') or ''}"
+        return None if latest.get("status") == "OFFLINE" else bool(latest.get("new_signal") and current_mark == payload.get("event_id"))
+    current = (supabase.table("dashboard")
+               .select("symbol,gap,bias,hard_invalid,pl_zone,updated_at")
+               .eq("symbol", symbol).limit(1).execute().data or [])
+    if not current:
+        return None
+    live = current[0]
+    stamp = datetime.fromisoformat(str(live.get("updated_at") or "").replace("Z", "+00:00"))
+    if stamp.tzinfo is None:
+        stamp = stamp.replace(tzinfo=timezone.utc)
+    if (datetime.now(timezone.utc) - stamp).total_seconds() > 420:
+        return None
+    gap = float(live.get("gap") or 0)
+    if live.get("hard_invalid") or live.get("bias") != payload.get("bias"):
+        return False
+    if kind == "gap_zone":
+        zone = "ABOVE" if gap > 0 else "BELOW"
+        return 9 <= abs(gap) <= 12 and live.get("pl_zone") == zone
+    if kind == "early_entry":
+        return abs(gap) >= 5
+    return False
 
-def send_gold_signal_alert(gold):
-    if not gold or not gold.get("new_signal"):
-        return
-    if is_market_closed():
-        print(f"[GOLD ALERT] Market closed - skipped ({market_time_label()})")
-        return
-    if not telegram_circuit.allow():
-        print(f"[GOLD ALERT BLOCKED] Circuit breaker locked — failures: {telegram_circuit.failures}")
-        return
 
-    direction = "LONG" if gold.get("status") == "LONG" else "SHORT" if gold.get("status") == "SHORT" else ""
-    if not direction:
-        return
-    mark = f"{direction}|{gold.get('signal_time') or ''}"
-    if mark == _load_gold_mark():
-        return
+def dispatch_signal_outbox():
+    return dispatch_pending(supabase, SIGNAL_BOT_TOKEN, SIGNAL_CHAT_ID,
+                            relevant=signal_outbox_relevant,
+                            market_open=lambda: not is_market_closed())
 
-    try:
-        icon = "📈" if direction == "LONG" else "📉"
-        usd_tf = gold.get("usd_tf") or {}
-        text = (
-            f"🥇 <b>PANDA GOLD {direction}</b> {icon}\n"
-            f"━━━━━━━━━━━━━━━━━━━━━\n"
-            f"<b>{GOLD_SYMBOL}</b> | SuperTrend flip confirmed\n"
-            f"Interval: <b>{GOLD_INTERVAL}</b>\n"
-            f"Entry: <b>{gold.get('entry'):.2f}</b>\n"
-            f"SL: <b>{gold.get('sl'):.2f}</b>\n"
-            f"TP1: <b>{gold.get('tp1'):.2f}</b> | TP2: <b>{gold.get('tp2'):.2f}</b> | TP3: <b>{gold.get('tp3'):.2f}</b>\n\n"
-            f"USD strength: <b>{gold.get('usd_strength', 0):+d}</b> "
-            f"(D1 {usd_tf.get('D1', 0):+d} / H4 {usd_tf.get('H4', 0):+d} / H1 {usd_tf.get('H1', 0):+d})\n"
-            f"Filter: <b>{html.escape(gold.get('filter') or 'CLEAR')}</b>\n\n"
-            f"<i>Currency bias data only. Not financial advice.</i>\n"
-            f"🐼 PANDA ENGINE v3.0"
-        )
-        response = requests.post(
-            f"https://api.telegram.org/bot{SIGNAL_BOT_TOKEN}/sendMessage",
-            data={"chat_id": SIGNAL_CHAT_ID, "text": text[:4000], "parse_mode": "HTML"},
-            timeout=15
-        )
-        if response.status_code == 200:
-            _save_gold_mark(mark)
-            print(f"[GOLD ALERT] Sent {GOLD_SYMBOL} {direction} → signals bot")
-            telegram_circuit.success()
-        else:
-            print("[GOLD ALERT ERROR]", response.text)
-            telegram_circuit.failure()
-    except Exception as e:
-        print("[GOLD ALERT ERROR]:", e)
-        telegram_circuit.failure()
 
 # ================= LOGIN ALERT =================
 @app.post("/api/login-alert")
@@ -4314,6 +4257,14 @@ async def master_scheduler():
                         await run_scheduler_step("news", check_news_alerts)
                     except Exception as e:
                         print("[NEWS ERROR - 1min]:", e)
+                    async with ENGINE_LOCK:
+                        try:
+                            await run_scheduler_step(
+                                "signal-retry",
+                                dispatch_signal_outbox,
+                            )
+                        except Exception as e:
+                            print("[SIGNAL OUTBOX] Retry error:", e)
                     LAST_NEWS_MARK = news_mark
 
             if now.minute % 5 == 0 and now.second < 10:
