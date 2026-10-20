@@ -12,6 +12,7 @@
     <Compile Include="../../PandaTradePlan.Dashboard.cs" Link="PandaTradePlan.Dashboard.cs"/>
     <Compile Include="../../PandaTradePlan.V13Defaults.cs" Link="PandaTradePlan.V13Defaults.cs"/>
     <Compile Include="../../PandaTradePlan.V13License.cs" Link="PandaTradePlan.V13License.cs"/>
+    <Compile Include="../../PanelLayoutRules.cs" Link="PanelLayoutRules.cs"/>
     <Compile Include="../../TradePlanRules.cs" Link="TradePlanRules.cs"/>
     <Compile Include="../../ScoreWindows.cs" Link="ScoreWindows.cs"/>
     <Compile Include="../../TradeExecutionRules.cs" Link="TradeExecutionRules.cs"/>

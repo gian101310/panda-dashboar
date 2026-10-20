@@ -1,4 +1,4 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net6.0</TargetFramework><EnableDefaultCompileItems>false</EnableDefaultCompileItems></PropertyGroup>
-  <ItemGroup><Compile Include="Program.cs"/><Compile Include="ExecutionCases.cs"/><Compile Include="../TradePlanRules.cs"/><Compile Include="../TradeExecutionRules.cs"/><Compile Include="../ScoreWindows.cs"/></ItemGroup>
+  <ItemGroup><Compile Include="Program.cs"/><Compile Include="ExecutionCases.cs"/><Compile Include="../PanelLayoutRules.cs"/><Compile Include="../TradePlanRules.cs"/><Compile Include="../TradeExecutionRules.cs"/><Compile Include="../ScoreWindows.cs"/></ItemGroup>
 </Project>

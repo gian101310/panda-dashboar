@@ -136,6 +136,14 @@ namespace cAlgo
 #endif
             SymbolName;}}
         private double Scale(double value){return value*PanelScale/100.0;}
+#if TRADE_PLAN_V12 || TRADE_PLAN_V13
+        private void UpdatePanelWidth()
+        {
+            var width=PanelLayoutRules.Width(PanelWidth,190,_minimized,_dashboardView);
+            _panelRoot.Width=Scale(width);
+            if(_dashboardSwitch!=null)_dashboardSwitch.Width=Scale(width-18);
+        }
+#endif
         private string SettingsKey {get{return string.Join("|",_orderKind,Mode,Reference,UseDay,UseWeek,UseMonth,UseH1Box,UseH4Box,UseD1Box,
             MinTargetPips,MaxEntryPips,MaxTargetPips,StopUnder100,StopUnder200,StopUnder300,StopFrom300);}}
         private PlanSettings PlacementSettings {get{return new PlanSettings {Kind=_orderKind,MinimumTargetPips=MinTargetPips,MaxEntryPips=MaxEntryPips,MaxTargetPips=MaxTargetPips,
@@ -306,7 +314,7 @@ namespace cAlgo
             LocalStorage.SetString("Panel minimized",_minimized?"1":"0",LocalStorageScope.Instance);
             _panelRoot=new StackPanel {Orientation=Orientation.Vertical,Width=(
 #if TRADE_PLAN_V12 || TRADE_PLAN_V13
-                Scale(PanelWidth)
+                Scale(PanelLayoutRules.Width(PanelWidth,190,_minimized,_dashboardView))
 #else
                 Scale(_minimized?190:PanelWidth)
 #endif
@@ -331,6 +339,7 @@ namespace cAlgo
                 _dashboardSummary.IsVisible=!_minimized&&!_dashboardView;
                 _dashboardSwitch.IsVisible=!_minimized;
                 _compact.IsVisible=false;
+                UpdatePanelWidth();
                 heading.Text=_minimized?"PANDA DASHBOARD":TradePlanTitle;
 #else
                 _panelBody.IsVisible=!_minimized;

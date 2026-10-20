@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-10-20 (Compact Trade Plan dashboards)
+
+- Made the Dashboard view use its own compact 190px base width in both Trade
+  Plan v1.2 and v1.3, while the Trade Plan view retains the configured width.
+- Resized the Dashboard/Trade Plan switch with the active view so it cannot
+  force the compact panel back to the full Trade Plan width.
+- Added layout regression coverage; both `.algo` packages compile and publish
+  successfully on macOS.
+
 ## 2026-10-20 (Private Trade Plan v1.3 distribution)
 
 - Added an admin-only `.algo` download backed by private Storage, plus a

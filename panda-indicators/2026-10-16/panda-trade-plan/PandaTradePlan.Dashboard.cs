@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using cAlgo.API;
+using PandaPlanning;
 
 namespace cAlgo
 {
@@ -106,7 +107,8 @@ namespace cAlgo
             _dashboardSummary.FontWeight=FontWeight.Bold;
             _dashboardSummary.IsVisible=!_minimized&&!_dashboardView;
             _panelRoot.AddChild(_dashboardSummary);
-            _dashboardSwitch=Button(_dashboardView?"Show trade plan":"Show dashboard",Blue,PanelWidth-18);
+            var currentWidth=PanelLayoutRules.Width(PanelWidth,190,_minimized,_dashboardView);
+            _dashboardSwitch=Button(_dashboardView?"Show trade plan":"Show dashboard",Blue,currentWidth-18);
             _dashboardSwitch.IsVisible=!_minimized;
             _dashboardSwitch.Click+=e=>
             {
@@ -115,6 +117,7 @@ namespace cAlgo
                 _dashboardBody.IsVisible=!_minimized&&_dashboardView;
                 _panelBody.IsVisible=!_minimized&&!_dashboardView;
                 _dashboardSummary.IsVisible=!_minimized&&!_dashboardView;
+                UpdatePanelWidth();
                 LocalStorage.SetString("Dashboard view",_dashboardView?"1":"0",LocalStorageScope.Instance);
                 LocalStorage.Flush(LocalStorageScope.Instance);
             };
