@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-21 — Panda Levels V2
+
+- Added a separate cTrader V2 with box fill on/off and 0–100% opacity (default 20%).
+- Added optional chart-timeframe Panda SuperTrend and Follow Line, off by default, using the existing personal indicator calculations.
+- Preserved the original box ranges and previous-period levels.
+
 ## 2026-10-21 â€” Panda Levels for cTrader
 
 - Added the parameter-free **Panda Levels** cTrader overlay with the established
