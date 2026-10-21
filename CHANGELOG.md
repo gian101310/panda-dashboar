@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-10-21 — Panda Levels for cTrader
+
+- Added the parameter-free **Panda Levels** cTrader overlay with the established
+  short/day, medium/week, and long/month Panda Boxes plus previous-day high and
+  low levels (`PDH` / `PDL`).
+- All periods, colors, opacity, UTC boundaries, and previous-day zone styling
+  are fixed internally. The indicator has no Panda Lines, signals, scoring,
+  panel, alerts, network access, licensing, or trading actions.
+
 ## 2026-10-21 — Level-aware Signal review labels
 
 - Signal alerts and phase digest now mark proximity to opposing box or previous-day/week levels as chart-review context. Stacked opposing levels receive a lower display priority only when gap and momentum are not strong; no alert or trade is blocked.
