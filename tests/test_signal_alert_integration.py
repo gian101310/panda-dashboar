@@ -50,6 +50,28 @@ class SignalAlertIntegrationTests(unittest.TestCase):
         self.assertEqual(queued[0]["detail"],
                          "GAP SURGE: gap +1 → +9 (magnitude +8 since previous cycle)")
 
+    def test_level_review_enriches_alert_and_bias_digest_without_blocking(self):
+        app = _load_app()
+        app._fresh_signal_level_file = lambda _: True
+        queued = []
+        app.enqueue_alert = lambda client, candidate, **kwargs: queued.append(candidate) or {"id": "queued"}
+        box = {"start_ts": 1800000000, "end_ts": 1800000000 + 14 * 86400,
+               "open_price": 1.1000, "close_price": 1.1020}
+        assessments = {}
+        symbols = app.dispatch_signal_candidates(
+            "2026-10-21T00:45:00+00:00", [], [],
+            [{"symbol": "EURUSD", "gap": 9, "bias": "BUY", "reason": "GAP SURGE", "prev_gap": 6}],
+            [], None,
+            {"EURUSD": {"boxes": [box]}},
+            {"EURUSD": {"pl_price": 1.1010, "pdh": 1.1015}},
+            [{"symbol": "EURUSD", "gap": 9, "bias": "BUY", "momentum": "STRONG"}],
+            assessments,
+        )
+        self.assertEqual(symbols, {"EURUSD"})
+        self.assertEqual(queued[0]["level_priority"], "CAUTION")
+        self.assertIn("PDH", queued[0]["price_context"])
+        self.assertEqual(assessments["EURUSD"]["priority"], "CAUTION")
+
     def test_momentum_only_does_not_queue_immediate_message(self):
         app = _load_app()
         app.enqueue_alert = Mock()

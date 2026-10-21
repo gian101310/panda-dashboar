@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-21 — Level-aware Signal review labels
+
+- Signal alerts and phase digest now mark proximity to opposing box or previous-day/week levels as chart-review context. Stacked opposing levels receive a lower display priority only when gap and momentum are not strong; no alert or trade is blocked.
+- Alerts show whether price is inside or beyond the H4 box. When several fresh related pairs also sit beyond H4 in the currency's direction, this is labeled possible broader H4 alignment, not a scoring change.
+
 ## 2026-10-21 — Signal alert price-level context
 
 - Signal-group alerts now note D1/H4/H1 box edges and previous day/week highs and lows within 15 pips of the sampled price, including stacked resistance above BUY alerts and stacked support below SELL alerts.

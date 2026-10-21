@@ -37,7 +37,7 @@ from news_results import resolve_news_actual, load_sent_results, mark_result_sen
 from news_speeches import is_fed_chair_speech, resolve_speech_summary, speech_api_key
 from lib.signal_alerts import RecoveryGate, consolidate_candidates, classify_gap_move
 from lib.signal_alert_outbox import enqueue_alert, dispatch_pending
-from lib.signal_price_levels import describe_price_levels
+from lib.signal_price_levels import assess_price_levels, related_h4_breadth
 
 load_dotenv()
 
@@ -2065,12 +2065,13 @@ def run_gap_once():
         print(f"[GOLD ERROR]: {e}")
         gold_signal = None
 
+    level_assessments = {}
     queued_symbols = dispatch_signal_candidates(
         signal_cycle_at, structure_alerts, gap_alerts, early_alerts, spike_alerts, gold_signal,
-        all_parsed_map, all_pl_map
+        all_parsed_map, all_pl_map, dashboard_payload, level_assessments
     )
     try:
-        send_phase_digest(dashboard_payload, queued_symbols, signal_cycle_at)
+        send_phase_digest(dashboard_payload, queued_symbols, signal_cycle_at, level_assessments)
         dispatch_signal_outbox()
     except Exception as e:
         print(f"[SIGNAL OUTBOX] Dispatch error: {e}")
@@ -2179,7 +2180,7 @@ def verdict_action_word(row, c):
     return "PB WAIT"
 
 
-def send_phase_digest(dashboard_rows, excluded_symbols, cycle_at):
+def send_phase_digest(dashboard_rows, excluded_symbols, cycle_at, level_assessments=None):
     """Grouped action message to the SPIKE bot/group (SIGNAL_*).
     Anti-spam: persisted 2h minimum, changed content, and no immediate repeats."""
     # Phase digest now goes to the SPIKE bot/group (SIGNAL_*), not the main snapshot group.
@@ -2214,6 +2215,11 @@ def send_phase_digest(dashboard_rows, excluded_symbols, cycle_at):
         if not c:
             continue
         tag = f"{r.get('symbol')} {c['dir']} {c['gap']:+.0f}"
+        level = (level_assessments or {}).get(r.get("symbol")) or {}
+        if level.get("priority") == "LOW PRIORITY":
+            tag += " [LOW PRIORITY: LEVELS]"
+        elif level.get("priority") in ("CAUTION", "REVIEW"):
+            tag += " [LEVEL REVIEW]"
         star = " ★" if c.get("pdr_ok") else ""
         w = verdict_action_word(r, c)
         if w == "CLOSE?":     groups["CLOSE"].append(tag)
@@ -2240,6 +2246,9 @@ def send_phase_digest(dashboard_rows, excluded_symbols, cycle_at):
     _sec("🟡", "PULLBACK ZONE PENDING", groups["PBWAIT"], "bias is confirmed; retrace has not arrived")
     _sec("⚠️", "LATE OR EXHAUSTED", groups["WATCH"], "momentum requires caution")
     _sec("🔴", "TREND RISK", groups["CLOSE"], "trend may be weakening")
+    if any((level_assessments or {}).get(r.get("symbol"), {}).get("priority") in ("LOW PRIORITY", "CAUTION", "REVIEW")
+           for r in dashboard_rows if r.get("symbol") not in excluded_symbols):
+        lines.append("Level labels mean check the chart; nearby lines alone do not cancel a setup.")
     msg = "\n".join(lines).strip()
     try:
         enqueue_alert(supabase, {"symbol": "DIGEST", "alert_type": "digest",
@@ -3358,7 +3367,8 @@ def _fresh_signal_level_file(symbol):
 
 
 def dispatch_signal_candidates(cycle_at, structure, gaps, early, spikes, gold,
-                               parsed_map=None, pl_map=None):
+                               parsed_map=None, pl_map=None, dashboard_rows=None,
+                               level_assessments=None):
     """Queue one prioritized event per pair; the outbox groups pairs on delivery."""
     candidates = list(structure)
     for item in gaps:
@@ -3390,18 +3400,42 @@ def dispatch_signal_candidates(cycle_at, structure, gaps, early, spikes, gold,
                                "cycle_at": cycle_at, "event_id": gold_mark,
                                "bias": gold["status"],
                                "detail": detail})
+    row_map = {row.get("symbol"): row for row in (dashboard_rows or [])}
+    fresh_pl_map = {symbol: pl for symbol, pl in (pl_map or {}).items()
+                    if pl and _fresh_signal_level_file(symbol)}
+    assessments = level_assessments if level_assessments is not None else {}
+    for symbol, row in row_map.items():
+        parsed, pl = (parsed_map or {}).get(symbol), fresh_pl_map.get(symbol)
+        if not parsed or not pl or row.get("bias") not in ("BUY", "SELL"):
+            continue
+        try:
+            breadth = related_h4_breadth(symbol, row["bias"], parsed_map, fresh_pl_map)
+            assessment = assess_price_levels(
+                symbol, parsed, pl, row["bias"], row.get("gap"), row.get("momentum"),
+                PREV_LEVEL_PRICE.get(symbol), breadth
+            )
+            assessments[symbol] = {**assessment, "bias": row["bias"]}
+        except Exception as context_error:
+            print(f"[SIGNAL LEVELS] {symbol}: {context_error}")
     queued = set()
     for candidate in consolidate_candidates(candidates):
         if candidate["alert_type"] == "momentum":
             continue  # quiet observation; the phase digest carries it
         symbol = candidate["symbol"]
-        pl = (pl_map or {}).get(symbol)
+        pl = fresh_pl_map.get(symbol)
         parsed = (parsed_map or {}).get(symbol)
-        if parsed and pl and _fresh_signal_level_file(symbol):
+        if parsed and pl:
             try:
-                candidate["price_context"] = describe_price_levels(
-                    symbol, parsed, pl, candidate.get("bias"), PREV_LEVEL_PRICE.get(symbol)
-                )
+                assessment = assessments.get(symbol)
+                if not assessment or assessment.get("bias") != candidate.get("bias"):
+                    row = row_map.get(symbol) or {}
+                    breadth = related_h4_breadth(symbol, candidate.get("bias"), parsed_map, fresh_pl_map)
+                    assessment = assess_price_levels(
+                        symbol, parsed, pl, candidate.get("bias"), row.get("gap"),
+                        row.get("momentum"), PREV_LEVEL_PRICE.get(symbol), breadth
+                    )
+                candidate["price_context"] = assessment["text"]
+                candidate["level_priority"] = assessment["priority"]
             except Exception as context_error:
                 print(f"[SIGNAL LEVELS] {symbol}: {context_error}")
         kind = candidate["alert_type"]

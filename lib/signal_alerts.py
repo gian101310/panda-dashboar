@@ -93,7 +93,9 @@ def render_immediate_message(rows):
         detail = html.escape(str(row.get("detail") or ""))
         gap = row.get("gap")
         gap_text = f" | gap {gap:+.0f}" if isinstance(gap, (int, float)) else ""
-        lines.append(f"\n<b>{symbol}</b> · {kind} · {bias}{gap_text}")
+        level_priority = row.get("level_priority") if not row.get("conflict") else None
+        level_tag = " · LOW PRIORITY: LEVELS" if level_priority == "LOW PRIORITY" else " · LEVEL REVIEW" if level_priority in ("CAUTION", "REVIEW") else ""
+        lines.append(f"\n<b>{symbol}</b> · {kind} · {bias}{gap_text}{level_tag}")
         if detail:
             lines.append(detail)
         if row.get("price_context") and not row.get("conflict"):
