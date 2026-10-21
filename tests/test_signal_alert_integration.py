@@ -38,6 +38,18 @@ class SignalAlertIntegrationTests(unittest.TestCase):
         self.assertEqual(symbols, {"EURUSD"})
         self.assertEqual(app.PREV_ZONE["EURUSD"], "BELOW")
 
+    def test_early_alert_displays_actual_previous_and_current_gap(self):
+        app = _load_app()
+        queued = []
+        app.enqueue_alert = lambda client, candidate, **kwargs: queued.append(candidate) or {"id": "queued"}
+        app.dispatch_signal_candidates(
+            "2026-10-21T00:45:00+00:00", [], [],
+            [{"symbol": "EURUSD", "gap": 9, "bias": "BUY", "reason": "GAP SURGE", "prev_gap": 1}],
+            [], None,
+        )
+        self.assertEqual(queued[0]["detail"],
+                         "GAP SURGE: gap +1 → +9 (magnitude +8 since previous cycle)")
+
     def test_momentum_only_does_not_queue_immediate_message(self):
         app = _load_app()
         app.enqueue_alert = Mock()

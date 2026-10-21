@@ -29,6 +29,7 @@ Make the dedicated Spike Alerts Telegram group (`SIGNAL_BOT_TOKEN` / `SIGNAL_CHA
 12. Recovery uses distinct five-minute cycle marks, so the hourly scheduler cannot count one data sample twice. Every pending send is checked against current market hours and relevant dashboard, Panda Lines, or Gold state before Telegram is called.
 13. `spike_events` is an observation log with a persisted four-hour per-symbol cooldown. New momentum-only observations leave its legacy `notified` field false because they no longer trigger a standalone post; they appear in the phase digest instead. Historical `notified` values are not reliable delivery receipts. Confirmed Signal-group delivery is recorded in `signal_alert_outbox`.
 14. A failed or expired digest may be queued again in a later 15-minute window. A confirmed digest still requires both changed content and a two-hour interval.
+15. `GAP SURGE` means the current valid gap magnitude increased by at least three points in the same direction from the immediately previous engine score. A flat or weakening score is not a surge, regardless of its older 30-minute history change. The message displays both scores and their magnitude difference; a smaller move crossing the valid threshold is `GAP CROSSOVER`.
 
 ## Success criteria
 

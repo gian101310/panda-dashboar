@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-10-21 (Accurate gap surge alerts)
+
+- The Signal group's `GAP SURGE` alert now requires an actual same-direction
+  increase of at least three gap points since the previous engine cycle.
+  Crossing into a valid gap without that jump remains `GAP CROSSOVER`.
+- Gap-change messages show the previous and current scores plus the change in
+  magnitude. Flat or weakening scores no longer produce surge alerts from an
+  older 30-minute history change. Core scoring and BB/INTRA rules are unchanged.
+
 ## 2026-10-20 (Quieter, durable Spike Alerts group)
 
 - Added a service-role-only Signal alert outbox with durable idempotency keys,

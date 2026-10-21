@@ -35,7 +35,7 @@ from dotenv import load_dotenv
 from supabase import create_client
 from news_results import resolve_news_actual, load_sent_results, mark_result_sent
 from news_speeches import is_fed_chair_speech, resolve_speech_summary, speech_api_key
-from lib.signal_alerts import RecoveryGate, consolidate_candidates
+from lib.signal_alerts import RecoveryGate, consolidate_candidates, classify_gap_move
 from lib.signal_alert_outbox import enqueue_alert, dispatch_pending
 
 load_dotenv()
@@ -1746,10 +1746,8 @@ def run_gap_once():
 
         # ---- EARLY ENTRY: detect gap threshold crossover (BEFORE the rally matures) ----
         _prev_gap_for_early = PREV_GAP.get(symbol, 0)
-        _gap_just_crossed = (abs(_prev_gap_for_early) < 5 and abs(gap) >= 5 and bias != "INVALID")
-        _gap_big_jump = (abs(gap) >= 5 and (delta_short or 0) != 0 and abs(delta_short or 0) >= 2 and bias != "INVALID")
-        if signal_ready and (_gap_just_crossed or _gap_big_jump):
-            _reason = "GAP CROSSOVER" if _gap_just_crossed else "GAP SURGE"
+        _reason = classify_gap_move(_prev_gap_for_early, gap, bias)
+        if signal_ready and _reason:
             early_alerts.append({
                 "symbol": symbol, "gap": gap, "bias": bias,
                 "reason": _reason, "delta_short": delta_short,
@@ -3358,7 +3356,8 @@ def dispatch_signal_candidates(cycle_at, structure, gaps, early, spikes, gold):
     for item in early:
         candidates.append({"symbol": item["symbol"], "alert_type": "early_entry",
                            "cycle_at": cycle_at, "gap": item["gap"], "bias": item["bias"],
-                           "detail": f"{item['reason']} from gap {item['prev_gap']:+.0f}"})
+                           "detail": (f"{item['reason']}: gap {item['prev_gap']:+.0f} → {item['gap']:+.0f} "
+                                      f"(magnitude {abs(item['gap']) - abs(item['prev_gap']):+.0f} since previous cycle)")})
     for item in spikes:
         candidates.append({"symbol": item["symbol"], "alert_type": "momentum",
                            "cycle_at": cycle_at, "gap": item["gap"], "bias": item["bias"],

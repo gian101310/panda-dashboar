@@ -5,6 +5,23 @@ import html
 
 
 PRIORITY = {"structure": 0, "gold": 0, "gap_zone": 1, "early_entry": 2, "momentum": 3}
+SURGE_MIN_MAGNITUDE_GAIN = 3
+
+
+def classify_gap_move(previous_gap, current_gap, bias):
+    """Classify only a real increase between consecutive engine scores."""
+    if bias not in ("BUY", "SELL") or abs(current_gap) < 5:
+        return None
+    if (bias == "BUY" and current_gap <= 0) or (bias == "SELL" and current_gap >= 0):
+        return None
+    previous = previous_gap or 0
+    same_direction = previous == 0 or (previous > 0) == (current_gap > 0)
+    gain = abs(current_gap) - abs(previous)
+    if same_direction and gain >= SURGE_MIN_MAGNITUDE_GAIN:
+        return "GAP SURGE"
+    if abs(previous) < 5:
+        return "GAP CROSSOVER"
+    return None
 
 
 class RecoveryGate:
@@ -65,7 +82,7 @@ def render_immediate_message(rows):
     """Render one compact group post; rows have already been prioritized."""
     labels = {
         "structure": "Structure change", "gold": "Gold flip",
-        "gap_zone": "Confirmed gap zone", "early_entry": "New gap move",
+        "gap_zone": "Confirmed gap zone", "early_entry": "Gap change",
         "momentum": "Momentum watch",
     }
     lines = ["🐼 <b>PANDA SIGNAL UPDATE</b>"]

@@ -1,11 +1,24 @@
 import unittest
 
-from lib.signal_alerts import RecoveryGate, build_idempotency_key, consolidate_candidates, render_immediate_message
+from lib.signal_alerts import RecoveryGate, build_idempotency_key, classify_gap_move, consolidate_candidates, render_immediate_message
 
 
 class SignalAlertTests(unittest.TestCase):
+    def test_surge_requires_actual_same_direction_magnitude_gain(self):
+        self.assertIsNone(classify_gap_move(8, 8, "BUY"))
+        self.assertIsNone(classify_gap_move(8, 7, "BUY"))
+        self.assertIsNone(classify_gap_move(7, 9, "BUY"))
+        self.assertEqual(classify_gap_move(6, 9, "BUY"), "GAP SURGE")
+        self.assertEqual(classify_gap_move(1, 9, "BUY"), "GAP SURGE")
+        self.assertEqual(classify_gap_move(-6, -9, "SELL"), "GAP SURGE")
+        self.assertEqual(classify_gap_move(4, 5, "BUY"), "GAP CROSSOVER")
+
     def test_recovery_requires_two_valid_cycles(self):
         gate = RecoveryGate()
+        self.assertFalse(gate.mark("EURUSD", True))
+        self.assertTrue(gate.mark("EURUSD", True))
+        self.assertTrue(gate.mark("EURUSD", True))
+        self.assertFalse(gate.mark("EURUSD", False))
         self.assertFalse(gate.mark("EURUSD", True))
         self.assertTrue(gate.mark("EURUSD", True))
 
@@ -14,10 +27,6 @@ class SignalAlertTests(unittest.TestCase):
         self.assertFalse(gate.mark("EURUSD", True, "2026-10-20T16:00:00+00:00"))
         self.assertFalse(gate.mark("EURUSD", True, "2026-10-20T16:00:00+00:00"))
         self.assertTrue(gate.mark("EURUSD", True, "2026-10-20T16:05:00+00:00"))
-        self.assertTrue(gate.mark("EURUSD", True))
-        self.assertFalse(gate.mark("EURUSD", False))
-        self.assertFalse(gate.mark("EURUSD", True))
-        self.assertTrue(gate.mark("EURUSD", True))
 
     def test_consolidates_pair_and_keeps_supporting_evidence(self):
         cycle = "2026-10-20T16:00:00+00:00"
