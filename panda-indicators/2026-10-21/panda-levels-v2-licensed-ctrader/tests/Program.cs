@@ -25,5 +25,6 @@ class Program
         Check(true, 123456, "Example Broker", 123456, "Example Broker");
         Check(false, 123456, "Other Broker", 123456, "Example Broker");
         Console.WriteLine("PASS: 14 license decisions, including unset placeholders and account switching.");
+        BoxWindowTests.Run();
     }
 }

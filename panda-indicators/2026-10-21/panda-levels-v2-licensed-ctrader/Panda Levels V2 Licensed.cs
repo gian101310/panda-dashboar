@@ -33,6 +33,10 @@ namespace cAlgo
         [Parameter("Box Fill Opacity (%)", DefaultValue = 20, MinValue = 0, MaxValue = 100, Group = "Panda Boxes")]
         public int BoxFillOpacity { get; set; }
 
+        // Match the MT4 broker's server clock; MT4 can use a different day boundary from cTrader UTC.
+        [Parameter("MT4 Server UTC Offset", DefaultValue = 3, MinValue = -12, MaxValue = 14, Group = "Panda Boxes")]
+        public int Mt4ServerUtcOffset { get; set; }
+
         [Parameter("Show Panda Lines", DefaultValue = false, Group = "Panda Lines")]
         public bool ShowPandaLines { get; set; }
 
@@ -71,13 +75,6 @@ namespace cAlgo
         private IndicatorDataSeries _follow;
         private IndicatorDataSeries _followTrend;
 
-        private sealed class PeriodRange
-        {
-            public DateTime Start;
-            public double High;
-            public double Low;
-        }
-
         private sealed class BoxSnapshot
         {
             public DateTime ShortStart, ShortEnd, MediumStart, MediumEnd, LongStart, LongEnd;
@@ -90,6 +87,7 @@ namespace cAlgo
         private Bars _monthlyBars;
         private DateTime _lastHourlyBarTime = DateTime.MinValue;
         private DateTime _lastDailyBarTime = DateTime.MinValue;
+        private DateTime _lastBoxServerDate = DateTime.MinValue;
 
         protected override void Initialize()
         {
@@ -120,8 +118,11 @@ namespace cAlgo
 
             DateTime hourlyTime = _hourlyBars.Count > 0 ? _hourlyBars.LastBar.OpenTime : DateTime.MinValue;
             DateTime dailyTime = _dailyBars.Count > 0 ? _dailyBars.LastBar.OpenTime : DateTime.MinValue;
-            if (hourlyTime == _lastHourlyBarTime && dailyTime == _lastDailyBarTime)
+            DateTime boxServerDate = Server.Time.AddHours(Mt4ServerUtcOffset).Date;
+            if (hourlyTime == _lastHourlyBarTime && dailyTime == _lastDailyBarTime &&
+                boxServerDate == _lastBoxServerDate)
                 return;
+            _lastBoxServerDate = boxServerDate;
 
             _lastHourlyBarTime = hourlyTime;
             _lastDailyBarTime = dailyTime;
@@ -335,8 +336,9 @@ namespace cAlgo
         {
             if (_hourlyBars == null)
                 return;
-
-            while (BuildPeriods(_hourlyBars, MonthKey).Count < 4)
+            // Load through the beginning of the actual oldest box, not four observed months.
+            DateTime requiredStart = PandaBoxMath.GetWindow(Server.Time, Mt4ServerUtcOffset, 0).Start;
+            while (_hourlyBars.Count == 0 || _hourlyBars.OpenTimes[0] > requiredStart)
             {
                 if (_hourlyBars.LoadMoreHistory() == 0)
                     return;
@@ -362,84 +364,31 @@ namespace cAlgo
         private bool TryBuildSnapshot(out BoxSnapshot snapshot)
         {
             snapshot = null;
-            var days = BuildPeriods(_hourlyBars, DayKey);
-            var weeks = BuildPeriods(_hourlyBars, WeekKey);
-            var months = BuildPeriods(_hourlyBars, MonthKey);
-            if (days.Count < 4 || weeks.Count < 4 || months.Count < 4)
+            LoadRequiredHourlyHistory();
+            var shortWindow = PandaBoxMath.GetWindow(Server.Time, Mt4ServerUtcOffset, 2);
+            var mediumWindow = PandaBoxMath.GetWindow(Server.Time, Mt4ServerUtcOffset, 1);
+            var longWindow = PandaBoxMath.GetWindow(Server.Time, Mt4ServerUtcOffset, 0);
+            double shortHigh, shortLow, mediumHigh, mediumLow, longHigh, longLow;
+            if (!TryBoxRange(shortWindow, out shortHigh, out shortLow) ||
+                !TryBoxRange(mediumWindow, out mediumHigh, out mediumLow) ||
+                !TryBoxRange(longWindow, out longHigh, out longLow))
                 return false;
-
-            var d1 = days[days.Count - 2];
-            var d2 = days[days.Count - 3];
-            var d3 = days[days.Count - 4];
-            var w1 = weeks[weeks.Count - 2];
-            var w2 = weeks[weeks.Count - 3];
-            var w3 = weeks[weeks.Count - 4];
-            var m1 = months[months.Count - 2];
-            var m2 = months[months.Count - 3];
-            var m3 = months[months.Count - 4];
-
             snapshot = new BoxSnapshot
             {
-                ShortHigh = Math.Max(d2.High, d3.High),
-                ShortLow = Math.Min(d2.Low, d3.Low),
-                ShortStart = d3.Start,
-                ShortEnd = d1.Start,
-                MediumHigh = Math.Max(w2.High, w3.High),
-                MediumLow = Math.Min(w2.Low, w3.Low),
-                MediumStart = w3.Start,
-                MediumEnd = w1.Start,
-                LongHigh = Math.Max(m2.High, m3.High),
-                LongLow = Math.Min(m2.Low, m3.Low),
-                LongStart = m3.Start,
-                LongEnd = m1.Start
+                ShortHigh = shortHigh, ShortLow = shortLow,
+                ShortStart = shortWindow.Start, ShortEnd = shortWindow.End,
+                MediumHigh = mediumHigh, MediumLow = mediumLow,
+                MediumStart = mediumWindow.Start, MediumEnd = mediumWindow.End,
+                LongHigh = longHigh, LongLow = longLow,
+                LongStart = longWindow.Start, LongEnd = longWindow.End
             };
             return true;
         }
 
-        private static List<PeriodRange> BuildPeriods(Bars bars, Func<DateTime, DateTime> keyOf)
+        private bool TryBoxRange(PandaBoxMath.Window window, out double high, out double low)
         {
-            var periods = new List<PeriodRange>();
-            DateTime currentKey = DateTime.MinValue;
-            PeriodRange current = null;
-
-            for (int index = 0; index < bars.Count; index++)
-            {
-                DateTime key = keyOf(bars.OpenTimes[index]);
-                if (current == null || key != currentKey)
-                {
-                    current = new PeriodRange
-                    {
-                        Start = bars.OpenTimes[index],
-                        High = bars.HighPrices[index],
-                        Low = bars.LowPrices[index]
-                    };
-                    periods.Add(current);
-                    currentKey = key;
-                }
-                else
-                {
-                    current.High = Math.Max(current.High, bars.HighPrices[index]);
-                    current.Low = Math.Min(current.Low, bars.LowPrices[index]);
-                }
-            }
-
-            return periods;
-        }
-
-        private static DateTime DayKey(DateTime time)
-        {
-            return time.Date;
-        }
-
-        private static DateTime WeekKey(DateTime time)
-        {
-            DateTime date = time.Date;
-            return date.AddDays(-(((int)date.DayOfWeek + 6) % 7));
-        }
-
-        private static DateTime MonthKey(DateTime time)
-        {
-            return new DateTime(time.Year, time.Month, 1);
+            return PandaBoxMath.TryRange(_hourlyBars.Count, i => _hourlyBars.OpenTimes[i],
+                i => _hourlyBars.HighPrices[i], i => _hourlyBars.LowPrices[i], window, out high, out low);
         }
 
         private void DrawBox(string label, DateTime start, double high, DateTime end, double low, Color color)
@@ -555,6 +504,74 @@ namespace cAlgo
             string prefix = ObjectPrefix + "Level." + label;
             Chart.RemoveObject(prefix + ".Line");
             Chart.RemoveObject(prefix + ".Text");
+        }
+    }
+
+    // Port of GetBoxWindow / CalculateBoxBounds from MT4 Panda Scoring v1 and v1.2.
+    internal static class PandaBoxMath
+    {
+        internal struct Window
+        {
+            public DateTime Start, End;
+        }
+
+        internal static Window GetWindow(DateTime utcNow, int utcOffset, int kind)
+        {
+            DateTime brokerNow = utcNow.AddHours(utcOffset);
+            DateTime start, end;
+            if (kind == 0) // D1 / long: two calendar months, one month offset.
+            {
+                end = new DateTime(brokerNow.Year, brokerNow.Month, 1).AddMonths(-1);
+                start = end.AddMonths(-2);
+            }
+            else if (kind == 1) // H4 / medium: two Monday-based weeks, one week offset.
+            {
+                DateTime monday = brokerNow.Date.AddDays(-(((int)brokerNow.DayOfWeek + 6) % 7));
+                end = monday.AddDays(-7);
+                start = end.AddDays(-14);
+            }
+            else // H1 / short: two trading days, one trading day offset.
+            {
+                DateTime day = brokerNow.Date;
+                while (day.DayOfWeek == DayOfWeek.Saturday || day.DayOfWeek == DayOfWeek.Sunday)
+                    day = day.AddDays(-1);
+                end = StepTradingDaysBack(day, 1);
+                start = StepTradingDaysBack(end, 2);
+            }
+            // Chart/H1 timestamps remain UTC. Only window selection uses the MT4 clock.
+            return new Window { Start = start.AddHours(-utcOffset), End = end.AddHours(-utcOffset) };
+        }
+
+        private static DateTime StepTradingDaysBack(DateTime day, int count)
+        {
+            while (count > 0)
+            {
+                day = day.AddDays(-1);
+                if (day.DayOfWeek != DayOfWeek.Saturday && day.DayOfWeek != DayOfWeek.Sunday)
+                    count--;
+            }
+            return day;
+        }
+
+        internal static bool TryRange(int count, Func<int, DateTime> timeAt,
+            Func<int, double> highAt, Func<int, double> lowAt, Window window,
+            out double high, out double low)
+        {
+            high = double.MinValue;
+            low = double.MaxValue;
+            bool found = false;
+            for (int i = count - 1; i >= 0; i--)
+            {
+                DateTime time = timeAt(i);
+                if (time >= window.End) continue;
+                if (time < window.Start) break;
+                double barHigh = highAt(i), barLow = lowAt(i);
+                if (barHigh <= 0 || barLow <= 0 || double.IsNaN(barHigh) || double.IsNaN(barLow)) continue;
+                high = Math.Max(high, barHigh);
+                low = Math.Min(low, barLow);
+                found = true;
+            }
+            return found;
         }
     }
 

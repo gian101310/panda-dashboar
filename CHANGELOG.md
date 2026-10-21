@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-21 - Match licensed Panda boxes to MT4 scoring
+
+- Replaced candle-date aggregation with the MT4 Scoring v1/v1.2 trading-day H1, Monday-week H4, and calendar-month D1 windows, including exact start-inclusive/end-exclusive H1 price scanning.
+- Added MT4 server UTC offset (default +3, confirmed by operator clock) so UTC cTrader bars use the MT4 midnight boundaries. All box drawings use the same converted windows.
+- Added calendar/weekend/month/offset and price-range regression tests. Licensing and Panda Lines controls remain intact.
+
 ## 2026-10-21 - Fix single-file licensed indicator build
 
 - Embedded the account license helper in the indicator source so pasting the full file into cTrader compiles without a separate helper. Regression checks now compile that single source file.
