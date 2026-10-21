@@ -9,12 +9,13 @@ namespace cAlgo
     public class PandaLevels : Indicator
     {
         private const string ObjectPrefix = "PandaLevels.";
-        private const double PreviousDayZoneWidthPercent = 0.01;
-
         private static readonly Color ShortBoxColor = Color.FromArgb(255, 255, 165, 0);
         private static readonly Color MediumBoxColor = Color.FromArgb(255, 0, 200, 120);
         private static readonly Color LongBoxColor = Color.FromArgb(255, 70, 120, 255);
         private static readonly Color PreviousDayColor = Color.Orange;
+        private static readonly Color PreviousWeekColor = Color.LimeGreen;
+        private static readonly Color PreviousMonthColor = Color.DeepSkyBlue;
+        private static readonly Color PreviousYearColor = Color.Magenta;
 
         private sealed class PeriodRange
         {
@@ -39,6 +40,7 @@ namespace cAlgo
             _hourlyBars = MarketData.GetBars(TimeFrame.Hour, SymbolName);
             _dailyBars = MarketData.GetBars(TimeFrame.Daily, SymbolName);
             LoadRequiredHourlyHistory();
+            LoadRequiredDailyHistory();
         }
 
         public override void Calculate(int index)
@@ -54,7 +56,7 @@ namespace cAlgo
             _lastHourlyBarTime = hourlyTime;
             _lastDailyBarTime = dailyTime;
             DrawPandaBoxes();
-            DrawPreviousDayLevels();
+            DrawPreviousPeriodLevels();
         }
 
         private void LoadRequiredHourlyHistory()
@@ -65,6 +67,18 @@ namespace cAlgo
             while (BuildPeriods(_hourlyBars, MonthKey).Count < 4)
             {
                 if (_hourlyBars.LoadMoreHistory() == 0)
+                    return;
+            }
+        }
+
+        private void LoadRequiredDailyHistory()
+        {
+            if (_dailyBars == null)
+                return;
+
+            while (BuildPeriods(_dailyBars, YearKey).Count < 2)
+            {
+                if (_dailyBars.LoadMoreHistory() == 0)
                     return;
             }
         }
@@ -168,6 +182,11 @@ namespace cAlgo
             return new DateTime(time.Year, time.Month, 1);
         }
 
+        private static DateTime YearKey(DateTime time)
+        {
+            return new DateTime(time.Year, 1, 1);
+        }
+
         private void DrawBox(string label, DateTime start, double high, DateTime end, double low, Color color)
         {
             string prefix = ObjectPrefix + "Box." + label;
@@ -188,52 +207,46 @@ namespace cAlgo
             Chart.RemoveObject(prefix + ".Border");
         }
 
-        private void DrawPreviousDayLevels()
+        private void DrawPreviousPeriodLevels()
         {
-            if (_dailyBars.Count < 2 || Bars.Count < 2)
+            DrawPreviousPeriodPair(BuildPeriods(_dailyBars, DayKey), "PDH", "PDL", PreviousDayColor);
+            DrawPreviousPeriodPair(BuildPeriods(_dailyBars, WeekKey), "PWH", "PWL", PreviousWeekColor);
+            DrawPreviousPeriodPair(BuildPeriods(_dailyBars, MonthKey), "PMH", "PML", PreviousMonthColor);
+            DrawPreviousPeriodPair(BuildPeriods(_dailyBars, YearKey), "PYH", "PYL", PreviousYearColor);
+        }
+
+        private void DrawPreviousPeriodPair(List<PeriodRange> periods, string highLabel, string lowLabel, Color color)
+        {
+            if (periods.Count < 2)
             {
-                RemovePreviousDayLevel("PDH");
-                RemovePreviousDayLevel("PDL");
+                RemovePreviousPeriodLevel(highLabel);
+                RemovePreviousPeriodLevel(lowLabel);
                 return;
             }
 
-            int previous = _dailyBars.Count - 2;
-            DrawPreviousDayLevel("PDH", _dailyBars.HighPrices[previous]);
-            DrawPreviousDayLevel("PDL", _dailyBars.LowPrices[previous]);
+            PeriodRange previous = periods[periods.Count - 2];
+            DrawPreviousPeriodLevel(highLabel, previous.High, color);
+            DrawPreviousPeriodLevel(lowLabel, previous.Low, color);
         }
 
-        private void DrawPreviousDayLevel(string label, double level)
+        private void DrawPreviousPeriodLevel(string label, double level, Color color)
         {
             string prefix = ObjectPrefix + "Level." + label;
-            double barSeconds = (Bars.OpenTimes[Bars.Count - 1] - Bars.OpenTimes[Bars.Count - 2]).TotalSeconds;
-            if (barSeconds <= 0)
-                barSeconds = 60;
+            Color lineColor = Color.FromArgb(210, color.R, color.G, color.B);
 
-            DateTime timeLeft = Bars.OpenTimes[0];
-            DateTime timeRight = Bars.OpenTimes[Bars.Count - 1].AddSeconds(barSeconds * Math.Max(Bars.Count, 50));
-            double halfWidth = level * PreviousDayZoneWidthPercent / 100.0;
-            Color borderColor = Color.FromArgb(180, PreviousDayColor.R, PreviousDayColor.G, PreviousDayColor.B);
-
-            var zone = Chart.DrawRectangle(prefix + ".Zone", timeLeft, level + halfWidth, timeRight, level - halfWidth,
-                Color.FromArgb(30, PreviousDayColor.R, PreviousDayColor.G, PreviousDayColor.B));
-            zone.IsFilled = true;
-            zone.IsInteractive = false;
-
-            var line = Chart.DrawTrendLine(prefix + ".Line", timeLeft, level, timeRight, level, borderColor);
-            line.LineStyle = LineStyle.Dots;
-            line.Thickness = 1;
+            var line = Chart.DrawHorizontalLine(prefix + ".Line", level, lineColor, 1, LineStyle.Dots);
             line.IsInteractive = false;
 
             var text = Chart.DrawText(prefix + ".Text", label + "  " + level.ToString("F" + Symbol.Digits),
-                timeRight, level, PreviousDayColor);
-            text.HorizontalAlignment = HorizontalAlignment.Right;
+                Bars.OpenTimes[Bars.Count - 1], level, color);
+            text.HorizontalAlignment = HorizontalAlignment.Left;
+            text.VerticalAlignment = VerticalAlignment.Center;
             text.IsInteractive = false;
         }
 
-        private void RemovePreviousDayLevel(string label)
+        private void RemovePreviousPeriodLevel(string label)
         {
             string prefix = ObjectPrefix + "Level." + label;
-            Chart.RemoveObject(prefix + ".Zone");
             Chart.RemoveObject(prefix + ".Line");
             Chart.RemoveObject(prefix + ".Text");
         }

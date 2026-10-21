@@ -27,8 +27,11 @@ class PandaLevelsCTraderTests(unittest.TestCase):
         ):
             self.assertNotIn(trading_api, self.text)
 
-    def test_draws_only_three_boxes_and_previous_day_levels(self):
-        for label in ("Short", "Medium", "Long", "PDH", "PDL"):
+    def test_draws_only_three_boxes_and_previous_period_levels(self):
+        for label in (
+            "Short", "Medium", "Long",
+            "PDH", "PDL", "PWH", "PWL", "PMH", "PML", "PYH", "PYL",
+        ):
             self.assertIn(f'"{label}"', self.text)
 
         for excluded in (
@@ -53,11 +56,13 @@ class PandaLevelsCTraderTests(unittest.TestCase):
         for calculation in expected_calculations:
             self.assertIn(calculation, self.text)
 
-    def test_previous_day_levels_use_last_completed_daily_bar(self):
-        self.assertIn("_dailyBars.Count - 2", self.text)
-        self.assertIn("_dailyBars.HighPrices[previous]", self.text)
-        self.assertIn("_dailyBars.LowPrices[previous]", self.text)
+    def test_previous_period_levels_span_the_chart_and_use_completed_periods(self):
+        self.assertIn("DrawPreviousPeriodLevels", self.text)
+        self.assertIn("YearKey", self.text)
+        self.assertIn("periods[periods.Count - 2]", self.text)
+        self.assertIn("Chart.DrawHorizontalLine", self.text)
         self.assertIn("LineStyle.Dots", self.text)
+        self.assertNotIn("Chart.DrawTrendLine(prefix + \".Line\"", self.text)
 
     def test_history_loading_continues_until_boxes_are_ready_or_server_is_exhausted(self):
         self.assertIn("while (BuildPeriods(_hourlyBars, MonthKey).Count < 4)", self.text)
