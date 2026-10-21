@@ -1,4 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net6.0</TargetFramework></PropertyGroup>
-  <ItemGroup><Compile Include="../AccountLicense.cs" Link="AccountLicense.cs" /></ItemGroup>
+  <ItemGroup>
+    <Compile Include="../Panda Levels V2 Licensed.cs" Link="Panda Levels V2 Licensed.cs" />
+    <PackageReference Include="cTrader.Automate" Version="1.0.17" />
+  </ItemGroup>
 </Project>

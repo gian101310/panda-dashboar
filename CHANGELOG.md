@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-21 - Fix single-file licensed indicator build
+
+- Embedded the account license helper in the indicator source so pasting the full file into cTrader compiles without a separate helper. Regression checks now compile that single source file.
+
 ## 2026-10-21 - Simplify licensed Panda Lines controls
 
 - Licensed Panda Levels V2 now exposes only one Panda Lines on/off switch. SuperTrend and Follow Line use their existing defaults internally. Box fill and opacity controls remain available.

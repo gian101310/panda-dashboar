@@ -9,7 +9,7 @@ private const string LicensedBrokerName = ""; // Optional; blank means account-o
 
 Account 0 is an unset placeholder and will never authorize. Use the cTrader trading account number, not the cTrader ID. Broker name is optional; if supplied, it must match `Account.BrokerName` (case-insensitive). Broker restriction avoids collisions between identical numbers at different brokers. Account-only restriction also treats live/demo accounts with the same number as identical.
 
-Build `PandaLevelsV2Licensed/PandaLevelsV2Licensed.csproj` in Release mode. Give the user only that build's `.algo`, exported without source. Do not distribute the original unrestricted V2 or any `.cs`, `.dll`, or project files. Use cTrader's user-restricted export as an additional protection when available.
+The indicator is self-contained in `Panda Levels V2 Licensed.cs`: paste the entire file into a new cTrader indicator, edit the account placeholder, and Build. No separate helper file is required. Alternatively, build `PandaLevelsV2Licensed/PandaLevelsV2Licensed.csproj` in Release mode. Give the user only that build's `.algo`, exported without source. Do not distribute the original unrestricted V2 or any `.cs`, `.dll`, or project files. Use cTrader's user-restricted export as an additional protection when available.
 
 The placeholder build intentionally shows **Account not licensed** and no overlay. Changing the constants requires rebuilding. Parameters are limited to Fill Boxes, Box Fill Opacity (%), and Show Panda Lines (on/off). SuperTrend and Follow Line use fixed existing defaults internally; the license is not a parameter.
 
