@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AssemblyName>Panda Levels V2 Licensed</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../Panda Levels V2 Licensed.cs" Link="Panda Levels V2 Licensed.cs" />
+    <Compile Include="../AccountLicense.cs" Link="AccountLicense.cs" />
+    <PackageReference Include="cTrader.Automate" Version="1.0.17" />
+  </ItemGroup>
+</Project>

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-21 - Panda Levels V2 account-lock template
+
+- Added a separate licensed V2 template with a required hardcoded trading account number and optional broker restriction. Unset account placeholders deny access.
+- Added account-switch and timer checks that clear drawings and plotted history when unauthorized, and restore them when authorized.
+- Kept all existing V2 fill, opacity and Panda Lines controls. License fields are not user parameters.
+
 ## 2026-10-21 — Panda Levels V2
 
 - Added a separate cTrader V2 with box fill on/off and 0–100% opacity (default 20%).
