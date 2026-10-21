@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-21 — Signal alert price-level context
+
+- Signal-group alerts now note D1/H4/H1 box edges and previous day/week highs and lows within 15 pips of the sampled price, including stacked resistance above BUY alerts and stacked support below SELL alerts.
+- If sampled price moves outside a box, the alert says the break is provisional until a candle closes. Missing boxes and stale Panda Lines prices add no level context.
+- Gap scores, strategy rules, and alert triggers are unchanged; this is context on alerts already being sent.
+
 ## 2026-10-21 (Accurate gap surge alerts)
 
 - The Signal group's `GAP SURGE` alert now requires an actual same-direction

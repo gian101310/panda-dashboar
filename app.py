@@ -37,6 +37,7 @@ from news_results import resolve_news_actual, load_sent_results, mark_result_sen
 from news_speeches import is_fed_chair_speech, resolve_speech_summary, speech_api_key
 from lib.signal_alerts import RecoveryGate, consolidate_candidates, classify_gap_move
 from lib.signal_alert_outbox import enqueue_alert, dispatch_pending
+from lib.signal_price_levels import describe_price_levels
 
 load_dotenv()
 
@@ -121,6 +122,7 @@ LAST_NEWS_MARK    = None
 PREV_MOMENTUM     = {}
 PREV_GAP          = {}
 PREV_BIAS         = {}
+PREV_LEVEL_PRICE  = {}  # last fresh Panda Lines sample; Signal context only
 PREV_GAP_INITIALIZED = False
 PREV_ZONE         = {}   # pair -> last TBG_ZONE (ABOVE/BELOW); drives Panda Lines FLIP alerts
 LAST_BOS_T        = {}   # pair -> last seen TBG_BOS_T (unix); first sighting seeds silently, never alerts on boot
@@ -2064,7 +2066,8 @@ def run_gap_once():
         gold_signal = None
 
     queued_symbols = dispatch_signal_candidates(
-        signal_cycle_at, structure_alerts, gap_alerts, early_alerts, spike_alerts, gold_signal
+        signal_cycle_at, structure_alerts, gap_alerts, early_alerts, spike_alerts, gold_signal,
+        all_parsed_map, all_pl_map
     )
     try:
         send_phase_digest(dashboard_payload, queued_symbols, signal_cycle_at)
@@ -3346,7 +3349,16 @@ def check_structure_alerts(pair, pl, cycle_at, ready):
     return candidates
 
 
-def dispatch_signal_candidates(cycle_at, structure, gaps, early, spikes, gold):
+def _fresh_signal_level_file(symbol):
+    try:
+        path = os.path.join(MT4_PATH, f"tbg_{symbol.upper()}.txt")
+        return 0 <= time.time() - os.path.getmtime(path) <= 600
+    except OSError:
+        return False
+
+
+def dispatch_signal_candidates(cycle_at, structure, gaps, early, spikes, gold,
+                               parsed_map=None, pl_map=None):
     """Queue one prioritized event per pair; the outbox groups pairs on delivery."""
     candidates = list(structure)
     for item in gaps:
@@ -3382,6 +3394,16 @@ def dispatch_signal_candidates(cycle_at, structure, gaps, early, spikes, gold):
     for candidate in consolidate_candidates(candidates):
         if candidate["alert_type"] == "momentum":
             continue  # quiet observation; the phase digest carries it
+        symbol = candidate["symbol"]
+        pl = (pl_map or {}).get(symbol)
+        parsed = (parsed_map or {}).get(symbol)
+        if parsed and pl and _fresh_signal_level_file(symbol):
+            try:
+                candidate["price_context"] = describe_price_levels(
+                    symbol, parsed, pl, candidate.get("bias"), PREV_LEVEL_PRICE.get(symbol)
+                )
+            except Exception as context_error:
+                print(f"[SIGNAL LEVELS] {symbol}: {context_error}")
         kind = candidate["alert_type"]
         cooldown = {"structure": 0, "gold": 0, "gap_zone": 14400, "early_entry": 7200}[kind]
         ttl = 1800 if kind == "structure" else 3600 if kind == "gold" else 240
@@ -3399,6 +3421,12 @@ def dispatch_signal_candidates(cycle_at, structure, gaps, early, spikes, gold):
                 PREV_ZONE[source["symbol"]] = source["state_zone"]
             if source.get("state_bos_t"):
                 LAST_BOS_T[source["symbol"]] = source["state_bos_t"]
+    for symbol in PAIRS:
+        pl = (pl_map or {}).get(symbol)
+        if pl and pl.get("pl_price") and _fresh_signal_level_file(symbol):
+            PREV_LEVEL_PRICE[symbol] = pl["pl_price"]
+        else:
+            PREV_LEVEL_PRICE.pop(symbol, None)
     return queued
 
 
