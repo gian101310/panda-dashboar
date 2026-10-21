@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-21 - Simplify licensed Panda Lines controls
+
+- Licensed Panda Levels V2 now exposes only one Panda Lines on/off switch. SuperTrend and Follow Line use their existing defaults internally. Box fill and opacity controls remain available.
+
 ## 2026-10-21 - Panda Levels V2 account-lock template
 
 - Added a separate licensed V2 template with a required hardcoded trading account number and optional broker restriction. Unset account placeholders deny access.

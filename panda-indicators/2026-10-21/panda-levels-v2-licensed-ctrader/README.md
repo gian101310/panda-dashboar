@@ -11,7 +11,7 @@ Account 0 is an unset placeholder and will never authorize. Use the cTrader trad
 
 Build `PandaLevelsV2Licensed/PandaLevelsV2Licensed.csproj` in Release mode. Give the user only that build's `.algo`, exported without source. Do not distribute the original unrestricted V2 or any `.cs`, `.dll`, or project files. Use cTrader's user-restricted export as an additional protection when available.
 
-The placeholder build intentionally shows **Account not licensed** and no overlay. Changing the constants requires rebuilding. All existing fill, opacity and optional Panda Lines parameters remain available; the license is not a parameter.
+The placeholder build intentionally shows **Account not licensed** and no overlay. Changing the constants requires rebuilding. Parameters are limited to Fill Boxes, Box Fill Opacity (%), and Show Panda Lines (on/off). SuperTrend and Follow Line use fixed existing defaults internally; the license is not a parameter.
 
 Authorization is checked at initialization, every calculation, account-switch events, and once per second without ticks. Switching to an unauthorized account clears this instance's boxes, levels and all line outputs. Switching back restores them. Each instance uses its own drawing prefix.
 

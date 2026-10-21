@@ -36,32 +36,16 @@ namespace cAlgo
         [Parameter("Show Panda Lines", DefaultValue = false, Group = "Panda Lines")]
         public bool ShowPandaLines { get; set; }
 
-        [Parameter("Show SuperTrend", DefaultValue = true, Group = "Panda Lines")]
-        public bool ShowSuperTrend { get; set; }
-
-        [Parameter("SuperTrend period", DefaultValue = 10, MinValue = 2, MaxValue = 200, Group = "Panda Lines")]
-        public int SuperTrendPeriod { get; set; }
-
-        [Parameter("SuperTrend multiplier", DefaultValue = 3.0, MinValue = 0.1, MaxValue = 20.0, Step = 0.1, Group = "Panda Lines")]
-        public double SuperTrendFactor { get; set; }
-
-        [Parameter("SuperTrend use ATR", DefaultValue = true, Group = "Panda Lines")]
-        public bool SuperTrendUseAtr { get; set; }
-
-        [Parameter("Show Follow Line", DefaultValue = true, Group = "Panda Lines")]
-        public bool ShowFollowLine { get; set; }
-
-        [Parameter("Follow BB period", DefaultValue = 21, MinValue = 2, MaxValue = 200, Group = "Panda Lines")]
-        public int FollowBbPeriod { get; set; }
-
-        [Parameter("Follow BB deviation", DefaultValue = 1.0, MinValue = 0.1, MaxValue = 10.0, Step = 0.1, Group = "Panda Lines")]
-        public double FollowBbDeviation { get; set; }
-
-        [Parameter("Follow use ATR", DefaultValue = true, Group = "Panda Lines")]
-        public bool FollowUseAtr { get; set; }
-
-        [Parameter("Follow ATR period", DefaultValue = 5, MinValue = 1, MaxValue = 200, Group = "Panda Lines")]
-        public int FollowAtrPeriod { get; set; }
+        // Fixed Panda Lines defaults; only the master visibility switch is exposed.
+        private const bool ShowSuperTrend = true;
+        private const int SuperTrendPeriod = 10;
+        private const double SuperTrendFactor = 3.0;
+        private const bool SuperTrendUseAtr = true;
+        private const bool ShowFollowLine = true;
+        private const int FollowBbPeriod = 21;
+        private const double FollowBbDeviation = 1.0;
+        private const bool FollowUseAtr = true;
+        private const int FollowAtrPeriod = 5;
 
         [Output("Panda SuperTrend Up", LineColor = "Lime", PlotType = PlotType.DiscontinuousLine, Thickness = 2)]
         public IndicatorDataSeries SuperTrendUp { get; set; }
