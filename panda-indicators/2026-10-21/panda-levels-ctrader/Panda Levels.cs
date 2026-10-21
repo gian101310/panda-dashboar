@@ -5,7 +5,7 @@ using cAlgo.API.Internals;
 
 namespace cAlgo
 {
-    [Indicator("Panda Levels", IsOverlay = true, TimeZone = TimeZones.UTC, AccessRights = AccessRights.None)]
+    [Indicator(IsOverlay = true, TimeZone = TimeZones.UTC, AccessRights = AccessRights.None)]
     public class PandaLevels : Indicator
     {
         private const string ObjectPrefix = "PandaLevels.";

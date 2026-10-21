@@ -14,7 +14,8 @@ class PandaLevelsCTraderTests(unittest.TestCase):
 
     def test_indicator_is_parameter_free_and_informational(self):
         self.assertIn("class PandaLevels", self.text)
-        self.assertIn('[Indicator("Panda Levels"', self.text)
+        self.assertIn("[Indicator(IsOverlay = true", self.text)
+        self.assertNotIn('[Indicator("', self.text)
         self.assertIn("AccessRights = AccessRights.None", self.text)
         self.assertNotIn("[Parameter(", self.text)
         for trading_api in (
