@@ -5,7 +5,7 @@ using cAlgo.API.Internals;
 
 namespace cAlgo
 {
-    [Indicator(IsOverlay = true, TimeZone = TimeZones.UTC, AccessRights = AccessRights.None)]
+    [Indicator("Panda Levels", IsOverlay = true, TimeZone = TimeZones.UTC, AccessRights = AccessRights.None)]
     public class PandaLevels : Indicator
     {
         private const string ObjectPrefix = "PandaLevels.";
@@ -62,11 +62,8 @@ namespace cAlgo
             if (_hourlyBars == null)
                 return;
 
-            for (int attempt = 0; attempt < 20; attempt++)
+            while (BuildPeriods(_hourlyBars, MonthKey).Count < 4)
             {
-                if (BuildPeriods(_hourlyBars, MonthKey).Count >= 4)
-                    return;
-
                 if (_hourlyBars.LoadMoreHistory() == 0)
                     return;
             }

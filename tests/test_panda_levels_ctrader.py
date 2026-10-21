@@ -14,6 +14,7 @@ class PandaLevelsCTraderTests(unittest.TestCase):
 
     def test_indicator_is_parameter_free_and_informational(self):
         self.assertIn("class PandaLevels", self.text)
+        self.assertIn('[Indicator("Panda Levels"', self.text)
         self.assertIn("AccessRights = AccessRights.None", self.text)
         self.assertNotIn("[Parameter(", self.text)
         for trading_api in (
@@ -56,6 +57,10 @@ class PandaLevelsCTraderTests(unittest.TestCase):
         self.assertIn("_dailyBars.HighPrices[previous]", self.text)
         self.assertIn("_dailyBars.LowPrices[previous]", self.text)
         self.assertIn("LineStyle.Dots", self.text)
+
+    def test_history_loading_continues_until_boxes_are_ready_or_server_is_exhausted(self):
+        self.assertIn("while (BuildPeriods(_hourlyBars, MonthKey).Count < 4)", self.text)
+        self.assertNotIn("attempt < 20", self.text)
 
 
 if __name__ == "__main__":

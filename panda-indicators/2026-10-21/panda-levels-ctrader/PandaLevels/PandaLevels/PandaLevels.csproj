@@ -6,6 +6,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../Panda Levels.cs" Link="Panda Levels.cs" />
-    <PackageReference Include="cTrader.Automate" Version="1.*" />
+    <PackageReference Include="cTrader.Automate" Version="1.0.17" />
   </ItemGroup>
 </Project>
