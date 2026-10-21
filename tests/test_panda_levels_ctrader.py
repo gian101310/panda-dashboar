@@ -58,11 +58,14 @@ class PandaLevelsCTraderTests(unittest.TestCase):
 
     def test_previous_period_levels_span_the_chart_and_use_completed_periods(self):
         self.assertIn("DrawPreviousPeriodLevels", self.text)
-        self.assertIn("YearKey", self.text)
-        self.assertIn("periods[periods.Count - 2]", self.text)
+        self.assertIn("MarketData.GetBars(TimeFrame.Weekly", self.text)
+        self.assertIn("MarketData.GetBars(TimeFrame.Monthly", self.text)
+        self.assertIn("higherTimeframeBars.Count - 2", self.text)
+        self.assertIn("Server.Time.Year - 1", self.text)
         self.assertIn("Chart.DrawHorizontalLine", self.text)
         self.assertIn("LineStyle.Dots", self.text)
         self.assertNotIn("Chart.DrawTrendLine(prefix + \".Line\"", self.text)
+        self.assertNotIn('prefix + ".Zone"', self.text)
 
     def test_history_loading_continues_until_boxes_are_ready_or_server_is_exhausted(self):
         self.assertIn("while (BuildPeriods(_hourlyBars, MonthKey).Count < 4)", self.text)

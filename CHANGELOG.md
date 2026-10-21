@@ -6,7 +6,8 @@
   short/day, medium/week, and long/month Panda Boxes plus previous day, week,
   month, and year high/low levels (`PDH` / `PDL`, `PWH` / `PWL`, `PMH` / `PML`,
   and `PYH` / `PYL`).
-- All level lines span the full chart and place fixed labels at the latest bar.
+- All level lines span the full chart without shaded S/R zones and use the
+  proven Panda Lines v2 daily, weekly, monthly, and previous-year calculations.
   All periods, colors, opacity, and UTC boundaries
   are fixed internally. The indicator has no Panda Lines, signals, scoring,
   panel, alerts, network access, licensing, or trading actions.

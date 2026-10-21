@@ -13,9 +13,9 @@ namespace cAlgo
         private static readonly Color MediumBoxColor = Color.FromArgb(255, 0, 200, 120);
         private static readonly Color LongBoxColor = Color.FromArgb(255, 70, 120, 255);
         private static readonly Color PreviousDayColor = Color.Orange;
-        private static readonly Color PreviousWeekColor = Color.LimeGreen;
-        private static readonly Color PreviousMonthColor = Color.DeepSkyBlue;
-        private static readonly Color PreviousYearColor = Color.Magenta;
+        private static readonly Color PreviousWeekColor = Color.DodgerBlue;
+        private static readonly Color PreviousMonthColor = Color.DarkViolet;
+        private static readonly Color PreviousYearColor = Color.Crimson;
 
         private sealed class PeriodRange
         {
@@ -32,6 +32,8 @@ namespace cAlgo
 
         private Bars _hourlyBars;
         private Bars _dailyBars;
+        private Bars _weeklyBars;
+        private Bars _monthlyBars;
         private DateTime _lastHourlyBarTime = DateTime.MinValue;
         private DateTime _lastDailyBarTime = DateTime.MinValue;
 
@@ -39,13 +41,15 @@ namespace cAlgo
         {
             _hourlyBars = MarketData.GetBars(TimeFrame.Hour, SymbolName);
             _dailyBars = MarketData.GetBars(TimeFrame.Daily, SymbolName);
+            _weeklyBars = MarketData.GetBars(TimeFrame.Weekly, SymbolName);
+            _monthlyBars = MarketData.GetBars(TimeFrame.Monthly, SymbolName);
             LoadRequiredHourlyHistory();
-            LoadRequiredDailyHistory();
         }
 
         public override void Calculate(int index)
         {
-            if (index != Bars.Count - 1 || _hourlyBars == null || _dailyBars == null)
+            if (index != Bars.Count - 1 || _hourlyBars == null || _dailyBars == null ||
+                _weeklyBars == null || _monthlyBars == null)
                 return;
 
             DateTime hourlyTime = _hourlyBars.Count > 0 ? _hourlyBars.LastBar.OpenTime : DateTime.MinValue;
@@ -67,18 +71,6 @@ namespace cAlgo
             while (BuildPeriods(_hourlyBars, MonthKey).Count < 4)
             {
                 if (_hourlyBars.LoadMoreHistory() == 0)
-                    return;
-            }
-        }
-
-        private void LoadRequiredDailyHistory()
-        {
-            if (_dailyBars == null)
-                return;
-
-            while (BuildPeriods(_dailyBars, YearKey).Count < 2)
-            {
-                if (_dailyBars.LoadMoreHistory() == 0)
                     return;
             }
         }
@@ -182,11 +174,6 @@ namespace cAlgo
             return new DateTime(time.Year, time.Month, 1);
         }
 
-        private static DateTime YearKey(DateTime time)
-        {
-            return new DateTime(time.Year, 1, 1);
-        }
-
         private void DrawBox(string label, DateTime start, double high, DateTime end, double low, Color color)
         {
             string prefix = ObjectPrefix + "Box." + label;
@@ -209,39 +196,90 @@ namespace cAlgo
 
         private void DrawPreviousPeriodLevels()
         {
-            DrawPreviousPeriodPair(BuildPeriods(_dailyBars, DayKey), "PDH", "PDL", PreviousDayColor);
-            DrawPreviousPeriodPair(BuildPeriods(_dailyBars, WeekKey), "PWH", "PWL", PreviousWeekColor);
-            DrawPreviousPeriodPair(BuildPeriods(_dailyBars, MonthKey), "PMH", "PML", PreviousMonthColor);
-            DrawPreviousPeriodPair(BuildPeriods(_dailyBars, YearKey), "PYH", "PYL", PreviousYearColor);
+            int index = Bars.Count - 1;
+            DateTime timeRight = Bars.OpenTimes[index].AddSeconds(EstimateBarSeconds(index) * 50.0);
+
+            DrawPreviousPeriodPair(_dailyBars, "PDH", "PDL", PreviousDayColor, timeRight);
+            DrawPreviousPeriodPair(_weeklyBars, "PWH", "PWL", PreviousWeekColor, timeRight);
+            DrawPreviousPeriodPair(_monthlyBars, "PMH", "PML", PreviousMonthColor, timeRight);
+
+            double previousYearHigh;
+            double previousYearLow;
+            GetPreviousYearHighLow(out previousYearHigh, out previousYearLow);
+            if (previousYearHigh > 0.0 && previousYearLow > 0.0)
+            {
+                DrawPreviousPeriodLevel("PYH", previousYearHigh, PreviousYearColor, timeRight);
+                DrawPreviousPeriodLevel("PYL", previousYearLow, PreviousYearColor, timeRight);
+            }
+            else
+            {
+                RemovePreviousPeriodLevel("PYH");
+                RemovePreviousPeriodLevel("PYL");
+            }
         }
 
-        private void DrawPreviousPeriodPair(List<PeriodRange> periods, string highLabel, string lowLabel, Color color)
+        private void DrawPreviousPeriodPair(Bars higherTimeframeBars, string highLabel, string lowLabel,
+            Color color, DateTime timeRight)
         {
-            if (periods.Count < 2)
+            if (higherTimeframeBars == null || higherTimeframeBars.Count < 2)
             {
                 RemovePreviousPeriodLevel(highLabel);
                 RemovePreviousPeriodLevel(lowLabel);
                 return;
             }
 
-            PeriodRange previous = periods[periods.Count - 2];
-            DrawPreviousPeriodLevel(highLabel, previous.High, color);
-            DrawPreviousPeriodLevel(lowLabel, previous.Low, color);
+            int previousCompletedIndex = higherTimeframeBars.Count - 2;
+            double high = higherTimeframeBars.HighPrices[previousCompletedIndex];
+            double low = higherTimeframeBars.LowPrices[previousCompletedIndex];
+            if (high > 0.0 && low > 0.0)
+            {
+                DrawPreviousPeriodLevel(highLabel, high, color, timeRight);
+                DrawPreviousPeriodLevel(lowLabel, low, color, timeRight);
+            }
         }
 
-        private void DrawPreviousPeriodLevel(string label, double level, Color color)
+        private void DrawPreviousPeriodLevel(string label, double level, Color color, DateTime timeRight)
         {
             string prefix = ObjectPrefix + "Level." + label;
-            Color lineColor = Color.FromArgb(210, color.R, color.G, color.B);
+            Color lineColor = Color.FromArgb(190, color.R, color.G, color.B);
 
             var line = Chart.DrawHorizontalLine(prefix + ".Line", level, lineColor, 1, LineStyle.Dots);
             line.IsInteractive = false;
 
             var text = Chart.DrawText(prefix + ".Text", label + "  " + level.ToString("F" + Symbol.Digits),
-                Bars.OpenTimes[Bars.Count - 1], level, color);
-            text.HorizontalAlignment = HorizontalAlignment.Left;
-            text.VerticalAlignment = VerticalAlignment.Center;
+                timeRight, level, color);
             text.IsInteractive = false;
+        }
+
+        private void GetPreviousYearHighLow(out double yearHigh, out double yearLow)
+        {
+            yearHigh = 0.0;
+            yearLow = double.MaxValue;
+            int previousYear = Server.Time.Year - 1;
+
+            for (int index = 0; index < _monthlyBars.Count; index++)
+            {
+                if (_monthlyBars.OpenTimes[index].Year != previousYear)
+                    continue;
+
+                yearHigh = Math.Max(yearHigh, _monthlyBars.HighPrices[index]);
+                yearLow = Math.Min(yearLow, _monthlyBars.LowPrices[index]);
+            }
+
+            if (yearLow == double.MaxValue)
+            {
+                yearHigh = 0.0;
+                yearLow = 0.0;
+            }
+        }
+
+        private double EstimateBarSeconds(int index)
+        {
+            if (index <= 0)
+                return 60.0;
+
+            double seconds = (Bars.OpenTimes[index] - Bars.OpenTimes[index - 1]).TotalSeconds;
+            return seconds > 0.0 ? seconds : 60.0;
         }
 
         private void RemovePreviousPeriodLevel(string label)
