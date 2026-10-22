@@ -1285,11 +1285,37 @@ function ScoreTfBadge({ row, showLabel = true, mt = 2, showEmpty = false }) {
   );
 }
 
+function nearbyPreviousLevel(row) {
+  const price = Number(row?.pl_price);
+  if (!Number.isFinite(price) || price <= 0) return null;
+  const pip = row.symbol?.includes('JPY') ? 0.01 : 0.0001;
+  const support = [], resistance = [];
+  for (const [name, raw] of [['PDH',row.pdh],['PDL',row.pdl],['PWH',row.pwh],['PWL',row.pwl]]) {
+    if (raw == null || raw === '') continue;
+    const level = Number(raw);
+    if (!Number.isFinite(level) || level <= 0) continue;
+    const distance = Math.abs(level - price) / pip;
+    if (distance > 30) continue;
+    if (level <= price) support.push({name,distance});
+    if (level >= price) resistance.push({name,distance});
+  }
+  support.sort((a,b) => a.distance - b.distance);
+  resistance.sort((a,b) => a.distance - b.distance);
+  if (support.length && resistance.length) return {label:'BETWEEN SUPPORT & RESISTANCE',color:'#ffd166'};
+  const levels = support.length ? support : resistance;
+  if (!levels.length) return null;
+  const stack = levels.length > 1 && levels[1].distance - levels[0].distance <= 10;
+  const side = support.length ? 'SUPPORT' : 'RESISTANCE';
+  const names = levels.slice(0,stack?2:1).map(level => level.name).join(' + ');
+  return {label:`${stack?'STACKED':'NEAR'} ${side} (${names})`,color:support.length?'#00b4ff':'#ffaa44'};
+}
+
 function PairCard({ row, trend, cotBias, confidence, memoryIndex, pdr, newsAlert }) {
   const gap=row.gap??0,valid=isValid(gap)&&!row.hard_invalid&&!isNeutralMatchup(row),bias=biasFromGap(gap),sig=signalLabel(row.signal,row.strength),strVal=row.strength??0,sc=stateColor(row.state),t=trend||{};
   const sparkColor=t.trend1h==='STRONGER'?'#00ff9f':t.trend1h==='WEAKER'?'#ff4d6d':'var(--text-muted)';
   const momIcons={BUILDING:'🚀',EMERGING:'📈',FADING:'📉',COOLING:'🌡️',REVERSAL:'⚠️',NEUTRAL:'▬',SPARK:'⚡',STRONG:'🔥',STABLE:'▬',CONSOLIDATING:'🔵',REVERSING:'⚠️'};
   const gapTrend=(row.delta_short??0)>0.5?'STRONGER':(row.delta_short??0)<-0.5?'WEAKER':'STABLE';
+  const nearby = nearbyPreviousLevel(row);
   if(!valid) return (
     <div style={{background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:10,padding:'12px 14px',display:'flex',flexDirection:'column',gap:7,height:'100%',boxSizing:'border-box',flex:1}}>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}><span style={{fontFamily:orb,fontSize:12,fontWeight:700,letterSpacing:2,color:'var(--text-secondary)'}}>{row.symbol}</span><span style={{fontFamily:mono,fontSize:9,color:'var(--bg-card)',background:'var(--text-muted)',border:'1px solid var(--border)',borderRadius:4,padding:'2px 7px'}}>WAIT</span></div>
@@ -1301,6 +1327,7 @@ function PairCard({ row, trend, cotBias, confidence, memoryIndex, pdr, newsAlert
       <div style={{position:'absolute',top:0,left:0,right:0,height:2,background:`linear-gradient(90deg,transparent,${t.closeAlert?'#ff4d6d':bias.color}88,transparent)`}}/>
       {t.closeAlert&&<div style={{background:'rgba(255,77,109,0.1)',border:'1px solid rgba(255,77,109,0.4)',borderRadius:5,padding:'4px 8px',display:'flex',alignItems:'center',gap:5}}><span>⚠️</span><span style={{fontFamily:mono,fontSize:9,color:'#ff4d6d',letterSpacing:1}}>CONSIDER CLOSING</span></div>}
       {newsAlert&&<div style={{background:'rgba(255,209,102,0.08)',border:'1px solid rgba(255,209,102,0.35)',borderRadius:5,padding:'3px 8px',display:'flex',alignItems:'center',gap:5}}><span style={{fontSize:10}}>📰</span><span style={{fontFamily:mono,fontSize:9,color:'#ffd166',letterSpacing:1,fontWeight:700}}>HIGH IMPACT NEWS</span></div>}
+      {nearby&&<div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>LEVEL</span><span style={{fontFamily:mono,fontSize:9,color:nearby.color,background:nearby.color+'18',border:`1px solid ${nearby.color}35`,borderRadius:4,padding:'2px 7px',fontWeight:700}}>{nearby.label}</span></div>}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}><span style={{fontFamily:orb,fontSize:13,fontWeight:900,letterSpacing:2,color:'var(--text-primary)'}}>{row.symbol}</span><div style={{display:'flex',alignItems:'center',gap:5}}><span style={{fontSize:12}}>{sig.icon}</span><span style={{fontFamily:mono,fontSize:10,color:bias.color,background:bias.bg,border:`1px solid ${bias.border}`,borderRadius:4,padding:'2px 7px',fontWeight:700}}>{bias.label}</span></div></div>
       <VerdictBanner row={row} pdr={pdr} t={t}/>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
@@ -1742,30 +1769,6 @@ function ValidSetupsTab({ data, trends, cotMap, confidenceMap }) {
 }
 // ===== VALID PAIRS TAB — ITP + PBP classification =====
 function ValidPairsTab({ data, trends, cotMap, confidenceMap }) {
-  const nearbyLevel = row => {
-    const price = Number(row.pl_price);
-    if (!Number.isFinite(price) || price <= 0) return null;
-    const pip = row.symbol?.includes('JPY') ? 0.01 : 0.0001;
-    const support = [], resistance = [];
-    for (const [name, raw] of [['PDH',row.pdh],['PDL',row.pdl],['PWH',row.pwh],['PWL',row.pwl]]) {
-      if (raw == null || raw === '') continue;
-      const level = Number(raw);
-      if (!Number.isFinite(level) || level <= 0) continue;
-      const distance = Math.abs(level - price) / pip;
-      if (distance > 30) continue;
-      if (level <= price) support.push({name,distance});
-      if (level >= price) resistance.push({name,distance});
-    }
-    support.sort((a,b) => a.distance - b.distance);
-    resistance.sort((a,b) => a.distance - b.distance);
-    if (support.length && resistance.length) return {label:'BETWEEN SUPPORT & RESISTANCE',color:'#ffd166'};
-    const levels = support.length ? support : resistance;
-    if (!levels.length) return null;
-    const stack = levels.length > 1 && levels[1].distance - levels[0].distance <= 10;
-    const side = support.length ? 'SUPPORT' : 'RESISTANCE';
-    const names = levels.slice(0,stack?2:1).map(level => level.name).join(' + ');
-    return {label:`${stack?'STACKED':'NEAR'} ${side} (${names})`,color:support.length?'#00b4ff':'#ffaa44'};
-  };
   // Classify pairs into ITP (Intraday Play) and PBP (Pullback Play)
   const itp = [];
   const pbp = [];
@@ -1819,7 +1822,7 @@ function ValidPairsTab({ data, trends, cotMap, confidenceMap }) {
     const playColor = playType === 'ITP' ? '#00ff9f' : '#00b4ff';
     const playBg = playType === 'ITP' ? 'rgba(0,255,159,0.08)' : 'rgba(0,180,255,0.08)';
     const playBorder = playType === 'ITP' ? 'rgba(0,255,159,0.30)' : 'rgba(0,180,255,0.30)';
-    const nearby = nearbyLevel(row);
+    const nearby = nearbyPreviousLevel(row);
     return (
       <div key={row.symbol} style={{background:'var(--bg-card)',border:`2px solid ${bias.border}`,borderRadius:10,padding:'14px 18px',display:'flex',alignItems:'center',gap:16,position:'relative',overflow:'hidden',boxShadow:`0 0 16px ${bias.color}15`}}>
         <div style={{position:'absolute',top:0,left:0,right:0,height:3,background:`linear-gradient(90deg,transparent,${bias.color},transparent)`}}/>
@@ -2900,6 +2903,7 @@ function OvCurrencyChart({ data }) {
 
 function OvSignalCard({ pair, tier, onClick, delay }) {
   const [hov,setHov]=useState(false);
+  const nearby=['BUY','SELL'].includes(pair.bias)&&!pair.hard_invalid?nearbyPreviousLevel(pair):null;
   const bc=pair.bias==='BUY'?OV_COLORS.buy:pair.bias==='SELL'?OV_COLORS.sell:OV_COLORS.textMuted;
   const isH=tier==='HIGH',isL=tier==='LOW';
   const tags=[];
@@ -2929,6 +2933,7 @@ function OvSignalCard({ pair, tier, onClick, delay }) {
       </div>
       <span style={{fontFamily:orb,fontSize:isH?28:isL?14:20,fontWeight:900,color:bc,textShadow:`0 0 ${isH?20:14}px ${bc}66`}}>{pair.gap>0?'+':''}{Number(pair.gap).toFixed(1)}</span>
     </div>
+    {nearby&&<div style={{display:'flex',alignItems:'center',gap:5,marginBottom:isL?4:8,flexWrap:'wrap'}}><span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted,letterSpacing:1}}>LEVEL</span><span style={{fontFamily:mono,fontSize:isL?8:9,color:nearby.color,background:nearby.color+'18',border:`1px solid ${nearby.color}35`,borderRadius:4,padding:'2px 7px',fontWeight:700}}>{nearby.label}</span></div>}
     {/* Metrics row */}
     {!isL&&<div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:8}}>
       <span style={{fontFamily:mono,fontSize:10,padding:'3px 8px',borderRadius:4,color:pair.conf>=70?OV_COLORS.buy:pair.conf>=50?OV_COLORS.warn:OV_COLORS.textMuted,background:pair.conf>=70?OV_COLORS.buyDim:pair.conf>=50?OV_COLORS.warnDim:'rgba(255,255,255,0.04)',border:`1px solid ${pair.conf>=70?OV_COLORS.buy+'30':pair.conf>=50?OV_COLORS.warn+'30':OV_COLORS.border}`}}>{pair.conf}%</span>
