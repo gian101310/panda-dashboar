@@ -23,6 +23,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 import html
+import math
 import os
 import re
 import requests
@@ -1770,14 +1771,17 @@ def run_gap_once():
         # ---- Gap Alert: abs(gap) 9–12 + valid Panda Lines ----
         _abs_gap = abs(gap)
         _pl_zone = pl_data.get("pl_zone")
+        _pl_status = panda_lines_status(_pl_zone, pl_data.get("pl_price"),
+                                        pl_data.get("pl_st"), pl_data.get("pl_fl"), symbol)
         _panda_valid = (
-            _pl_zone is not None and
-            ((gap > 0 and _pl_zone == "ABOVE") or (gap < 0 and _pl_zone == "BELOW"))
+            (gap > 0 and _pl_status == "BELOW") or
+            (gap < 0 and _pl_status == "ABOVE")
         )
         if signal_ready and pl_ready_map[symbol] and 9 <= _abs_gap <= 12 and _panda_valid:
             gap_alerts.append({
                 "symbol": symbol, "gap": gap, "bias": bias,
-                "pl_zone": _pl_zone, "execution": execution, "confidence": confidence,
+                "pl_zone": _pl_zone, "pl_status": _pl_status,
+                "execution": execution, "confidence": confidence,
             })
 
         gap_deltas[symbol] = round(gap - PREV_GAP.get(symbol, gap), 2)
@@ -2172,8 +2176,9 @@ def verdict_action_word(row, c):
     gap = row.get("gap") or 0
     ag = abs(gap)
     direction = "BUY" if gap > 0 else "SELL"
-    zone = (row.get("pl_zone") or "").upper()
-    pl_valid = (direction == "BUY" and zone == "ABOVE") or (direction == "SELL" and zone == "BELOW")
+    status = panda_lines_status(row.get("pl_zone"), row.get("pl_price"), row.get("pl_st"),
+                                row.get("pl_fl"), row.get("symbol"))
+    pl_valid = (direction == "BUY" and status == "BELOW") or (direction == "SELL" and status == "ABOVE")
     if ag >= 9 and pl_valid:
         return "EXECUTE"
     if in_pullback_zone_now(row):
@@ -2216,8 +2221,7 @@ def send_phase_digest(dashboard_rows, excluded_symbols, cycle_at, level_assessme
         if not c:
             continue
         tag = f"{r.get('symbol')} {c['dir']} {c['gap']:+.0f}"
-        if r.get("pl_zone") in ("ABOVE", "BELOW", "BETWEEN"):
-            tag += f" PL {panda_lines_position(r['pl_zone'])}"
+        tag += f" PL {panda_lines_status(r.get('pl_zone'), r.get('pl_price'), r.get('pl_st'), r.get('pl_fl'), r.get('symbol'))}"
         level = (level_assessments or {}).get(r.get("symbol")) or {}
         if level.get("priority") == "LOW PRIORITY":
             tag += " [LOW PRIORITY: LEVELS]"
@@ -2351,6 +2355,30 @@ def maybe_run_nightly_analyst(now):
 
 
 # ================= SNAPSHOT GENERATOR =================
+PL_DISPLAY_BUFFER_PIPS = 10.0
+
+
+def panda_lines_status(zone, price, st, fl, symbol):
+    """Confirmed line position after a 10-pip clearance from both lines."""
+    if zone == "BETWEEN":
+        return "BETWEEN"
+    if zone not in ("ABOVE", "BELOW"):
+        return "UNVERIFIED"
+    try:
+        price, st, fl = float(price), float(st), float(fl)
+    except (TypeError, ValueError):
+        return "UNVERIFIED"
+    if not all(math.isfinite(v) and v > 0 for v in (price, st, fl)):
+        return "UNVERIFIED"
+    pip = 0.01 if "JPY" in (symbol or "").upper() else 0.0001
+    clearance = PL_DISPLAY_BUFFER_PIPS * pip
+    if zone == "ABOVE" and price > max(st, fl):
+        return "BELOW" if price - max(st, fl) + 1e-10 >= clearance else "NEAR"
+    if zone == "BELOW" and price < min(st, fl):
+        return "ABOVE" if min(st, fl) - price + 1e-10 >= clearance else "NEAR"
+    return "BETWEEN" if min(st, fl) <= price <= max(st, fl) else "UNVERIFIED"
+
+
 def panda_lines_position(zone):
     """Display line position relative to price; stored zone describes price relative to lines."""
     return {"ABOVE": "BELOW", "BELOW": "ABOVE"}.get(zone, zone or "-")
@@ -2573,8 +2601,10 @@ def generate_snapshot(pair_data):
                   fill=tc, font=font_data)
         draw.text((x + 800, box_y), f"PDR {p.get('pdr', '-')}",
                   fill=tc, font=font_data)
-        draw.text((x + BOTTOM_OFFSETS["fl_st"], metrics_y), f"PL {panda_lines_position(p.get('pl_zone'))}",
-                  fill=tc, font=font_data)
+        pl_label = p.get("pl_status") or "UNVERIFIED"
+        pl_color = C_YELLOW if pl_label in ("NEAR", "BETWEEN") else C_WHITE if pl_label == "UNVERIFIED" else tc
+        draw.text((x + BOTTOM_OFFSETS["fl_st"], metrics_y), f"PL {'N/A' if pl_label == 'UNVERIFIED' else pl_label}",
+                  fill=pl_color, font=font_data)
         _act = p.get("action", "")
         if _act:
             draw.text((x + 380, metrics_y), _act, fill=tc, font=font_data)
@@ -3134,6 +3164,8 @@ def send_snapshot():
             gap        = r.get("gap", 0)
             hard_inv   = r.get("hard_invalid", False)
             pl_zone_v  = r.get("pl_zone") or "-"
+            pl_status_v = panda_lines_status(pl_zone_v, r.get("pl_price"), r.get("pl_st"),
+                                             r.get("pl_fl"), symbol)
             base_d1  = r.get("base_d1") or 0
             base_h4  = r.get("base_h4") or 0
             base_h1  = r.get("base_h1") or 0
@@ -3228,6 +3260,7 @@ def send_snapshot():
                 "bias": bias_val,
                 "box_badge": box_badge,
                 "pl_zone": pl_zone_v,
+                "pl_status": pl_status_v,
                 "pdr": pdr_display,
                 "action": action_word,
                 "score": conf_display,
@@ -3349,7 +3382,7 @@ def check_structure_alerts(pair, pl, cycle_at, ready):
         if ready and prev in ("ABOVE", "BELOW") and prev != zone:
             direction = "BULLISH" if zone == "ABOVE" else "BEARISH"
             candidates.append({"symbol": pair, "alert_type": "structure", "cycle_at": cycle_at,
-                               "detail": f"PL FLIP: PL {panda_lines_position(prev)} → PL {panda_lines_position(zone)} ({direction})",
+                               "detail": f"Panda Lines FLIP ({direction}); PL {panda_lines_status(zone, pl.get('pl_price'), pl.get('pl_st'), pl.get('pl_fl'), pair)} now",
                                "event_id": f"flip:{prev}:{zone}:{cycle_at}", "state_zone": zone,
                                "bias": "BUY" if zone == "ABOVE" else "SELL"})
         else:
@@ -3382,9 +3415,12 @@ def dispatch_signal_candidates(cycle_at, structure, gaps, early, spikes, gold,
     """Queue one prioritized event per pair; the outbox groups pairs on delivery."""
     candidates = list(structure)
     for item in gaps:
+        pl = (pl_map or {}).get(item["symbol"]) or {}
+        status = item.get("pl_status") or panda_lines_status(item.get("pl_zone"), pl.get("pl_price"),
+                                                              pl.get("pl_st"), pl.get("pl_fl"), item["symbol"])
         candidates.append({"symbol": item["symbol"], "alert_type": "gap_zone",
                            "cycle_at": cycle_at, "gap": item["gap"], "bias": item["bias"],
-                           "detail": f"PL {panda_lines_position(item['pl_zone'])} confirms gap zone"})
+                           "detail": f"PL {status} confirms gap zone" if status in ("BELOW", "ABOVE") else f"PL {status}; buffer unconfirmed"})
     for item in early:
         candidates.append({"symbol": item["symbol"], "alert_type": "early_entry",
                            "cycle_at": cycle_at, "gap": item["gap"], "bias": item["bias"],
@@ -4162,7 +4198,8 @@ def build_ai_snapshot_fallback(active, session):
         bias = p.get("bias", "WAIT")
         gap = p.get("gap") or 0
         momentum = p.get("momentum") or "UNKNOWN"
-        pl_zone = panda_lines_position(p.get("pl_zone"))
+        pl_zone = panda_lines_status(p.get("pl_zone"), p.get("pl_price"), p.get("pl_st"),
+                                     p.get("pl_fl"), symbol)
         top_pairs.append(f"{symbol} {bias} ({abs(gap):.1f} gap, {momentum}, PL {pl_zone})")
 
     return (
@@ -4187,7 +4224,7 @@ def send_ai_snapshot():
     try:
         # Fetch current dashboard data
         res = supabase.table("dashboard").select(
-            "symbol, gap, bias, momentum, pl_zone, confidence, box_h1_trend, box_h4_trend"
+            "symbol, gap, bias, momentum, pl_zone, pl_price, pl_st, pl_fl, confidence, box_h1_trend, box_h4_trend"
         ).execute()
         pairs = res.data or []
         if not pairs:

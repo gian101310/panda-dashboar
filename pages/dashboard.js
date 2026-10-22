@@ -199,8 +199,8 @@ function computeVerdict(row, pdr, t) {
   if ((t && t.closeAlert) || label.includes('AT RISK')) return { icon: '🔴', txt: 'CLOSE / PROTECT', hint: 'Trend is at risk. No new entries — protect any open trade.', c: '#ff4d6d' };
   if (label.includes('LATE') || label.includes('EXTENDED')) return { icon: '🟠', txt: `${dir} VALID — TOO LATE, WAIT FOR PULLBACK`, hint: 'Bias is valid but the move is mature or the daily range is spent. No market entry — only a pullback re-entry.', c: '#ffaa44' };
 
-  const zone = (row?.pl_zone || '').toUpperCase();
-  const plValid = (dir === 'BUY' && zone === 'ABOVE') || (dir === 'SELL' && zone === 'BELOW');
+  const plStatus = plBufferedStatus(row);
+  const plValid = (dir === 'BUY' && plStatus === 'BELOW') || (dir === 'SELL' && plStatus === 'ABOVE');
   const z = isPullbackZoneNow(row, dir);
 
   // RULE 1 — market execution
@@ -383,19 +383,35 @@ function boxConfirm(bias, h4Trend, h1Trend) {
 // BUY  valid = Panda Lines BELOW price
 // SELL valid = Panda Lines ABOVE price
 // BETWEEN   = not valid for intra game
-function plLinesPosition(zone) {
-  return zone === 'ABOVE' ? 'BELOW' : zone === 'BELOW' ? 'ABOVE' : zone || '—';
+const PL_BUFFER_PIPS = 10;
+function plBufferedStatus(row) {
+  const zone = row?.pl_zone;
+  if (zone === 'BETWEEN') return 'BETWEEN';
+  if (zone !== 'ABOVE' && zone !== 'BELOW') return 'UNVERIFIED';
+  const price = Number(row?.pl_price), st = Number(row?.pl_st), fl = Number(row?.pl_fl);
+  if (![price, st, fl].every(v => Number.isFinite(v) && v > 0)) return 'UNVERIFIED';
+  const pip = String(row?.symbol || '').toUpperCase().includes('JPY') ? 0.01 : 0.0001;
+  const buffer = PL_BUFFER_PIPS * pip;
+  if (zone === 'ABOVE' && price > Math.max(st, fl))
+    return price - Math.max(st, fl) + 1e-10 >= buffer ? 'BELOW' : 'NEAR';
+  if (zone === 'BELOW' && price < Math.min(st, fl))
+    return Math.min(st, fl) - price + 1e-10 >= buffer ? 'ABOVE' : 'NEAR';
+  return price >= Math.min(st, fl) && price <= Math.max(st, fl) ? 'BETWEEN' : 'UNVERIFIED';
 }
 function plZoneBadge(zone, bias) {
-  if (!zone) return null;
+  return { valid: (bias === 'BUY' && zone === 'ABOVE') || (bias === 'SELL' && zone === 'BELOW') };
+}
+function plDisplayBadge(row, bias) {
+  const status = plBufferedStatus(row);
   const isBuy  = bias === 'BUY';
   const isSell = bias === 'SELL';
-  if (zone === 'ABOVE')   return isBuy  ? { label:'🟢 PL BELOW', color:'#00ff9f', bg:'rgba(0,255,159,0.10)',  border:'rgba(0,255,159,0.35)',  valid:true  }
+  if (status === 'BELOW') return isBuy  ? { label:'🟢 PL BELOW', color:'#00ff9f', bg:'rgba(0,255,159,0.10)',  border:'rgba(0,255,159,0.35)',  valid:true  }
                                         : { label:'⬇️ PL BELOW', color:'#ffd166', bg:'rgba(255,209,102,0.10)', border:'rgba(255,209,102,0.35)', valid:false };
-  if (zone === 'BELOW')   return isSell ? { label:'🔴 PL ABOVE', color:'#ff4d6d', bg:'rgba(255,77,109,0.10)',  border:'rgba(255,77,109,0.35)',  valid:true  }
+  if (status === 'ABOVE') return isSell ? { label:'🔴 PL ABOVE', color:'#ff4d6d', bg:'rgba(255,77,109,0.10)',  border:'rgba(255,77,109,0.35)',  valid:true  }
                                         : { label:'⬆️ PL ABOVE', color:'#ffd166', bg:'rgba(255,209,102,0.10)', border:'rgba(255,209,102,0.35)', valid:false };
-  if (zone === 'BETWEEN') return         { label:'↔️ BETWEEN',      color:'#ffaa44', bg:'rgba(255,170,68,0.10)',  border:'rgba(255,170,68,0.35)',  valid:false };
-  return null;
+  if (status === 'NEAR') return { label:'🟡 PL NEAR', color:'#ffd166', bg:'rgba(255,209,102,0.10)', border:'rgba(255,209,102,0.35)', valid:false };
+  if (status === 'BETWEEN') return { label:'↔️ PL BETWEEN', color:'#ffaa44', bg:'rgba(255,170,68,0.10)', border:'rgba(255,170,68,0.35)', valid:false };
+  return { label:'PL UNVERIFIED', color:'#ffd166', bg:'rgba(255,209,102,0.10)', border:'rgba(255,209,102,0.35)', valid:false };
 }
 
 function atrFill(atrPoints, currentPrice, entryPrice) {
@@ -1298,7 +1314,7 @@ function PairCard({ row, trend, cotBias, confidence, memoryIndex, pdr, newsAlert
       {(()=>{const mu=getMatchup(row);if(!mu)return null;return(<div style={{display:'flex',alignItems:'center',gap:6,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>MATCHUP</span><span style={{fontFamily:mono,fontSize:9,color:mu.color,background:mu.color+'12',border:`1px solid ${mu.color}30`,borderRadius:4,padding:'1px 7px',whiteSpace:'nowrap'}}>{mu.label}</span>{mu.note==='IDEAL'&&<span style={{fontFamily:mono,fontSize:7,color:mu.color,letterSpacing:1,opacity:0.8}}>IDEAL</span>}{mu.note==='AVOID'&&<span style={{fontFamily:mono,fontSize:7,color:'#ffaa44',letterSpacing:1,opacity:0.8}}>AVOID</span>}</div>);})()}
       <ScoreTfBadge row={row}/>
       {(()=>{const bh1=boxTrend(row.box_h1_trend),bh4=boxTrend(row.box_h4_trend);if(!bh1&&!bh4)return null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>BOX</span>{bh4&&<span style={{fontFamily:mono,fontSize:8,color:bh4.color,background:bh4.bg,border:`1px solid ${bh4.border}`,borderRadius:3,padding:'1px 6px'}}>H4 {bh4.label}</span>}{bh1&&<span style={{fontFamily:mono,fontSize:8,color:bh1.color,background:bh1.bg,border:`1px solid ${bh1.border}`,borderRadius:3,padding:'1px 6px'}}>H1 {bh1.label}</span>}</div>);})()}
-      {(()=>{ const pl=plZoneBadge(row.pl_zone,row.bias); if(!pl)return null; const plTip=pl.valid?'Panda Lines confirmed: Panda Lines agree with gap direction. This is the price confirmation layer.':'Panda Lines not confirmed: price structure does not yet agree with gap direction. Wait for alignment or use as additional caution.'; return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>PL</span><span title={plTip} style={{fontFamily:mono,fontSize:8,color:pl.color,background:pl.bg,border:`1px solid ${pl.border}`,borderRadius:3,padding:'1px 6px',fontWeight:700,cursor:'help'}}>{pl.label}</span>{pl.valid&&<span style={{fontFamily:mono,fontSize:7,color:'#00ff9f',letterSpacing:1}}>✅</span>}{!pl.valid&&<span style={{fontFamily:mono,fontSize:7,color:'#ff7744',letterSpacing:1}}>⛔</span>}</div>);})()}{(()=>{
+      {(()=>{ const pl=plDisplayBadge(row,row.bias); if(!pl)return null; const plTip=pl.valid?'Panda Lines confirmed: Panda Lines agree with gap direction. This is the price confirmation layer.':'Panda Lines not confirmed: price structure does not yet agree with gap direction. Wait for alignment or use as additional caution.'; return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>PL</span><span title={plTip} style={{fontFamily:mono,fontSize:8,color:pl.color,background:pl.bg,border:`1px solid ${pl.border}`,borderRadius:3,padding:'1px 6px',fontWeight:700,cursor:'help'}}>{pl.label}</span>{pl.valid&&<span style={{fontFamily:mono,fontSize:7,color:'#00ff9f',letterSpacing:1}}>✅</span>}{!pl.valid&&<span style={{fontFamily:mono,fontSize:7,color:'#ff7744',letterSpacing:1}}>⛔</span>}</div>);})()}{(()=>{
   const bc=boxConfirm(row.bias,row.box_h4_trend,row.box_h1_trend);
   const af=atrFill(row.atr);
   if(!bc&&!af)return null;
@@ -1428,7 +1444,7 @@ function PairCardModal({ row, trend, cotBias, onClose, isMobile, confidence, mem
         )}
 
         {/* PL Zone — CONTINUATIONday validity */}
-        {(()=>{ const pl = plZoneBadge(row.pl_zone, row.bias); if (!pl) return null; return (
+        {(()=>{ const pl = plDisplayBadge(row, row.bias); if (!pl) return null; return (
           <div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',background:'rgba(0,0,0,0.15)',borderRadius:8}}>
             <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)',letterSpacing:2}}>PL LINES</span>
             <span style={{fontFamily:mono,fontSize:10,color:pl.color,background:pl.bg,border:`1px solid ${pl.border}`,borderRadius:4,padding:'2px 10px',fontWeight:700}}>{pl.label}</span>
@@ -1679,7 +1695,7 @@ function ValidSetupsTab({ data, trends, cotMap, confidenceMap }) {
               {(()=>{const mu=getMatchup(row);if(!mu)return null;return(<div style={{fontFamily:mono,fontSize:9,color:mu.color,background:mu.color+'12',border:`1px solid ${mu.color}28`,borderRadius:4,padding:'2px 7px',display:'inline-block',marginTop:3,whiteSpace:'nowrap'}}>{mu.label}{mu.note&&<span style={{marginLeft:5,opacity:0.7,fontSize:8}}>{mu.note}</span>}</div>);})()}
               <ScoreTfBadge row={row}/>
               {(()=>{const bh4=boxTrend(row.box_h4_trend),bh1=boxTrend(row.box_h1_trend);if(!bh4&&!bh1)return null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>BOX</span>{bh4&&<span style={{fontFamily:mono,fontSize:8,color:bh4.color,background:bh4.bg,border:`1px solid ${bh4.border}`,borderRadius:3,padding:'1px 6px'}}>H4 {bh4.label}</span>}{bh1&&<span style={{fontFamily:mono,fontSize:8,color:bh1.color,background:bh1.bg,border:`1px solid ${bh1.border}`,borderRadius:3,padding:'1px 6px'}}>H1 {bh1.label}</span>}</div>);})()}
-              {(()=>{ const pl=plZoneBadge(row.pl_zone,row.bias); if(!pl)return null; return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>PL</span><span style={{fontFamily:mono,fontSize:9,color:pl.color,background:pl.bg,border:`1px solid ${pl.border}`,borderRadius:4,padding:'1px 8px',fontWeight:700}}>{pl.label}</span>{pl.valid&&<span style={{fontFamily:mono,fontSize:8,color:'#00ff9f',fontWeight:700}}>G1 ✅</span>}{!pl.valid&&<span style={{fontFamily:mono,fontSize:8,color:'#ff7744'}}>G1 ⛔</span>}</div>);})()}
+              {(()=>{ const pl=plDisplayBadge(row,row.bias); if(!pl)return null; return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>PL</span><span style={{fontFamily:mono,fontSize:9,color:pl.color,background:pl.bg,border:`1px solid ${pl.border}`,borderRadius:4,padding:'1px 8px',fontWeight:700}}>{pl.label}</span>{pl.valid&&<span style={{fontFamily:mono,fontSize:8,color:'#00ff9f',fontWeight:700}}>G1 ✅</span>}{!pl.valid&&<span style={{fontFamily:mono,fontSize:8,color:'#ff7744'}}>G1 ⛔</span>}</div>);})()}
               {(()=>{
                 const bc=boxConfirm(row.bias,row.box_h4_trend,row.box_h1_trend);
                 const af=atrFill(row.atr);
@@ -1737,8 +1753,8 @@ function ValidPairsTab({ data, trends, cotMap, confidenceMap }) {
     const biasDir = gap > 0 ? 'BUY' : gap < 0 ? 'SELL' : 'WAIT';
     if (biasDir === 'WAIT') return;
     if (r.hard_invalid || isNeutralMatchup(r)) return;
-    const zone = (r.pl_zone || '').toUpperCase();
-    const plValid = (biasDir === 'BUY' && zone === 'ABOVE') || (biasDir === 'SELL' && zone === 'BELOW');
+    const plStatus = plBufferedStatus(r);
+    const plValid = (biasDir === 'BUY' && plStatus === 'BELOW') || (biasDir === 'SELL' && plStatus === 'ABOVE');
     if (absGap >= 9 && plValid && conf >= 60) {
       itp.push(r);
     } else if (absGap >= 5 && absGap <= 8 && conf >= 50) {
@@ -1811,7 +1827,7 @@ function ValidPairsTab({ data, trends, cotMap, confidenceMap }) {
               {bconf&&<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:bconf.color,background:bconf.bg,border:`1px solid ${bconf.border}`,borderRadius:4,padding:'1px 7px',fontWeight:700,marginLeft:4}}>{bconf.label}</span>}
             </div>);
           })()}
-          {(()=>{ const pl=plZoneBadge(row.pl_zone,row.bias); if(!pl)return null; return(
+          {(()=>{ const pl=plDisplayBadge(row,row.bias); if(!pl)return null; return(
             <div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}>
               <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>PL</span>
               <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:pl.color,background:pl.bg,border:`1px solid ${pl.border}`,borderRadius:4,padding:'1px 8px',fontWeight:700}}>{pl.label}</span>
@@ -2269,7 +2285,7 @@ function ShadowTab() {
                   <td style={{...td,color:outC}}>{r.outcome||'—'}</td>
                   <td style={{...td,color:'var(--text-muted)'}}>{r.exit_reason||'—'}</td>
                   <td style={{...td,color:'var(--text-muted)'}}>{r.session||'—'}</td>
-                  <td style={{...td,color:'var(--text-muted)'}}>{r.pl_zone ? `PL ${plLinesPosition(r.pl_zone)}` : '—'}</td>
+                  <td style={{...td,color:'var(--text-muted)'}}>PL UNVERIFIED</td>
                   <td style={{...td,color:r.status==='PENDING'?'#00b4ff':'var(--text-muted)'}}>{r.status}</td>
                 </tr>
               );
@@ -2371,7 +2387,7 @@ function SignalLogTab() {
                   <td style={{padding:'6px',color:r.momentum==='STRONG'?'#00ff9f':r.momentum==='BUILDING'?'#00b4ff':'var(--text-muted)'}}>{r.momentum||'—'}</td>
                   <td style={{padding:'6px',color:'var(--text-muted)'}}>{r.state||'—'}</td>
                   <td style={{padding:'6px',fontWeight:700,color:r.strength>=2?'#00ff9f':r.strength>=1?'#ffd166':'var(--text-muted)'}}>{Number(r.strength||0).toFixed(1)}</td>
-                  <td style={{padding:'6px'}}>{r.pl_zone?<span style={{fontSize:9,color:r.pl_zone==='ABOVE'?'#00ff9f':r.pl_zone==='BELOW'?'#ff4d6d':'#ffd166'}}>PL {plLinesPosition(r.pl_zone)}</span>:'—'}</td>
+                  <td style={{padding:'6px'}}><span style={{fontSize:9,color:'#ffd166'}}>PL UNVERIFIED</span></td>
                   <td style={{padding:'6px',textAlign:'center'}}>{valid?<span style={{color:'#00ff9f'}}>✅</span>:<span style={{color:'var(--text-muted)'}}>⛔</span>}</td>
                 </tr>
               );
@@ -2900,7 +2916,7 @@ function OvSignalCard({ pair, tier, onClick, delay }) {
       {tags.map(t=><span key={t.label} style={{fontFamily:mono,fontSize:8,color:t.color,background:t.bg,border:`1px solid ${t.color}30`,borderRadius:3,padding:'2px 6px',letterSpacing:1}}>{t.label}</span>)}
     </div>}
     {hov&&!isL&&<div style={{marginTop:10,paddingTop:8,borderTop:`1px solid ${OV_COLORS.border}`,display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
-      {(()=>{const plv=pair.pl_zone==='ABOVE'&&pair.bias==='BUY'||pair.pl_zone==='BELOW'&&pair.bias==='SELL';const plc=plv?OV_COLORS.buy:'#ff7744';return <span style={{fontFamily:mono,fontSize:8,color:plc,background:plc+'12',border:`1px solid ${plc}30`,borderRadius:3,padding:'1px 6px'}}>PL {plLinesPosition(pair.pl_zone)} {plv?'✅':'⛔'}</span>;})()}
+      {(()=>{const status=plBufferedStatus(pair);const plv=status==='BELOW'&&pair.bias==='BUY'||status==='ABOVE'&&pair.bias==='SELL';const plc=plv?OV_COLORS.buy:'#ff7744';return <span style={{fontFamily:mono,fontSize:8,color:plc,background:plc+'12',border:`1px solid ${plc}30`,borderRadius:3,padding:'1px 6px'}}>PL {status} {plv?'✅':'⛔'}</span>;})()}
       {pair.box_h4&&pair.box_h4!=='UNKNOWN'&&(()=>{const c=pair.box_h4==='UPTREND'?OV_COLORS.buy:pair.box_h4==='DOWNTREND'?OV_COLORS.sell:OV_COLORS.warn;return <span style={{fontFamily:mono,fontSize:8,color:c,background:c+'12',border:`1px solid ${c}30`,borderRadius:3,padding:'1px 6px'}}>H4 {pair.box_h4==='UPTREND'?'▲ UP':pair.box_h4==='DOWNTREND'?'▼ DN':'↔ RNG'}</span>;})()}
       {pair.box_h1&&pair.box_h1!=='UNKNOWN'&&(()=>{const c=pair.box_h1==='UPTREND'?OV_COLORS.buy:pair.box_h1==='DOWNTREND'?OV_COLORS.sell:OV_COLORS.warn;return <span style={{fontFamily:mono,fontSize:8,color:c,background:c+'12',border:`1px solid ${c}30`,borderRadius:3,padding:'1px 6px'}}>H1 {pair.box_h1==='UPTREND'?'▲ UP':pair.box_h1==='DOWNTREND'?'▼ DN':'↔ RNG'}</span>;})()}
       <span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted,background:'rgba(255,255,255,0.04)',borderRadius:3,padding:'1px 6px'}}>PDR {Number(pair.pdr_strength||0).toFixed(2)} {pair.pdr_strong?'✓':''}</span>
@@ -3085,7 +3101,8 @@ function OverviewTab({ data, trends, pdrData, upcomingNews, spikes, confidenceMa
   const pairs = useMemo(()=> data.map(row => ({
     symbol:row.symbol, gap:row.gap??0, bias:row.bias||'WAIT',
     momentum:trends[row.symbol]?.momentum||'NEUTRAL', closeAlert:trends[row.symbol]?.closeAlert||false,
-    pl_zone:row.pl_zone||'BETWEEN', box_h4:row.box_h4_trend||'RANGING', box_h1:row.box_h1_trend||'RANGING',
+    pl_zone:row.pl_zone||'BETWEEN', pl_price:row.pl_price, pl_st:row.pl_st, pl_fl:row.pl_fl,
+    box_h4:row.box_h4_trend||'RANGING', box_h1:row.box_h1_trend||'RANGING',
     pdr_strong:(row.pdr_dir!=null?!!row.pdr_strong_live:(pdrData[row.symbol]?.strong||false)), pdr_strength:(row.pdr_dir!=null?(row.pdr_ratio||0):(pdrData[row.symbol]?.strength||0)),
     pdr_direction:(row.pdr_dir!=null?row.pdr_dir:(pdrData[row.symbol]?.direction||'NEUTRAL')),
     edge:confidenceMap[row.symbol]?.historical?.flag||null, conf:confidenceMap[row.symbol]?.confidence||0,
@@ -4177,7 +4194,7 @@ export default function Dashboard() {
                         <td style={tdc}><div style={{display:'flex',alignItems:'center',gap:5}}><div style={{flex:1,height:4,background:'var(--border)',borderRadius:2,overflow:'hidden',minWidth:40}}><div style={{width:`${Math.min(100,(Math.abs(sv)/30)*100)}%`,height:'100%',background:strColor(sv),borderRadius:2}}/></div><span style={{fontFamily:orb,fontSize:10,color:strColor(sv),fontWeight:700,minWidth:28}}>{Number(sv).toFixed(1)}</span></div></td>
                         <td style={tdc}>{(()=>{const s=signalLabel(row.signal,sv);return<span style={{fontFamily:mono,fontSize:9,color:s.color}}>{s.icon}</span>;})()}</td>
                         <td style={tdc}>{cotB?<span style={{fontFamily:mono,fontSize:9,color:cotB.bias==='BULLISH'?'#00ff9f':'#ff4d6d'}}>{cotB.bias==='BULLISH'?'▲':'▼'}</span>:<span style={{color:'var(--text-muted)'}}>—</span>}</td>
-                        <td style={tdc}>{(()=>{const pl=plZoneBadge(row.pl_zone,row.bias);if(!pl)return <span style={{color:'var(--text-muted)'}}>—</span>;return <span style={{fontFamily:mono,fontSize:9,color:pl.color,background:pl.bg,border:`1px solid ${pl.border}`,borderRadius:3,padding:'1px 6px',whiteSpace:'nowrap'}}>{pl.valid?'✅':'⛔'} {pl.label}</span>;})()}</td>
+                        <td style={tdc}>{(()=>{const pl=plDisplayBadge(row,row.bias);if(!pl)return <span style={{color:'var(--text-muted)'}}>—</span>;return <span style={{fontFamily:mono,fontSize:9,color:pl.color,background:pl.bg,border:`1px solid ${pl.border}`,borderRadius:3,padding:'1px 6px',whiteSpace:'nowrap'}}>{pl.valid?'✅':'⛔'} {pl.label}</span>;})()}</td>
                         <td style={tdc}>{(()=>{const isBuy=bias.label==='BUY',isSell=bias.label==='SELL';if(!isBuy&&!isSell)return <span style={{color:'var(--text-muted)'}}>—</span>;const isJpy=row.symbol?.includes('JPY');const dec=isJpy?3:5;const levels=isBuy?[{l:'PDL',v:row.pdl},{l:'PWL',v:row.pwl}].filter(x=>x.v!=null).sort((a,b)=>b.v-a.v):[{l:'PDH',v:row.pdh},{l:'PWH',v:row.pwh}].filter(x=>x.v!=null).sort((a,b)=>a.v-b.v);if(!levels.length)return <span style={{color:'var(--text-muted)'}}>—</span>;const c1=isBuy?'#00ff9f':'#ff4d6d';return <div style={{display:'flex',gap:4}}>{levels.map((lv,i)=><span key={lv.l} style={{fontFamily:mono,fontSize:8,color:i===0?c1:'#00b4ff',whiteSpace:'nowrap'}}>{lv.l} {Number(lv.v).toFixed(dec)}</span>)}</div>;})()}</td>
                         <td style={tdc}>{t.closeAlert?<span style={{fontFamily:mono,fontSize:9,color:'#ff4d6d'}}>⚠️</span>:<span style={{color:'var(--text-muted)'}}>—</span>}</td>
                       </tr>

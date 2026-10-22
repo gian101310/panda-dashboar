@@ -92,6 +92,17 @@ class SnapshotLayoutTests(unittest.TestCase):
         self.assertEqual(app.panda_lines_position("BETWEEN"), "BETWEEN")
         self.assertEqual(app.panda_lines_position(None), "-")
 
+    def test_panda_lines_buffer_requires_ten_pips_from_both_lines(self):
+        app = _load_app()
+
+        self.assertEqual(app.panda_lines_status("ABOVE", 1.1014, 1.1000, 1.1004, "EURUSD"), "BELOW")
+        self.assertEqual(app.panda_lines_status("ABOVE", 1.1008, 1.1000, 1.1004, "EURUSD"), "NEAR")
+        self.assertEqual(app.panda_lines_status("BELOW", 1.0988, 1.1000, 1.0998, "EURUSD"), "ABOVE")
+        self.assertEqual(app.panda_lines_status("BELOW", 1.0994, 1.1000, 1.0998, "EURUSD"), "NEAR")
+        self.assertEqual(app.panda_lines_status("ABOVE", 1.1002, 1.1000, 1.1004, "EURUSD"), "BETWEEN")
+        self.assertEqual(app.panda_lines_status("ABOVE", None, 1.1000, 1.1004, "EURUSD"), "UNVERIFIED")
+        self.assertEqual(app.panda_lines_status("ABOVE", 150.20, 150.00, 150.10, "USDJPY"), "BELOW")
+
     def test_telegram_snapshot_layout_keeps_all_context_readable(self):
         app = _load_app()
 

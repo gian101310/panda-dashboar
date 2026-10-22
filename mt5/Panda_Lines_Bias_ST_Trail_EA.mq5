@@ -4,7 +4,7 @@
 //| Requires current panda_score_<PAIR>.txt in Terminal\Common\Files |
 //+------------------------------------------------------------------+
 #property copyright "Panda Engine"
-#property version   "1.13"
+#property version   "1.14"
 #property strict
 #property tester_indicator "Panda Lines v4.1 MT5.ex5"
 
@@ -16,6 +16,7 @@ input bool     InpSTUseATR       = true;
 input bool     InpSTShowSignals  = false; // Keep the debugging chart to Panda Lines only
 input double   InpLots          = 0.01;
 input double   InpStopOffsetPips = 30.0;
+input double   InpEntryBufferPips = 10.0; // Require this clearance beyond both Panda Lines
 input bool     InpBreakEvenAtRisk = true;  // Move SL to entry after gain reaches initial risk
 input double   InpTrailStartPips = 50.0;   // Start ST trailing only above this unrealized gain
 input double   InpPipSize       = 0.0;    // 0 = forex digits rule; set explicitly for gold/indices
@@ -178,14 +179,15 @@ bool ReadAlignment(const MqlTick &tick,int &direction,double &stLine)
       CopyBuffer(g_st,3,1,1,bbBear)!=1) return false;
    double close1=iClose(_Symbol,_Period,1);
    if(close1<=0.0) return false;
+   double buffer=InpEntryBufferPips*PipSize();
    // Skip plot joins where both colors appear on the same bar.
    if(LineSet(stBull) && !LineSet(stBear) && LineSet(bbBull[0]) &&
-      !LineSet(bbBear[0]) && close1>stBull && close1>bbBull[0] &&
-      tick.bid>stBull && tick.bid>bbBull[0])
+      !LineSet(bbBear[0]) && close1>=stBull+buffer && close1>=bbBull[0]+buffer &&
+      tick.bid>=stBull+buffer && tick.bid>=bbBull[0]+buffer)
    { direction=1; stLine=stBull; }
    else if(LineSet(stBear) && !LineSet(stBull) && LineSet(bbBear[0]) &&
-           !LineSet(bbBull[0]) && close1<stBear && close1<bbBear[0] &&
-           tick.ask<stBear && tick.ask<bbBear[0])
+           !LineSet(bbBull[0]) && close1<=stBear-buffer && close1<=bbBear[0]-buffer &&
+           tick.ask<=stBear-buffer && tick.ask<=bbBear[0]-buffer)
    { direction=-1; stLine=stBear; }
    return true;
 }
@@ -368,7 +370,7 @@ void ManageTrailing(const MqlTick &tick)
 
 int OnInit()
 {
-   if(InpLots<=0.0 || InpStopOffsetPips<=0.0 || InpTrailStartPips<0.0 ||
+   if(InpLots<=0.0 || InpStopOffsetPips<=0.0 || InpEntryBufferPips<0.0 || InpTrailStartPips<0.0 ||
       InpBasketPips<=0.0 || InpBasketUSD<=0.0 ||
       InpMaxBiasAgeMin<=0 || InpConfirmMinGapMin<=0 ||
       InpConfirmMaxGapMin<InpConfirmMinGapMin ||
