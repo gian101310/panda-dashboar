@@ -4,6 +4,12 @@
 
 ---
 
+## Oct 23, 2026 — Panda MC MT5 EA v1.13
+
+- Added the Panda Lines and confirmed Panda Engine bias EA source and compiled MT5 build under `mt5/`.
+- New entries start at 02:00 Dubai time each day; aligned re-entries remain eligible later that day. The chart displays Panda Lines and bias for debugging, and entries use the `Panda MC` comment.
+- Installed the same build in the IC Markets MT5 Experts folder. Attached chart instances must be reloaded to use the new build.
+
 ## Jul 16, 2026 — Retired Hermes/Guardian + Supabase hardening + EA idempotency
 
 - Removed the unused Hermes feed, learning table/RPCs, and active handoff documents.
