@@ -117,6 +117,7 @@ PAIRS = [
 
 LAST_QUARTER_MARK = None
 LAST_HOUR_MARK    = None
+LAST_HOUR_ATTEMPT = None
 LAST_MARKET_DESK_DAY = None
 LAST_NEWS_MARK    = None
 PREV_MOMENTUM     = {}
@@ -3097,10 +3098,10 @@ def send_daily_market_desk():
 def send_snapshot():
     if is_market_closed():
         print(f"[SNAPSHOT] Market closed - skipped ({market_time_label()})")
-        return
+        return True
     if not telegram_circuit.allow():
         print(f"[SNAPSHOT BLOCKED] Circuit breaker locked — failures: {telegram_circuit.failures}, locked_until: {telegram_circuit.locked_until}, now: {time.time():.0f}")
-        return
+        return False
     try:
         res  = supabase.table("dashboard").select("*").execute()
         data = res.data or []
@@ -3291,6 +3292,7 @@ def send_snapshot():
                 "telegram_snapshot_fail",
                 response.text[:500] if response else "no response",
             )
+        return sent_ok
     except Exception as e:
         print("[TELEGRAM ERROR]:", e)
         telegram_circuit.failure()
@@ -3304,6 +3306,7 @@ def send_snapshot():
                 label="SnapshotExcLog"
             )
         except: pass
+        return False
 
 # ================= SPIKE ALERT =================
 MOMENTUM_GUIDE = {
@@ -3547,7 +3550,7 @@ async def login_alert(data: dict):
 # ================= SCHEDULER =================
 ENGINE_LOCK = asyncio.Lock()
 
-def hourly_snapshot_due(now, last_hour_mark):
+def hourly_snapshot_due(now, last_hour_mark, last_attempt=None):
     """
     Return whether the hourly Telegram snapshot should run.
     The scheduler can be busy during the first seconds after :01, especially
@@ -3558,6 +3561,9 @@ def hourly_snapshot_due(now, last_hour_mark):
     hour_mark = now.replace(minute=0, second=0, microsecond=0)
     if last_hour_mark == hour_mark:
         return False, last_hour_mark
+    if last_attempt and last_attempt.replace(minute=0, second=0, microsecond=0) == hour_mark:
+        if (now - last_attempt).total_seconds() < 60:
+            return False, hour_mark
     return True, hour_mark
 
 def daily_market_desk_due(now, last_day_mark):
@@ -4299,7 +4305,7 @@ def daily_cleanup():
     print(f"[CLEANUP] Daily cleanup complete — {total_deleted}/{len(cleanup_targets)} tables cleaned")
 
 async def master_scheduler():
-    global LAST_QUARTER_MARK, LAST_HOUR_MARK, LAST_MARKET_DESK_DAY, LAST_NEWS_MARK
+    global LAST_QUARTER_MARK, LAST_HOUR_MARK, LAST_HOUR_ATTEMPT, LAST_MARKET_DESK_DAY, LAST_NEWS_MARK
     await asyncio.sleep(5)
     if LAST_HOUR_MARK is None:
         LAST_HOUR_MARK = load_snapshot_hour_mark()
@@ -4339,41 +4345,50 @@ async def master_scheduler():
                             print("[ENGINE ERROR - 15min]:", e)
                     LAST_QUARTER_MARK = quarter_mark
 
-            hourly_due, hour_mark = hourly_snapshot_due(now, LAST_HOUR_MARK)
+            hourly_due, hour_mark = hourly_snapshot_due(now, LAST_HOUR_MARK, LAST_HOUR_ATTEMPT)
             if hourly_due:
                 async with ENGINE_LOCK:
+                    first_attempt = (LAST_HOUR_ATTEMPT is None or
+                                     LAST_HOUR_ATTEMPT.replace(minute=0, second=0, microsecond=0) != hour_mark)
+                    LAST_HOUR_ATTEMPT = now
                     try:
                         print(f"\n{'='*50}\n[HOURLY] Firing at {now.strftime('%H:%M:%S')}")
-                        persist_snapshot_hour_mark(hour_mark)
-                        await run_scheduler_step("hourly-gap", run_gap_once)
+                        # The 5-minute cycle refreshes dashboard data. Do not let a
+                        # second score pass delay or suppress hourly delivery.
                         # Auto-reset circuit breaker before hourly snapshot
                         # — ensures snapshot always attempts, even after transient failures
                         if not telegram_circuit.allow():
                             print("[HOURLY] Circuit breaker was locked — auto-resetting for snapshot")
                             telegram_circuit.failures = 0
                             telegram_circuit.locked_until = 0
-                        await run_scheduler_step("hourly-snapshot", send_snapshot)
-                        # Reset breaker again before AI snapshot — snapshot failure must not kill market update
-                        if not telegram_circuit.allow():
-                            print("[HOURLY] Circuit breaker tripped during snapshot — resetting for AI market update")
-                            telegram_circuit.failures = 0
-                            telegram_circuit.locked_until = 0
-                        await run_scheduler_step("hourly-ai-update", send_ai_snapshot)
-                        daily_desk_due, day_mark = daily_market_desk_due(now, LAST_MARKET_DESK_DAY)
-                        if daily_desk_due:
+                        snapshot_ok = await asyncio.to_thread(send_snapshot)
+                        if snapshot_ok:
+                            LAST_HOUR_MARK = hour_mark
+                            persist_snapshot_hour_mark(hour_mark)
+                        else:
+                            print("[HOURLY] Snapshot not confirmed; will retry in 60 seconds")
+                        if first_attempt:
+                            # AI and Market Desk retain their hourly/daily cadence
+                            # even when the main snapshot needs another attempt.
                             if not telegram_circuit.allow():
-                                print("[MARKET DESK] Circuit breaker was locked — auto-resetting for daily report")
+                                print("[HOURLY] Circuit breaker tripped during snapshot — resetting for AI market update")
                                 telegram_circuit.failures = 0
                                 telegram_circuit.locked_until = 0
-                            market_desk_ok = await asyncio.to_thread(send_daily_market_desk)
-                            if market_desk_ok:
-                                persist_market_desk_day_mark(day_mark)
-                                LAST_MARKET_DESK_DAY = day_mark
-                        await run_scheduler_step("hourly-cleanup", daily_cleanup)
-                        maybe_run_nightly_analyst(now)
+                            await run_scheduler_step("hourly-ai-update", send_ai_snapshot)
+                            daily_desk_due, day_mark = daily_market_desk_due(now, LAST_MARKET_DESK_DAY)
+                            if daily_desk_due:
+                                if not telegram_circuit.allow():
+                                    print("[MARKET DESK] Circuit breaker was locked — auto-resetting for daily report")
+                                    telegram_circuit.failures = 0
+                                    telegram_circuit.locked_until = 0
+                                market_desk_ok = await asyncio.to_thread(send_daily_market_desk)
+                                if market_desk_ok:
+                                    persist_market_desk_day_mark(day_mark)
+                                    LAST_MARKET_DESK_DAY = day_mark
+                            await run_scheduler_step("hourly-cleanup", daily_cleanup)
+                            maybe_run_nightly_analyst(now)
                     except Exception as e:
                         print("[ENGINE ERROR - hourly]:", e)
-                LAST_HOUR_MARK = hour_mark
 
         except Exception as e:
             print("[SCHEDULER ERROR]:", e)

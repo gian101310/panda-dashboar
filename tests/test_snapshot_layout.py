@@ -192,6 +192,22 @@ class SchedulerTimingTests(unittest.TestCase):
         self.assertFalse(duplicate_due)
         self.assertEqual(duplicate_mark, mark)
 
+    def test_failed_hourly_snapshot_retries_after_one_minute(self):
+        app = _load_app()
+        attempted = datetime(2026, 10, 23, 2, 1, 0)
+
+        early_due, mark = app.hourly_snapshot_due(
+            datetime(2026, 10, 23, 2, 1, 30), None, attempted
+        )
+        retry_due, retry_mark = app.hourly_snapshot_due(
+            datetime(2026, 10, 23, 2, 2, 1), None, attempted
+        )
+
+        self.assertFalse(early_due)
+        self.assertTrue(retry_due)
+        self.assertEqual(mark, datetime(2026, 10, 23, 2, 0, 0))
+        self.assertEqual(retry_mark, mark)
+
     def test_hourly_snapshot_mark_survives_engine_restart(self):
         previous_mark_file = os.environ.get("PANDA_SNAPSHOT_MARK_FILE")
         with tempfile.TemporaryDirectory() as temp_dir:

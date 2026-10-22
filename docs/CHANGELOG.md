@@ -4,6 +4,12 @@
 
 ---
 
+## Oct 23, 2026 — Recover missed hourly Panda score snapshots
+
+- Hourly Telegram snapshots now use the latest 5-minute score cycle instead of waiting for a second score pass.
+- The hourly completion marker is saved only after Telegram confirms the snapshot; failed sends retry after one minute within the hour.
+- Added a scheduler retry regression test. The 02:00 Dubai snapshot had been marked done before any send and was missed.
+
 ## Oct 23, 2026 — Panda MC MT5 EA v1.13
 
 - Added the Panda Lines and confirmed Panda Engine bias EA source and compiled MT5 build under `mt5/`.
