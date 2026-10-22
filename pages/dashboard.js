@@ -379,17 +379,21 @@ function boxConfirm(bias, h4Trend, h1Trend) {
   return { label:'⚠️ RANGING', color:'#ffd166', bg:'rgba(255,209,102,0.10)', border:'rgba(255,209,102,0.35)' };
 }
 // ===== PL ZONE BADGE (CONTINUATIONday validity) =====
-// BUY  valid = price ABOVE both Panda Lines
-// SELL valid = price BELOW both Panda Lines
+// Stored zone describes price relative to lines; displayed label describes lines relative to price.
+// BUY  valid = Panda Lines BELOW price
+// SELL valid = Panda Lines ABOVE price
 // BETWEEN   = not valid for intra game
+function plLinesPosition(zone) {
+  return zone === 'ABOVE' ? 'BELOW' : zone === 'BELOW' ? 'ABOVE' : zone || '—';
+}
 function plZoneBadge(zone, bias) {
   if (!zone) return null;
   const isBuy  = bias === 'BUY';
   const isSell = bias === 'SELL';
-  if (zone === 'ABOVE')   return isBuy  ? { label:'🟢 ABOVE LINES', color:'#00ff9f', bg:'rgba(0,255,159,0.10)',  border:'rgba(0,255,159,0.35)',  valid:true  }
-                                        : { label:'⬆️ ABOVE LINES', color:'#ffd166', bg:'rgba(255,209,102,0.10)', border:'rgba(255,209,102,0.35)', valid:false };
-  if (zone === 'BELOW')   return isSell ? { label:'🔴 BELOW LINES', color:'#ff4d6d', bg:'rgba(255,77,109,0.10)',  border:'rgba(255,77,109,0.35)',  valid:true  }
-                                        : { label:'⬇️ BELOW LINES', color:'#ffd166', bg:'rgba(255,209,102,0.10)', border:'rgba(255,209,102,0.35)', valid:false };
+  if (zone === 'ABOVE')   return isBuy  ? { label:'🟢 PL BELOW', color:'#00ff9f', bg:'rgba(0,255,159,0.10)',  border:'rgba(0,255,159,0.35)',  valid:true  }
+                                        : { label:'⬇️ PL BELOW', color:'#ffd166', bg:'rgba(255,209,102,0.10)', border:'rgba(255,209,102,0.35)', valid:false };
+  if (zone === 'BELOW')   return isSell ? { label:'🔴 PL ABOVE', color:'#ff4d6d', bg:'rgba(255,77,109,0.10)',  border:'rgba(255,77,109,0.35)',  valid:true  }
+                                        : { label:'⬆️ PL ABOVE', color:'#ffd166', bg:'rgba(255,209,102,0.10)', border:'rgba(255,209,102,0.35)', valid:false };
   if (zone === 'BETWEEN') return         { label:'↔️ BETWEEN',      color:'#ffaa44', bg:'rgba(255,170,68,0.10)',  border:'rgba(255,170,68,0.35)',  valid:false };
   return null;
 }
@@ -2248,7 +2252,7 @@ function ShadowTab() {
 
       {rows.length > 0 && <div style={{overflowX:'auto',background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:10}}>
         <table style={{width:'100%',borderCollapse:'collapse'}}>
-          <thead><tr style={{background:'var(--bg-hover)'}}>{['OPENED','SYMBOL','TIER','DIR','ENTRY GAP','PEAK','PIPS','OUTCOME','EXIT REASON','SESSION','PL ZONE','STATUS'].map(h=><th key={h} style={hd}>{h}</th>)}</tr></thead>
+          <thead><tr style={{background:'var(--bg-hover)'}}>{['OPENED','SYMBOL','TIER','DIR','ENTRY GAP','PEAK','PIPS','OUTCOME','EXIT REASON','SESSION','PL POSITION','STATUS'].map(h=><th key={h} style={hd}>{h}</th>)}</tr></thead>
           <tbody>
             {rows.map(r=>{
               const dirC = r.direction==='BUY'?'#00ff9f':'#ff4d6d';
@@ -2265,7 +2269,7 @@ function ShadowTab() {
                   <td style={{...td,color:outC}}>{r.outcome||'—'}</td>
                   <td style={{...td,color:'var(--text-muted)'}}>{r.exit_reason||'—'}</td>
                   <td style={{...td,color:'var(--text-muted)'}}>{r.session||'—'}</td>
-                  <td style={{...td,color:'var(--text-muted)'}}>{r.pl_zone||'—'}</td>
+                  <td style={{...td,color:'var(--text-muted)'}}>{r.pl_zone ? `PL ${plLinesPosition(r.pl_zone)}` : '—'}</td>
                   <td style={{...td,color:r.status==='PENDING'?'#00b4ff':'var(--text-muted)'}}>{r.status}</td>
                 </tr>
               );
@@ -2367,7 +2371,7 @@ function SignalLogTab() {
                   <td style={{padding:'6px',color:r.momentum==='STRONG'?'#00ff9f':r.momentum==='BUILDING'?'#00b4ff':'var(--text-muted)'}}>{r.momentum||'—'}</td>
                   <td style={{padding:'6px',color:'var(--text-muted)'}}>{r.state||'—'}</td>
                   <td style={{padding:'6px',fontWeight:700,color:r.strength>=2?'#00ff9f':r.strength>=1?'#ffd166':'var(--text-muted)'}}>{Number(r.strength||0).toFixed(1)}</td>
-                  <td style={{padding:'6px'}}>{r.pl_zone?<span style={{fontSize:9,color:r.pl_zone==='ABOVE'?'#00ff9f':r.pl_zone==='BELOW'?'#ff4d6d':'#ffd166'}}>{r.pl_zone}</span>:'—'}</td>
+                  <td style={{padding:'6px'}}>{r.pl_zone?<span style={{fontSize:9,color:r.pl_zone==='ABOVE'?'#00ff9f':r.pl_zone==='BELOW'?'#ff4d6d':'#ffd166'}}>PL {plLinesPosition(r.pl_zone)}</span>:'—'}</td>
                   <td style={{padding:'6px',textAlign:'center'}}>{valid?<span style={{color:'#00ff9f'}}>✅</span>:<span style={{color:'var(--text-muted)'}}>⛔</span>}</td>
                 </tr>
               );
@@ -2896,7 +2900,7 @@ function OvSignalCard({ pair, tier, onClick, delay }) {
       {tags.map(t=><span key={t.label} style={{fontFamily:mono,fontSize:8,color:t.color,background:t.bg,border:`1px solid ${t.color}30`,borderRadius:3,padding:'2px 6px',letterSpacing:1}}>{t.label}</span>)}
     </div>}
     {hov&&!isL&&<div style={{marginTop:10,paddingTop:8,borderTop:`1px solid ${OV_COLORS.border}`,display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
-      {(()=>{const plv=pair.pl_zone==='ABOVE'&&pair.bias==='BUY'||pair.pl_zone==='BELOW'&&pair.bias==='SELL';const plc=plv?OV_COLORS.buy:'#ff7744';return <span style={{fontFamily:mono,fontSize:8,color:plc,background:plc+'12',border:`1px solid ${plc}30`,borderRadius:3,padding:'1px 6px'}}>PL {pair.pl_zone} {plv?'✅':'⛔'}</span>;})()}
+      {(()=>{const plv=pair.pl_zone==='ABOVE'&&pair.bias==='BUY'||pair.pl_zone==='BELOW'&&pair.bias==='SELL';const plc=plv?OV_COLORS.buy:'#ff7744';return <span style={{fontFamily:mono,fontSize:8,color:plc,background:plc+'12',border:`1px solid ${plc}30`,borderRadius:3,padding:'1px 6px'}}>PL {plLinesPosition(pair.pl_zone)} {plv?'✅':'⛔'}</span>;})()}
       {pair.box_h4&&pair.box_h4!=='UNKNOWN'&&(()=>{const c=pair.box_h4==='UPTREND'?OV_COLORS.buy:pair.box_h4==='DOWNTREND'?OV_COLORS.sell:OV_COLORS.warn;return <span style={{fontFamily:mono,fontSize:8,color:c,background:c+'12',border:`1px solid ${c}30`,borderRadius:3,padding:'1px 6px'}}>H4 {pair.box_h4==='UPTREND'?'▲ UP':pair.box_h4==='DOWNTREND'?'▼ DN':'↔ RNG'}</span>;})()}
       {pair.box_h1&&pair.box_h1!=='UNKNOWN'&&(()=>{const c=pair.box_h1==='UPTREND'?OV_COLORS.buy:pair.box_h1==='DOWNTREND'?OV_COLORS.sell:OV_COLORS.warn;return <span style={{fontFamily:mono,fontSize:8,color:c,background:c+'12',border:`1px solid ${c}30`,borderRadius:3,padding:'1px 6px'}}>H1 {pair.box_h1==='UPTREND'?'▲ UP':pair.box_h1==='DOWNTREND'?'▼ DN':'↔ RNG'}</span>;})()}
       <span style={{fontFamily:mono,fontSize:8,color:OV_COLORS.textMuted,background:'rgba(255,255,255,0.04)',borderRadius:3,padding:'1px 6px'}}>PDR {Number(pair.pdr_strength||0).toFixed(2)} {pair.pdr_strong?'✓':''}</span>

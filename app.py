@@ -2216,6 +2216,8 @@ def send_phase_digest(dashboard_rows, excluded_symbols, cycle_at, level_assessme
         if not c:
             continue
         tag = f"{r.get('symbol')} {c['dir']} {c['gap']:+.0f}"
+        if r.get("pl_zone") in ("ABOVE", "BELOW", "BETWEEN"):
+            tag += f" PL {panda_lines_position(r['pl_zone'])}"
         level = (level_assessments or {}).get(r.get("symbol")) or {}
         if level.get("priority") == "LOW PRIORITY":
             tag += " [LOW PRIORITY: LEVELS]"
@@ -2349,6 +2351,11 @@ def maybe_run_nightly_analyst(now):
 
 
 # ================= SNAPSHOT GENERATOR =================
+def panda_lines_position(zone):
+    """Display line position relative to price; stored zone describes price relative to lines."""
+    return {"ABOVE": "BELOW", "BELOW": "ABOVE"}.get(zone, zone or "-")
+
+
 def _score_label(raw_score):
     """Exact match to dashboard.js scoreLabel — uses single strongest TF value, NOT sum."""
     v = raw_score or 0
@@ -2566,7 +2573,7 @@ def generate_snapshot(pair_data):
                   fill=tc, font=font_data)
         draw.text((x + 800, box_y), f"PDR {p.get('pdr', '-')}",
                   fill=tc, font=font_data)
-        draw.text((x + BOTTOM_OFFSETS["fl_st"], metrics_y), f"PL {p.get('pl_zone', '-')}",
+        draw.text((x + BOTTOM_OFFSETS["fl_st"], metrics_y), f"PL {panda_lines_position(p.get('pl_zone'))}",
                   fill=tc, font=font_data)
         _act = p.get("action", "")
         if _act:
@@ -3342,7 +3349,7 @@ def check_structure_alerts(pair, pl, cycle_at, ready):
         if ready and prev in ("ABOVE", "BELOW") and prev != zone:
             direction = "BULLISH" if zone == "ABOVE" else "BEARISH"
             candidates.append({"symbol": pair, "alert_type": "structure", "cycle_at": cycle_at,
-                               "detail": f"Panda Lines FLIP {prev} → {zone} ({direction})",
+                               "detail": f"PL FLIP: PL {panda_lines_position(prev)} → PL {panda_lines_position(zone)} ({direction})",
                                "event_id": f"flip:{prev}:{zone}:{cycle_at}", "state_zone": zone,
                                "bias": "BUY" if zone == "ABOVE" else "SELL"})
         else:
@@ -3377,7 +3384,7 @@ def dispatch_signal_candidates(cycle_at, structure, gaps, early, spikes, gold,
     for item in gaps:
         candidates.append({"symbol": item["symbol"], "alert_type": "gap_zone",
                            "cycle_at": cycle_at, "gap": item["gap"], "bias": item["bias"],
-                           "detail": f"Panda Lines {item['pl_zone']} confirms gap zone"})
+                           "detail": f"PL {panda_lines_position(item['pl_zone'])} confirms gap zone"})
     for item in early:
         candidates.append({"symbol": item["symbol"], "alert_type": "early_entry",
                            "cycle_at": cycle_at, "gap": item["gap"], "bias": item["bias"],
@@ -4155,7 +4162,7 @@ def build_ai_snapshot_fallback(active, session):
         bias = p.get("bias", "WAIT")
         gap = p.get("gap") or 0
         momentum = p.get("momentum") or "UNKNOWN"
-        pl_zone = p.get("pl_zone") or "-"
+        pl_zone = panda_lines_position(p.get("pl_zone"))
         top_pairs.append(f"{symbol} {bias} ({abs(gap):.1f} gap, {momentum}, PL {pl_zone})")
 
     return (

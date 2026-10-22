@@ -84,6 +84,14 @@ def _load_app():
 
 
 class SnapshotLayoutTests(unittest.TestCase):
+    def test_panda_lines_display_describes_lines_relative_to_price(self):
+        app = _load_app()
+
+        self.assertEqual(app.panda_lines_position("ABOVE"), "BELOW")
+        self.assertEqual(app.panda_lines_position("BELOW"), "ABOVE")
+        self.assertEqual(app.panda_lines_position("BETWEEN"), "BETWEEN")
+        self.assertEqual(app.panda_lines_position(None), "-")
+
     def test_telegram_snapshot_layout_keeps_all_context_readable(self):
         app = _load_app()
 
