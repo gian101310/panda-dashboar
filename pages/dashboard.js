@@ -1742,6 +1742,30 @@ function ValidSetupsTab({ data, trends, cotMap, confidenceMap }) {
 }
 // ===== VALID PAIRS TAB — ITP + PBP classification =====
 function ValidPairsTab({ data, trends, cotMap, confidenceMap }) {
+  const nearbyLevel = row => {
+    const price = Number(row.pl_price);
+    if (!Number.isFinite(price) || price <= 0) return null;
+    const pip = row.symbol?.includes('JPY') ? 0.01 : 0.0001;
+    const support = [], resistance = [];
+    for (const [name, raw] of [['PDH',row.pdh],['PDL',row.pdl],['PWH',row.pwh],['PWL',row.pwl]]) {
+      if (raw == null || raw === '') continue;
+      const level = Number(raw);
+      if (!Number.isFinite(level) || level <= 0) continue;
+      const distance = Math.abs(level - price) / pip;
+      if (distance > 30) continue;
+      if (level <= price) support.push({name,distance});
+      if (level >= price) resistance.push({name,distance});
+    }
+    support.sort((a,b) => a.distance - b.distance);
+    resistance.sort((a,b) => a.distance - b.distance);
+    if (support.length && resistance.length) return {label:'BETWEEN SUPPORT & RESISTANCE',color:'#ffd166'};
+    const levels = support.length ? support : resistance;
+    if (!levels.length) return null;
+    const stack = levels.length > 1 && levels[1].distance - levels[0].distance <= 10;
+    const side = support.length ? 'SUPPORT' : 'RESISTANCE';
+    const names = levels.slice(0,stack?2:1).map(level => level.name).join(' + ');
+    return {label:`${stack?'STACKED':'NEAR'} ${side} (${names})`,color:support.length?'#00b4ff':'#ffaa44'};
+  };
   // Classify pairs into ITP (Intraday Play) and PBP (Pullback Play)
   const itp = [];
   const pbp = [];
@@ -1795,6 +1819,7 @@ function ValidPairsTab({ data, trends, cotMap, confidenceMap }) {
     const playColor = playType === 'ITP' ? '#00ff9f' : '#00b4ff';
     const playBg = playType === 'ITP' ? 'rgba(0,255,159,0.08)' : 'rgba(0,180,255,0.08)';
     const playBorder = playType === 'ITP' ? 'rgba(0,255,159,0.30)' : 'rgba(0,180,255,0.30)';
+    const nearby = nearbyLevel(row);
     return (
       <div key={row.symbol} style={{background:'var(--bg-card)',border:`2px solid ${bias.border}`,borderRadius:10,padding:'14px 18px',display:'flex',alignItems:'center',gap:16,position:'relative',overflow:'hidden',boxShadow:`0 0 16px ${bias.color}15`}}>
         <div style={{position:'absolute',top:0,left:0,right:0,height:3,background:`linear-gradient(90deg,transparent,${bias.color},transparent)`}}/>
@@ -1836,6 +1861,10 @@ function ValidPairsTab({ data, trends, cotMap, confidenceMap }) {
             </div>
           );})()}
           {(()=>{const isBuy=bias.label==='BUY',isSell=bias.label==='SELL';if(!isBuy&&!isSell)return null;const isJpy=row.symbol?.includes('JPY');const dec=isJpy?3:5;const levels=isBuy?[{l:'PDL',v:row.pdl},{l:'PWL',v:row.pwl},{l:'PML',v:row.pml}].filter(x=>x.v!=null).sort((a,b)=>b.v-a.v):[{l:'PDH',v:row.pdh},{l:'PWH',v:row.pwh},{l:'PMH',v:row.pmh}].filter(x=>x.v!=null).sort((a,b)=>a.v-b.v);const top2=levels.slice(0,2);if(!top2.length)return null;const c1=isBuy?'#00ff9f':'#ff4d6d';const c2='#00b4ff';return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}><span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>PB ENTRY</span>{top2.map((lv,i)=><span key={lv.l} style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:i===0?c1:c2,background:(i===0?c1:c2)+'12',border:`1px solid ${(i===0?c1:c2)}28`,borderRadius:3,padding:'1px 6px',fontWeight:600}}>{lv.l} {Number(lv.v).toFixed(dec)}</span>)}</div>);})()}
+          {nearby&&<div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}>
+            <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:'var(--text-muted)',letterSpacing:1}}>LEVEL</span>
+            <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:nearby.color,background:nearby.color+'18',border:`1px solid ${nearby.color}35`,borderRadius:4,padding:'1px 8px',fontWeight:700}}>{nearby.label}</span>
+          </div>}
           <div style={{display:'flex',gap:8}}>
             {[['1H',t.delta1h],['4H',t.delta4h],['8H',t.delta8h]].map(([l,v])=>{const val=v??0;const c=Math.abs(val)<0.1?'var(--text-muted)':val>0?'#00ff9f':'#ff4d6d';return(<div key={l} style={{display:'flex',alignItems:'center',gap:3}}><span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:'var(--text-muted)'}}>{l}</span><span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:c,fontWeight:700}}>{Math.abs(val)<0.1?'±0':(val>0?'+':'')+val}</span></div>);})}
           </div>

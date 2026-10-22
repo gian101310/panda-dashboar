@@ -1,11 +1,43 @@
 import unittest
 from datetime import datetime, timezone
+from types import SimpleNamespace
 from unittest.mock import Mock
 
 from test_snapshot_layout import _load_app
 
 
 class SignalAlertIntegrationTests(unittest.TestCase):
+    def test_market_desk_marks_near_support_without_changing_bias(self):
+        app = _load_app()
+        rows = [{"symbol": "EURJPY", "gap": -11, "bias": "SELL", "hard_invalid": False,
+                 "base_score": -5, "quote_score": 6, "pl_zone": "BELOW",
+                 "pl_price": 175.743, "pdl": 175.542}]
+        watch = app._market_desk_pair_rows(rows)
+        self.assertEqual(watch[0][3], "SELL -11")
+        self.assertIn("NEAR SUPPORT (PDL)", watch[0][5])
+
+    def test_phase_digest_shows_short_level_label(self):
+        app = _load_app()
+        class EmptyQuery:
+            def __getattr__(self, name):
+                if name == "execute":
+                    return lambda: SimpleNamespace(data=[])
+                return lambda *args, **kwargs: self
+        app.supabase = SimpleNamespace(table=lambda _: EmptyQuery())
+        app.SIGNAL_BOT_TOKEN = "test"
+        app.SIGNAL_CHAT_ID = "test"
+        app.is_market_closed = lambda: False
+        app.classify_phase_server = lambda _: {"dir": "SELL", "gap": -11, "pdr_ok": False}
+        app.verdict_action_word = lambda *_: "EXECUTE"
+        queued = []
+        app.enqueue_alert = lambda client, candidate, **kwargs: queued.append(candidate)
+        app.send_phase_digest(
+            [{"symbol": "EURJPY", "pl_zone": "BELOW"}], set(),
+            "2026-10-23T00:00:00+00:00",
+            {"EURJPY": {"priority": "REVIEW", "short_label": "NEAR SUPPORT"}},
+        )
+        self.assertIn("NEAR SUPPORT", queued[0]["text"])
+
     def test_structure_seeds_on_recovery_and_waits_for_durable_queue(self):
         app = _load_app()
         cycle = "2026-10-20T16:00:00+00:00"
@@ -69,7 +101,8 @@ class SignalAlertIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(symbols, {"EURUSD"})
         self.assertEqual(queued[0]["level_priority"], "CAUTION")
-        self.assertIn("PDH", queued[0]["price_context"])
+        self.assertEqual(queued[0]["price_context"], "BETWEEN SUPPORT AND RESISTANCE")
+        self.assertNotIn("PDH", queued[0]["price_context"])
         self.assertEqual(assessments["EURUSD"]["priority"], "CAUTION")
 
     def test_momentum_only_does_not_queue_immediate_message(self):

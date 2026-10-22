@@ -1,7 +1,8 @@
 import unittest
 
 from lib.signal_alerts import render_immediate_message
-from lib.signal_price_levels import assess_price_levels, describe_price_levels, related_h4_breadth
+from lib.signal_price_levels import (assess_price_levels, describe_price_levels,
+                                     related_h4_breadth, summarize_nearby_levels)
 
 
 def box(days, first, second):
@@ -10,6 +11,20 @@ def box(days, first, second):
 
 
 class SignalPriceLevelTests(unittest.TestCase):
+    def test_plain_nearby_labels_follow_price_and_show_a_same_side_stack(self):
+        support = summarize_nearby_levels(
+            "EURJPY", None, {"pl_price": 175.743, "pdl": 175.542})
+        self.assertEqual(support, {"label": "NEAR SUPPORT", "names": "PDL"})
+        resistance = summarize_nearby_levels(
+            "USDJPY", None, {"pl_price": 156.639, "pdl": 156.690})
+        self.assertEqual(resistance["label"], "NEAR RESISTANCE")
+        stack = summarize_nearby_levels(
+            "NZDCAD", None, {"pl_price": 0.79576, "pdl": 0.79502, "pwl": 0.79424})
+        self.assertEqual(stack, {"label": "STACKED SUPPORT", "names": "PDL + PWL"})
+        both = summarize_nearby_levels(
+            "EURUSD", None, {"pl_price": 1.1000, "pdl": 1.0990, "pdh": 1.1010})
+        self.assertEqual(both["label"], "BETWEEN SUPPORT AND RESISTANCE")
+
     def test_stacked_resistance_warns_buy_without_changing_gap(self):
         context = describe_price_levels(
             "EURUSD", {"boxes": [box(62, 1.1020, 1.1000), box(14, 1.1015, 1.0990)]},

@@ -38,7 +38,7 @@ from news_results import resolve_news_actual, load_sent_results, mark_result_sen
 from news_speeches import is_fed_chair_speech, resolve_speech_summary, speech_api_key
 from lib.signal_alerts import RecoveryGate, consolidate_candidates, classify_gap_move
 from lib.signal_alert_outbox import enqueue_alert, dispatch_pending
-from lib.signal_price_levels import assess_price_levels, related_h4_breadth
+from lib.signal_price_levels import assess_price_levels, related_h4_breadth, summarize_nearby_levels
 
 load_dotenv()
 
@@ -2227,6 +2227,8 @@ def send_phase_digest(dashboard_rows, excluded_symbols, cycle_at, level_assessme
             tag += " [LOW PRIORITY: LEVELS]"
         elif level.get("priority") in ("CAUTION", "REVIEW"):
             tag += " [LEVEL REVIEW]"
+        if level.get("short_label"):
+            tag += f" · {level['short_label']}"
         star = " ★" if c.get("pdr_ok") else ""
         w = verdict_action_word(r, c)
         if w == "CLOSE?":     groups["CLOSE"].append(tag)
@@ -2877,13 +2879,16 @@ def _market_desk_pair_rows(rows):
     candidates.sort(key=lambda r: (r["rank_group"], 0 if r["pl_ok"] else 1, -abs(r["gap"]), r["symbol"]))
     out = []
     for idx, r in enumerate(candidates[:6], start=1):
+        source = next((row for row in rows if row.get("symbol") == r["symbol"]), {})
+        level = summarize_nearby_levels(r["symbol"], None, source)
+        level_note = f" | {level['label']} ({level['names']})" if level["label"] else ""
         out.append([
             str(idx),
             r["symbol"],
             r["context"],
             f"{r['bias']} {r['gap']:+.0f}",
             r["catalyst"],
-            r["plan"],
+            r["plan"] + level_note,
         ])
     if not out:
         out.append(["-", "NO SETUP", "No clean score gap >= 5", "WAIT", "NONE", "Stand down until score + structure align."])
@@ -2891,7 +2896,7 @@ def _market_desk_pair_rows(rows):
 
 def generate_market_desk_report(rows):
     rows = rows or []
-    width, height = 1700, 2100
+    width, height = 1700, 2900
     margin = 70
     page_bg = (255, 255, 255)
     black = (20, 20, 20)
@@ -2948,7 +2953,7 @@ def generate_market_desk_report(rows):
     y = 58
     draw.text((width // 2, y), "PANDA MARKET DESK", fill=black, font=font_title, anchor="ma")
     y += 72
-    draw.text((width // 2, y), "DAILY PRE-MARKET SCORE -> STRUCTURE MAP", fill=black, font=font_sub, anchor="ma")
+    draw.text((width // 2, y), "DAILY BIAS -> GAMEPLAY WATCHLIST", fill=black, font=font_sub, anchor="ma")
     y += 44
     draw.text((width // 2, y), "2 AM DUBAI WATCHLIST - CONDITIONAL, NOT SIGNALS", fill=black, font=font_th, anchor="ma")
     y += 36
@@ -2991,7 +2996,7 @@ def generate_market_desk_report(rows):
             ["1. SCORE", "Classify currencies by strongest score: +4 to +6 STRONG, -4 to -6 WEAK, everything else NEUTRAL."],
             ["2. MAP", "Pair strongest vs weakest. Gap is base score minus quote score; no D1/H4/H1 summing."],
             ["3. FILTER", "Remove hard invalid, same-side conflict, neutral-vs-neutral, and unclear gap."],
-            ["4. STRUCTURE", "Require market structure, Panda Line zone, and G1 confirmation before execution."],
+            ["4. GAMEPLAY", "Apply the structure and Panda Line filters of your chosen gameplay before entry."],
             ["5. RISK", "News, spread, session timing, and invalidation come before any entry."],
         ],
         [215, 1345],
@@ -3017,19 +3022,19 @@ def generate_market_desk_report(rows):
     draw.rectangle([margin, y, width - margin, y + box_h], fill=soft, outline=grid)
     draw.text((margin + 18, y + 18), "PANDA DESK READ:", fill=black, font=font_b)
     note = (
-        "Score finds the bias catalyst. Fundamentals explain the driver. "
-        "Structure confirms the setup. This report ranks what to watch; it is not a standalone trade signal."
+        "Bias sets direction. Structure filters entries. "
+        "Choose your gameplay, then look for a pullback with favorable risk/reward. This watchlist is not an entry signal."
     )
     for idx, line in enumerate(textwrap.wrap(note, width=112)):
         draw.text((margin + 260, y + 18 + idx * 29), line, fill=black, font=font)
     y += box_h + 42
 
-    draw.text((width // 2, y), "STRUCTURE FIRST. SCORE IS THE FILTER.", fill=black, font=font_sub, anchor="ma")
+    draw.text((width // 2, y), "BIAS IS KING. STRUCTURE IS THE FILTER.", fill=black, font=font_sub, anchor="ma")
     y += 48
     draw.text((margin, y), f"PANDA ENGINE v3.0 | {datetime.now().strftime('%Y-%m-%d %H:%M')}", fill=black, font=font_sm)
 
     path = "panda_market_desk.png"
-    img.save(path, quality=95)
+    img.crop((0, 0, width, min(height, y + 60))).save(path, quality=95)
     return path
 
 def _send_telegram_photo(path, caption, component="telegram_photo"):
@@ -3460,7 +3465,8 @@ def dispatch_signal_candidates(cycle_at, structure, gaps, early, spikes, gold,
                 symbol, parsed, pl, row["bias"], row.get("gap"), row.get("momentum"),
                 PREV_LEVEL_PRICE.get(symbol), breadth
             )
-            assessments[symbol] = {**assessment, "bias": row["bias"]}
+            assessments[symbol] = {**assessment, "bias": row["bias"],
+                                   "short_label": summarize_nearby_levels(symbol, parsed, pl)["label"]}
         except Exception as context_error:
             print(f"[SIGNAL LEVELS] {symbol}: {context_error}")
     queued = set()
@@ -3480,7 +3486,7 @@ def dispatch_signal_candidates(cycle_at, structure, gaps, early, spikes, gold,
                         symbol, parsed, pl, candidate.get("bias"), row.get("gap"),
                         row.get("momentum"), PREV_LEVEL_PRICE.get(symbol), breadth
                     )
-                candidate["price_context"] = assessment["text"]
+                candidate["price_context"] = summarize_nearby_levels(symbol, parsed, pl)["label"]
                 candidate["level_priority"] = assessment["priority"]
             except Exception as context_error:
                 print(f"[SIGNAL LEVELS] {symbol}: {context_error}")

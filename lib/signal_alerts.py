@@ -99,7 +99,7 @@ def render_immediate_message(rows):
         if detail:
             lines.append(detail)
         if row.get("price_context") and not row.get("conflict"):
-            lines.append("Levels at detection: " + html.escape(str(row["price_context"])))
+            lines.append(html.escape(str(row["price_context"])))
         if row.get("conflict"):
             lines.append("Mixed directional evidence; verify the chart before drawing a setup conclusion.")
         supporting = [e["detail"] for e in row.get("evidence", [])

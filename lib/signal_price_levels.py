@@ -4,6 +4,7 @@ import math
 
 
 NEAR_PIPS = 15
+DISPLAY_NEAR_PIPS = 30
 
 
 def _number(value):
@@ -69,6 +70,49 @@ def related_h4_breadth(symbol, bias, parsed_map, pl_map):
     if available < 3:
         return None
     return {"currency": currency, "matched": matched, "available": available}
+
+
+def summarize_nearby_levels(symbol, parsed, pl):
+    """Return concise, price-relative level context without changing alert priority."""
+    price = _number((pl or {}).get("pl_price"))
+    if price is None:
+        return {"label": "", "names": ""}
+    pip = 0.01 if "JPY" in symbol.upper() else 0.0001
+    levels = []
+    for tf in ("D1", "H4", "H1"):
+        bounds = box_bounds(parsed, tf)
+        if bounds:
+            levels.extend(((bounds[0], f"{tf} box"), (bounds[1], f"{tf} box")))
+    for key in ("pdh", "pdl", "pwh", "pwl"):
+        level = _number((pl or {}).get(key))
+        if level is not None:
+            levels.append((level, key.upper()))
+
+    support, resistance = [], []
+    for level, name in levels:
+        distance = abs(level - price) / pip
+        if distance > DISPLAY_NEAR_PIPS:
+            continue
+        if level < price:
+            support.append((distance, name))
+        elif level > price:
+            resistance.append((distance, name))
+        else:
+            support.append((0.0, name))
+            resistance.append((0.0, name))
+    support.sort()
+    resistance.sort()
+    if support and resistance:
+        return {"label": "BETWEEN SUPPORT AND RESISTANCE", "names": ""}
+    nearby = support or resistance
+    if not nearby:
+        return {"label": "", "names": ""}
+    stack = len(nearby) > 1 and nearby[1][0] - nearby[0][0] <= 10
+    side = "SUPPORT" if support else "RESISTANCE"
+    return {
+        "label": f"{'STACKED' if stack else 'NEAR'} {side}",
+        "names": " + ".join(name for _, name in nearby[:2 if stack else 1]),
+    }
 
 
 def assess_price_levels(symbol, parsed, pl, bias, gap=None, momentum=None,
