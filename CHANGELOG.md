@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-23 - Separate H1 profit-trail MT5 EA
+
+- Added a separate MT5 EA source and compiled file with its own magic number; the original SuperTrend-trailing EA remains available.
+- At 1R, the new EA moves SL beyond entry using estimated round-trip commission, accrued swap, and a configurable pip cushion. It then tightens the stop using confirmed H1 swings and an H1 ATR peak-price limit.
+- After profit protection is active, a completed H1 candle inside or beyond the Panda Lines closes the position. Reentry waits for a fully closed H1 candle after exit, then uses fresh Panda bias and both lines without the original fixed entry buffer.
+- Kept the original entry, scoring, 0.01-lot default, and daily basket rules. The new EA is not installed or activated in MT5 by this change.
+
 ## 2026-10-21 - Match licensed Panda boxes to MT4 scoring
 
 - Replaced candle-date aggregation with the MT4 Scoring v1/v1.2 trading-day H1, Monday-week H4, and calendar-month D1 windows, including exact start-inclusive/end-exclusive H1 price scanning.
