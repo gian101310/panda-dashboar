@@ -26,6 +26,47 @@ function utcTime(){
   return d.toISOString().slice(11,19)+' UTC';
 }
 
+function nearbyLevel(row){
+  const price=Number(row.pl_price);
+  if(!Number.isFinite(price)||price<=0)return null;
+  const pip=row.symbol?.includes('JPY')?.01:.0001;
+  const support=[],resistance=[];
+  for(const [name,raw] of [['PDH',row.pdh],['PDL',row.pdl],['PWH',row.pwh],['PWL',row.pwl]]){
+    if(raw==null||raw==='')continue;
+    const level=Number(raw);
+    if(!Number.isFinite(level)||level<=0)continue;
+    const distance=Math.abs(level-price)/pip;
+    if(distance>30)continue;
+    if(level<=price)support.push({name,distance});
+    if(level>=price)resistance.push({name,distance});
+  }
+  support.sort((a,b)=>a.distance-b.distance);
+  resistance.sort((a,b)=>a.distance-b.distance);
+  if(support.length&&resistance.length)return 'BETWEEN SUPPORT & RESISTANCE';
+  const levels=support.length?support:resistance;
+  if(!levels.length)return null;
+  const stack=levels.length>1&&levels[1].distance-levels[0].distance<=10;
+  return `${stack?'STACKED':'NEAR'} ${support.length?'SUPPORT':'RESISTANCE'} (${levels.slice(0,stack?2:1).map(x=>x.name).join(' + ')})`;
+}
+
+function pullbackLevels(row,bias){
+  const keys=bias==='BUY'?[['PDL',row.pdl],['PWL',row.pwl],['PML',row.pml],['PYL',row.pyl]]
+    :[['PDH',row.pdh],['PWH',row.pwh],['PMH',row.pmh],['PYH',row.pyh]];
+  return keys.filter(([,value])=>value!=null&&value!==''&&Number.isFinite(Number(value)))
+    .sort((a,b)=>bias==='BUY'?Number(b[1])-Number(a[1]):Number(a[1])-Number(b[1]))
+    .slice(0,2).map(([name,value])=>`${name} ${Number(value).toFixed(row.symbol?.includes('JPY')?3:5)}`);
+}
+
+function streamPairs(rows){
+  return rows.filter(row=>{
+    const gap=Number(row.gap);
+    return row.symbol&&!row.hard_invalid&&Number.isFinite(gap)&&Math.abs(gap)>=5;
+  }).map(row=>{
+    const gap=Number(row.gap),bias=gap>=5?'BUY':'SELL';
+    return {...row,pair:row.symbol,gap,bias,level:nearbyLevel(row),pullback:pullbackLevels(row,bias)};
+  }).sort((a,b)=>Math.abs(b.gap)-Math.abs(a.gap));
+}
+
 /* ─── page ─── */
 export default function StreamPage(){
   const [pairs,setPairs]=useState([]);
@@ -42,20 +83,17 @@ export default function StreamPage(){
   const [uptime,setUptime]=useState('00:00:00');
   const [lastRefresh,setLastRefresh]=useState('--:--:--');
   const [signalCount,setSignalCount]=useState(0);
+  const [dataError,setDataError]=useState('');
 
   /* fetch /api/data every 30s */
   const fetchData=useCallback(async()=>{
     try{
       const r=await fetch('/api/data');
+      if(r.status===401){setDataError('Sign in with an approved Panda account to view live Stream data.');setPairs([]);setSignalCount(0);return;}
+      if(!r.ok)throw new Error(`Stream data request failed (${r.status})`);
       const json=await r.json();
       const rows=Array.isArray(json)?json:(json.data||[]);
-      const valid=rows.filter(p=>{
-        const g=parseFloat(p.gap)||0;
-        return g>=5||g<=-5;
-      }).map(p=>{
-        const g=parseFloat(p.gap)||0;
-        return {pair:p.symbol, bias:g>=5?'BUY':'SELL', strong:Math.abs(g)>=8, gap:g};
-      }).sort((a,b)=>Math.abs(b.gap)-Math.abs(a.gap));
+      const valid=streamPairs(rows);
       /* detect new/changed signals */
       const sig=valid.map(p=>p.pair+p.bias).join(',');
       if(prevPairsRef.current&&sig!==prevPairsRef.current){
@@ -67,7 +105,8 @@ export default function StreamPage(){
       setPairs(valid);
       setSignalCount(valid.length);
       setLastRefresh(new Date().toISOString().slice(11,19));
-    }catch(e){console.error(e)}
+      setDataError('');
+    }catch(e){console.error(e);setDataError('Live data is temporarily unavailable.');}
   },[]);
 
   useEffect(()=>{fetchData();const i=setInterval(fetchData,30000);return()=>clearInterval(i)},[fetchData]);
@@ -78,7 +117,7 @@ export default function StreamPage(){
     const i=setInterval(()=>{
       setFade(false);
       setTimeout(()=>{
-        heroRef.current=(heroRef.current+1)%Math.min(pairs.length,8);
+        heroRef.current=(heroRef.current+1)%pairs.length;
         setHeroIdx(heroRef.current);
         setFade(true);
       },450);
@@ -98,8 +137,7 @@ export default function StreamPage(){
     return()=>clearInterval(i);
   },[]);
 
-  const top=pairs.filter(p=>p.strong).slice(0,6);
-  const hero=pairs[heroIdx]||null;
+  const hero=pairs[heroIdx%pairs.length]||null;
   const isBuy=hero&&hero.bias==='BUY';
   const neonG='#00ffae';
   const neonR='#ff4d6d';
@@ -202,30 +240,35 @@ export default function StreamPage(){
           <div style={S.emptyHero}>
             <div style={S.scanRing}/>
             <div style={S.scanRing2}/>
-            <div style={S.scanTitle}>SCANNING MARKETS…</div>
-            <div style={S.scanSub}>WAITING FOR HIGH-PROBABILITY SETUPS</div>
-            <div style={S.ctaInline}>Join VIP — Get alerts instantly</div>
+            <div style={S.scanTitle}>{dataError?'STREAM DATA UNAVAILABLE':'SCANNING MARKETS…'}</div>
+            <div style={S.scanSub}>{dataError||'WAITING FOR VALID PAIRS'}</div>
+            {dataError?.startsWith('Sign in')&&<a href="/login" style={S.ctaInline}>SIGN IN</a>}
           </div>
         )}
       </div>
 
-      {/* ─── TOP SIGNALS ROW ─── */}
-      {top.length>0&&(
+      {/* ─── ALL VALID PAIRS ─── */}
+      {pairs.length>0&&(
         <div style={S.topSection}>
-          <div style={S.topLabel}>HIGH PROBABILITY</div>
+          <div style={S.topLabel}>VALID PAIRS · {pairs.length} LIVE</div>
           <div style={S.topRow}>
-            {top.map((p,i)=>{
+            {pairs.map((p,i)=>{
               const c=p.bias==='BUY'?neonG:neonR;
               const isHero=hero&&p.pair===hero.pair;
+              const tf=[p.base_score_tf&&`${p.pair.slice(0,3)} ${p.base_score_tf}`,p.quote_score_tf&&`${p.pair.slice(3,6)} ${p.quote_score_tf}`].filter(Boolean).join(' · ');
               return(
                 <div key={p.pair} style={{...S.topCard,animationDelay:`${i*.1}s`,
                   borderColor:isHero?c+'66':c+'28',
                   background:isHero?'rgba(255,255,255,.04)':'rgba(255,255,255,.015)',
-                  boxShadow:isHero?`0 0 32px ${c}22, inset 0 0 24px ${c}08`:`0 0 16px ${c}08`,
-                  transform:isHero?'scale(1.04)':'scale(1)',
+                  boxShadow:isHero?`0 0 22px ${c}22, inset 0 0 18px ${c}08`:`0 0 16px ${c}08`,
                   transition:'all .5s ease'}}>
-                  <div style={S.topPair}>{p.pair}</div>
-                  <div style={{...S.topBias,color:c}}>{p.bias}</div>
+                  <div style={S.cardHeader}><span style={S.topPair}>{p.pair}</span><span style={{...S.cardGap,color:c}}>{p.gap>0?'+':''}{p.gap.toFixed(1)}</span></div>
+                  <div style={S.cardMeta}><span style={{...S.topBias,color:c}}>{p.bias}</span><span>{Math.abs(p.gap)>=9&&p.pl_zone!=='BETWEEN'?'INTRA':'BB'}</span><span>{p.momentum||'NEUTRAL'}</span></div>
+                  <div style={S.cardLine}><b>CONF</b> {p.confidence||'—'} <b>PL</b> {p.pl_zone||'—'}</div>
+                  <div style={S.cardLine}><b>BOX</b> H4 {p.box_h4_trend||'—'} · H1 {p.box_h1_trend||'—'}</div>
+                  <div style={S.cardLine}><b>EXTREME TF</b> {tf||'NONE'}</div>
+                  <div style={S.cardLine}><b>PB ENTRY</b> {p.pullback.join(' · ')||'—'}</div>
+                  {p.level&&<div style={{...S.cardLevel,color:p.level.includes('RESISTANCE')?'#ffaa44':'#00b4ff'}}>⚠ {p.level}</div>}
                 </div>
               );
             })}
@@ -242,7 +285,7 @@ export default function StreamPage(){
 
     <style jsx global>{`
       *{margin:0;padding:0;box-sizing:border-box}
-      html,body{background:#060810;overflow:hidden}
+      html,body{background:#060810;overflow-x:hidden;overflow-y:auto}
       @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
       @keyframes pulse{0%,100%{opacity:1}50%{opacity:.2}}
       @keyframes glowPulse{0%,100%{filter:brightness(1)}50%{filter:brightness(1.08)}}
@@ -264,9 +307,9 @@ export default function StreamPage(){
 /* ─── styles ─── */
 const S={
   root:{
-    width:'1920px',height:'1080px',position:'relative',overflow:'hidden',
+    width:'100%',minHeight:'100vh',position:'relative',overflow:'hidden',
     background:'linear-gradient(170deg,#050710 0%,#0a0e1a 35%,#0c1024 60%,#070b14 100%)',
-    display:'flex',flexDirection:'column',padding:'40px 80px',
+    display:'flex',flexDirection:'column',padding:'32px clamp(20px,4vw,80px)',
   },
   bgShift:{
     position:'absolute',inset:0,pointerEvents:'none',zIndex:0,
@@ -313,11 +356,11 @@ const S={
 
   /* hero */
   heroSection:{
-    flex:1,display:'flex',justifyContent:'center',alignItems:'center',
+    flex:1,minHeight:'250px',display:'flex',justifyContent:'center',alignItems:'center',
     position:'relative',zIndex:1,
   },
   heroCard:{
-    textAlign:'center',padding:'56px 110px 48px',borderRadius:'30px',
+    textAlign:'center',padding:'28px clamp(28px,5vw,90px)',borderRadius:'30px',
     background:'linear-gradient(160deg,rgba(255,255,255,.03),rgba(255,255,255,.005))',
     backdropFilter:'blur(12px)',
     border:'1.5px solid',
@@ -331,9 +374,9 @@ const S={
     animation:'shimmerSweep .8s ease-out',
     pointerEvents:'none',
   },
-  heroPair:{fontFamily:orb,fontSize:'130px',fontWeight:900,color:'#fff',letterSpacing:'12px',lineHeight:1,
+  heroPair:{fontFamily:orb,fontSize:'clamp(48px,6vw,100px)',fontWeight:900,color:'#fff',letterSpacing:'6px',lineHeight:1,
     position:'relative',zIndex:1},
-  heroBias:{fontFamily:orb,fontSize:'78px',fontWeight:700,letterSpacing:'16px',marginTop:'2px',
+  heroBias:{fontFamily:orb,fontSize:'clamp(42px,4vw,62px)',fontWeight:700,letterSpacing:'10px',marginTop:'2px',
     animation:'biasPulse 3s ease-in-out infinite',position:'relative',zIndex:1},
   heroUnderline:{height:'3px',borderRadius:'2px',margin:'18px auto 0',opacity:.7,
     position:'relative',zIndex:1},
@@ -369,16 +412,21 @@ const S={
   /* top signals row */
   topSection:{flexShrink:0,position:'relative',zIndex:1,paddingBottom:'8px'},
   topLabel:{fontFamily:orb,fontSize:'11px',fontWeight:500,color:'rgba(255,255,255,.15)',
-    letterSpacing:'6px',textAlign:'center',marginBottom:'16px'},
-  topRow:{display:'flex',justifyContent:'center',gap:'22px',flexWrap:'nowrap'},
+    letterSpacing:'4px',textAlign:'center',marginBottom:'10px'},
+  topRow:{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(230px,1fr))',gap:'10px'},
   topCard:{
-    padding:'20px 38px',borderRadius:'16px',textAlign:'center',
+    padding:'10px 12px',borderRadius:'12px',textAlign:'left',minHeight:'150px',
     border:'1px solid',
     animation:'fadeUp .5s ease both',
-    minWidth:'165px',
+    minWidth:0,
   },
-  topPair:{fontFamily:orb,fontSize:'20px',fontWeight:700,color:'rgba(255,255,255,.88)',letterSpacing:'3px'},
-  topBias:{fontFamily:orb,fontSize:'17px',fontWeight:700,letterSpacing:'5px',marginTop:'4px'},
+  cardHeader:{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'6px'},
+  topPair:{fontFamily:orb,fontSize:'16px',fontWeight:700,color:'rgba(255,255,255,.88)',letterSpacing:'1px'},
+  cardGap:{fontFamily:orb,fontSize:'18px',fontWeight:900},
+  cardMeta:{display:'flex',alignItems:'center',gap:'8px',fontFamily:mono,fontSize:'10px',color:'rgba(255,255,255,.52)',whiteSpace:'nowrap',margin:'5px 0 6px'},
+  topBias:{fontFamily:orb,fontSize:'11px',fontWeight:700,letterSpacing:'1px'},
+  cardLine:{fontFamily:mono,fontSize:'9px',lineHeight:'15px',color:'rgba(255,255,255,.55)',overflowWrap:'anywhere'},
+  cardLevel:{fontFamily:mono,fontSize:'9px',lineHeight:'15px',fontWeight:700,overflowWrap:'anywhere'},
 
   /* live ticker bar */
   tickerBar:{
