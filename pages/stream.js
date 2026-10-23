@@ -258,16 +258,16 @@ export default function StreamPage(){
               const tf=[p.base_score_tf&&`${p.pair.slice(0,3)} ${p.base_score_tf}`,p.quote_score_tf&&`${p.pair.slice(3,6)} ${p.quote_score_tf}`].filter(Boolean).join(' · ');
               return(
                 <div key={p.pair} style={{...S.topCard,animationDelay:`${i*.1}s`,
-                  borderColor:isHero?c+'66':c+'28',
-                  background:isHero?'rgba(255,255,255,.04)':'rgba(255,255,255,.015)',
-                  boxShadow:isHero?`0 0 22px ${c}22, inset 0 0 18px ${c}08`:`0 0 16px ${c}08`,
+                  borderColor:isHero?c+'aa':c+'65',borderLeft:`3px solid ${c}`,
+                  background:isHero?'rgba(22,35,54,.98)':'rgba(15,24,40,.96)',
+                  boxShadow:isHero?`0 0 22px ${c}28, inset 0 0 18px ${c}0a`:`0 3px 16px rgba(0,0,0,.35)`,
                   transition:'all .5s ease'}}>
                   <div style={S.cardHeader}><span style={S.topPair}>{p.pair}</span><span style={{...S.cardGap,color:c}}>{p.gap>0?'+':''}{p.gap.toFixed(1)}</span></div>
                   <div style={S.cardMeta}><span style={{...S.topBias,color:c}}>{p.bias}</span><span>{Math.abs(p.gap)>=9&&p.pl_zone!=='BETWEEN'?'INTRA':'BB'}</span><span>{p.momentum||'NEUTRAL'}</span></div>
-                  <div style={S.cardLine}><b>CONF</b> {p.confidence||'—'} <b>PL</b> {p.pl_zone||'—'}</div>
-                  <div style={S.cardLine}><b>BOX</b> H4 {p.box_h4_trend||'—'} · H1 {p.box_h1_trend||'—'}</div>
-                  <div style={S.cardLine}><b>EXTREME TF</b> {tf||'NONE'}</div>
-                  <div style={S.cardLine}><b>PB ENTRY</b> {p.pullback.join(' · ')||'—'}</div>
+                  <div style={S.cardLine}><span style={S.cardLabel}>CONF</span> {p.confidence||'—'} <span style={S.cardLabel}>PL</span> {p.pl_zone||'—'}</div>
+                  <div style={S.cardLine}><span style={S.cardLabel}>BOX</span> H4 {p.box_h4_trend||'—'} · H1 {p.box_h1_trend||'—'}</div>
+                  <div style={S.cardLine}><span style={S.cardLabel}>EXTREME TF</span> {tf||'NONE'}</div>
+                  <div style={S.cardLine}><span style={S.cardLabel}>PB ENTRY</span> {p.pullback.join(' · ')||'—'}</div>
                   {p.level&&<div style={{...S.cardLevel,color:p.level.includes('RESISTANCE')?'#ffaa44':'#00b4ff'}}>⚠ {p.level}</div>}
                 </div>
               );
@@ -356,7 +356,7 @@ const S={
 
   /* hero */
   heroSection:{
-    flex:1,minHeight:'250px',display:'flex',justifyContent:'center',alignItems:'center',
+    flex:1,minHeight:'190px',display:'flex',justifyContent:'center',alignItems:'center',
     position:'relative',zIndex:1,
   },
   heroCard:{
@@ -402,31 +402,32 @@ const S={
     border:'1px solid rgba(0,180,255,.05)',
     animation:'scanPing2 4.5s ease-in-out infinite',pointerEvents:'none',
   },
-  scanTitle:{fontFamily:orb,fontSize:'34px',fontWeight:700,color:'rgba(255,255,255,.2)',letterSpacing:'8px',
+  scanTitle:{fontFamily:orb,fontSize:'34px',fontWeight:700,color:'#e7edf7',letterSpacing:'6px',
     position:'relative',zIndex:1},
-  scanSub:{fontFamily:raj,fontSize:'18px',color:'rgba(255,255,255,.1)',marginTop:'14px',letterSpacing:'3px',
+  scanSub:{fontFamily:raj,fontSize:'20px',color:'#c3d2e6',marginTop:'14px',letterSpacing:'2px',
     position:'relative',zIndex:1},
-  ctaInline:{fontFamily:raj,fontSize:'16px',color:'#00b4ff',marginTop:'36px',letterSpacing:'2px',opacity:.35,
+  ctaInline:{fontFamily:raj,fontSize:'18px',color:'#55cfff',marginTop:'36px',letterSpacing:'2px',
     position:'relative',zIndex:1},
 
   /* top signals row */
   topSection:{flexShrink:0,position:'relative',zIndex:1,paddingBottom:'8px'},
-  topLabel:{fontFamily:orb,fontSize:'11px',fontWeight:500,color:'rgba(255,255,255,.15)',
-    letterSpacing:'4px',textAlign:'center',marginBottom:'10px'},
+  topLabel:{fontFamily:orb,fontSize:'14px',fontWeight:700,color:'#dce8fa',
+    letterSpacing:'3px',textAlign:'center',marginBottom:'12px'},
   topRow:{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(230px,1fr))',gap:'10px'},
   topCard:{
-    padding:'10px 12px',borderRadius:'12px',textAlign:'left',minHeight:'150px',
+    padding:'12px 14px',borderRadius:'12px',textAlign:'left',minHeight:'185px',
     border:'1px solid',
     animation:'fadeUp .5s ease both',
     minWidth:0,
   },
   cardHeader:{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'6px'},
-  topPair:{fontFamily:orb,fontSize:'16px',fontWeight:700,color:'rgba(255,255,255,.88)',letterSpacing:'1px'},
-  cardGap:{fontFamily:orb,fontSize:'18px',fontWeight:900},
-  cardMeta:{display:'flex',alignItems:'center',gap:'8px',fontFamily:mono,fontSize:'10px',color:'rgba(255,255,255,.52)',whiteSpace:'nowrap',margin:'5px 0 6px'},
-  topBias:{fontFamily:orb,fontSize:'11px',fontWeight:700,letterSpacing:'1px'},
-  cardLine:{fontFamily:mono,fontSize:'9px',lineHeight:'15px',color:'rgba(255,255,255,.55)',overflowWrap:'anywhere'},
-  cardLevel:{fontFamily:mono,fontSize:'9px',lineHeight:'15px',fontWeight:700,overflowWrap:'anywhere'},
+  topPair:{fontFamily:orb,fontSize:'18px',fontWeight:700,color:'#fff',letterSpacing:'1px'},
+  cardGap:{fontFamily:orb,fontSize:'21px',fontWeight:900},
+  cardMeta:{display:'flex',alignItems:'center',gap:'9px',fontFamily:mono,fontSize:'12px',fontWeight:700,color:'#d1dded',whiteSpace:'nowrap',margin:'7px 0 9px',paddingBottom:'6px',borderBottom:'1px solid rgba(255,255,255,.14)'},
+  topBias:{fontFamily:orb,fontSize:'12px',fontWeight:900,letterSpacing:'1px'},
+  cardLine:{fontFamily:mono,fontSize:'11px',lineHeight:'19px',fontWeight:600,color:'#ecf3ff',overflowWrap:'anywhere'},
+  cardLabel:{fontFamily:mono,fontSize:'10px',fontWeight:900,color:'#70cfff',letterSpacing:'.4px'},
+  cardLevel:{fontFamily:mono,fontSize:'11px',lineHeight:'19px',fontWeight:900,overflowWrap:'anywhere',marginTop:'4px'},
 
   /* live ticker bar */
   tickerBar:{
