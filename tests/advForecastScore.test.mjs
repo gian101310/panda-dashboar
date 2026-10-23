@@ -17,14 +17,15 @@ const eurcad = {
   adv_quote_d1: 2, adv_quote_h4: 4, adv_quote_h1: 2,
 };
 
-// Mon-Thu shows tomorrow's score. Friday shows the next-week score.
+// Mon-Thu shows tomorrow's score. Friday's next-week score stays visible all weekend.
 assert.equal(advScore(eurcad, new Date('2026-10-26T08:00:00Z')).detail, 'TMRW:-8');
 assert.equal(advScore(eurcad, new Date('2026-10-28T08:00:00Z')).detail, 'TMRW:-8');
 assert.equal(advScore(eurcad, new Date('2026-10-23T08:00:00Z')).detail, 'WK:-9');
 assert.equal(advScore(eurcad, new Date('2026-10-30T08:00:00Z')).detail, 'WK:-9 MTH:-9');
-assert.equal(advScore(eurcad, new Date('2026-10-31T08:00:00Z')).detail, 'MTH:-9');
-assert.equal(advScore(eurcad, new Date('2026-10-24T08:00:00Z')), null);
-assert.equal(advScore(eurcad, new Date('2026-10-25T08:00:00Z')), null);
+assert.equal(advScore(eurcad, new Date('2026-10-31T08:00:00Z')).detail, 'WK:-9 MTH:-9');
+assert.equal(advScore(eurcad, new Date('2026-10-24T08:00:00Z')).detail, 'WK:-9');
+assert.equal(advScore(eurcad, new Date('2026-10-25T08:00:00Z')).detail, 'WK:-9');
+assert.equal(advScore(eurcad, new Date('2026-10-23T21:24:00Z')).detail, 'WK:-9');
 assert.equal(advScore(eurcad, new Date('2026-10-28T08:00:00Z')).h4Context, 'NEXT WK H4 EUR -5 WEAK / CAD +4 STRONG');
 
 // Dubai's date determines the month-end window.

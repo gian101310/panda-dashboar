@@ -3,7 +3,7 @@
 ## 2026-10-24 - Correct ADV forecast scoring
 
 - Projected pair gaps use each currency's strongest timeframe score after the relevant ADV substitutions. ADV zero replaces the current timeframe value.
-- The dashboard shows next-day projection Monday-Thursday, next-week projection Friday, and next-month projection on the 30th or 31st in Dubai. ADV H4 strength context remains visible beside the forecast.
+- The dashboard shows next-day projection Monday-Thursday, next-week projection Friday through Sunday, and next-month projection on the 30th or 31st in Dubai. ADV H4 strength context remains visible beside the forecast.
 - Forecast labels describe projected bias without giving hold or exit instructions.
 
 ## 2026-10-23 - Separate H1 profit-trail MT5 EA

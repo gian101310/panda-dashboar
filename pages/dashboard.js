@@ -450,8 +450,8 @@ function advScore(row, now = new Date()) {
     [row.adv_quote_d1 ?? 0, row.adv_quote_h4 ?? 0, quote[2]]
   );
 
-  // Panda operates on Dubai time: next day Mon-Thu, next week Fri, and
-  // next month on the 30th or 31st (including weekends).
+  // Panda operates on Dubai time: next day Mon-Thu, and the Friday next-week
+  // forecast remains visible through the weekend. Month-end is additive.
   const dubaiNow = new Date(now.getTime() + 4 * 60 * 60 * 1000);
   const day = dubaiNow.getUTCDay();
   const showMonth = dubaiNow.getUTCDate() >= 30;
@@ -459,7 +459,7 @@ function advScore(row, now = new Date()) {
   const keepsBias = gap => currentBias === 'BUY' ? gap >= 5 : gap <= -5;
   const forecasts = [];
   if (day >= 1 && day <= 4) forecasts.push({ name: 'TMRW', gap: nextDay });
-  if (day === 5) forecasts.push({ name: 'WK', gap: nextWeek });
+  if (day === 5 || day === 6 || day === 0) forecasts.push({ name: 'WK', gap: nextWeek });
   if (showMonth) forecasts.push({ name: 'MTH', gap: nextMonth });
   if (!forecasts.length) return null;
   const weak = currentBias === 'WAIT' ? [] : forecasts.filter(item => !keepsBias(item.gap));
