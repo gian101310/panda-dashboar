@@ -450,17 +450,23 @@ function advScore(row, now = new Date()) {
     [row.adv_quote_d1 ?? 0, row.adv_quote_h4 ?? 0, quote[2]]
   );
 
-  // Panda operates on Dubai time. The next-week projection is always visible;
-  // the next-month projection appears on the 30th or 31st.
+  // Panda operates on Dubai time: next day Mon-Thu, next week Fri, and
+  // next month on the 30th or 31st (including weekends).
   const dubaiNow = new Date(now.getTime() + 4 * 60 * 60 * 1000);
+  const day = dubaiNow.getUTCDay();
   const showMonth = dubaiNow.getUTCDate() >= 30;
   const currentBias = row.hard_invalid ? 'WAIT' : (row.gap ?? 0) >= 5 ? 'BUY' : (row.gap ?? 0) <= -5 ? 'SELL' : 'WAIT';
   const keepsBias = gap => currentBias === 'BUY' ? gap >= 5 : gap <= -5;
-  const forecasts = [{ name: 'TMRW', gap: nextDay }, { name: 'WK', gap: nextWeek }];
+  const forecasts = [];
+  if (day >= 1 && day <= 4) forecasts.push({ name: 'TMRW', gap: nextDay });
+  if (day === 5) forecasts.push({ name: 'WK', gap: nextWeek });
   if (showMonth) forecasts.push({ name: 'MTH', gap: nextMonth });
+  if (!forecasts.length) return null;
   const weak = currentBias === 'WAIT' ? [] : forecasts.filter(item => !keepsBias(item.gap));
   const fmt = value => (value > 0 ? '+' : '') + value;
   const detail = forecasts.map(item => `${item.name}:${fmt(item.gap)}`).join(' ');
+  const h4Read = value => `${fmt(value)} ${value >= 4 ? 'STRONG' : value <= -4 ? 'WEAK' : 'NEUTRAL'}`;
+  const h4Context = `NEXT WK H4 ${row.base_currency || 'BASE'} ${h4Read(row.adv_base_h4 ?? 0)} / ${row.quote_currency || 'QUOTE'} ${h4Read(row.adv_quote_h4 ?? 0)}`;
   let label, color, bg, border, level;
   if (currentBias === 'WAIT') {
     label = 'ADV FORECAST'; color = '#00b4ff';
@@ -475,7 +481,7 @@ function advScore(row, now = new Date()) {
     label = `🟡 ${weak.map(item => item.name).join('/')} WEAK`; color = '#ffd166';
     bg = 'rgba(255,209,102,0.10)'; border = 'rgba(255,209,102,0.35)'; level = 'WARN';
   }
-  return { label, color, bg, border, detail, level, gaps: { h1: nextDay, h4: nextWeek, d1: nextMonth } };
+  return { label, color, bg, border, detail, h4Context, level, gaps: { h1: nextDay, h4: nextWeek, d1: nextMonth } };
 }
 
 // ===== CURRENCY STRENGTH MATCHUP LABEL (v2) =====
@@ -1443,6 +1449,7 @@ function PairCardModal({ row, trend, cotBias, onClose, isMobile, confidence, mem
             <span style={{fontFamily:mono,fontSize:13,color:adv.color,fontWeight:700}}>{adv.label}</span>
             <div style={{display:'flex',flexDirection:'column',gap:2}}>
               <span style={{fontFamily:mono,fontSize:10,color:adv.color}}>{adv.detail}</span>
+              <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>{adv.h4Context}</span>
               <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>
                 {adv.level==='OK'?'Projected score keeps the current bias':adv.level==='BAD'?'Projected score loses the current bias':adv.level==='WARN'?'Projected scores show mixed bias strength':'Projected gap from MT4 ADV values'}
               </span>
@@ -1721,7 +1728,7 @@ function ValidSetupsTab({ data, trends, cotMap, confidenceMap }) {
                   {af&&<span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)',letterSpacing:0.5}}>ATR {af.atrPips}p · {af.pipsPerHour}p/hr</span>}
                 </div>);
               })()}
-              {(()=>{const adv=advScore(row);if(!adv)return null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}><span style={{fontFamily:mono,fontSize:9,color:adv.color,background:adv.bg,border:`1px solid ${adv.border}`,borderRadius:4,padding:'2px 8px',fontWeight:700}}>{adv.label}</span><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)'}}>{adv.detail}</span></div>);})()}
+              {(()=>{const adv=advScore(row);if(!adv)return null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:3,flexWrap:'wrap'}}><span style={{fontFamily:mono,fontSize:9,color:adv.color,background:adv.bg,border:`1px solid ${adv.border}`,borderRadius:4,padding:'2px 8px',fontWeight:700}}>{adv.label}</span><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)'}}>{adv.detail}</span><span style={{fontFamily:mono,fontSize:8,color:'var(--text-muted)'}}>{adv.h4Context}</span></div>);})()}
               {(()=>{const cf=confidenceMap&&confidenceMap[row.symbol];if(!cf)return null;const cs=confStyle(cf.confidence);if(!cs)return null;return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>CONF</span><span style={{fontFamily:mono,fontSize:9,color:cs.color,background:cs.bg,border:`1px solid ${cs.border}`,borderRadius:4,padding:'2px 8px',fontWeight:700}}>{cf.confidence} {cs.label}</span></div>);})()}
               {(()=>{const isBuy=bias.label==='BUY',isSell=bias.label==='SELL';if(!isBuy&&!isSell)return null;const isJpy=row.symbol?.includes('JPY');const dec=isJpy?3:5;const levels=isBuy?[{l:'PDL',v:row.pdl},{l:'PWL',v:row.pwl},{l:'PML',v:row.pml}].filter(x=>x.v!=null).sort((a,b)=>b.v-a.v):[{l:'PDH',v:row.pdh},{l:'PWH',v:row.pwh},{l:'PMH',v:row.pmh}].filter(x=>x.v!=null).sort((a,b)=>a.v-b.v);const top2=levels.slice(0,2);if(!top2.length)return null;const c1=isBuy?'#00ff9f':'#ff4d6d';const c2='#00b4ff';return(<div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}><span style={{fontFamily:mono,fontSize:8,color:'var(--text-secondary)',letterSpacing:1,fontWeight:600}}>PB ENTRY</span>{top2.map((lv,i)=><span key={lv.l} style={{fontFamily:mono,fontSize:9,color:i===0?c1:c2,background:(i===0?c1:c2)+'12',border:`1px solid ${(i===0?c1:c2)}28`,borderRadius:3,padding:'1px 6px',fontWeight:600}}>{lv.l} {Number(lv.v).toFixed(dec)}</span>)}</div>);})()}
             </div>
@@ -1874,7 +1881,7 @@ function ValidPairsTab({ data, trends, cotMap, confidenceMap }) {
         {(()=>{const adv=advScore(row);if(!adv)return null;return(
           <div style={{minWidth:90,textAlign:'center'}}>
             <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:'var(--text-muted)',letterSpacing:2,marginBottom:2}}>ADV</div>
-            <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:adv.color,background:adv.bg,border:`1px solid ${adv.border}`,borderRadius:4,padding:'2px 6px',fontWeight:700}}>{adv.label}</div>
+            <div title={adv.h4Context} style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:adv.color,background:adv.bg,border:`1px solid ${adv.border}`,borderRadius:4,padding:'2px 6px',fontWeight:700}}>{adv.label}</div>
           </div>
         );})()}
         {cotBias&&<div style={{minWidth:60,textAlign:'center'}}>
