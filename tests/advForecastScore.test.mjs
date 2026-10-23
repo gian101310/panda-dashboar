@@ -16,14 +16,15 @@ const eurcad = {
   adv_quote_d1: 2, adv_quote_h4: 4, adv_quote_h1: 2,
 };
 
-// Wednesday, Friday, then Friday the 30th in Dubai.
-assert.equal(advScore(eurcad, new Date('2026-10-28T08:00:00Z')).detail, 'TMRW:-8');
+// Next-week scoring always replaces H4 and H1, including before Friday.
+assert.equal(advScore(eurcad, new Date('2026-10-28T08:00:00Z')).detail, 'TMRW:-8 WK:-9');
 assert.equal(advScore(eurcad, new Date('2026-10-23T08:00:00Z')).detail, 'TMRW:-8 WK:-9');
 assert.equal(advScore(eurcad, new Date('2026-10-30T08:00:00Z')).detail, 'TMRW:-8 WK:-9 MTH:-9');
-assert.equal(advScore(eurcad, new Date('2026-10-31T08:00:00Z')).detail, 'TMRW:-8 MTH:-9');
+assert.equal(advScore(eurcad, new Date('2026-10-31T08:00:00Z')).detail, 'TMRW:-8 WK:-9 MTH:-9');
 
-// Dubai's date determines the window, even when UTC is still Thursday.
+// Dubai's date determines the month-end window.
 assert.equal(advScore(eurcad, new Date('2026-10-22T21:00:00Z')).detail, 'TMRW:-8 WK:-9');
+assert.equal(advScore(eurcad, new Date('2026-10-29T21:00:00Z')).detail, 'TMRW:-8 WK:-9 MTH:-9');
 
 // An ADV zero replaces the current H1 value, including when it was strongest.
 const zeroH1 = { ...eurcad, base_d1: -2, base_h4: -1, base_h1: -6, adv_base_h1: 0 };

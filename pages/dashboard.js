@@ -450,15 +450,13 @@ function advScore(row, now = new Date()) {
     [row.adv_quote_d1 ?? 0, row.adv_quote_h4 ?? 0, quote[2]]
   );
 
-  // Panda operates on Dubai time. Week and month forecasts appear only in
-  // the requested decision windows; a zero ADV value replaces the current one.
+  // Panda operates on Dubai time. The next-week projection is always visible;
+  // the next-month projection appears on the 30th or 31st.
   const dubaiNow = new Date(now.getTime() + 4 * 60 * 60 * 1000);
-  const showWeek = dubaiNow.getUTCDay() === 5;
   const showMonth = dubaiNow.getUTCDate() >= 30;
   const currentBias = row.hard_invalid ? 'WAIT' : (row.gap ?? 0) >= 5 ? 'BUY' : (row.gap ?? 0) <= -5 ? 'SELL' : 'WAIT';
   const keepsBias = gap => currentBias === 'BUY' ? gap >= 5 : gap <= -5;
-  const forecasts = [{ name: 'TMRW', gap: nextDay }];
-  if (showWeek) forecasts.push({ name: 'WK', gap: nextWeek });
+  const forecasts = [{ name: 'TMRW', gap: nextDay }, { name: 'WK', gap: nextWeek }];
   if (showMonth) forecasts.push({ name: 'MTH', gap: nextMonth });
   const weak = currentBias === 'WAIT' ? [] : forecasts.filter(item => !keepsBias(item.gap));
   const fmt = value => (value > 0 ? '+' : '') + value;
