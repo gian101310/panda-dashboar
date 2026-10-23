@@ -220,14 +220,19 @@ function computeVerdict(row, pdr, t) {
 function VerdictBanner({ row, pdr, t, compact }) {
   const v = computeVerdict(row, pdr, t);
   if (!v) return null;
+  const levelWarning = nearbyLevelWarning(row, v);
   const monoF = "'Share Tech Mono',monospace";
   if (compact) return (
-    <span title={v.hint} style={{fontFamily:monoF,fontSize:9,color:v.c,background:v.c+'14',border:`1px solid ${v.c}40`,borderRadius:4,padding:'2px 8px',fontWeight:700,letterSpacing:0.5,cursor:'help',whiteSpace:'nowrap',display:'inline-block'}}>{v.icon} {v.txt}</span>
+    <span style={{display:'inline-flex',alignItems:'center',gap:5,flexWrap:'wrap'}}>
+      <span title={v.hint} style={{fontFamily:monoF,fontSize:9,color:v.c,background:v.c+'14',border:`1px solid ${v.c}40`,borderRadius:4,padding:'2px 8px',fontWeight:700,letterSpacing:0.5,cursor:'help',whiteSpace:'nowrap'}}>{v.icon} {v.txt}</span>
+      {levelWarning&&<span style={{fontFamily:monoF,fontSize:9,color:'#ffd166',background:'rgba(255,209,102,0.12)',border:'1px solid rgba(255,209,102,0.4)',borderRadius:4,padding:'2px 8px',fontWeight:700}}>{levelWarning}</span>}
+    </span>
   );
   return (
     <div title={v.hint} style={{display:'flex',flexDirection:'column',gap:2,background:v.c+'10',border:`1px solid ${v.c}45`,borderLeft:`3px solid ${v.c}`,borderRadius:6,padding:'6px 10px',cursor:'help'}}>
       <span style={{fontFamily:monoF,fontSize:10,color:v.c,fontWeight:700,letterSpacing:1}}>{v.icon} {v.txt}</span>
       <span style={{fontFamily:monoF,fontSize:8,color:'var(--text-muted)',lineHeight:1.35}}>{v.hint}</span>
+      {levelWarning&&<span style={{fontFamily:monoF,fontSize:9,color:'#ffd166',fontWeight:700,lineHeight:1.4}}>{levelWarning}</span>}
     </div>
   );
 }
@@ -1303,6 +1308,14 @@ function nearbyPreviousLevel(row) {
   const side = support.length ? 'SUPPORT' : 'RESISTANCE';
   const names = levels.slice(0,stack?2:1).map(level => level.name).join(' + ');
   return {label:`${stack?'STACKED':'NEAR'} ${side} (${names})`,color:support.length?'#00b4ff':'#ffaa44'};
+}
+
+function nearbyLevelWarning(row, verdict) {
+  if (!row || row.hard_invalid || Math.abs(row.gap ?? 0) < 5) return null;
+  const nearby = nearbyPreviousLevel(row);
+  if (!nearby) return null;
+  const prefix = verdict?.txt?.startsWith('MARKET EXECUTE') ? '⚠️ MARKET EXECUTE:' : '⚠️ LEVEL NEARBY:';
+  return `${prefix} ${nearby.label} — check the chart level`;
 }
 
 function PairCard({ row, trend, cotBias, confidence, memoryIndex, pdr, newsAlert }) {

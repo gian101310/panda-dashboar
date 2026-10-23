@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-24 - Warn on nearby levels in dashboard verdicts
+
+- Show an amber nearby support/resistance warning beside every valid bias verdict, with an explicit market-execution warning when the verdict says MARKET EXECUTE.
+- Reuse the existing 30-pip previous-day/week level detection; scores and execution rules are unchanged.
+
 ## 2026-10-24 - Correct ADV forecast scoring
 
 - Projected pair gaps use each currency's strongest timeframe score after the relevant ADV substitutions. ADV zero replaces the current timeframe value.
