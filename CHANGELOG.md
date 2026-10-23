@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-24 - Correct ADV forecast scoring
+
+- Projected pair gaps use each currency's strongest timeframe score after the relevant ADV substitutions. ADV zero replaces the current timeframe value.
+- The dashboard shows next-day scoring daily, next-week scoring on Friday, and next-month scoring on the 30th or 31st, using Dubai dates.
+- Forecast labels describe projected bias without giving hold or exit instructions.
+
 ## 2026-10-23 - Separate H1 profit-trail MT5 EA
 
 - Added a separate MT5 EA source and compiled file with its own magic number; the original SuperTrend-trailing EA remains available.

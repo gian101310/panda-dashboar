@@ -424,69 +424,60 @@ function atrFill(atrPoints, currentPrice, entryPrice) {
   return { pipsPerHour: pipsPerHour.toFixed(1), atrPips: atrPips.toFixed(0) };
 }
 
-// ===== ADVANCE SCORE WARNING =====
-// ADV scores project: H1=tomorrow, H4=next week, D1=next month
-// ===== ADV TIMEFRAME HOLD/EXIT LOGIC =====
-// H1 ADV → next-day bias (always evaluated)
-// H4 ADV → next-week bias (critical on Thu/Fri — hold over weekend?)
-// D1 ADV → next-month bias (critical last 3 days of month — hold into new month?)
-// Returns: { label, color, bg, border, detail, level, verdicts:{h1,h4,d1}, holdExit }
-function advScore(row) {
-  // ADV SUBSTITUTION READING (Boss-G spec):
-  // NEXT DAY  = current D1 + current H4 + ADV H1 (replaces H1 only where ADV H1 has a score)
-  // NEXT WEEK = current D1 + ADV H4 + ADV H1 (replace where present; valid from Friday close)
-  // NEXT MONTH = ADV D1 + ADV H4 + ADV H1 (replace where present)
-  // ADV score of 0 = walang score -> keep the current TF score (nothing changes).
+// ===== ADVANCE SCORE FORECAST =====
+// Substitute only the timeframe(s) that advance for each horizon. As with the
+// engine gap, select each currency's strongest single score, then subtract.
+function strongestAdvCurrencyScore(values) {
+  const positive = Math.max(0, ...values.filter(value => value > 0));
+  const negative = Math.min(0, ...values.filter(value => value < 0));
+  if (positive === -negative) return 0;
+  return positive > -negative ? positive : negative;
+}
+
+function advScore(row, now = new Date()) {
   if (!row) return null;
-  const abD1 = row.adv_base_d1 ?? 0, abH4 = row.adv_base_h4 ?? 0, abH1 = row.adv_base_h1 ?? 0;
-  const aqD1 = row.adv_quote_d1 ?? 0, aqH4 = row.adv_quote_h4 ?? 0, aqH1 = row.adv_quote_h1 ?? 0;
-  if (!abD1 && !abH4 && !abH1 && !aqD1 && !aqH4 && !aqH1) return null; // no advance data at all
-  const bD1c = row.base_d1 ?? 0, bH4c = row.base_h4 ?? 0, bH1c = row.base_h1 ?? 0;
-  const qD1c = row.quote_d1 ?? 0, qH4c = row.quote_h4 ?? 0, qH1c = row.quote_h1 ?? 0;
-  const sub = (adv, cur) => (adv !== 0 ? adv : cur);
-  const advH1 = (bD1c + bH4c + sub(abH1, bH1c)) - (qD1c + qH4c + sub(aqH1, qH1c));                       // next-day reading
-  const advH4 = (bD1c + sub(abH4, bH4c) + sub(abH1, bH1c)) - (qD1c + sub(aqH4, qH4c) + sub(aqH1, qH1c)); // next-week reading
-  const advD1 = (sub(abD1, bD1c) + sub(abH4, bH4c) + sub(abH1, bH1c)) - (sub(aqD1, qD1c) + sub(aqH4, qH4c) + sub(aqH1, qH1c)); // next-month reading
-  const isBuy = (row.gap ?? 0) > 0;
-  const okH1 = isBuy ? advH1 >= 5 : advH1 <= -5;
-  const okH4 = isBuy ? advH4 >= 5 : advH4 <= -5;
-  const okD1 = isBuy ? advD1 >= 5 : advD1 <= -5;
-  // Time context
-  const now = new Date();
-  const dow = now.getUTCDay(); // 0=Sun..5=Fri
-  const dom = now.getUTCDate();
-  const lastDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth()+1, 0)).getUTCDate();
-  const isFriWindow = dow >= 4 || dow === 0; // Thu-Sun: weekend decision window
-  const isMonthEnd  = (lastDay - dom) <= 2;  // Last 3 days of month
-  // Per-TF verdicts
-  const fmtg = v => (v>0?'+':'')+v;
-  const h1v = okH1 ? {tag:'HOLD',note:`Next-day reading ${fmtg(advH1)} keeps the bias`,c:'#00ff9f'} : {tag:'EXIT',note:`Next-day reading ${fmtg(advH1)} loses the bias`,c:'#ff4d6d'};
-  const h4v = okH4 ? {tag:'HOLD',note:(isFriWindow?'Safe to hold over weekend':`Next-week reading ${fmtg(advH4)} keeps the bias`)+' · valid from Fri close',c:'#00ff9f'} : {tag:'EXIT',note:(isFriWindow?'Exit before weekend — next-week reading weak':`Next-week reading ${fmtg(advH4)} loses the bias`)+' · valid from Fri close',c:'#ff4d6d'};
-  const d1v = okD1 ? {tag:'HOLD',note:isMonthEnd?'Safe to hold into new month':`Next-month reading ${fmtg(advD1)} keeps the bias`,c:'#00ff9f'} : {tag:'EXIT',note:isMonthEnd?'Exit before month end — next-month reading weak':`Next-month reading ${fmtg(advD1)} loses the bias`,c:'#ff4d6d'};
-  // Combined hold/exit
-  const exits = [!okH1, !okH4, !okD1].filter(Boolean).length;
-  let holdExit, label, color, bg, border, level;
-  if (exits === 0) {
-    holdExit = 'HOLD'; label = '🟢 HOLD'; color = '#00ff9f';
+  const base = [row.base_d1 ?? 0, row.base_h4 ?? 0, row.adv_base_h1 ?? 0];
+  const quote = [row.quote_d1 ?? 0, row.quote_h4 ?? 0, row.adv_quote_h1 ?? 0];
+  const projectedGap = (baseScores, quoteScores) =>
+    strongestAdvCurrencyScore(baseScores) - strongestAdvCurrencyScore(quoteScores);
+  const nextDay = projectedGap(base, quote);
+  const nextWeek = projectedGap(
+    [base[0], row.adv_base_h4 ?? 0, base[2]],
+    [quote[0], row.adv_quote_h4 ?? 0, quote[2]]
+  );
+  const nextMonth = projectedGap(
+    [row.adv_base_d1 ?? 0, row.adv_base_h4 ?? 0, base[2]],
+    [row.adv_quote_d1 ?? 0, row.adv_quote_h4 ?? 0, quote[2]]
+  );
+
+  // Panda operates on Dubai time. Week and month forecasts appear only in
+  // the requested decision windows; a zero ADV value replaces the current one.
+  const dubaiNow = new Date(now.getTime() + 4 * 60 * 60 * 1000);
+  const showWeek = dubaiNow.getUTCDay() === 5;
+  const showMonth = dubaiNow.getUTCDate() >= 30;
+  const currentBias = row.hard_invalid ? 'WAIT' : (row.gap ?? 0) >= 5 ? 'BUY' : (row.gap ?? 0) <= -5 ? 'SELL' : 'WAIT';
+  const keepsBias = gap => currentBias === 'BUY' ? gap >= 5 : gap <= -5;
+  const forecasts = [{ name: 'TMRW', gap: nextDay }];
+  if (showWeek) forecasts.push({ name: 'WK', gap: nextWeek });
+  if (showMonth) forecasts.push({ name: 'MTH', gap: nextMonth });
+  const weak = currentBias === 'WAIT' ? [] : forecasts.filter(item => !keepsBias(item.gap));
+  const fmt = value => (value > 0 ? '+' : '') + value;
+  const detail = forecasts.map(item => `${item.name}:${fmt(item.gap)}`).join(' ');
+  let label, color, bg, border, level;
+  if (currentBias === 'WAIT') {
+    label = 'ADV FORECAST'; color = '#00b4ff';
+    bg = 'rgba(0,180,255,0.08)'; border = 'rgba(0,180,255,0.25)'; level = 'NEUTRAL';
+  } else if (!weak.length) {
+    label = '🟢 BIAS HOLDS'; color = '#00ff9f';
     bg = 'rgba(0,255,159,0.08)'; border = 'rgba(0,255,159,0.25)'; level = 'OK';
-  } else if (exits === 1 && okH4) {
-    holdExit = 'HOLD'; label = '🟡 HOLD — H1 WEAK'; color = '#ffd166';
-    bg = 'rgba(255,209,102,0.10)'; border = 'rgba(255,209,102,0.35)'; level = 'WARN';
-  } else if (exits >= 2 || !okH4) {
-    holdExit = 'EXIT'; label = '🔴 EXIT'; color = '#ff4d6d';
+  } else if (weak.length === forecasts.length) {
+    label = '🔴 BIAS WEAKENS'; color = '#ff4d6d';
     bg = 'rgba(255,77,109,0.10)'; border = 'rgba(255,77,109,0.35)'; level = 'BAD';
   } else {
-    holdExit = 'HOLD'; label = '🟡 HOLD — CAUTION'; color = '#ffd166';
+    label = `🟡 ${weak.map(item => item.name).join('/')} WEAK`; color = '#ffd166';
     bg = 'rgba(255,209,102,0.10)'; border = 'rgba(255,209,102,0.35)'; level = 'WARN';
   }
-  const fmt = v => (v>0?'+':'')+v;
-  const detail = `TMRW:${fmt(advH1)} WK:${fmt(advH4)} MTH:${fmt(advD1)}`;
-  // Contextual urgency flags
-  const urgent = [];
-  if (isFriWindow && !okH4) urgent.push('⚠️ WEEKEND');
-  if (isMonthEnd  && !okD1) urgent.push('⚠️ MONTH-END');
-  return { label, color, bg, border, detail, level, holdExit, urgent,
-    verdicts: { h1:h1v, h4:h4v, d1:d1v }, gaps: { h1:advH1, h4:advH4, d1:advD1 } };
+  return { label, color, bg, border, detail, level, gaps: { h1: nextDay, h4: nextWeek, d1: nextMonth } };
 }
 
 // ===== CURRENCY STRENGTH MATCHUP LABEL (v2) =====
@@ -1448,14 +1439,14 @@ function PairCardModal({ row, trend, cotBias, onClose, isMobile, confidence, mem
         {/* Extreme timeframe badge */}
         <ScoreTfBadge row={row} mt={0} showEmpty/>
 
-        {/* ADV Score Warning */}
+        {/* ADV score forecast */}
         {(()=>{const adv=advScore(row);if(!adv)return null;return(
           <div style={{display:'flex',alignItems:'center',gap:8,padding:'10px 14px',background:adv.bg,borderRadius:8,border:`1px solid ${adv.border}`}}>
             <span style={{fontFamily:mono,fontSize:13,color:adv.color,fontWeight:700}}>{adv.label}</span>
             <div style={{display:'flex',flexDirection:'column',gap:2}}>
               <span style={{fontFamily:mono,fontSize:10,color:adv.color}}>{adv.detail}</span>
               <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>
-                {adv.holdExit==='HOLD'?'Advance scoring aligned — hold position':adv.holdExit==='EXIT'?'⚠️ Consider exit — advance gap weakening':'⚠️ Caution — partial misalignment'}
+                {adv.level==='OK'?'Projected score keeps the current bias':adv.level==='BAD'?'Projected score loses the current bias':adv.level==='WARN'?'Projected scores show mixed bias strength':'Projected gap from MT4 ADV values'}
               </span>
             </div>
           </div>
