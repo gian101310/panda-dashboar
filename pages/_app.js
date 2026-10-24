@@ -22,6 +22,7 @@ function MaintenanceScreen() {
           </div>
           <div style={{width:60,height:2,background:'linear-gradient(90deg,transparent,#ffaa44,transparent)',margin:'0 auto 24px',borderRadius:2}}/>
           <div style={{fontSize:9,color:'#4a5568',letterSpacing:3}}>SYSTEM OFFLINE</div>
+          <a href="/admin-login" style={{display:'inline-block',marginTop:22,padding:'10px 16px',border:'1px solid #ffaa4466',borderRadius:6,color:'#ffaa44',fontSize:11,letterSpacing:2,textDecoration:'none'}}>ADMIN ACCESS</a>
         </div>
       </div>
     </>
