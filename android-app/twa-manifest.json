@@ -1,0 +1,52 @@
+{
+  "packageId": "app.pandaengine",
+  "host": "pandaengine.app",
+  "name": "Panda Engine",
+  "launcherName": "Panda",
+  "display": "standalone",
+  "themeColor": "#050A14",
+  "themeColorDark": "#000000",
+  "navigationColor": "#000000",
+  "navigationColorDark": "#000000",
+  "navigationDividerColor": "#000000",
+  "navigationDividerColorDark": "#000000",
+  "backgroundColor": "#050A14",
+  "enableNotifications": false,
+  "startUrl": "/dashboard",
+  "iconUrl": "https://pandaengine.app/icons/panda-512.png",
+  "maskableIconUrl": "https://pandaengine.app/icons/panda-512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "release.keystore",
+    "alias": "pandaengine"
+  },
+  "appVersionName": "1",
+  "appVersionCode": 1,
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://pandaengine.app/manifest.json",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://pandaengine.app/",
+  "minSdkVersion": 24,
+  "orientation": "default",
+  "fingerprints": [
+    {
+      "name": "local-release",
+      "value": "27:5A:49:41:6A:24:E0:AB:93:B6:B7:17:FB:03:73:62:11:7B:E4:36:CA:F8:0C:AF:35:10:E2:CC:2F:BC:85:C6"
+    }
+  ],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": [],
+  "protocolHandlers": [],
+  "fileHandlers": [],
+  "launchHandlerClientMode": "",
+  "displayOverride": [],
+  "appVersion": "1"
+}

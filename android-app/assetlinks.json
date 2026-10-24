@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "app.pandaengine",
+        "sha256_cert_fingerprints": ["27:5A:49:41:6A:24:E0:AB:93:B6:B7:17:FB:03:73:62:11:7B:E4:36:CA:F8:0C:AF:35:10:E2:CC:2F:BC:85:C6"]
+      }
+    }]

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-25 - Add Android app package
+
+- Generated a Trusted Web Activity project for app.pandaengine with Android target API 36 and minimum API 24.
+- Built a signed test APK and Play Store AAB; kept the signing key and generated packages outside Git.
+- Added the website association file for the test APK signature and documented the build and Play signing steps.
+
 ## 2026-10-24 - Warn on nearby levels in dashboard verdicts
 
 - Show an amber nearby support/resistance warning beside every valid bias verdict, with an explicit market-execution warning when the verdict says MARKET EXECUTE.
