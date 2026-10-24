@@ -2,6 +2,12 @@
 
 Latest entries first. Keep this short so Claude can read it before work.
 
+## 2026-10-25 - iOS app preparation for Mac Codex
+
+- Boss-G's iPhone Home Screen version of Panda Engine works. The Android APK has also been installed and opened on a phone.
+- Mac Codex should read `docs/CLAUDE_WINDOWS_HANDOFF_2026-10-25.md` before starting the separate iOS project. It records the current mobile state, Git coordination, and iOS work boundaries.
+- No iOS native project or App Store submission exists yet. This entry is a handoff only.
+
 ## 2026-07-16 - Security Cleanup And Windows Indicator Release
 
 - Commits already deployed: `f65952b remove-unused-hermes-guardian-and-harden-security`, `752aa0f fix-ea-result-idempotency`
