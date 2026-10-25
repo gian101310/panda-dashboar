@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { validateIndicatorRequest } from '../lib/indicatorLicense.mjs';
+import { parseIndicatorLicenseBody, validateIndicatorRequest } from '../lib/indicatorLicense.mjs';
 import { createIndicatorLicenseRequestHandler } from '../lib/indicatorLicenseRequestHandler.mjs';
 import { buildIndicatorRequestAlertMessage } from '../lib/indicatorRequestAlert.mjs';
 
@@ -14,6 +14,16 @@ function response() {
     end() { return this; },
   };
 }
+
+test('license endpoint accepts raw form data sent by cTrader', () => {
+  const fields = parseIndicatorLicenseBody('product_code=ctrader_panda_levels_v2&account_number=12345678&account_server=Demo+Broker');
+  assert.deepEqual(fields, {
+    product_code: 'ctrader_panda_levels_v2',
+    account_number: '12345678',
+    account_server: 'Demo Broker',
+  });
+  assert.equal(parseIndicatorLicenseBody(fields), fields);
+});
 
 async function invoke(handler, req) {
   const res = response();

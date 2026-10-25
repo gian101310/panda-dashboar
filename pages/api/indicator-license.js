@@ -1,5 +1,5 @@
 import { supabase } from '../../lib/supabase';
-import { decideIndicatorLicense, normalizeMt4AccountId, normalizeProductCode } from '../../lib/indicatorLicense.mjs';
+import { decideIndicatorLicense, normalizeMt4AccountId, normalizeProductCode, parseIndicatorLicenseBody } from '../../lib/indicatorLicense.mjs';
 import { getIndicatorProduct } from '../../lib/indicatorProducts.mjs';
 
 const APPROVED_BODY = 'OK|APPROVED';
@@ -12,7 +12,7 @@ function text(res, status, body) {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return text(res, 405, 'DENY|METHOD_NOT_ALLOWED');
 
-  const body = req.body || {};
+  const body = parseIndicatorLicenseBody(req.body);
   const productCode = normalizeProductCode(body.product_code);
   const mt4AccountId = normalizeMt4AccountId(body.mt4_account_id || body.account_number);
 
