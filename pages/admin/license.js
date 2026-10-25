@@ -58,7 +58,7 @@ export default function LicenseAdminPage() {
   const [revealedToken, setRevealedToken] = useState('');
   const [revealStatus, setRevealStatus] = useState('REVEAL & COPY ACTIVE TOKEN');
   const revealTimerRef = useRef(null);
-  const [form, setForm] = useState({ customer_name: '', contact: '', telegram_username: '', mt4_account_id: '', trading_account_number: '', platform: 'MT4', product_code: INDICATOR_PRODUCTS[0].code, paid_confirmed: false, price_override: '', notes: '' });
+  const [form, setForm] = useState({ customer_name: '', contact: '', telegram_username: '', mt4_account_id: '', trading_account_number: '', platform: 'MT4', product_code: INDICATOR_PRODUCTS[0].code, paid_confirmed: false, expires_at: '', price_override: '', notes: '' });
 
   const load = useCallback(async () => {
     const res = await fetch('/api/admin/indicator-licenses');
@@ -120,6 +120,24 @@ export default function LicenseAdminPage() {
     setSavingId('');
   }
 
+  async function downloadMt5PandaLevelsLicense(license) {
+    setError('');
+    const res = await fetch(`/api/admin/mt5-panda-levels-license?license_id=${encodeURIComponent(license.id)}`);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(data.error || 'License file download failed');
+      return;
+    }
+    const url = URL.createObjectURL(await res.blob());
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `PandaLevelsMT5_${license.trading_account_number || license.mt4_account_id}.lic`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
   async function createLicense(e) {
     e.preventDefault();
     const account = usesTradingAccount(form.platform, form.product_code) ? form.trading_account_number : form.mt4_account_id;
@@ -133,7 +151,7 @@ export default function LicenseAdminPage() {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) { setError(data.error || 'Create failed'); setCreating(false); return; }
-    setForm({ customer_name: '', contact: '', telegram_username: '', mt4_account_id: '', trading_account_number: '', platform: 'MT4', product_code: INDICATOR_PRODUCTS[0].code, paid_confirmed: false, price_override: '', notes: '' });
+    setForm({ customer_name: '', contact: '', telegram_username: '', mt4_account_id: '', trading_account_number: '', platform: 'MT4', product_code: INDICATOR_PRODUCTS[0].code, paid_confirmed: false, expires_at: '', price_override: '', notes: '' });
     setShowCreate(false);
     setCreating(false);
     await load();
@@ -141,7 +159,7 @@ export default function LicenseAdminPage() {
 
   function openProductLicenseCreate(productCode) {
     const product = productMap[productCode];
-    setForm({ customer_name: '', contact: '', telegram_username: '', mt4_account_id: '', trading_account_number: '', platform: product?.platform || 'CTRADER', product_code: productCode, paid_confirmed: false, price_override: '', notes: '' });
+    setForm({ customer_name: '', contact: '', telegram_username: '', mt4_account_id: '', trading_account_number: '', platform: product?.platform || 'CTRADER', product_code: productCode, paid_confirmed: false, expires_at: '', price_override: '', notes: '' });
     setShowCreate(true);
     requestAnimationFrame(() => document.getElementById('manual-license-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   }
@@ -345,12 +363,12 @@ export default function LicenseAdminPage() {
             </div>
             {[
               { code: CTRADER_PANDA_LEVELS_PRODUCT_CODE, platform: 'ctrader', title: 'PANDA LEVELS V2 · cTRADER', file: 'Panda Levels V2 cTrader Licensed.algo', kind: '.ALGO' },
-              { code: MT5_PANDA_LEVELS_PRODUCT_CODE, platform: 'mt5', title: 'PANDA LEVELS · MT5', file: 'Panda Levels MT5 Licensed.zip', kind: '.ZIP' },
+              { code: MT5_PANDA_LEVELS_PRODUCT_CODE, platform: 'mt5', title: 'PANDA LEVELS · MT5 OFFLINE', file: 'Panda Levels MT5 Licensed Offline.zip', kind: '.ZIP' },
             ].map((item) => (
               <div key={item.code} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', background: '#080c18', border: '1px solid #00b4ff55', borderRadius: 7, padding: 12, marginBottom: 12 }}>
                 <div>
                   <div style={{ fontFamily: orb, fontSize: 10, color: '#e8eaf0' }}>{item.title}</div>
-                  <div style={{ fontFamily: raj, fontSize: 12, color: '#60708d', marginTop: 4 }}>Admin download. Create and approve the trading account license; disable or set an expiry here when needed.</div>
+                  <div style={{ fontFamily: raj, fontSize: 12, color: '#60708d', marginTop: 4 }}>{item.platform === 'mt5' ? 'Indicator-only download. Approve a paid MT5 account, set EXPIRY below, then download that account’s license file. Delivered files remain usable until their expiry.' : 'Admin download. Create and approve the trading account license; disable or set an expiry here when needed.'}</div>
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <a href={`/api/admin/panda-levels-download?platform=${item.platform}`} download={item.file} style={{ ...smallBtn('#00b4ff'), textDecoration: 'none' }}>DOWNLOAD {item.kind}</a>
@@ -452,7 +470,7 @@ export default function LicenseAdminPage() {
                 </div>
                 <div>
                   <label style={{ fontFamily: mono, fontSize: 8, color: '#445566', letterSpacing: 1, display: 'block', marginBottom: 4 }}>INDICATOR</label>
-                  <select value={form.product_code} onChange={(e) => { const product = productMap[e.target.value]; setForm({ ...form, product_code: e.target.value, platform: product?.platform || 'MT4' }); }} style={{ ...input, width: '100%' }}>
+                  <select value={form.product_code} onChange={(e) => { const product = productMap[e.target.value]; setForm({ ...form, product_code: e.target.value, platform: product?.platform || 'MT4', expires_at: e.target.value === MT5_PANDA_LEVELS_PRODUCT_CODE ? form.expires_at : '' }); }} style={{ ...input, width: '100%' }}>
                     {INDICATOR_PRODUCTS.map((p) => <option key={p.code} value={p.code}>{p.name} — {p.priceLabel}</option>)}
                   </select>
                 </div>
@@ -463,6 +481,10 @@ export default function LicenseAdminPage() {
                     <option value="true">PAID</option>
                   </select>
                 </div>
+                {form.product_code === MT5_PANDA_LEVELS_PRODUCT_CODE && <div>
+                  <label style={{ fontFamily: mono, fontSize: 8, color: '#445566', letterSpacing: 1, display: 'block', marginBottom: 4 }}>EXPIRY DATE · DUBAI</label>
+                  <input type="date" value={form.expires_at} onChange={(e) => setForm({ ...form, expires_at: e.target.value })} style={{ ...input, width: '100%' }} />
+                </div>}
                 <div>
                   <label style={{ fontFamily: mono, fontSize: 8, color: '#445566', letterSpacing: 1, display: 'block', marginBottom: 4 }}>PRICE (CUSTOM)</label>
                   <input value={form.price_override} onChange={(e) => setForm({ ...form, price_override: e.target.value })} placeholder="e.g. $300 USD" style={{ ...input, width: '100%' }} />
@@ -533,6 +555,7 @@ export default function LicenseAdminPage() {
                           <button onClick={() => patch(license.id, { action: license.status === 'DISABLED' ? 'enable' : 'disable' })} style={smallBtn(license.status === 'DISABLED' ? '#00b4ff' : '#ff4d6d')}>
                             {license.status === 'DISABLED' ? 'ENABLE' : 'DISABLE'}
                           </button>
+                          {license.product_code === MT5_PANDA_LEVELS_PRODUCT_CODE && <button type="button" onClick={() => downloadMt5PandaLevelsLicense(license)} style={smallBtn('#00b4ff')}>DOWNLOAD LICENSE FILE</button>}
                           <button onClick={() => deleteLicense(license.id, license.customer_name)} style={smallBtn('#ff9944')}>DELETE</button>
                         </div>
                       </td>

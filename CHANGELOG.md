@@ -1,3 +1,7 @@
+## 2026-10-26 - MT5 Panda Levels offline licenses
+- Added one MT5 indicator binary plus Admin-issued account-bound, expiring license files; no EA is required.
+- The Admin expiry date covers the selected Dubai day. Previously delivered offline files remain valid until that date.
+
 # Changelog
 
 ## 2026-10-26 - Panda-approved Levels indicators

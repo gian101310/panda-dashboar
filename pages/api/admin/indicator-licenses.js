@@ -1,7 +1,8 @@
 import { supabase } from '../../../lib/supabase';
 import { requireAdmin } from '../../../lib/auth';
-import { getIndicatorProduct } from '../../../lib/indicatorProducts.mjs';
+import { getIndicatorProduct, MT5_PANDA_LEVELS_PRODUCT_CODE } from '../../../lib/indicatorProducts.mjs';
 import { normalizeIndicatorPlatform, normalizeMt4AccountId, normalizeProductCode, normalizeTradingAccountNumber } from '../../../lib/indicatorLicense.mjs';
+import { expiryAtEndOfDubaiDay } from '../../../lib/mt5PandaLevelsOfflineLicense.mjs';
 
 const STATUSES = new Set(['PENDING', 'APPROVED', 'DISABLED', 'EXPIRED']);
 
@@ -64,7 +65,7 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'POST') {
-    const { customer_name, contact, telegram_username, mt4_account_id, trading_account_number, product_code, paid_confirmed, price_override, notes } = req.body || {};
+    const { customer_name, contact, telegram_username, mt4_account_id, trading_account_number, product_code, paid_confirmed, expires_at, price_override, notes } = req.body || {};
     const productCode = normalizeProductCode(product_code);
     const product = getIndicatorProduct(productCode);
     if (!product) return res.status(400).json({ error: 'invalid product' });
@@ -73,6 +74,9 @@ export default async function handler(req, res) {
       ? normalizeTradingAccountNumber(trading_account_number || mt4_account_id)
       : normalizeMt4AccountId(mt4_account_id);
     if (!customer_name || !account) return res.status(400).json({ error: 'name, account_id, product required' });
+    if (productCode === MT5_PANDA_LEVELS_PRODUCT_CODE && expires_at && !expiryAtEndOfDubaiDay(expires_at)) {
+      return res.status(400).json({ error: 'invalid expiry date' });
+    }
     const row = {
       customer_name: String(customer_name).trim(),
       contact: String(contact || '').trim(),
@@ -82,6 +86,7 @@ export default async function handler(req, res) {
       platform,
       product_code: productCode,
       paid_confirmed: !!paid_confirmed,
+      expires_at: expires_at || null,
       price_override: price_override ? String(price_override).trim() : null,
       notes: notes ? String(notes).trim() : null,
       status: 'PENDING',
