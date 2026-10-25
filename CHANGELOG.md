@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-26 - Panda-approved Levels indicators
+
+- Added cTrader and MT5 Panda Levels license products with Admin approval, disable, paid status, and expiry controls.
+- Added private Admin downloads for online-licensed builds; the MT5 package includes a read-only license feed EA.
+- Removed current public repo copies of the old offline Levels indicators; historical copies cannot be revoked.
+
 ## 2026-10-25 - Add Android app package
 
 - Generated a Trusted Web Activity project for app.pandaengine with Android target API 36 and minimum API 24.
