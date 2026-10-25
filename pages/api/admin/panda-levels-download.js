@@ -3,7 +3,7 @@ import { supabase } from '../../../lib/supabase';
 
 const ARTIFACTS = {
   ctrader: { key: 'panda-levels-v2-ctrader-licensed.algo', name: 'Panda Levels V2 cTrader Licensed.algo' },
-  mt5: { key: 'panda-levels-v2-12-mt5-offline-20261026.zip', name: 'Panda Levels MT5 Licensed Offline.zip' },
+  mt5: { key: 'panda-levels-v2-13-mt5-offline-20261026.zip', name: 'Panda Levels MT5 Licensed Offline.zip' },
 };
 
 export default async function handler(req, res) {
