@@ -1002,6 +1002,11 @@ def gold_signal_to_snapshot_card(gold):
         "OFFLINE" if "offline" in filter_text.lower() else
         filter_text
     )
+    try:
+        st_level = float(gold.get("st"))
+        gold_level = f"ST {st_level:.2f}" if math.isfinite(st_level) and st_level > 0 else "N/A"
+    except (TypeError, ValueError):
+        gold_level = "N/A"
     return {
         "symbol": GOLD_SYMBOL,
         "gap": gold.get("gap") or 0,
@@ -1013,6 +1018,7 @@ def gold_signal_to_snapshot_card(gold):
         "score": score_text.replace(" | ", " "),
         "category": "BUY" if status == "LONG" else "SELL" if status == "SHORT" else "YELLOW" if status == "OFFLINE" else "WHITE",
         "xtf": tp_text,
+        "level": gold_level,
     }
 
 def _load_current_parsed_map_for_gold():
@@ -2456,62 +2462,28 @@ def _load_snapshot_font(font_name, size):
 
 
 def snapshot_pair_levels(row):
-    """Display-only level context matching the dashboard Pair Card."""
+    """Nearest previous day/week level for the Snapshot display."""
     symbol = row.get("symbol") or ""
     try:
         price = float(row.get("pl_price"))
     except (TypeError, ValueError):
-        price = None
-    if price is not None and (not math.isfinite(price) or price <= 0):
-        price = None
+        return "N/A"
+    if not math.isfinite(price) or price <= 0:
+        return "N/A"
     pip = 0.01 if "JPY" in symbol.upper() else 0.0001
-    support, resistance = [], []
-    if price is not None:
-        for name in ("PDH", "PDL", "PWH", "PWL"):
-            try:
-                level = float(row.get(name.lower()))
-            except (TypeError, ValueError):
-                continue
-            if not math.isfinite(level) or level <= 0:
-                continue
-            distance = abs(level - price) / pip
-            if distance > 30:
-                continue
-            if level <= price:
-                support.append((distance, name))
-            if level >= price:
-                resistance.append((distance, name))
-    support.sort()
-    resistance.sort()
-    if support and resistance:
-        nearby = "BETWEEN SUPPORT & RESISTANCE"
-    else:
-        levels = support or resistance
-        if levels:
-            stacked = len(levels) > 1 and levels[1][0] - levels[0][0] <= 10
-            side = "SUPPORT" if support else "RESISTANCE"
-            names = " + ".join(name for _, name in levels[:2 if stacked else 1])
-            nearby = f"{'STACKED' if stacked else 'NEAR'} {side} ({names})"
-        else:
-            nearby = ""
-
-    gap = row.get("gap") or 0
-    is_buy = gap >= 5
-    is_sell = gap <= -5
-    candidates = (("PDL", "PWL", "PML", "PYL") if is_buy else
-                  ("PDH", "PWH", "PMH", "PYH") if is_sell else ())
-    pullback = []
-    for name in candidates:
+    levels = []
+    for name in ("PDH", "PDL", "PWH", "PWL"):
         try:
             level = float(row.get(name.lower()))
         except (TypeError, ValueError):
             continue
         if math.isfinite(level) and level > 0:
-            pullback.append((name, level))
-    pullback.sort(key=lambda item: item[1], reverse=is_buy)
+            levels.append((abs(level - price) / pip, name, level))
+    if not levels:
+        return "N/A"
+    _, name, level = min(levels)
     decimals = 3 if "JPY" in symbol.upper() else 5
-    pullback_text = "  ".join(f"{name} {level:.{decimals}f}" for name, level in pullback[:2])
-    return nearby, pullback_text
+    return f"{name} {level:.{decimals}f}"
 
 def build_snapshot_layout(pair_count):
     """
@@ -2525,14 +2497,14 @@ def build_snapshot_layout(pair_count):
     gutter = 32
     header_h = 220
     footer_h = 120
-    row_h = 450   # dedicated level and pullback line below XTF
+    row_h = 450   # dedicated nearest-level line below XTF
     row_gap = 16
     width = margin * 2 + card_w * columns + gutter * (columns - 1)
     height = header_h + rows_per_col * (row_h + row_gap) + footer_h
     return {
         "columns": columns,
         "rows_per_col": rows_per_col,
-        "fields": ["PAIR", "GAP", "BIAS", "MATCHUP", "H1/H4", "PL", "SCORE", "XTF", "LEVEL"],
+        "fields": ["PAIR", "GAP", "BIAS", "MATCHUP", "H1/H4", "PL", "XTF", "LEVEL"],
         "width": width,
         "height": height,
         "card_w": card_w,
@@ -2545,7 +2517,7 @@ def build_snapshot_layout(pair_count):
         "accent_w": 18,
         "top_offsets": {"gap": 430, "bias": 680, "matchup": 1080},
         "line_offsets": {"box": 112, "metrics": 198, "xtf": 284, "levels": 368},
-        "bottom_offsets": {"box": 0, "fl_st": 0, "score": 650},
+        "bottom_offsets": {"box": 0, "fl_st": 0},
     }
 
 def generate_snapshot(pair_data):
@@ -2598,13 +2570,12 @@ def generate_snapshot(pair_data):
     font_bold  = _load_snapshot_font("arialbd.ttf", 72)
     font_hdr   = _load_snapshot_font("arialbd.ttf", 52)
     font_sm    = _load_snapshot_font("arial.ttf",   44)
-    font_level = _load_snapshot_font("arial.ttf",   34)
 
     # ---- Header ----
     draw.rectangle([0, 0, width, HEADER_H], fill=BG_CARD)
     draw.rectangle([0, HEADER_H - 4, width, HEADER_H], fill=ACCENT)
     draw.text((MARGIN, 40), "PANDA ENGINE v3.0", fill=TEXT_HEAD, font=font_title)
-    draw.text((MARGIN, 120), "PAIR  GAP  BIAS  MATCHUP  H1/H4  PDR  PL  ACTION  SCORE",
+    draw.text((MARGIN, 120), "PAIR  GAP  BIAS  MATCHUP  H1/H4  PDR  PL  XTF  LEVEL",
               fill=TEXT_HEAD, font=font_hdr)
 
     # ---- Data rows ----
@@ -2667,11 +2638,6 @@ def generate_snapshot(pair_data):
         pl_color = C_YELLOW if pl_label in ("NEAR", "BETWEEN") else C_WHITE if pl_label == "UNVERIFIED" else tc
         draw.text((x + BOTTOM_OFFSETS["fl_st"], metrics_y), f"PL {'N/A' if pl_label == 'UNVERIFIED' else pl_label}",
                   fill=pl_color, font=font_data)
-        _act = p.get("action", "")
-        if _act:
-            draw.text((x + 380, metrics_y), _act, fill=tc, font=font_data)
-        draw.text((x + 740, metrics_y), f"SCORE {p.get('score', '-')}",
-                  fill=tc, font=font_data)
 
         # EXTREME TF line (v9) — timeframes at ±4/5/6 per currency, e.g. "GBP D1+5 H4+5 | JPY H1-5"
         xtf_y = y_card + LINE_OFFSETS.get("xtf", 284)
@@ -2679,11 +2645,7 @@ def generate_snapshot(pair_data):
                   fill=tc, font=font_data)
 
         level_y = y_card + LINE_OFFSETS["levels"]
-        nearby = p.get("nearby_level") or "-"
-        pullback = p.get("pullback_levels") or "-"
-        level_color = C_YELLOW if nearby.startswith("BETWEEN") else tc
-        draw.text((x, level_y), f"LEVEL {nearby}", fill=level_color, font=font_level)
-        draw.text((x + 950, level_y), f"PB {pullback}", fill=tc, font=font_level)
+        draw.text((x, level_y), f"LEVEL {p.get('level') or 'N/A'}", fill=tc, font=font_data)
 
     # ---- Footer (clean — legend lives on the dashboard Overview tab) ----
     footer_y = height - FOOTER_H
@@ -3257,10 +3219,6 @@ def send_snapshot():
             box_h4 = _box_short.get(r.get("box_h4_trend", ""), "-")
             box_badge = f"H1:{box_h1}  H4:{box_h4}"
 
-            # Confidence score (exact port of dashboard computeConfidence)
-            conf_score, conf_tier = _compute_confidence(r)
-            conf_display = f"{conf_score} {conf_tier}"
-
             # Validity for Telegram: gap threshold + not hard_invalid (no PL filter)
             is_valid = (not hard_inv) and bias_val in ("BUY", "SELL") and abs_gap >= 5
 
@@ -3292,10 +3250,6 @@ def send_snapshot():
                 white_count += 1
                 bias_val = "INVALID"
 
-            # ACTION word from execution rules (easy read on the image)
-            _pc = classify_phase_server(r)
-            action_word = verdict_action_word(r, _pc)
-
             # PDR in plain words RELATIVE TO BIAS (live broker data preferred):
             #   SUPPORTS = yesterday moved with the bias and held (continuation backdrop)
             #   WEAK SUP = right direction, no conviction
@@ -3325,7 +3279,7 @@ def send_snapshot():
             if _b_tf: _xtf_parts.append(f"{r.get('base_currency') or symbol[:3]} {_b_tf}")
             if _q_tf: _xtf_parts.append(f"{r.get('quote_currency') or symbol[3:6]} {_q_tf}")
             xtf_str = " | ".join(_xtf_parts) if _xtf_parts else "NONE"
-            nearby_level, pullback_levels = snapshot_pair_levels(r)
+            level = snapshot_pair_levels(r)
 
             pair_data.append({
                 "symbol": symbol,
@@ -3335,12 +3289,9 @@ def send_snapshot():
                 "pl_zone": pl_zone_v,
                 "pl_status": pl_status_v,
                 "pdr": pdr_display,
-                "action": action_word,
-                "score": conf_display,
                 "category": category,
                 "xtf": xtf_str,
-                "nearby_level": nearby_level,
-                "pullback_levels": pullback_levels,
+                "level": level,
                 "matchup": _snapshot_pair_matchup(r),
             })
 
@@ -3358,7 +3309,7 @@ def send_snapshot():
 
         if not pair_data:
             pair_data = [{"symbol": "NO DATA", "gap": 0, "bias": "-", "box_badge": "-",
-                          "pl_zone": "-", "score": 0, "category": "WHITE", "xtf": "-"}]
+                          "pl_zone": "-", "category": "WHITE", "xtf": "-"}]
 
         img_path = generate_snapshot(pair_data)
 
