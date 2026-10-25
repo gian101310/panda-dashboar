@@ -2454,6 +2454,65 @@ def _load_snapshot_font(font_name, size):
     except Exception:
         return ImageFont.load_default()
 
+
+def snapshot_pair_levels(row):
+    """Display-only level context matching the dashboard Pair Card."""
+    symbol = row.get("symbol") or ""
+    try:
+        price = float(row.get("pl_price"))
+    except (TypeError, ValueError):
+        price = None
+    if price is not None and (not math.isfinite(price) or price <= 0):
+        price = None
+    pip = 0.01 if "JPY" in symbol.upper() else 0.0001
+    support, resistance = [], []
+    if price is not None:
+        for name in ("PDH", "PDL", "PWH", "PWL"):
+            try:
+                level = float(row.get(name.lower()))
+            except (TypeError, ValueError):
+                continue
+            if not math.isfinite(level) or level <= 0:
+                continue
+            distance = abs(level - price) / pip
+            if distance > 30:
+                continue
+            if level <= price:
+                support.append((distance, name))
+            if level >= price:
+                resistance.append((distance, name))
+    support.sort()
+    resistance.sort()
+    if support and resistance:
+        nearby = "BETWEEN SUPPORT & RESISTANCE"
+    else:
+        levels = support or resistance
+        if levels:
+            stacked = len(levels) > 1 and levels[1][0] - levels[0][0] <= 10
+            side = "SUPPORT" if support else "RESISTANCE"
+            names = " + ".join(name for _, name in levels[:2 if stacked else 1])
+            nearby = f"{'STACKED' if stacked else 'NEAR'} {side} ({names})"
+        else:
+            nearby = ""
+
+    gap = row.get("gap") or 0
+    is_buy = gap >= 5
+    is_sell = gap <= -5
+    candidates = (("PDL", "PWL", "PML", "PYL") if is_buy else
+                  ("PDH", "PWH", "PMH", "PYH") if is_sell else ())
+    pullback = []
+    for name in candidates:
+        try:
+            level = float(row.get(name.lower()))
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(level) and level > 0:
+            pullback.append((name, level))
+    pullback.sort(key=lambda item: item[1], reverse=is_buy)
+    decimals = 3 if "JPY" in symbol.upper() else 5
+    pullback_text = "  ".join(f"{name} {level:.{decimals}f}" for name, level in pullback[:2])
+    return nearby, pullback_text
+
 def build_snapshot_layout(pair_count):
     """
     Telegram previews tall portrait images as narrow thumbnails. Keep 21 pairs in
@@ -2466,14 +2525,14 @@ def build_snapshot_layout(pair_count):
     gutter = 32
     header_h = 220
     footer_h = 120
-    row_h = 370   # +70 for EXTREME TF (XTF) line — v9
+    row_h = 450   # dedicated level and pullback line below XTF
     row_gap = 16
     width = margin * 2 + card_w * columns + gutter * (columns - 1)
     height = header_h + rows_per_col * (row_h + row_gap) + footer_h
     return {
         "columns": columns,
         "rows_per_col": rows_per_col,
-        "fields": ["PAIR", "GAP", "BIAS", "MATCHUP", "H1/H4", "PL", "SCORE", "XTF"],
+        "fields": ["PAIR", "GAP", "BIAS", "MATCHUP", "H1/H4", "PL", "SCORE", "XTF", "LEVEL"],
         "width": width,
         "height": height,
         "card_w": card_w,
@@ -2485,7 +2544,7 @@ def build_snapshot_layout(pair_count):
         "row_gap": row_gap,
         "accent_w": 18,
         "top_offsets": {"gap": 430, "bias": 680, "matchup": 1080},
-        "line_offsets": {"box": 112, "metrics": 198, "xtf": 284},
+        "line_offsets": {"box": 112, "metrics": 198, "xtf": 284, "levels": 368},
         "bottom_offsets": {"box": 0, "fl_st": 0, "score": 650},
     }
 
@@ -2539,6 +2598,7 @@ def generate_snapshot(pair_data):
     font_bold  = _load_snapshot_font("arialbd.ttf", 72)
     font_hdr   = _load_snapshot_font("arialbd.ttf", 52)
     font_sm    = _load_snapshot_font("arial.ttf",   44)
+    font_level = _load_snapshot_font("arial.ttf",   34)
 
     # ---- Header ----
     draw.rectangle([0, 0, width, HEADER_H], fill=BG_CARD)
@@ -2617,6 +2677,13 @@ def generate_snapshot(pair_data):
         xtf_y = y_card + LINE_OFFSETS.get("xtf", 284)
         draw.text((x + BOTTOM_OFFSETS["box"], xtf_y), f"XTF {p.get('xtf', '-')}",
                   fill=tc, font=font_data)
+
+        level_y = y_card + LINE_OFFSETS["levels"]
+        nearby = p.get("nearby_level") or "-"
+        pullback = p.get("pullback_levels") or "-"
+        level_color = C_YELLOW if nearby.startswith("BETWEEN") else tc
+        draw.text((x, level_y), f"LEVEL {nearby}", fill=level_color, font=font_level)
+        draw.text((x + 950, level_y), f"PB {pullback}", fill=tc, font=font_level)
 
     # ---- Footer (clean — legend lives on the dashboard Overview tab) ----
     footer_y = height - FOOTER_H
@@ -3258,6 +3325,7 @@ def send_snapshot():
             if _b_tf: _xtf_parts.append(f"{r.get('base_currency') or symbol[:3]} {_b_tf}")
             if _q_tf: _xtf_parts.append(f"{r.get('quote_currency') or symbol[3:6]} {_q_tf}")
             xtf_str = " | ".join(_xtf_parts) if _xtf_parts else "NONE"
+            nearby_level, pullback_levels = snapshot_pair_levels(r)
 
             pair_data.append({
                 "symbol": symbol,
@@ -3271,6 +3339,8 @@ def send_snapshot():
                 "score": conf_display,
                 "category": category,
                 "xtf": xtf_str,
+                "nearby_level": nearby_level,
+                "pullback_levels": pullback_levels,
                 "matchup": _snapshot_pair_matchup(r),
             })
 
