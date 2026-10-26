@@ -2,7 +2,7 @@
 // Requires PandaDashboardFeedMT5-Licensed on one chart and the separate
 // Panda MT5 Dashboard Overlay account license in Panda Engine Admin.
 #property copyright "Panda Engine"
-#property version "1.00"
+#property version "1.01"
 #property indicator_chart_window
 #property indicator_plots 0
 
@@ -96,7 +96,10 @@ string JsonScalar(const string json, const string key)
 
 datetime ParseUtcStamp(const string value)
 {
-   if(StringLen(value) < 19 || StringSubstr(value, 10, 1) != "T") return 0;
+   // The feed's server_time is ISO 8601, while Supabase updated_at uses a space.
+   if(StringLen(value) < 19) return 0;
+   string separator = StringSubstr(value, 10, 1);
+   if(separator != "T" && separator != " ") return 0;
    string stamp = StringSubstr(value, 0, 19);
    StringReplace(stamp, "-", ".");
    StringReplace(stamp, "T", " ");

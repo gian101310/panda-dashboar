@@ -15,6 +15,8 @@ The panel uses Panda's existing MT5 overlay snapshot. It does not recompute scor
 3. In Panda Engine Admin, approve and mark paid a **Panda MT5 Dashboard Overlay** license for the MT5 account number. A Panda Levels license alone does not authorize this dashboard feed.
 4. Attach the feed EA to one supported forex chart. Attach the scoring indicator to any chart where the panel is wanted. Refresh Navigator or restart MT5 if the files do not appear.
 
+After replacing the `.ex5` while MT5 is running, remove and reattach the scoring indicator to load the new build. Leave the feed EA on its separate chart.
+
 One feed EA refreshes the shared snapshot every 60 seconds for all indicator instances. **LIVE** means its last successful response is within the server's 10-minute freshness limit; each pair must also have an updated score within that limit. **STALE** means the feed needs refreshing. A license rejection appears as its server status and clears the displayed rows. If the feed has never run, the panel shows **ATTACH FEED EA**.
 
 The source is `Panda Scoring Dashboard MT5.mq5`; compile it in MetaEditor if changing the `PanelX`, `PanelY`, or initial view inputs is insufficient. The released `.ex5` was compiled with MetaEditor64 and `compile.log` records the result.

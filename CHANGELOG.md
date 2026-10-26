@@ -1,3 +1,6 @@
+## 2026-10-26 - Fix MT5 scoring row freshness
+- Accept the dashboard feed's space-separated UTC updated_at timestamps, so fresh valid pairs are displayed instead of 0/21.
+
 ## 2026-10-26 - Compact MT5 scoring dashboard
 - Added a small MT5 indicator with switchable valid-pairs and chart-pair views plus a collapsible header.
 - Reused the separately licensed Panda MT5 dashboard feed, with per-pair freshness checks and no scoring or EA rule changes.
