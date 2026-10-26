@@ -3,6 +3,7 @@ import { createCtraderOverlayHandler } from '../../lib/ctraderOverlayHandler.mjs
 import { createIndicatorDeviceAccess } from '../../lib/indicatorDeviceAccess.mjs';
 import { createIndicatorDeviceShadowRecorder } from '../../lib/indicatorDeviceShadowRecorder.mjs';
 import { CTRADER_OVERLAY_PRODUCT_CODE } from '../../lib/indicatorProducts.mjs';
+import { createIndicatorLicenseLookupBackoff } from '../../lib/indicatorLicenseLookupBackoff.mjs';
 
 const requests = new Map();
 const DEVICE_TOUCH_MS = 5 * 60 * 1000;
@@ -88,7 +89,7 @@ const handler = createCtraderOverlayHandler({
     if (error) throw error;
     return data;
   },
-  getLicense: async (account, productCode) => {
+  getLicense: createIndicatorLicenseLookupBackoff(async (account, productCode) => {
     const { data, error } = await supabase
       .from('indicator_licenses')
       .select('id,status,expires_at,paid_confirmed,device_limit')
@@ -100,7 +101,7 @@ const handler = createCtraderOverlayHandler({
       .maybeSingle();
     if (error) throw error;
     return data;
-  },
+  }),
   getDashboardRows: async () => {
     const { data, error } = await supabase.from('dashboard').select(`
       symbol, gap, bias, hard_invalid, box_h4_trend, box_h1_trend,

@@ -3,6 +3,7 @@ import { MT5_OVERLAY_PRODUCT_CODE } from '../../lib/indicatorProducts.mjs';
 import { createIndicatorDeviceAccess } from '../../lib/indicatorDeviceAccess.mjs';
 import { createIndicatorDeviceShadowRecorder } from '../../lib/indicatorDeviceShadowRecorder.mjs';
 import { createMetatraderOverlayHandler } from '../../lib/metatraderOverlayHandler.mjs';
+import { createIndicatorLicenseLookupBackoff } from '../../lib/indicatorLicenseLookupBackoff.mjs';
 
 const PLATFORM = 'MT5';
 const requests = new Map();
@@ -83,7 +84,7 @@ const handler = createMetatraderOverlayHandler({
     if (error) throw error;
     return data;
   },
-  getLicense: async (account, productCode) => {
+  getLicense: createIndicatorLicenseLookupBackoff(async (account, productCode) => {
     const { data, error } = await supabase
       .from('indicator_licenses')
       .select('id,status,expires_at,paid_confirmed,device_limit')
@@ -95,7 +96,7 @@ const handler = createMetatraderOverlayHandler({
       .maybeSingle();
     if (error) throw error;
     return data;
-  },
+  }),
   getDashboardRows: async () => {
     const { data, error } = await supabase.from('dashboard').select(`
       symbol, gap, bias, hard_invalid, box_h4_trend, box_h1_trend,
