@@ -2537,9 +2537,8 @@ def build_snapshot_layout(pair_count):
         "row_h": row_h,
         "row_gap": row_gap,
         "accent_w": 18,
-        "top_offsets": {"gap": 430, "bias": 680, "matchup": 1080},
+        "top_offsets": {"gap_label": 425, "gap_value": 555, "bias": 770, "matchup": 1190},
         "line_offsets": {"box": 104, "metrics": 188, "levels": 274},
-        "bottom_offsets": {"box": 0, "fl_st": 0},
     }
 
 def generate_snapshot(pair_data):
@@ -2562,7 +2561,6 @@ def generate_snapshot(pair_data):
     ACCENT_W = layout["accent_w"]
     TOP_OFFSETS = layout["top_offsets"]
     LINE_OFFSETS = layout["line_offsets"]
-    BOTTOM_OFFSETS = layout["bottom_offsets"]
 
     # ---- Palette (light theme with high-visibility signal rows) ----
     BG_PAGE   = (214, 220, 226)
@@ -2592,13 +2590,16 @@ def generate_snapshot(pair_data):
     font_bold  = _load_snapshot_font("arialbd.ttf", 72)
     font_hdr   = _load_snapshot_font("arialbd.ttf", 52)
     font_sm    = _load_snapshot_font("arial.ttf",   44)
+    font_match = _load_snapshot_font("arial.ttf",   38)
+    font_label = _load_snapshot_font("arialbd.ttf", 42)
     font_level = _load_snapshot_font("arialbd.ttf", 60)
+    font_xtf = [_load_snapshot_font("arial.ttf", size) for size in (54, 48, 42, 36)]
 
     # ---- Header ----
     draw.rectangle([0, 0, width, HEADER_H], fill=BG_CARD)
     draw.rectangle([0, HEADER_H - 4, width, HEADER_H], fill=ACCENT)
     draw.text((MARGIN, 40), "PANDA ENGINE v3.0", fill=TEXT_HEAD, font=font_title)
-    draw.text((MARGIN, 120), "PAIR  GAP  BIAS  MATCHUP  H1/H4  PDR  PL  XTF  NEARBY LEVEL",
+    draw.text((MARGIN, 120), "LIVE PAIR SNAPSHOT  |  NEARBY LEVELS WITHIN 30 PIPS",
               fill=TEXT_HEAD, font=font_hdr)
 
     # ---- Data rows ----
@@ -2645,26 +2646,42 @@ def generate_snapshot(pair_data):
         metrics_y = y_card + LINE_OFFSETS["metrics"]
 
         draw.text((x, top_y), str(p.get("symbol", "")), fill=tc, font=font_pair)
-        draw.text((x + TOP_OFFSETS["gap"], top_y + 5), gap_str, fill=tc, font=font_bold)
+        draw.text((x + TOP_OFFSETS["gap_label"], top_y + 23), "GAP", fill=tc, font=font_label)
+        draw.text((x + TOP_OFFSETS["gap_value"], top_y + 5), gap_str, fill=tc, font=font_bold)
         if bias_text == "INVALID":
             draw.text((x + TOP_OFFSETS["bias"], top_y + 5), bias_text, fill=tc, font=font_bold)
         else:
             draw.text((x + TOP_OFFSETS["bias"], top_y - 2), bias_text, fill=tc, font=font_bias)
-        draw.text((x + TOP_OFFSETS["matchup"], top_y + 26), str(p.get("matchup") or "-"),
-                  fill=tc, font=font_sm)
+        draw.text((x + TOP_OFFSETS["matchup"], top_y + 30), str(p.get("matchup") or "-"),
+                  fill=tc, font=font_match)
 
-        draw.text((x + BOTTOM_OFFSETS["box"], box_y), f"H1/H4 {p.get('box_badge', '-')}",
-                  fill=tc, font=font_data)
-        draw.text((x + 800, box_y), f"PDR {p.get('pdr', '-')}",
-                  fill=tc, font=font_data)
+        if "box_h1" in p:
+            draw.text((x, box_y + 8), "H1", fill=tc, font=font_label)
+            draw.text((x + 115, box_y), p["box_h1"], fill=tc, font=font_data)
+            draw.text((x + 360, box_y + 8), "H4", fill=tc, font=font_label)
+            draw.text((x + 475, box_y), p["box_h4"], fill=tc, font=font_data)
+        else:
+            draw.text((x, box_y + 8), "BOX", fill=tc, font=font_label)
+            draw.text((x + 155, box_y), str(p.get("box_badge") or "-"), fill=tc, font=font_data)
+        draw.text((x + 800, box_y + 8), "PDR", fill=tc, font=font_label)
+        draw.text((x + 950, box_y), str(p.get("pdr") or "-"), fill=tc, font=font_data)
         pl_verdict = p.get("pl_verdict") or "N/A"
         pl_color = C_YELLOW if pl_verdict in ("NEAR", "INVALID") else C_WHITE if pl_verdict == "N/A" else tc
-        draw.text((x + BOTTOM_OFFSETS["fl_st"], metrics_y), f"PL {pl_verdict}",
-                  fill=pl_color, font=font_data)
+        draw.text((x, metrics_y + 8), "PL", fill=tc, font=font_label)
+        draw.text((x + 110, metrics_y), pl_verdict, fill=pl_color, font=font_data)
 
         # EXTREME TF line (v9) — timeframes at ±4/5/6 per currency, e.g. "GBP D1+5 H4+5 | JPY H1-5"
-        draw.text((x + 430, metrics_y), f"XTF {p.get('xtf', '-')}",
-                  fill=tc, font=font_data)
+        draw.text((x + 550, metrics_y + 8), "XTF", fill=tc, font=font_label)
+        xtf_text = str(p.get("xtf") or "-")
+        xtf_width = CARD_W - 760
+        xtf_font = next((font for font in font_xtf
+                         if draw.textbbox((0, 0), xtf_text, font=font)[2] <= xtf_width), font_xtf[-1])
+        full_xtf = xtf_text
+        while xtf_text and draw.textbbox((0, 0), xtf_text + "…", font=xtf_font)[2] > xtf_width:
+            xtf_text = xtf_text[:-1]
+        if xtf_text != full_xtf:
+            xtf_text += "…"
+        draw.text((x + 680, metrics_y), xtf_text, fill=tc, font=xtf_font)
 
         level_y = y_card + LINE_OFFSETS["levels"]
         draw.line((x, level_y - 12, x_card + CARD_W - 26, level_y - 12), fill=tc, width=2)
@@ -3313,6 +3330,8 @@ def send_snapshot():
                 "gap": gap,
                 "bias": bias_val,
                 "box_badge": box_badge,
+                "box_h1": box_h1,
+                "box_h4": box_h4,
                 "pl_zone": pl_zone_v,
                 "pl_status": pl_status_v,
                 "pl_verdict": snapshot_pl_verdict(bias_val, pl_status_v),
