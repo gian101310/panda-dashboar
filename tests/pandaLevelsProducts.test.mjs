@@ -3,13 +3,14 @@ import assert from 'node:assert/strict';
 import {
   CTRADER_PANDA_LEVELS_PRODUCT_CODE,
   MT5_PANDA_LEVELS_PRODUCT_CODE,
+  MT5_PANDA_LEVELS_VIP_PRODUCT_CODE,
   PUBLIC_DOWNLOAD_PRODUCTS,
   getIndicatorProduct,
 } from '../lib/indicatorProducts.mjs';
 import { decideIndicatorLicense } from '../lib/indicatorLicense.mjs';
 
 test('Panda Levels products are separate Admin licenses and never public downloads', () => {
-  for (const code of [CTRADER_PANDA_LEVELS_PRODUCT_CODE, MT5_PANDA_LEVELS_PRODUCT_CODE]) {
+  for (const code of [CTRADER_PANDA_LEVELS_PRODUCT_CODE, MT5_PANDA_LEVELS_PRODUCT_CODE, MT5_PANDA_LEVELS_VIP_PRODUCT_CODE]) {
     const product = getIndicatorProduct(code);
     assert.ok(product);
     assert.equal(product.adminOnly, true);
@@ -18,6 +19,8 @@ test('Panda Levels products are separate Admin licenses and never public downloa
   }
   assert.equal(getIndicatorProduct(CTRADER_PANDA_LEVELS_PRODUCT_CODE).platform, 'CTRADER');
   assert.equal(getIndicatorProduct(MT5_PANDA_LEVELS_PRODUCT_CODE).platform, 'MT5');
+  assert.equal(getIndicatorProduct(MT5_PANDA_LEVELS_VIP_PRODUCT_CODE).platform, 'MT5');
+  assert.notEqual(MT5_PANDA_LEVELS_PRODUCT_CODE, MT5_PANDA_LEVELS_VIP_PRODUCT_CODE);
 });
 
 test('Panda Levels approval can be disabled or expired through existing license decisions', () => {

@@ -39,6 +39,7 @@ test('offline license cannot be issued for unpaid, disabled, expired or other pr
     { status: 'DISABLED' },
     { expires_at: '2026-10-25' },
     { product_code: 'mt5_dashboard_overlay' },
+    { product_code: 'mt5_panda_levels_vip' },
   ]) {
     assert.throws(() => createMt5PandaLevelsLicense({ ...approved, ...change }, key, { now }), Error);
   }

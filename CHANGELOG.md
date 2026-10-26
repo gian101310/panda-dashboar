@@ -1,3 +1,7 @@
+## 2026-10-26 - Panda Level MT5 VIP and lighter Levels
+- Added a separately licensed VIP MT5 indicator with one Panda Lines switch and a private Admin download.
+- Reduced Levels redraw and history retry work; packaged one EX5 per product for Windows and macOS using the same account license on both.
+
 ## 2026-10-26 - Scoring dashboard Admin downloads
 - Added MT5 scoring ZIP and cTrader scoring ALGO download cards to Indicator Licensing Admin.
 - Replaced the old dashboard overlay names in the product list while retaining product codes and existing account approvals.

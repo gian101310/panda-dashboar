@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Head from 'next/head';
-import { CTRADER_OVERLAY_PRODUCT_CODE, CTRADER_PANDA_LEVELS_PRODUCT_CODE, CTRADER_TRADE_PLAN_V13_PRODUCT_CODE, INDICATOR_PRODUCTS, MT4_OVERLAY_PRODUCT_CODE, MT5_OVERLAY_PRODUCT_CODE, MT5_PANDA_LEVELS_PRODUCT_CODE } from '../../lib/indicatorProducts.mjs';
+import { CTRADER_OVERLAY_PRODUCT_CODE, CTRADER_PANDA_LEVELS_PRODUCT_CODE, CTRADER_TRADE_PLAN_V13_PRODUCT_CODE, INDICATOR_PRODUCTS, isMt5OfflineLevelsProduct, MT4_OVERLAY_PRODUCT_CODE, MT5_OVERLAY_PRODUCT_CODE, MT5_PANDA_LEVELS_PRODUCT_CODE, MT5_PANDA_LEVELS_VIP_PRODUCT_CODE } from '../../lib/indicatorProducts.mjs';
 import { generateIndicatorToken } from '../../lib/indicatorTokenGenerator.mjs';
 
 const mono = "'Share Tech Mono', monospace";
@@ -13,7 +13,8 @@ const downloadGroups = [
     color: '#ffd166',
     items: [
       { code: MT5_OVERLAY_PRODUCT_CODE, title: 'PANDA SCORING DASHBOARD', file: 'panda-scoring-dashboard-mt5-licensed.zip', kind: '.ZIP', href: `/api/indicator-download?product=${MT5_OVERLAY_PRODUCT_CODE}`, description: 'Compact ALL / PAIR scoring indicator and licensed feed EA. Approve the MT5 account; the feed checks its license online.' },
-      { code: MT5_PANDA_LEVELS_PRODUCT_CODE, title: 'PANDA LEVELS · OFFLINE', file: 'Panda Levels MT5 Licensed Offline.zip', kind: '.ZIP', href: '/api/admin/panda-levels-download?platform=mt5', description: 'Indicator-only package. Approve a paid MT5 account, set EXPIRY below, then download that account’s license file.' },
+      { code: MT5_PANDA_LEVELS_PRODUCT_CODE, title: 'PANDA LEVELS · OFFLINE', file: 'Panda Levels MT5 Licensed Offline.zip', kind: '.ZIP', href: '/api/admin/panda-levels-download?platform=mt5', description: 'Windows + macOS · one account license for both. Approve a paid MT5 account, set EXPIRY below, then download its license file.' },
+      { code: MT5_PANDA_LEVELS_VIP_PRODUCT_CODE, title: 'PANDA LEVEL MT5 VIP', file: 'Panda Level MT5 VIP.zip', kind: '.ZIP', href: '/api/admin/panda-levels-download?platform=mt5-vip', description: 'Windows + macOS · one VIP account license for both. Show Panda Lines controls SuperTrend and Follow Line together.' },
     ],
   },
   {
@@ -148,7 +149,9 @@ export default function LicenseAdminPage() {
 
   async function downloadMt5PandaLevelsLicense(license) {
     setError('');
-    const res = await fetch(`/api/admin/mt5-panda-levels-license?license_id=${encodeURIComponent(license.id)}`);
+    const vip = license.product_code === MT5_PANDA_LEVELS_VIP_PRODUCT_CODE;
+    const route = vip ? '/api/admin/mt5-panda-levels-vip-license' : '/api/admin/mt5-panda-levels-license';
+    const res = await fetch(`${route}?license_id=${encodeURIComponent(license.id)}`);
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       setError(data.error || 'License file download failed');
@@ -157,7 +160,7 @@ export default function LicenseAdminPage() {
     const url = URL.createObjectURL(await res.blob());
     const link = document.createElement('a');
     link.href = url;
-    link.download = `PandaLevelsMT5_${license.trading_account_number || license.mt4_account_id}.lic`;
+    link.download = `${vip ? 'PandaLevelsMT5VIP' : 'PandaLevelsMT5'}_${license.trading_account_number || license.mt4_account_id}.lic`;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -491,7 +494,7 @@ export default function LicenseAdminPage() {
                 </div>
                 <div>
                   <label style={{ fontFamily: mono, fontSize: 8, color: '#445566', letterSpacing: 1, display: 'block', marginBottom: 4 }}>INDICATOR</label>
-                  <select value={form.product_code} onChange={(e) => { const product = productMap[e.target.value]; setForm({ ...form, product_code: e.target.value, platform: product?.platform || 'MT4', expires_at: e.target.value === MT5_PANDA_LEVELS_PRODUCT_CODE ? form.expires_at : '' }); }} style={{ ...input, width: '100%' }}>
+                  <select value={form.product_code} onChange={(e) => { const product = productMap[e.target.value]; setForm({ ...form, product_code: e.target.value, platform: product?.platform || 'MT4', expires_at: isMt5OfflineLevelsProduct(e.target.value) ? form.expires_at : '' }); }} style={{ ...input, width: '100%' }}>
                     {INDICATOR_PRODUCTS.map((p) => <option key={p.code} value={p.code}>{p.name} — {p.priceLabel}</option>)}
                   </select>
                 </div>
@@ -502,7 +505,7 @@ export default function LicenseAdminPage() {
                     <option value="true">PAID</option>
                   </select>
                 </div>
-                {form.product_code === MT5_PANDA_LEVELS_PRODUCT_CODE && <div>
+                {isMt5OfflineLevelsProduct(form.product_code) && <div>
                   <label style={{ fontFamily: mono, fontSize: 8, color: '#445566', letterSpacing: 1, display: 'block', marginBottom: 4 }}>EXPIRY DATE · DUBAI</label>
                   <input type="date" value={form.expires_at} onChange={(e) => setForm({ ...form, expires_at: e.target.value })} style={{ ...input, width: '100%' }} />
                 </div>}
@@ -576,7 +579,7 @@ export default function LicenseAdminPage() {
                           <button onClick={() => patch(license.id, { action: license.status === 'DISABLED' ? 'enable' : 'disable' })} style={smallBtn(license.status === 'DISABLED' ? '#00b4ff' : '#ff4d6d')}>
                             {license.status === 'DISABLED' ? 'ENABLE' : 'DISABLE'}
                           </button>
-                          {license.product_code === MT5_PANDA_LEVELS_PRODUCT_CODE && <button type="button" onClick={() => downloadMt5PandaLevelsLicense(license)} style={smallBtn('#00b4ff')}>DOWNLOAD LICENSE FILE</button>}
+                          {isMt5OfflineLevelsProduct(license.product_code) && <button type="button" onClick={() => downloadMt5PandaLevelsLicense(license)} style={smallBtn('#00b4ff')}>DOWNLOAD LICENSE FILE</button>}
                           <button onClick={() => deleteLicense(license.id, license.customer_name)} style={smallBtn('#ff9944')}>DELETE</button>
                         </div>
                       </td>

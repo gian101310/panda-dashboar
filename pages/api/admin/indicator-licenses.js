@@ -1,6 +1,6 @@
 import { supabase } from '../../../lib/supabase';
 import { requireAdmin } from '../../../lib/auth';
-import { getIndicatorProduct, MT5_PANDA_LEVELS_PRODUCT_CODE } from '../../../lib/indicatorProducts.mjs';
+import { getIndicatorProduct, isMt5OfflineLevelsProduct } from '../../../lib/indicatorProducts.mjs';
 import { normalizeIndicatorPlatform, normalizeMt4AccountId, normalizeProductCode, normalizeTradingAccountNumber } from '../../../lib/indicatorLicense.mjs';
 import { expiryAtEndOfDubaiDay } from '../../../lib/mt5PandaLevelsOfflineLicense.mjs';
 
@@ -74,7 +74,7 @@ export default async function handler(req, res) {
       ? normalizeTradingAccountNumber(trading_account_number || mt4_account_id)
       : normalizeMt4AccountId(mt4_account_id);
     if (!customer_name || !account) return res.status(400).json({ error: 'name, account_id, product required' });
-    if (productCode === MT5_PANDA_LEVELS_PRODUCT_CODE && expires_at && !expiryAtEndOfDubaiDay(expires_at)) {
+    if (isMt5OfflineLevelsProduct(productCode) && expires_at && !expiryAtEndOfDubaiDay(expires_at)) {
       return res.status(400).json({ error: 'invalid expiry date' });
     }
     const row = {

@@ -3,7 +3,8 @@ import { supabase } from '../../../lib/supabase';
 
 const ARTIFACTS = {
   ctrader: { key: 'panda-levels-v2-ctrader-licensed.algo', name: 'Panda Levels V2 cTrader Licensed.algo' },
-  mt5: { key: 'panda-levels-v2-13-mt5-offline-20261026.zip', name: 'Panda Levels MT5 Licensed Offline.zip' },
+  mt5: { key: 'panda-levels-v2-14-mt5-offline-20261026.zip', name: 'Panda Levels MT5 Licensed Offline.zip' },
+  'mt5-vip': { key: 'panda-level-mt5-vip-v1-01-20261026.zip', name: 'Panda Level MT5 VIP.zip' },
 };
 
 export default async function handler(req, res) {
@@ -12,7 +13,7 @@ export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).end();
 
   const artifact = ARTIFACTS[String(req.query?.platform || '').toLowerCase()];
-  if (!artifact) return res.status(400).json({ error: 'Choose cTrader or MT5' });
+  if (!artifact) return res.status(400).json({ error: 'Choose cTrader, MT5, or MT5 VIP' });
 
   try {
     const { data, error } = await supabase.storage.from('private-indicators').download(artifact.key);
