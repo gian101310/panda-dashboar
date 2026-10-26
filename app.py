@@ -83,6 +83,8 @@ SIGNAL_CHAT_ID        = os.environ.get("SIGNAL_CHAT_ID", TELEGRAM_CHAT_ID)
 SUPABASE_URL          = os.environ.get("SUPABASE_URL", "")
 SUPABASE_KEY          = os.environ.get("SUPABASE_SERVICE_KEY", "")
 MAX_FILE_AGE_SECONDS  = 300   # 5 mins — mt4 files update every ~2 mins
+TRACK_SIGNAL_RESULTS  = os.environ.get("PANDA_TRACK_SIGNAL_RESULTS", "0").lower() in ("1", "true", "yes", "on")
+TRACK_SHADOW_RESULTS  = os.environ.get("PANDA_TRACK_SHADOW_RESULTS", "0").lower() in ("1", "true", "yes", "on")
 
 LOGIN_ALERT_BOT_TOKEN = os.environ.get("LOGIN_ALERT_BOT_TOKEN", "")
 LOGIN_ALERT_CHAT_ID   = os.environ.get("LOGIN_ALERT_CHAT_ID", "")
@@ -1761,9 +1763,11 @@ def run_gap_once():
 
         # ---- Signal entry: dual strategy (BB + INTRA) ----
         pl_data = all_pl_map.get(symbol, {})
-        check_bb_entry(symbol, gap, scores, pl_data, momentum, parsed)
-        check_intra_entry(symbol, gap, scores, pl_data, momentum, parsed)
-        check_shadow_entry(symbol, gap, scores, pl_data, momentum)  # write-only research logger
+        if TRACK_SIGNAL_RESULTS:
+            check_bb_entry(symbol, gap, scores, pl_data, momentum, parsed)
+            check_intra_entry(symbol, gap, scores, pl_data, momentum, parsed)
+        if TRACK_SHADOW_RESULTS:
+            check_shadow_entry(symbol, gap, scores, pl_data, momentum)
         structure_alerts.extend(check_structure_alerts(
             symbol, pl_data, signal_cycle_at, signal_ready and pl_ready_map[symbol]
         ))
@@ -2001,22 +2005,20 @@ def run_gap_once():
 
     if gap_history_payload:
         try:
-            for row in gap_history_payload:
-                supabase_retry(
-                    lambda r=row: supabase.table("gap_history").upsert(r, on_conflict="timestamp,symbol").execute(),
-                    label="GapHistory"
-                )
+            supabase_retry(
+                lambda: supabase.table("gap_history").upsert(gap_history_payload, on_conflict="timestamp,symbol").execute(),
+                label="GapHistory"
+            )
             print(f"[SUPABASE] Gap history: {len(gap_history_payload)} rows")
         except Exception as e:
             print("[SUPABASE ERROR] Gap history:", e)
 
     if strength_payload:
         try:
-            for row in strength_payload:
-                supabase_retry(
-                    lambda r=row: supabase.table("strength_log").insert(r).execute(),
-                    label="StrengthLog"
-                )
+            supabase_retry(
+                lambda: supabase.table("strength_log").insert(strength_payload).execute(),
+                label="StrengthLog"
+            )
             print(f"[SUPABASE] Strength log: {len(strength_payload)} rows")
         except Exception as e:
             print("[SUPABASE ERROR] Strength:", e)
@@ -2082,8 +2084,10 @@ def run_gap_once():
         print(f"[SIGNAL OUTBOX] Dispatch error: {e}")
 
     # ---- Evaluate pending signal results (price-based) ----
-    evaluate_pending_signals(all_scores, all_pl_map)
-    evaluate_pending_shadows(all_scores, all_pl_map)
+    if TRACK_SIGNAL_RESULTS:
+        evaluate_pending_signals(all_scores, all_pl_map)
+    if TRACK_SHADOW_RESULTS:
+        evaluate_pending_shadows(all_scores, all_pl_map)
 
     # ---- Signal Tracker: update cycle via Vercel API ----
     try:
@@ -4504,7 +4508,8 @@ async def master_scheduler():
                                     persist_market_desk_day_mark(day_mark)
                                     LAST_MARKET_DESK_DAY = day_mark
                             await run_scheduler_step("hourly-cleanup", daily_cleanup)
-                            maybe_run_nightly_analyst(now)
+                            if TRACK_SIGNAL_RESULTS or TRACK_SHADOW_RESULTS:
+                                maybe_run_nightly_analyst(now)
                     except Exception as e:
                         print("[ENGINE ERROR - hourly]:", e)
 
