@@ -6,13 +6,13 @@ Compact, read-only on-chart indicator with three buttons:
 - **PAIR** shows the pair on the attached chart, including its gap, bias, PL zone/G1 state, and H4/H1 box labels. It also shows WAIT or INVALID pairs.
 - **− / +** collapses or restores the panel. The chosen view is saved per chart.
 
-The panel uses Panda's existing MT5 overlay snapshot. It does not recompute scores, alter Panda Levels or EA behavior, place trades, or change any engine strategy rules. The feed is account licensed separately from Panda Levels using the existing **Panda MT5 Dashboard Overlay** product in Panda Engine Admin (`mt5_dashboard_overlay`). The feed server validates the MT5 account, license status, payment, expiry, and device policy. This indicator reads only the account-specific cache written by that licensed feed.
+The panel uses Panda's existing MT5 overlay snapshot. It does not recompute scores, alter Panda Levels or EA behavior, place trades, or change any engine strategy rules. The feed is account licensed separately from Panda Levels using the **Panda MT5 Scoring Dashboard** product in Panda Engine Admin (`mt5_dashboard_overlay`). The product code is retained so previously approved dashboard accounts continue working. The feed server validates the MT5 account, license status, payment, expiry, and device policy. This indicator reads only the account-specific cache written by that licensed feed.
 
 ## Install
 
 1. In MT5, open **File → Open Data Folder**. Copy `Panda Scoring Dashboard MT5.ex5` into `MQL5/Indicators` and `PandaDashboardFeedMT5-Licensed.ex5` into `MQL5/Experts`.
 2. In MT5 **Tools → Options → Expert Advisors**, allow WebRequest for `https://pandaengine.app`.
-3. In Panda Engine Admin, approve and mark paid a **Panda MT5 Dashboard Overlay** license for the MT5 account number. A Panda Levels license alone does not authorize this dashboard feed.
+3. In Panda Engine Admin, approve and mark paid a **Panda MT5 Scoring Dashboard** license for the MT5 account number. A Panda Levels license alone does not authorize this dashboard feed.
 4. Attach the feed EA to one supported forex chart. Attach the scoring indicator to any chart where the panel is wanted. Refresh Navigator or restart MT5 if the files do not appear.
 
 After replacing the `.ex5` while MT5 is running, remove and reattach the scoring indicator to load the new build. Leave the feed EA on its separate chart.

@@ -1,3 +1,7 @@
+## 2026-10-26 - Scoring dashboard Admin downloads
+- Added MT5 scoring ZIP and cTrader scoring ALGO download cards to Indicator Licensing Admin.
+- Replaced the old dashboard overlay names in the product list while retaining product codes and existing account approvals.
+
 ## 2026-10-26 - Fix MT5 scoring row freshness
 - Accept the dashboard feed's space-separated UTC updated_at timestamps, so fresh valid pairs are displayed instead of 0/21.
 

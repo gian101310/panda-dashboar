@@ -28,6 +28,16 @@ test('never exposes Personal artifacts through the public catalog', () => {
   assert.equal(fs.existsSync('public/downloads/PandaDashboardOverlayMT5-Personal.ex5'), false);
 });
 
+test('scoring dashboard listings replace the old overlay labels and point to their packages', () => {
+  const products = productCatalog.PUBLIC_DOWNLOAD_PRODUCTS;
+  const ctrader = products.find((product) => product.code === 'ctrader_dashboard_overlay');
+  const mt5 = products.find((product) => product.code === 'mt5_dashboard_overlay');
+  assert.equal(ctrader?.name, 'Panda cTrader Scoring Dashboard');
+  assert.equal(ctrader?.downloadPath, '/downloads/panda-scoring-dashboard-ctrader-licensed.algo');
+  assert.equal(mt5?.name, 'Panda MT5 Scoring Dashboard');
+  assert.equal(mt5?.downloadPath, '/downloads/panda-scoring-dashboard-mt5-licensed.zip');
+});
+
 test('trade plan v1.3 is not in the public indicator or download catalog', () => {
   assert.equal(productCatalog.PUBLIC_INDICATOR_PRODUCTS.some((product) => product.code === 'ctrader_trade_plan_v13'), false);
   assert.equal(productCatalog.PUBLIC_DOWNLOAD_PRODUCTS.some((product) => product.code === 'ctrader_trade_plan_v13'), false);

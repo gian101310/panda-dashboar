@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Head from 'next/head';
-import { CTRADER_PANDA_LEVELS_PRODUCT_CODE, CTRADER_TRADE_PLAN_V13_PRODUCT_CODE, INDICATOR_PRODUCTS, MT5_PANDA_LEVELS_PRODUCT_CODE } from '../../lib/indicatorProducts.mjs';
+import { CTRADER_OVERLAY_PRODUCT_CODE, CTRADER_PANDA_LEVELS_PRODUCT_CODE, CTRADER_TRADE_PLAN_V13_PRODUCT_CODE, INDICATOR_PRODUCTS, MT5_OVERLAY_PRODUCT_CODE, MT5_PANDA_LEVELS_PRODUCT_CODE } from '../../lib/indicatorProducts.mjs';
 import { generateIndicatorToken } from '../../lib/indicatorTokenGenerator.mjs';
 
 const mono = "'Share Tech Mono', monospace";
@@ -362,16 +362,18 @@ export default function LicenseAdminPage() {
               </div>
             </div>
             {[
+              { code: CTRADER_OVERLAY_PRODUCT_CODE, title: 'PANDA cTRADER SCORING DASHBOARD', file: 'panda-scoring-dashboard-ctrader-licensed.algo', kind: '.ALGO', href: `/api/indicator-download?product=${CTRADER_OVERLAY_PRODUCT_CODE}`, description: 'Licensed cTrader chart-pair scoring panel. Approve the client account below; no manual license key is needed.' },
+              { code: MT5_OVERLAY_PRODUCT_CODE, title: 'PANDA MT5 SCORING DASHBOARD', file: 'panda-scoring-dashboard-mt5-licensed.zip', kind: '.ZIP', href: `/api/indicator-download?product=${MT5_OVERLAY_PRODUCT_CODE}`, description: 'Compact ALL / PAIR scoring indicator and licensed feed EA. Approve the MT5 account below; the feed checks its license online.' },
               { code: CTRADER_PANDA_LEVELS_PRODUCT_CODE, platform: 'ctrader', title: 'PANDA LEVELS V2 · cTRADER', file: 'Panda Levels V2 cTrader Licensed.algo', kind: '.ALGO' },
               { code: MT5_PANDA_LEVELS_PRODUCT_CODE, platform: 'mt5', title: 'PANDA LEVELS · MT5 OFFLINE', file: 'Panda Levels MT5 Licensed Offline.zip', kind: '.ZIP' },
             ].map((item) => (
               <div key={item.code} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', background: '#080c18', border: '1px solid #00b4ff55', borderRadius: 7, padding: 12, marginBottom: 12 }}>
                 <div>
                   <div style={{ fontFamily: orb, fontSize: 10, color: '#e8eaf0' }}>{item.title}</div>
-                  <div style={{ fontFamily: raj, fontSize: 12, color: '#60708d', marginTop: 4 }}>{item.platform === 'mt5' ? 'Indicator-only download. Approve a paid MT5 account, set EXPIRY below, then download that account’s license file. Delivered files remain usable until their expiry.' : 'Admin download. Create and approve the trading account license; disable or set an expiry here when needed.'}</div>
+                  <div style={{ fontFamily: raj, fontSize: 12, color: '#60708d', marginTop: 4 }}>{item.description || (item.platform === 'mt5' ? 'Indicator-only download. Approve a paid MT5 account, set EXPIRY below, then download that account’s license file. Delivered files remain usable until their expiry.' : 'Admin download. Create and approve the trading account license; disable or set an expiry here when needed.')}</div>
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <a href={`/api/admin/panda-levels-download?platform=${item.platform}`} download={item.file} style={{ ...smallBtn('#00b4ff'), textDecoration: 'none' }}>DOWNLOAD {item.kind}</a>
+                  <a href={item.href || `/api/admin/panda-levels-download?platform=${item.platform}`} download={item.file} style={{ ...smallBtn('#00b4ff'), textDecoration: 'none' }}>DOWNLOAD {item.kind}</a>
                   <button type="button" onClick={() => openProductLicenseCreate(item.code)} style={smallBtn('#00ff9f')}>CREATE LICENSE</button>
                 </div>
               </div>
