@@ -2648,7 +2648,7 @@ def generate_snapshot(pair_data):
         draw.text((x, top_y), str(p.get("symbol", "")), fill=tc, font=font_pair)
         draw.text((x + TOP_OFFSETS["gap_label"], top_y + 23), "GAP", fill=tc, font=font_label)
         draw.text((x + TOP_OFFSETS["gap_value"], top_y + 5), gap_str, fill=tc, font=font_bold)
-        if bias_text == "INVALID":
+        if bias_text in ("INVALID", "OFFLINE"):
             draw.text((x + TOP_OFFSETS["bias"], top_y + 5), bias_text, fill=tc, font=font_bold)
         else:
             draw.text((x + TOP_OFFSETS["bias"], top_y - 2), bias_text, fill=tc, font=font_bias)
