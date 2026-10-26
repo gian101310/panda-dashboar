@@ -8,6 +8,20 @@ import {
   ROUTE_TO_PAGE_KEY,
 } from '../lib/pageVisibility.mjs';
 
+async function fetchAccess(url) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5000);
+  try {
+    return await fetch(url, { signal: controller.signal, cache: 'no-store' });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function CheckingAccessScreen() {
+  return <div style={{minHeight:'100vh',background:'#0a0a14',display:'flex',alignItems:'center',justifyContent:'center',color:'#8892b0',fontFamily:"'Share Tech Mono',monospace",fontSize:12,letterSpacing:2}}>CHECKING ACCESS...</div>;
+}
+
 function MaintenanceScreen() {
   return (
     <>
@@ -22,6 +36,7 @@ function MaintenanceScreen() {
           </div>
           <div style={{width:60,height:2,background:'linear-gradient(90deg,transparent,#ffaa44,transparent)',margin:'0 auto 24px',borderRadius:2}}/>
           <div style={{fontSize:9,color:'#4a5568',letterSpacing:3}}>SYSTEM OFFLINE</div>
+          <button type="button" onClick={() => window.location.reload()} style={{display:'inline-block',marginTop:22,padding:'10px 16px',border:'1px solid #8892b066',borderRadius:6,background:'transparent',color:'#8892b0',fontSize:11,letterSpacing:2,cursor:'pointer'}}>RETRY</button>
           <a href="/admin-login" style={{display:'inline-block',marginTop:22,padding:'10px 16px',border:'1px solid #ffaa4466',borderRadius:6,color:'#ffaa44',fontSize:11,letterSpacing:2,textDecoration:'none'}}>ADMIN ACCESS</a>
         </div>
       </div>
@@ -55,6 +70,7 @@ export default function App({ Component, pageProps }) {
   const [accessDecision, setAccessDecision] = useState('checking');
 
   useEffect(() => {
+    let cancelled = false;
     // Skip checks for API routes (they handle their own auth)
     if (router.pathname.startsWith('/api')) {
       setChecked(true);
@@ -66,14 +82,22 @@ export default function App({ Component, pageProps }) {
       let isAdmin = false;
       let hasMaintBypass = false;
       let maintenanceEnabled = false;
+      let maintenanceKnown = false;
       let visibility = DEFAULT_PAGE_VISIBILITY;
       let hasAdminLoginAccess = false;
       const pageKey = ROUTE_TO_PAGE_KEY[router.pathname];
       const isAdminMaintenanceEntry = router.pathname === '/admin-login';
+      if (isAdminMaintenanceEntry) {
+        if (!cancelled) {
+          setAccessDecision('allow');
+          setChecked(true);
+        }
+        return;
+      }
 
       // 1) Check who the user is (if logged in)
       try {
-        const uRes = await fetch('/api/me');
+        const uRes = await fetchAccess('/api/me');
         if (uRes.ok) {
           const uData = await uRes.json();
           if (uData.role === 'admin') isAdmin = true;
@@ -83,16 +107,17 @@ export default function App({ Component, pageProps }) {
 
       // 2) Maintenance check
       try {
-        const mRes = await fetch('/api/maintenance');
+        const mRes = await fetchAccess('/api/maintenance');
         if (mRes.ok) {
           const mData = await mRes.json();
           maintenanceEnabled = mData.maintenance === true;
+          maintenanceKnown = true;
         }
       } catch {}
 
       if (pageKey === 'login') {
         try {
-          const accessRes = await fetch('/api/admin-maintenance-access');
+          const accessRes = await fetchAccess('/api/admin-maintenance-access');
           if (accessRes.ok) {
             const accessData = await accessRes.json();
             hasAdminLoginAccess = accessData.allowed === true;
@@ -101,9 +126,9 @@ export default function App({ Component, pageProps }) {
       }
 
       // 3) Page visibility check (only for public-facing pages)
-      if (pageKey) {
+      if (pageKey && maintenanceKnown && !maintenanceEnabled) {
         try {
-          const pvRes = await fetch('/api/page-visibility-public');
+          const pvRes = await fetchAccess('/api/page-visibility-public');
           if (pvRes.ok) {
             const pv = await pvRes.json();
             visibility = pv;
@@ -111,11 +136,12 @@ export default function App({ Component, pageProps }) {
         } catch {}
       }
 
-      setAccessDecision(isAdminMaintenanceEntry ? 'allow' : getPageAccessDecision({
+      if (cancelled) return;
+      setAccessDecision(getPageAccessDecision({
         isAdmin,
         hasMaintenanceBypass: hasMaintBypass,
         hasAdminLoginAccess,
-        maintenanceEnabled,
+        maintenanceEnabled: maintenanceEnabled || !maintenanceKnown,
         pageKey,
         visibility,
       }));
@@ -124,9 +150,10 @@ export default function App({ Component, pageProps }) {
 
     setAccessDecision('checking');
     checkAccess();
+    return () => { cancelled = true; };
   }, [router.pathname]);
 
-  if (!checked || accessDecision === 'checking') return null;
+  if (!checked || accessDecision === 'checking') return <CheckingAccessScreen />;
   if (accessDecision === 'maintenance') return <MaintenanceScreen />;
   if (accessDecision === 'coming_soon') return <ComingSoonScreen />;
 
