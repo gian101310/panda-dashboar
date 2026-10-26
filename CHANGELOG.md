@@ -1,3 +1,7 @@
+## 2026-10-26 - Compact MT5 scoring dashboard
+- Added a small MT5 indicator with switchable valid-pairs and chart-pair views plus a collapsible header.
+- Reused the separately licensed Panda MT5 dashboard feed, with per-pair freshness checks and no scoring or EA rule changes.
+
 ## 2026-10-26 - MT5 Panda Levels offline licenses
 - Added one MT5 indicator binary plus Admin-issued account-bound, expiring license files; no EA is required.
 - The Admin expiry date covers the selected Dubai day. Previously delivered offline files remain valid until that date.
