@@ -1,12 +1,38 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Head from 'next/head';
-import { CTRADER_OVERLAY_PRODUCT_CODE, CTRADER_PANDA_LEVELS_PRODUCT_CODE, CTRADER_TRADE_PLAN_V13_PRODUCT_CODE, INDICATOR_PRODUCTS, MT5_OVERLAY_PRODUCT_CODE, MT5_PANDA_LEVELS_PRODUCT_CODE } from '../../lib/indicatorProducts.mjs';
+import { CTRADER_OVERLAY_PRODUCT_CODE, CTRADER_PANDA_LEVELS_PRODUCT_CODE, CTRADER_TRADE_PLAN_V13_PRODUCT_CODE, INDICATOR_PRODUCTS, MT4_OVERLAY_PRODUCT_CODE, MT5_OVERLAY_PRODUCT_CODE, MT5_PANDA_LEVELS_PRODUCT_CODE } from '../../lib/indicatorProducts.mjs';
 import { generateIndicatorToken } from '../../lib/indicatorTokenGenerator.mjs';
 
 const mono = "'Share Tech Mono', monospace";
 const orb = "'Orbitron', sans-serif";
 const raj = "'Rajdhani', sans-serif";
 const productMap = Object.fromEntries(INDICATOR_PRODUCTS.map((product) => [product.code, product]));
+const downloadGroups = [
+  {
+    platform: 'MT5',
+    color: '#ffd166',
+    items: [
+      { code: MT5_OVERLAY_PRODUCT_CODE, title: 'PANDA SCORING DASHBOARD', file: 'panda-scoring-dashboard-mt5-licensed.zip', kind: '.ZIP', href: `/api/indicator-download?product=${MT5_OVERLAY_PRODUCT_CODE}`, description: 'Compact ALL / PAIR scoring indicator and licensed feed EA. Approve the MT5 account; the feed checks its license online.' },
+      { code: MT5_PANDA_LEVELS_PRODUCT_CODE, title: 'PANDA LEVELS · OFFLINE', file: 'Panda Levels MT5 Licensed Offline.zip', kind: '.ZIP', href: '/api/admin/panda-levels-download?platform=mt5', description: 'Indicator-only package. Approve a paid MT5 account, set EXPIRY below, then download that account’s license file.' },
+    ],
+  },
+  {
+    platform: 'cTRADER',
+    color: '#00b4ff',
+    items: [
+      { code: CTRADER_OVERLAY_PRODUCT_CODE, title: 'PANDA SCORING DASHBOARD', file: 'panda-scoring-dashboard-ctrader-licensed.algo', kind: '.ALGO', href: `/api/indicator-download?product=${CTRADER_OVERLAY_PRODUCT_CODE}`, description: 'Licensed chart-pair scoring panel. Approve the cTrader account; no manual license key is needed.' },
+      { code: CTRADER_PANDA_LEVELS_PRODUCT_CODE, title: 'PANDA LEVELS V2', file: 'Panda Levels V2 cTrader Licensed.algo', kind: '.ALGO', href: '/api/admin/panda-levels-download?platform=ctrader', description: 'Admin download. Create and approve the trading account license; disable or set an expiry here when needed.' },
+      { code: CTRADER_TRADE_PLAN_V13_PRODUCT_CODE, title: 'PANDA TRADE PLAN v1.3', file: 'Panda Trade Plan v1.3.algo', kind: '.ALGO', href: '/api/admin/trade-plan-download', description: 'Admin-only .algo. Send it to your client, then create and approve their account license.' },
+    ],
+  },
+  {
+    platform: 'MT4',
+    color: '#ff9944',
+    items: [
+      { code: MT4_OVERLAY_PRODUCT_CODE, title: 'PANDA DASHBOARD OVERLAY', file: 'panda-dashboard-overlay-mt4-licensed.zip', kind: '.ZIP', href: `/api/indicator-download?product=${MT4_OVERLAY_PRODUCT_CODE}`, description: 'Licensed MT4 chart-pair panel and feed EA. Approve the client’s MT4 account before installation.' },
+    ],
+  },
+];
 
 function usesTradingAccount(platform, productCode) {
   return platform === 'CTRADER' || platform === 'MT5' || String(productCode || '').endsWith('_dashboard_overlay');
@@ -351,31 +377,24 @@ export default function LicenseAdminPage() {
 
           <section style={{ background: '#0e1525', border: '1px solid #1a2540', borderRadius: 10, padding: 16, marginBottom: 16 }}>
             <div style={{ fontFamily: orb, fontSize: 10, color: '#ffd166', letterSpacing: 2, marginBottom: 12 }}>INDICATOR DOWNLOADS</div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', background: '#080c18', border: '1px solid #00b4ff55', borderRadius: 7, padding: 12, marginBottom: 12 }}>
-              <div>
-                <div style={{ fontFamily: orb, fontSize: 10, color: '#e8eaf0' }}>PANDA TRADE PLAN v1.3 · cTRADER</div>
-                <div style={{ fontFamily: raj, fontSize: 12, color: '#60708d', marginTop: 4 }}>Admin-only .algo. Send it to your client, then create and approve their account license.</div>
-              </div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <a href="/api/admin/trade-plan-download" download="Panda Trade Plan v1.3.algo" style={{ ...smallBtn('#00b4ff'), textDecoration: 'none' }}>DOWNLOAD .ALGO</a>
-                <button type="button" onClick={() => openProductLicenseCreate(CTRADER_TRADE_PLAN_V13_PRODUCT_CODE)} style={smallBtn('#00ff9f')}>CREATE LICENSE</button>
-              </div>
-            </div>
-            {[
-              { code: CTRADER_OVERLAY_PRODUCT_CODE, title: 'PANDA cTRADER SCORING DASHBOARD', file: 'panda-scoring-dashboard-ctrader-licensed.algo', kind: '.ALGO', href: `/api/indicator-download?product=${CTRADER_OVERLAY_PRODUCT_CODE}`, description: 'Licensed cTrader chart-pair scoring panel. Approve the client account below; no manual license key is needed.' },
-              { code: MT5_OVERLAY_PRODUCT_CODE, title: 'PANDA MT5 SCORING DASHBOARD', file: 'panda-scoring-dashboard-mt5-licensed.zip', kind: '.ZIP', href: `/api/indicator-download?product=${MT5_OVERLAY_PRODUCT_CODE}`, description: 'Compact ALL / PAIR scoring indicator and licensed feed EA. Approve the MT5 account below; the feed checks its license online.' },
-              { code: CTRADER_PANDA_LEVELS_PRODUCT_CODE, platform: 'ctrader', title: 'PANDA LEVELS V2 · cTRADER', file: 'Panda Levels V2 cTrader Licensed.algo', kind: '.ALGO' },
-              { code: MT5_PANDA_LEVELS_PRODUCT_CODE, platform: 'mt5', title: 'PANDA LEVELS · MT5 OFFLINE', file: 'Panda Levels MT5 Licensed Offline.zip', kind: '.ZIP' },
-            ].map((item) => (
-              <div key={item.code} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', background: '#080c18', border: '1px solid #00b4ff55', borderRadius: 7, padding: 12, marginBottom: 12 }}>
-                <div>
-                  <div style={{ fontFamily: orb, fontSize: 10, color: '#e8eaf0' }}>{item.title}</div>
-                  <div style={{ fontFamily: raj, fontSize: 12, color: '#60708d', marginTop: 4 }}>{item.description || (item.platform === 'mt5' ? 'Indicator-only download. Approve a paid MT5 account, set EXPIRY below, then download that account’s license file. Delivered files remain usable until their expiry.' : 'Admin download. Create and approve the trading account license; disable or set an expiry here when needed.')}</div>
+            {downloadGroups.map((group) => (
+              <div key={group.platform} style={{ border: '1px solid #1a2540', borderRadius: 8, padding: 12, marginBottom: 14, background: '#0a1020' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                  <div style={{ fontFamily: orb, fontSize: 11, color: group.color, letterSpacing: 2 }}>{group.platform}</div>
+                  <div style={{ fontFamily: mono, fontSize: 8, color: '#60708d' }}>{group.items.length} DOWNLOAD{group.items.length === 1 ? '' : 'S'}</div>
                 </div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <a href={item.href || `/api/admin/panda-levels-download?platform=${item.platform}`} download={item.file} style={{ ...smallBtn('#00b4ff'), textDecoration: 'none' }}>DOWNLOAD {item.kind}</a>
-                  <button type="button" onClick={() => openProductLicenseCreate(item.code)} style={smallBtn('#00ff9f')}>CREATE LICENSE</button>
-                </div>
+                {group.items.map((item) => (
+                  <div key={item.code} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', background: '#080c18', border: `1px solid ${group.color}44`, borderRadius: 7, padding: 12, marginBottom: 8 }}>
+                    <div>
+                      <div style={{ fontFamily: orb, fontSize: 10, color: '#e8eaf0' }}>{item.title}</div>
+                      <div style={{ fontFamily: raj, fontSize: 12, color: '#60708d', marginTop: 4 }}>{item.description}</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <a href={item.href} download={item.file} style={{ ...smallBtn('#00b4ff'), textDecoration: 'none' }}>DOWNLOAD {item.kind}</a>
+                      <button type="button" onClick={() => openProductLicenseCreate(item.code)} style={smallBtn('#00ff9f')}>CREATE LICENSE</button>
+                    </div>
+                  </div>
+                ))}
               </div>
             ))}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', gap: 10 }}>
