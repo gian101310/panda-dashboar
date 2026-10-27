@@ -53,3 +53,4 @@ guardian-watchdog.log
 # Successful news-result deliveries (local engine runtime state)
 news_result_marks.json
 news_result_marks.tmp
+.journal-sync-task.log

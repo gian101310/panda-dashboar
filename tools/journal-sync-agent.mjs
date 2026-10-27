@@ -32,6 +32,8 @@ const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_AN
 const MCP_URL = process.env.CTRADER_MCP_URL || 'http://127.0.0.1:9876/mcp/';
 const cliArgs = new Set(process.argv.slice(2));
 const shouldWrite = cliArgs.has('--write');
+const quiet = cliArgs.has('--quiet');
+const accountId = process.argv.find(arg => arg.startsWith('--account='))?.split('=')[1];
 
 function numberArg(name, fallback) {
   const raw = process.argv.find(arg => arg.startsWith(`--${name}=`));
@@ -125,7 +127,8 @@ function mapDealToJournalRow(deal) {
 
 function mapHistoryToJournalRow(trade) {
   const symbol = String(trade.symbolName || '').replace('/', '').toUpperCase();
-  const direction = String(trade.tradeSide || trade.direction || '').toUpperCase();
+  const direction = String(trade.side || trade.tradeSide || trade.direction || '').toUpperCase();
+  if (direction !== 'BUY' && direction !== 'SELL') return null;
   const entryPrice = Number(trade.entryPrice) || null;
   const exitPrice = Number(trade.closePrice || trade.exitPrice) || null;
   const profit = Number(trade.netProfit ?? trade.profit ?? 0);
@@ -143,7 +146,7 @@ function mapHistoryToJournalRow(trade) {
     entry_price: entryPrice,
     exit_price: exitPrice,
     profit_loss: Math.round(profit * 100) / 100,
-    profit_loss_pips: calcPips(symbol, direction, entryPrice, exitPrice),
+    profit_loss_pips: Number.isFinite(Number(trade.pips)) ? Number(trade.pips) : calcPips(symbol, direction, entryPrice, exitPrice),
     commission: Math.round(commission * 100) / 100,
     swap: Math.round(swap * 100) / 100,
     entry_time: trade.openTime || trade.entryTime || null,
@@ -157,6 +160,21 @@ function mapHistoryToJournalRow(trade) {
 
 async function main() {
   const client = await createMcpClient();
+  if (shouldWrite && !accountId) throw new Error('--account is required for --write');
+
+  let brokerName = null;
+  if (accountId) {
+    const [accountsResult, balanceResult] = await Promise.all([
+      client.call('get_accounts_list'),
+      client.call('get_balance'),
+    ]);
+    const account = (accountsResult?.accounts || []).find(item => String(item.login) === accountId);
+    brokerName = balanceResult?.brokerName || null;
+    if (!account?.isLive || !brokerName || account.brokerTitle !== brokerName || balanceResult.connectionState !== 'Authenticated') {
+      throw new Error(`Live account ${accountId} is not the authenticated cTrader account`);
+    }
+    console.log(`ACCOUNT | ${accountId} | ${brokerName}`);
+  }
 
   // Pull both data sources
   const [dealsResult, historyResult] = await Promise.all([
@@ -171,7 +189,7 @@ async function main() {
 
   // Map deals to journal rows
   const dealRows = deals.map(mapDealToJournalRow).filter(r => r.symbol && r.exit_time);
-  const historyRows = history.map(mapHistoryToJournalRow).filter(r => r.symbol && r.exit_time);
+  const historyRows = history.map(mapHistoryToJournalRow).filter(r => r?.symbol && r.entry_time && r.exit_time);
 
   // Deduplicate by position_id (deals take priority — they're more recent)
   const seen = new Set();
@@ -179,7 +197,7 @@ async function main() {
   for (const row of [...dealRows, ...historyRows]) {
     if (!row.position_id || seen.has(row.position_id)) continue;
     seen.add(row.position_id);
-    allRows.push(row);
+    allRows.push(accountId ? { ...row, account_id: accountId, broker_name: brokerName, position_id: `${accountId}:${row.position_id}` } : row);
   }
 
   console.log(`MAPPED | unique_trades=${allRows.length} | from_deals=${dealRows.length} | from_history=${historyRows.length}`);
@@ -190,10 +208,12 @@ async function main() {
   }
 
   // Print summary
-  for (const row of allRows.slice(0, 10)) {
-    console.log(`  ${row.symbol} ${row.direction} ${row.volume}L | ${row.profit_loss_pips}p | $${row.profit_loss} | ${row.exit_time}`);
+  if (!quiet) {
+    for (const row of allRows.slice(0, 10)) {
+      console.log(`  ${row.symbol} ${row.direction} ${row.volume}L | ${row.profit_loss_pips}p | $${row.profit_loss} | ${row.exit_time}`);
+    }
+    if (allRows.length > 10) console.log(`  ... and ${allRows.length - 10} more`);
   }
-  if (allRows.length > 10) console.log(`  ... and ${allRows.length - 10} more`);
 
   if (!shouldWrite) {
     console.log(`\nDRY_RUN | ${allRows.length} trades ready. Use --write to upsert to Supabase.`);
@@ -203,14 +223,33 @@ async function main() {
   if (!SUPABASE_KEY) throw new Error('SUPABASE_SERVICE_KEY or SUPABASE_ANON_KEY is required for --write');
   const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
+  const existingIds = new Set();
+  for (let offset = 0; ; offset += 1000) {
+    const { data, error } = await supabase
+      .from('trade_journal')
+      .select('position_id')
+      .eq('account_id', accountId)
+      .order('position_id', { ascending: true })
+      .range(offset, offset + 999);
+    if (error) throw new Error(`trade_journal lookup failed: ${error.message}`);
+    for (const trade of data || []) existingIds.add(trade.position_id);
+    if ((data || []).length < 1000) break;
+  }
+
+  const newRows = allRows.filter(row => !existingIds.has(row.position_id));
+  if (!newRows.length) {
+    console.log('UP_TO_DATE | no new trades');
+    return;
+  }
+
   // Upsert using position_id as the conflict key
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from('trade_journal')
-    .upsert(allRows, { onConflict: 'position_id', ignoreDuplicates: false });
+    .upsert(newRows, { onConflict: 'position_id', ignoreDuplicates: false });
 
   if (error) throw new Error(`trade_journal upsert failed: ${error.message}`);
 
-  console.log(`\nWROTE | ${allRows.length} trades synced to trade_journal`);
+  console.log(`\nWROTE | ${newRows.length} new trades synced to trade_journal`);
 }
 
 main().catch(err => {

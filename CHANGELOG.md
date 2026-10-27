@@ -1,3 +1,7 @@
+## 2026-10-28 - Guarded cTrader journal sync
+- Added authenticated account checks, account-scoped trade IDs, preserved broker pips, and new-trade-only writes.
+- Added a scheduled task runner with a local log.
+
 ## 2026-10-28 - Read-only cTrader cross-hedge panel
 - Added a local Panda bias snapshot export after scoring and separate cTrader cross-hedge source with deterministic exposure tests.
 - The panel simulates exposure and alternatives without placing or modifying trades.
