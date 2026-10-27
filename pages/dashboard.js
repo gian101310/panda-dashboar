@@ -3309,14 +3309,14 @@ function OverviewTab({ data, trends, pdrData, upcomingNews, spikes, confidenceMa
           </div>);})()}
 
           {/* INVALID PAIRS */}
-          {invalidTier.length>0&&<div style={{opacity:0.5,marginTop:8}}>
-            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
-              <Radio size={10} color='#ff4d6d'/><span style={{fontFamily:mono,fontSize:9,color:'#ff4d6d',letterSpacing:2,fontWeight:700}}>INVALID PAIRS</span><span style={{fontFamily:mono,fontSize:8,color:'#7b8faa'}}>{invalidTier.length}</span>
-            </div>
+          {invalidTier.length>0&&<details style={{marginTop:8}}>
+            <summary style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',padding:'8px 0',listStyle:'none'}}>
+              <Radio size={10} color='#ff4d6d'/><span style={{fontFamily:mono,fontSize:9,color:'#ff4d6d',letterSpacing:2,fontWeight:700}}>SHOW INVALID PAIRS</span><span style={{fontFamily:mono,fontSize:8,color:'#7b8faa'}}>{invalidTier.length}</span>
+            </summary>
             <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(auto-fill,minmax(140px,1fr))',gap:5}}>
               {invalidTier.map((p,i)=><OvSignalCard key={p.symbol} pair={p} tier="LOW" onClick={()=>{const r=findRow(p.symbol);if(r)onSelectPair(r);}} delay={i*30+700}/>)}
             </div>
-          </div>}
+          </details>}
           <OvMomentumBar pairs={pairs}/>
         </div>
 
@@ -3626,7 +3626,7 @@ function SignalFlashcard({ data, trends }) {
       </div>
 
       {/* Mini ticker strip */}
-      <div style={{display:'flex',gap:6,overflowX:'auto',maxWidth:'100%',paddingBottom:4,WebkitOverflowScrolling:'touch',overscrollBehaviorX:'contain',touchAction:'pan-x',scrollbarWidth:'thin'}}>
+      <div style={{display:'flex',gap:6,overflowX:'auto',maxWidth:'100%',paddingBottom:4,WebkitOverflowScrolling:'touch',overscrollBehaviorX:'contain',touchAction:'auto',scrollbarWidth:'thin'}}>
         {allSigs.map((r,i) => {
           const b = r.bias==='BUY'; const c = b?'#00ff9f':'#ff4d6d';
           return (
@@ -4047,7 +4047,7 @@ export default function Dashboard() {
         )}
 
         {/* STATS */}
-        <div style={{display:'flex',gap:isMobile?5:7,padding:isMobile?'8px 12px':'10px 20px',overflowX:'auto',maxWidth:'100%',WebkitOverflowScrolling:'touch',overscrollBehaviorX:'contain',touchAction:'pan-x',zIndex:1}}>
+        <div style={{display:'flex',gap:isMobile?5:7,padding:isMobile?'8px 12px':'10px 20px',overflowX:'auto',maxWidth:'100%',WebkitOverflowScrolling:'touch',overscrollBehaviorX:'contain',touchAction:'auto',zIndex:1}}>
           <StatCard label="PAIRS"       value={data.length}     color="#00b4ff"/>
           <StatCard label="📈 BUY"      value={buyCount}        color="#00ff9f"/>
           <StatCard label="📉 SELL"     value={sellCount}       color="#ff4d6d"/>
@@ -4067,7 +4067,7 @@ export default function Dashboard() {
 
         {/* FILTERS BAR (Panels/Table only) */}
         {['PANELS','TABLE'].includes(tab)&&(
-          <div style={{display:'flex',alignItems:'center',gap:7,padding:isMobile?'0 12px 10px':'0 20px 10px',flexWrap:'nowrap',overflowX:'auto',maxWidth:'100%',WebkitOverflowScrolling:'touch',overscrollBehaviorX:'contain',touchAction:'pan-x',scrollbarWidth:'thin',zIndex:1}}>
+          <div style={{display:'flex',alignItems:'center',gap:7,padding:isMobile?'0 12px 10px':'0 20px 10px',flexWrap:'nowrap',overflowX:'auto',maxWidth:'100%',WebkitOverflowScrolling:'touch',overscrollBehaviorX:'contain',touchAction:'auto',scrollbarWidth:'thin',zIndex:1}}>
             <div style={{display:'flex',gap:4,flex:'0 0 auto'}}>
               {FILTERS.map(f=><button key={f} onClick={()=>setFilter(f)} style={{background:filter===f?(f==='⚠️ CLOSE'?'rgba(255,77,109,0.12)':'rgba(0,180,255,0.1)'):'transparent',border:`1px solid ${filter===f?(f==='⚠️ CLOSE'?'#ff4d6d':'#00b4ff'):'var(--border)'}`,borderRadius:5,color:filter===f?(f==='⚠️ CLOSE'?'#ff4d6d':'#00b4ff'):'var(--text-muted)',fontFamily:mono,fontSize:9,letterSpacing:1,padding:'5px 9px',cursor:'pointer',whiteSpace:'nowrap',flexShrink:0}}>{f}</button>)}
             </div>
