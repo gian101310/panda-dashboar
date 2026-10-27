@@ -3626,7 +3626,7 @@ function SignalFlashcard({ data, trends }) {
       </div>
 
       {/* Mini ticker strip */}
-      <div style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:4,scrollbarWidth:'thin'}}>
+      <div style={{display:'flex',gap:6,overflowX:'auto',maxWidth:'100%',paddingBottom:4,WebkitOverflowScrolling:'touch',overscrollBehaviorX:'contain',touchAction:'pan-x',scrollbarWidth:'thin'}}>
         {allSigs.map((r,i) => {
           const b = r.bias==='BUY'; const c = b?'#00ff9f':'#ff4d6d';
           return (
@@ -3956,7 +3956,7 @@ export default function Dashboard() {
 
           {/* SIDEBAR NAV */}
           <aside style={isMobile
-            ?{position:'fixed',top:0,left:0,bottom:0,width:230,zIndex:90,background:'var(--bg-secondary)',borderRight:'1px solid var(--border)',padding:'58px 10px 16px',display:'flex',flexDirection:'column',gap:4,transform:sidebarOpen?'translateX(0)':'translateX(-105%)',transition:'transform 0.25s ease',boxShadow:sidebarOpen?'4px 0 24px rgba(0,0,0,0.5)':'none',overflowY:'auto'}
+            ?{position:'fixed',top:0,left:0,bottom:0,width:230,maxHeight:'100dvh',zIndex:90,background:'var(--bg-secondary)',borderRight:'1px solid var(--border)',padding:'58px 10px 16px',display:'flex',flexDirection:'column',gap:4,transform:sidebarOpen?'translateX(0)':'translateX(-105%)',transition:'transform 0.25s ease',boxShadow:sidebarOpen?'4px 0 24px rgba(0,0,0,0.5)':'none',overflowY:'auto',WebkitOverflowScrolling:'touch',overscrollBehaviorY:'contain',touchAction:'pan-y'}
             :{width:190,flexShrink:0,background:'var(--bg-secondary)',borderRight:'1px solid var(--border)',padding:'14px 8px',display:'flex',flexDirection:'column',gap:3,alignSelf:'stretch',position:'sticky',top:0,maxHeight:'100vh',overflowY:'auto'}}>
             <div style={{fontFamily:mono,fontSize:8,letterSpacing:3,color:'var(--text-muted)',padding:'2px 12px 8px'}}>NAVIGATION</div>
             {(()=>{const ICON={'OVERVIEW':'🏠','PANELS':'🧩','SIGNALS':'📡','TABLE':'📋','GAP CHART':'📈','RESEARCH':'🔬','CALCULATOR':'🧮','SETUPS':'🎯','PHASE GUIDE':'🧭','VALID PAIRS':'✅','CHART':'📉','ANALYTICS':'📊','SHADOW':'🌑','LOGS':'📜','PANDA AI':'🐼','ENGINE':'🏥'};
@@ -4047,7 +4047,7 @@ export default function Dashboard() {
         )}
 
         {/* STATS */}
-        <div style={{display:'flex',gap:isMobile?5:7,padding:isMobile?'8px 12px':'10px 20px',overflowX:'auto',zIndex:1}}>
+        <div style={{display:'flex',gap:isMobile?5:7,padding:isMobile?'8px 12px':'10px 20px',overflowX:'auto',maxWidth:'100%',WebkitOverflowScrolling:'touch',overscrollBehaviorX:'contain',touchAction:'pan-x',zIndex:1}}>
           <StatCard label="PAIRS"       value={data.length}     color="#00b4ff"/>
           <StatCard label="📈 BUY"      value={buyCount}        color="#00ff9f"/>
           <StatCard label="📉 SELL"     value={sellCount}       color="#ff4d6d"/>
@@ -4067,9 +4067,9 @@ export default function Dashboard() {
 
         {/* FILTERS BAR (Panels/Table only) */}
         {['PANELS','TABLE'].includes(tab)&&(
-          <div style={{display:'flex',alignItems:'center',gap:7,padding:isMobile?'0 12px 10px':'0 20px 10px',flexWrap:'nowrap',overflowX:'auto',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',zIndex:1}}>
-            <div style={{display:'flex',gap:4}}>
-              {FILTERS.map(f=><button key={f} onClick={()=>setFilter(f)} style={{background:filter===f?(f==='⚠️ CLOSE'?'rgba(255,77,109,0.12)':'rgba(0,180,255,0.1)'):'transparent',border:`1px solid ${filter===f?(f==='⚠️ CLOSE'?'#ff4d6d':'#00b4ff'):'var(--border)'}`,borderRadius:5,color:filter===f?(f==='⚠️ CLOSE'?'#ff4d6d':'#00b4ff'):'var(--text-muted)',fontFamily:mono,fontSize:9,letterSpacing:1,padding:'5px 9px',cursor:'pointer'}}>{f}</button>)}
+          <div style={{display:'flex',alignItems:'center',gap:7,padding:isMobile?'0 12px 10px':'0 20px 10px',flexWrap:'nowrap',overflowX:'auto',maxWidth:'100%',WebkitOverflowScrolling:'touch',overscrollBehaviorX:'contain',touchAction:'pan-x',scrollbarWidth:'thin',zIndex:1}}>
+            <div style={{display:'flex',gap:4,flex:'0 0 auto'}}>
+              {FILTERS.map(f=><button key={f} onClick={()=>setFilter(f)} style={{background:filter===f?(f==='⚠️ CLOSE'?'rgba(255,77,109,0.12)':'rgba(0,180,255,0.1)'):'transparent',border:`1px solid ${filter===f?(f==='⚠️ CLOSE'?'#ff4d6d':'#00b4ff'):'var(--border)'}`,borderRadius:5,color:filter===f?(f==='⚠️ CLOSE'?'#ff4d6d':'#00b4ff'):'var(--text-muted)',fontFamily:mono,fontSize:9,letterSpacing:1,padding:'5px 9px',cursor:'pointer',whiteSpace:'nowrap',flexShrink:0}}>{f}</button>)}
             </div>
             <input style={{background:'var(--bg-secondary)',border:'1px solid var(--border)',borderRadius:5,padding:'6px 10px',color:'var(--text-primary)',fontFamily:raj,fontSize:13,flex:1,minWidth:120}} placeholder="🔍 SEARCH..." value={search} onChange={e=>setSearch(e.target.value)}/>
             <select style={{background:'var(--bg-secondary)',border:'1px solid var(--border)',borderRadius:5,padding:'6px 10px',color:'var(--text-secondary)',fontFamily:mono,fontSize:9,cursor:'pointer'}} value={sort} onChange={e=>setSort(e.target.value)}>

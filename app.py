@@ -2988,6 +2988,12 @@ def _market_desk_pair_rows(rows):
             f"{base_cur} {_desk_fmt_score(base_score)} {base_cls} "
             f"vs {quote_cur} {_desk_fmt_score(quote_score)} {quote_cls}"
         )
+        adv = snapshot_adv_forecast(r)
+        adv_agrees = False
+        if adv:
+            adv_gap = float(adv.split(" ", 1)[1])
+            adv_agrees = (bias == "BUY" and adv_gap >= 5) or (bias == "SELL" and adv_gap <= -5)
+            plan += f" | ADV {adv}: {'agrees' if adv_agrees else 'diverges'}"
         candidates.append({
             "symbol": symbol,
             "gap": gap,
@@ -2995,10 +3001,12 @@ def _market_desk_pair_rows(rows):
             "catalyst": catalyst,
             "rank_group": 0 if strong_vs_weak else 1,
             "pl_ok": pl_ok,
+            "adv_agrees": adv_agrees,
             "context": context,
             "plan": plan,
         })
-    candidates.sort(key=lambda r: (r["rank_group"], 0 if r["pl_ok"] else 1, -abs(r["gap"]), r["symbol"]))
+    candidates.sort(key=lambda r: (0 if r["adv_agrees"] else 1, r["rank_group"],
+                                   0 if r["pl_ok"] else 1, -abs(r["gap"]), r["symbol"]))
     out = []
     for idx, r in enumerate(candidates[:6], start=1):
         source = next((row for row in rows if row.get("symbol") == r["symbol"]), {})
@@ -3016,9 +3024,76 @@ def _market_desk_pair_rows(rows):
         out.append(["-", "NO SETUP", "No clean score gap >= 5", "WAIT", "NONE", "Stand down until score + structure align."])
     return out
 
+def _market_desk_adv_rows(rows, now=None):
+    """Read-only ADV horizon compared with the current, valid pair bias."""
+    out = []
+    for row in rows:
+        bias = row.get("bias") or "WAIT"
+        gap = float(row.get("gap") or 0)
+        if row.get("hard_invalid") or bias not in ("BUY", "SELL") or abs(gap) < 5:
+            continue
+        forecast = snapshot_adv_forecast(row, now)
+        if not forecast:
+            continue
+        horizon, value = forecast.split(" ", 1)
+        adv_gap = float(value)
+        agrees = (bias == "BUY" and adv_gap >= 5) or (bias == "SELL" and adv_gap <= -5)
+        note = "ADV agrees; watch structure" if agrees else "ADV diverges; lower priority"
+        out.append((not agrees, -abs(gap), [row.get("symbol") or "", f"{bias} {gap:+g}",
+                                           f"{horizon} {adv_gap:+g}", note]))
+    out.sort(key=lambda item: (item[0], item[1], item[2][0]))
+    return [item[2] for item in out[:8]] or [["-", "WAIT", "N/A", "No fresh valid ADV watch"]]
+
+
+def _market_desk_news_rows(rows, now=None):
+    """Upcoming high-impact forecast context and pairs agreeing with that read."""
+    now = now or datetime.now(timezone.utc)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    events = []
+    for event in fetch_news_feed():
+        if (event.get("impact") or "").lower() != "high":
+            continue
+        event_at = parse_news_time(event.get("date"), event.get("time"))
+        if not event_at or not now <= event_at <= now + timedelta(hours=36):
+            continue
+        currency = (event.get("country") or event.get("currency") or "").upper()
+        if currency not in {"AUD", "CAD", "EUR", "GBP", "JPY", "NZD", "USD"}:
+            continue
+        events.append((event_at, currency, event))
+    events.sort(key=lambda item: item[0])
+    out = []
+    for event_at, currency, event in events[:5]:
+        title = event.get("title") or "High-impact event"
+        forecast = event.get("forecast") or "-"
+        previous = event.get("previous") or "-"
+        read = build_news_forecast_read(title, currency, forecast, previous)
+        agreeing = []
+        if read["bias"] in ("SUPPORT", "RISK"):
+            for row in rows:
+                symbol = row.get("symbol") or ""
+                if currency not in (symbol[:3], symbol[3:6]) or row.get("hard_invalid"):
+                    continue
+                bias = row.get("bias") or "WAIT"
+                gap = float(row.get("gap") or 0)
+                if bias not in ("BUY", "SELL") or abs(gap) < 5:
+                    continue
+                supports = (currency == symbol[:3] and bias == "BUY") or (currency == symbol[3:6] and bias == "SELL")
+                if supports == (read["bias"] == "SUPPORT"):
+                    adv = snapshot_adv_forecast(row, now)
+                    if adv:
+                        adv_gap = float(adv.split(" ", 1)[1])
+                        if (bias == "BUY" and adv_gap >= 5) or (bias == "SELL" and adv_gap <= -5):
+                            agreeing.append(f"{symbol} {bias}")
+        dubai_time = event_at.astimezone(timezone(timedelta(hours=4))).strftime("%d %b %H:%M")
+        out.append([dubai_time, f"{currency} {title}", f"F {forecast} / P {previous}",
+                    read["bias"], ", ".join(agreeing[:4]) or "No confirmed pair; watch reaction"])
+    return out or [["-", "No high-impact event in next 36h", "-", "WAIT", "Check calendar again later"]]
+
+
 def generate_market_desk_report(rows):
     rows = rows or []
-    width, height = 1700, 2900
+    width, height = 1700, 4300
     margin = 70
     page_bg = (255, 255, 255)
     black = (20, 20, 20)
@@ -3077,7 +3152,7 @@ def generate_market_desk_report(rows):
     y += 72
     draw.text((width // 2, y), "DAILY BIAS -> GAMEPLAY WATCHLIST", fill=black, font=font_sub, anchor="ma")
     y += 44
-    draw.text((width // 2, y), "2 AM DUBAI WATCHLIST - CONDITIONAL, NOT SIGNALS", fill=black, font=font_th, anchor="ma")
+    draw.text((width // 2, y), "DUBAI MARKET WATCH - CONDITIONAL, NOT SIGNALS", fill=black, font=font_th, anchor="ma")
     y += 36
     draw.line([margin, y, width - margin, y], fill=black, width=2)
     y += 22
@@ -3110,7 +3185,15 @@ def generate_market_desk_report(rows):
         fills=row_fills,
     )
 
-    y = _section(y, "3. EXECUTION ROUTINE")
+    y = _section(y, "3. ADVANCE SCORE FORECAST - PAIRS TO WATCH")
+    y = _table(y, ["PAIR", "NOW", "ADV GAP", "READ"], _market_desk_adv_rows(rows),
+               [220, 240, 250, 850], row_h=48)
+
+    y = _section(y, "4. UPCOMING HIGH-IMPACT NEWS - FORECAST AGREEMENT")
+    y = _table(y, ["DUBAI", "EVENT", "FORECAST / PREVIOUS", "READ", "PANDA + ADV AGREE"],
+               _market_desk_news_rows(rows), [200, 425, 320, 155, 460], row_h=48)
+
+    y = _section(y, "5. EXECUTION ROUTINE")
     y = _table(
         y,
         ["STEP", "RULE"],
@@ -3125,7 +3208,7 @@ def generate_market_desk_report(rows):
         row_h=48,
     )
 
-    y = _section(y, "4. FUNDAMENTAL CATALYST CHECKLIST")
+    y = _section(y, "6. FUNDAMENTAL CATALYST CHECKLIST")
     y = _table(
         y,
         ["DRIVER", "WHAT TO MONITOR", "WHY IT MATTERS"],
@@ -3221,7 +3304,7 @@ def send_daily_market_desk():
         report_path = generate_market_desk_report(data)
         ok, response = _send_telegram_photo(
             report_path,
-            f"PANDA MARKET DESK\n{datetime.now().strftime('%Y-%m-%d %H:%M')}\nDaily 2 AM pre-market score -> structure map",
+            f"PANDA MARKET DESK\n{datetime.now().strftime('%Y-%m-%d %H:%M')} Dubai\nADV watchlist + upcoming news forecast",
             component="Market Desk",
         )
         try:
@@ -3735,16 +3818,12 @@ def hourly_snapshot_due(now, last_hour_mark, last_attempt=None):
     return True, hour_mark
 
 def daily_market_desk_due(now, last_day_mark):
-    """
-    Send one Panda Market Desk report daily at 2 AM Dubai time on trading days.
-    The scheduler checks this inside the hourly block, so the send lands around
-    02:01 with the same MAIN Telegram route as snapshots.
-    """
+    """Send at 22:01, 23:01, 00:01 and the existing 02:01 Dubai slot."""
     if is_market_closed():
         return False, last_day_mark
-    if now.hour < 2:
+    if now.hour not in (22, 23, 0, 2):
         return False, last_day_mark
-    day_mark = now.date().isoformat()
+    day_mark = now.strftime("%Y-%m-%dT%H")
     if last_day_mark == day_mark:
         return False, last_day_mark
     return True, day_mark
@@ -4676,7 +4755,7 @@ def weekly_market_desk():
     ok = send_daily_market_desk()
     if ok:
         now = datetime.now()
-        day_mark = now.date().isoformat()
+        day_mark = now.strftime("%Y-%m-%dT%H")
         persist_market_desk_day_mark(day_mark)
         global LAST_MARKET_DESK_DAY
         LAST_MARKET_DESK_DAY = day_mark
