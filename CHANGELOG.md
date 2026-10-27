@@ -1,3 +1,7 @@
+## 2026-10-27 - Guarded Panda Lines H1 EA
+- Added a separate MT5 EA with a confirmed 30-pip level break, retest entry, 30-pip stop-risk cap, level-clearance check, and 1.5R TP.
+- Preserved the previous EA and all engine scoring rules; no live EA was replaced.
+
 ## 2026-10-26 - Panda Level MT5 VIP and lighter Levels
 - Added a separately licensed VIP MT5 indicator with one Panda Lines switch and a private Admin download.
 - Reduced Levels redraw and history retry work; packaged one EX5 per product for Windows and macOS using the same account license on both.
