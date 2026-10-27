@@ -446,14 +446,12 @@ function advScore(row, now = new Date()) {
   const projectedGap = (baseScores, quoteScores) =>
     strongestAdvCurrencyScore(baseScores) - strongestAdvCurrencyScore(quoteScores);
   const nextDay = projectedGap(base, quote);
-  const nextWeek = projectedGap(
-    [base[0], row.adv_base_h4 ?? 0, base[2]],
-    [quote[0], row.adv_quote_h4 ?? 0, quote[2]]
-  );
-  const nextMonth = projectedGap(
-    [row.adv_base_d1 ?? 0, row.adv_base_h4 ?? 0, base[2]],
-    [row.adv_quote_d1 ?? 0, row.adv_quote_h4 ?? 0, quote[2]]
-  );
+  const weekBase = [base[0], row.adv_base_h4 ?? 0, base[2]];
+  const weekQuote = [quote[0], row.adv_quote_h4 ?? 0, quote[2]];
+  const monthBase = [row.adv_base_d1 ?? 0, row.adv_base_h4 ?? 0, base[2]];
+  const monthQuote = [row.adv_quote_d1 ?? 0, row.adv_quote_h4 ?? 0, quote[2]];
+  const nextWeek = projectedGap(weekBase, weekQuote);
+  const nextMonth = projectedGap(monthBase, monthQuote);
 
   // Panda operates on Dubai time: next day Mon-Thu, and the Friday next-week
   // forecast remains visible through the weekend. Month-end is additive.
@@ -463,15 +461,24 @@ function advScore(row, now = new Date()) {
   const currentBias = row.hard_invalid ? 'WAIT' : (row.gap ?? 0) >= 5 ? 'BUY' : (row.gap ?? 0) <= -5 ? 'SELL' : 'WAIT';
   const keepsBias = gap => currentBias === 'BUY' ? gap >= 5 : gap <= -5;
   const forecasts = [];
-  if (day >= 1 && day <= 4) forecasts.push({ name: 'TMRW', gap: nextDay });
-  if (day === 5 || day === 6 || day === 0) forecasts.push({ name: 'WK', gap: nextWeek });
-  if (showMonth) forecasts.push({ name: 'MTH', gap: nextMonth });
+  if (day >= 1 && day <= 4) forecasts.push({ name: 'TMRW', gap: nextDay, baseScores: base, quoteScores: quote, sources: ['D1 current', 'H4 current', 'ADV H1'] });
+  if (day === 5 || day === 6 || day === 0) forecasts.push({ name: 'WK', gap: nextWeek, baseScores: weekBase, quoteScores: weekQuote, sources: ['D1 current', 'ADV H4', 'ADV H1'] });
+  if (showMonth) forecasts.push({ name: 'MTH', gap: nextMonth, baseScores: monthBase, quoteScores: monthQuote, sources: ['ADV D1', 'ADV H4', 'ADV H1'] });
   if (!forecasts.length) return null;
   const weak = currentBias === 'WAIT' ? [] : forecasts.filter(item => !keepsBias(item.gap));
   const fmt = value => (value > 0 ? '+' : '') + value;
   const detail = forecasts.map(item => `${item.name}:${fmt(item.gap)}`).join(' ');
-  const h4Read = value => `${fmt(value)} ${value >= 4 ? 'STRONG' : value <= -4 ? 'WEAK' : 'NEUTRAL'}`;
-  const h4Context = `NEXT WK H4 ${row.base_currency || 'BASE'} ${h4Read(row.adv_base_h4 ?? 0)} / ${row.quote_currency || 'QUOTE'} ${h4Read(row.adv_quote_h4 ?? 0)}`;
+  const explainCurrency = (currency, scores, sources) => {
+    const selected = strongestAdvCurrencyScore(scores);
+    if (selected === 0 && scores.some(value => value > 0) && scores.some(value => value < 0))
+      return `${currency} 0 (opposing scores offset)`;
+    if (scores.every(value => value === 0)) return `${currency} 0 (no score)`;
+    const used = sources.filter((_, index) => scores[index] === selected);
+    return `${currency} ${fmt(selected)} (${used.join('/')})`;
+  };
+  const explanations = forecasts.map(item =>
+    `${item.name}: ${explainCurrency(row.base_currency || 'BASE', item.baseScores, item.sources)} − ${explainCurrency(row.quote_currency || 'QUOTE', item.quoteScores, item.sources)} = ${fmt(item.gap)}`
+  );
   let label, color, bg, border, level;
   if (currentBias === 'WAIT') {
     label = 'ADV FORECAST'; color = '#00b4ff';
@@ -486,7 +493,11 @@ function advScore(row, now = new Date()) {
     label = `🟡 ${weak.map(item => item.name).join('/')} WEAK`; color = '#ffd166';
     bg = 'rgba(255,209,102,0.10)'; border = 'rgba(255,209,102,0.35)'; level = 'WARN';
   }
-  return { label, color, bg, border, detail, h4Context, level, gaps: { h1: nextDay, h4: nextWeek, d1: nextMonth } };
+  const summary = level === 'OK' ? `Projected gap stays in ${currentBias} range; confirm with the live score.`
+    : level === 'BAD' ? `Projected gap no longer meets the ${currentBias} threshold; confirm with the live score.`
+    : level === 'WARN' ? 'Projected bias differs by horizon; confirm with the live score.'
+    : 'ADV projection only; confirm with the live score.';
+  return { label, color, bg, border, detail, explanations, summary, level, gaps: { h1: nextDay, h4: nextWeek, d1: nextMonth } };
 }
 
 // ===== CURRENCY STRENGTH MATCHUP LABEL (v2) =====
@@ -1462,10 +1473,8 @@ function PairCardModal({ row, trend, cotBias, onClose, isMobile, confidence, mem
             <span style={{fontFamily:mono,fontSize:13,color:adv.color,fontWeight:700}}>{adv.label}</span>
             <div style={{display:'flex',flexDirection:'column',gap:2}}>
               <span style={{fontFamily:mono,fontSize:10,color:adv.color}}>{adv.detail}</span>
-              <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>{adv.h4Context}</span>
-              <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>
-                {adv.level==='OK'?'Projected score keeps the current bias':adv.level==='BAD'?'Projected score loses the current bias':adv.level==='WARN'?'Projected scores show mixed bias strength':'Projected gap from MT4 ADV values'}
-              </span>
+              {adv.explanations.map(line => <span key={line} style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>{line}</span>)}
+              <span style={{fontFamily:mono,fontSize:9,color:'var(--text-muted)'}}>{adv.summary}</span>
             </div>
           </div>
         );})()}
