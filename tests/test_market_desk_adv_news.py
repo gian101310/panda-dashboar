@@ -5,6 +5,11 @@ from test_snapshot_layout import _load_app
 
 
 class MarketDeskAdvNewsTests(unittest.TestCase):
+    def test_report_names_separate_pre_market_from_market_open(self):
+        app = _load_app()
+        self.assertEqual(app.market_desk_display_name("adv"), "PANDA PRE-MARKET DESK")
+        self.assertEqual(app.market_desk_display_name("current"), "PANDA MARKET DESK")
+
     def test_current_watchlist_stays_on_actual_score_while_adv_covers_new_bias(self):
         app = _load_app()
         app.snapshot_adv_forecast = lambda row, now=None: "TMRW +7" if row["symbol"] == "EURJPY" else "TMRW -7"

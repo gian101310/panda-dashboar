@@ -3107,10 +3107,17 @@ def _market_desk_news_rows(rows, now=None):
     return out or [["-", "No high-impact event in next 36h", "-", "WAIT", "Check calendar again later"]]
 
 
+def market_desk_display_name(report_type):
+    if report_type == "adv":
+        return "PANDA PRE-MARKET DESK"
+    if report_type == "current":
+        return "PANDA MARKET DESK"
+    raise ValueError("Unknown Market Desk report type")
+
+
 def generate_market_desk_report(rows, report_type="current"):
     rows = rows or []
-    if report_type not in ("current", "adv"):
-        raise ValueError("Unknown Market Desk report type")
+    title = market_desk_display_name(report_type)
     width, height = 1700, 4300 if report_type == "adv" else 2900
     margin = 70
     page_bg = (255, 255, 255)
@@ -3166,7 +3173,7 @@ def generate_market_desk_report(rows, report_type="current"):
         return y + 28
 
     y = 58
-    draw.text((width // 2, y), "PANDA MARKET DESK", fill=black, font=font_title, anchor="ma")
+    draw.text((width // 2, y), title, fill=black, font=font_title, anchor="ma")
     y += 72
     subtitle = "NEXT SESSION ADV SCORE + UPCOMING NEWS" if report_type == "adv" else "DAILY BIAS -> GAMEPLAY WATCHLIST"
     draw.text((width // 2, y), subtitle, fill=black, font=font_sub, anchor="ma")
@@ -3268,7 +3275,7 @@ def generate_market_desk_report(rows, report_type="current"):
     y += 48
     draw.text((margin, y), f"PANDA ENGINE v3.0 | {datetime.now().strftime('%Y-%m-%d %H:%M')}", fill=black, font=font_sm)
 
-    path = "panda_market_desk_adv.png" if report_type == "adv" else "panda_market_desk.png"
+    path = "panda_pre_market_desk.png" if report_type == "adv" else "panda_market_desk.png"
     img.crop((0, 0, width, min(height, y + 60))).save(path, quality=95)
     return path
 
@@ -3322,6 +3329,8 @@ def build_snapshot_caption(buy_count, sell_count, yellow_count, white_count, now
     )
 
 def send_daily_market_desk(report_type="current"):
+    title = market_desk_display_name(report_type)
+    is_pre_market = report_type == "adv"
     if not telegram_circuit.allow():
         print(f"[MARKET DESK BLOCKED] Circuit breaker locked — failures: {telegram_circuit.failures}")
         return False
@@ -3333,19 +3342,19 @@ def send_daily_market_desk(report_type="current"):
             return False
         report_path = generate_market_desk_report(data, report_type)
         stamp = datetime.now().strftime('%Y-%m-%d %H:%M')
-        caption = (f"PANDA MARKET DESK\n{stamp} Dubai\nNext-session ADV scoring + upcoming news forecast"
-                   if report_type == "adv" else
-                   f"PANDA MARKET DESK\n{stamp}\nDaily 2 AM pre-market score -> structure map")
+        caption = (f"{title}\n{stamp} Dubai\nNext-session ADV scoring + upcoming news forecast"
+                   if is_pre_market else
+                   f"{title}\n{stamp}\nDaily 2 AM actual-score market-open read")
         ok, response = _send_telegram_photo(
             report_path,
             caption,
-            component="Market Desk",
+            component="Pre-Market Desk" if is_pre_market else "Market Desk",
         )
         try:
             supabase_retry(
                 lambda: supabase.table("engine_logs").insert({
                     "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
-                    "component": "telegram_market_desk_ok" if ok else "telegram_market_desk_fail",
+                    "component": ("telegram_pre_market_desk_" if is_pre_market else "telegram_market_desk_") + ("ok" if ok else "fail"),
                     "duration": 0,
                     "error": None if ok else (response.text[:500] if response else "no response"),
                 }).execute(),
@@ -3365,7 +3374,7 @@ def send_daily_market_desk(report_type="current"):
             supabase_retry(
                 lambda: supabase.table("engine_logs").insert({
                     "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
-                    "component": "telegram_market_desk_exception",
+                    "component": "telegram_pre_market_desk_exception" if is_pre_market else "telegram_market_desk_exception",
                     "duration": 0,
                     "error": str(e)[:500],
                 }).execute(),
