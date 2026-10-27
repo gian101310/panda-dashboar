@@ -39,6 +39,7 @@ from news_speeches import is_fed_chair_speech, resolve_speech_summary, speech_ap
 from lib.signal_alerts import RecoveryGate, consolidate_candidates, classify_gap_move
 from lib.signal_alert_outbox import enqueue_alert, dispatch_pending
 from lib.signal_price_levels import assess_price_levels, related_h4_breadth, summarize_nearby_levels
+from lib.panda_hedge_bias_export import export_hedge_bias_snapshot
 
 load_dotenv()
 
@@ -1963,6 +1964,15 @@ def run_gap_once():
             print(f"[SCORE FILE] {sym}: {_sf_err}")
     if dashboard_payload:
         print(f"[SCORE FILES] Wrote {len(dashboard_payload)} panda_score_*.txt files")
+
+    # Local, read-only setup feed for the personal cTrader cross-hedge indicator.
+    # This copies completed scores; it does not participate in scoring or signals.
+    if dashboard_payload:
+        try:
+            exported = export_hedge_bias_snapshot(dashboard_payload)
+            print(f"[CROSS-HEDGE] Exported {exported} Panda setup rows")
+        except Exception as export_error:
+            print(f"[CROSS-HEDGE] Setup snapshot unavailable: {export_error}")
 
     # ---- SIGNAL SNAPSHOTS: Log all 21 pairs every cycle ----
     if dashboard_payload:

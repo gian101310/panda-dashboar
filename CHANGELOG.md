@@ -1,3 +1,7 @@
+## 2026-10-28 - Read-only cTrader cross-hedge panel
+- Added a local Panda bias snapshot export after scoring and separate cTrader cross-hedge source with deterministic exposure tests.
+- The panel simulates exposure and alternatives without placing or modifying trades.
+
 ## 2026-10-28 - Separate actual scores from next-session ADV
 - Kept the 2 AM Market Desk on actual D1/H4/H1 scores and its original watchlist.
 - Made the 10 PM, 11 PM, and midnight Market Desk reports show next-session ADV projections and upcoming news agreement.

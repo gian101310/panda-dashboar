@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AssemblyName>PandaCrossHedge</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="PandaCrossHedge.cs" />
+    <Compile Include="ExposureEngine.cs" />
+    <Compile Include="PandaBiasSnapshot.cs" />
+    <PackageReference Include="cTrader.Automate" Version="1.0.17" />
+  </ItemGroup>
+</Project>
