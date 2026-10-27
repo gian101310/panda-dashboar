@@ -1,7 +1,11 @@
+## 2026-10-28 - Separate actual scores from next-session ADV
+- Kept the 2 AM Market Desk on actual D1/H4/H1 scores and its original watchlist.
+- Made the 10 PM, 11 PM, and midnight Market Desk reports show next-session ADV projections and upcoming news agreement.
+
 ## 2026-10-28 - Mobile bars and ADV Market Desk
 - Made mobile navigation, stat, filter, and pair ticker bars scroll on touch within their own area.
 - Added an ADV forecast watchlist and upcoming high-impact news forecast agreement to the Market Desk image.
-- Scheduled Market Desk sends alongside hourly snapshots at 10 PM, 11 PM, midnight, and the existing 2 AM Dubai slot.
+- Evening Market Desk reports use ADV; the 2 AM Market Desk remains on actual scores.
 
 ## 2026-10-27 - Guarded Panda Lines H1 EA
 - Added a separate MT5 EA with a confirmed 30-pip level break, retest entry, 30-pip stop-risk cap, level-clearance check, and 1.5R TP.

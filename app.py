@@ -2988,12 +2988,6 @@ def _market_desk_pair_rows(rows):
             f"{base_cur} {_desk_fmt_score(base_score)} {base_cls} "
             f"vs {quote_cur} {_desk_fmt_score(quote_score)} {quote_cls}"
         )
-        adv = snapshot_adv_forecast(r)
-        adv_agrees = False
-        if adv:
-            adv_gap = float(adv.split(" ", 1)[1])
-            adv_agrees = (bias == "BUY" and adv_gap >= 5) or (bias == "SELL" and adv_gap <= -5)
-            plan += f" | ADV {adv}: {'agrees' if adv_agrees else 'diverges'}"
         candidates.append({
             "symbol": symbol,
             "gap": gap,
@@ -3001,12 +2995,10 @@ def _market_desk_pair_rows(rows):
             "catalyst": catalyst,
             "rank_group": 0 if strong_vs_weak else 1,
             "pl_ok": pl_ok,
-            "adv_agrees": adv_agrees,
             "context": context,
             "plan": plan,
         })
-    candidates.sort(key=lambda r: (0 if r["adv_agrees"] else 1, r["rank_group"],
-                                   0 if r["pl_ok"] else 1, -abs(r["gap"]), r["symbol"]))
+    candidates.sort(key=lambda r: (r["rank_group"], 0 if r["pl_ok"] else 1, -abs(r["gap"]), r["symbol"]))
     out = []
     for idx, r in enumerate(candidates[:6], start=1):
         source = next((row for row in rows if row.get("symbol") == r["symbol"]), {})
@@ -3024,25 +3016,43 @@ def _market_desk_pair_rows(rows):
         out.append(["-", "NO SETUP", "No clean score gap >= 5", "WAIT", "NONE", "Stand down until score + structure align."])
     return out
 
+def _market_desk_forecast_reference(now=None):
+    """Midnight belongs to the evening forecast window before the 2 AM read."""
+    now = now or datetime.now(timezone.utc)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    return now - timedelta(hours=2) if now.astimezone(DUBAI_TZ).hour == 0 else now
+
+
 def _market_desk_adv_rows(rows, now=None):
-    """Read-only ADV horizon compared with the current, valid pair bias."""
+    """Projected next-day/next-week pairs, independent of today's valid bias."""
     out = []
+    forecast_now = _market_desk_forecast_reference(now)
     for row in rows:
-        bias = row.get("bias") or "WAIT"
-        gap = float(row.get("gap") or 0)
-        if row.get("hard_invalid") or bias not in ("BUY", "SELL") or abs(gap) < 5:
-            continue
-        forecast = snapshot_adv_forecast(row, now)
+        forecast = snapshot_adv_forecast(row, forecast_now)
         if not forecast:
             continue
         horizon, value = forecast.split(" ", 1)
         adv_gap = float(value)
-        agrees = (bias == "BUY" and adv_gap >= 5) or (bias == "SELL" and adv_gap <= -5)
-        note = "ADV agrees; watch structure" if agrees else "ADV diverges; lower priority"
-        out.append((not agrees, -abs(gap), [row.get("symbol") or "", f"{bias} {gap:+g}",
-                                           f"{horizon} {adv_gap:+g}", note]))
-    out.sort(key=lambda item: (item[0], item[1], item[2][0]))
-    return [item[2] for item in out[:8]] or [["-", "WAIT", "N/A", "No fresh valid ADV watch"]]
+        projected = "BUY" if adv_gap >= 5 else "SELL" if adv_gap <= -5 else "WAIT"
+        if projected == "WAIT":
+            continue
+        gap = float(row.get("gap") or 0)
+        current = row.get("bias") or "WAIT"
+        if row.get("hard_invalid") or current not in ("BUY", "SELL", "WAIT"):
+            read = "Current invalid; verify live score"
+        elif current == projected:
+            read = "Bias holds; confirm live score"
+        elif current in ("BUY", "SELL"):
+            read = "Possible flip; wait for live score"
+        else:
+            read = "New projected bias; wait for live score"
+        out.append((-abs(adv_gap), row.get("symbol") or "", [
+            row.get("symbol") or "", f"{current} {gap:+g}",
+            f"{'NEXT' if horizon == 'TMRW' else horizon} {projected} {adv_gap:+g}", read,
+        ]))
+    out.sort(key=lambda item: (item[0], item[1]))
+    return [item[2] for item in out[:8]] or [["-", "WAIT", "N/A", "No projected BUY/SELL gap >= 5"]]
 
 
 def _market_desk_news_rows(rows, now=None):
@@ -3050,8 +3060,12 @@ def _market_desk_news_rows(rows, now=None):
     now = now or datetime.now(timezone.utc)
     if now.tzinfo is None:
         now = now.replace(tzinfo=timezone.utc)
+    forecast_now = _market_desk_forecast_reference(now)
+    feed = fetch_news_feed()
+    if not feed:
+        return [["-", "News feed unavailable or empty", "-", "CHECK", "Recheck calendar before the session"]]
     events = []
-    for event in fetch_news_feed():
+    for event in feed:
         if (event.get("impact") or "").lower() != "high":
             continue
         event_at = parse_news_time(event.get("date"), event.get("time"))
@@ -3063,7 +3077,7 @@ def _market_desk_news_rows(rows, now=None):
         events.append((event_at, currency, event))
     events.sort(key=lambda item: item[0])
     out = []
-    for event_at, currency, event in events[:5]:
+    for event_at, currency, event in events[:8]:
         title = event.get("title") or "High-impact event"
         forecast = event.get("forecast") or "-"
         previous = event.get("previous") or "-"
@@ -3074,26 +3088,30 @@ def _market_desk_news_rows(rows, now=None):
                 symbol = row.get("symbol") or ""
                 if currency not in (symbol[:3], symbol[3:6]) or row.get("hard_invalid"):
                     continue
-                bias = row.get("bias") or "WAIT"
-                gap = float(row.get("gap") or 0)
-                if bias not in ("BUY", "SELL") or abs(gap) < 5:
+                adv = snapshot_adv_forecast(row, forecast_now)
+                if not adv:
                     continue
-                supports = (currency == symbol[:3] and bias == "BUY") or (currency == symbol[3:6] and bias == "SELL")
+                adv_gap = float(adv.split(" ", 1)[1])
+                projected = "BUY" if adv_gap >= 5 else "SELL" if adv_gap <= -5 else "WAIT"
+                if projected == "WAIT":
+                    continue
+                supports = (currency == symbol[:3] and projected == "BUY") or (currency == symbol[3:6] and projected == "SELL")
                 if supports == (read["bias"] == "SUPPORT"):
-                    adv = snapshot_adv_forecast(row, now)
-                    if adv:
-                        adv_gap = float(adv.split(" ", 1)[1])
-                        if (bias == "BUY" and adv_gap >= 5) or (bias == "SELL" and adv_gap <= -5):
-                            agreeing.append(f"{symbol} {bias}")
+                    agreeing.append(f"{symbol} {projected}")
         dubai_time = event_at.astimezone(timezone(timedelta(hours=4))).strftime("%d %b %H:%M")
+        pair_read = (", ".join(agreeing[:4]) if agreeing else
+                     "Forecast has no directional read" if read["bias"] == "NEUTRAL" else
+                     "No ADV pair agrees; watch actual")
         out.append([dubai_time, f"{currency} {title}", f"F {forecast} / P {previous}",
-                    read["bias"], ", ".join(agreeing[:4]) or "No confirmed pair; watch reaction"])
+                    read["bias"], pair_read])
     return out or [["-", "No high-impact event in next 36h", "-", "WAIT", "Check calendar again later"]]
 
 
-def generate_market_desk_report(rows):
+def generate_market_desk_report(rows, report_type="current"):
     rows = rows or []
-    width, height = 1700, 4300
+    if report_type not in ("current", "adv"):
+        raise ValueError("Unknown Market Desk report type")
+    width, height = 1700, 4300 if report_type == "adv" else 2900
     margin = 70
     page_bg = (255, 255, 255)
     black = (20, 20, 20)
@@ -3150,14 +3168,25 @@ def generate_market_desk_report(rows):
     y = 58
     draw.text((width // 2, y), "PANDA MARKET DESK", fill=black, font=font_title, anchor="ma")
     y += 72
-    draw.text((width // 2, y), "DAILY BIAS -> GAMEPLAY WATCHLIST", fill=black, font=font_sub, anchor="ma")
+    subtitle = "NEXT SESSION ADV SCORE + UPCOMING NEWS" if report_type == "adv" else "DAILY BIAS -> GAMEPLAY WATCHLIST"
+    draw.text((width // 2, y), subtitle, fill=black, font=font_sub, anchor="ma")
     y += 44
-    draw.text((width // 2, y), "DUBAI MARKET WATCH - CONDITIONAL, NOT SIGNALS", fill=black, font=font_th, anchor="ma")
+    timing = "10 PM / 11 PM / MIDNIGHT DUBAI FORECAST - NOT SIGNALS" if report_type == "adv" else "2 AM DUBAI WATCHLIST - CONDITIONAL, NOT SIGNALS"
+    draw.text((width // 2, y), timing, fill=black, font=font_th, anchor="ma")
     y += 36
     draw.line([margin, y, width - margin, y], fill=black, width=2)
     y += 22
 
-    y = _section(y, "1. LATEST PANDA CURRENCY READ")
+    if report_type == "adv":
+        y = _section(y, "1. NEXT SESSION ADV SCORE - PROJECTED PAIRS TO WATCH")
+        y = _table(y, ["PAIR", "TODAY", "ADV PROJECTION", "READ"], _market_desk_adv_rows(rows),
+                   [220, 240, 250, 850], row_h=48)
+
+        y = _section(y, "2. NEXT 36H HIGH-IMPACT NEWS - FORECAST VS ADV")
+        y = _table(y, ["DUBAI", "EVENT", "FORECAST / PREVIOUS", "READ", "PANDA + ADV AGREE"],
+                   _market_desk_news_rows(rows), [200, 425, 320, 155, 460], row_h=48)
+
+    y = _section(y, "3. CURRENT PANDA CURRENCY READ - REFERENCE" if report_type == "adv" else "1. LATEST PANDA CURRENCY READ")
     y = _table(
         y,
         ["CUR", "D1", "H4", "H1", "READ", "CLASS", "NOTE"],
@@ -3175,7 +3204,7 @@ def generate_market_desk_report(rows):
             row_fills.append(watch_fill)
         else:
             row_fills.append((218, 242, 226))
-    y = _section(y, "2. TOP WATCHLIST - CONDITIONAL, NOT SIGNALS")
+    y = _section(y, "2. TOP WATCHLIST - CONDITIONAL, NOT SIGNALS" if report_type == "current" else "4. CURRENT SCORE WATCHLIST - REFERENCE ONLY")
     y = _table(
         y,
         ["RANK", "PAIR", "SCORE CONTEXT", "BIAS", "CATALYST", "PLAN"],
@@ -3185,30 +3214,31 @@ def generate_market_desk_report(rows):
         fills=row_fills,
     )
 
-    y = _section(y, "3. ADVANCE SCORE FORECAST - PAIRS TO WATCH")
-    y = _table(y, ["PAIR", "NOW", "ADV GAP", "READ"], _market_desk_adv_rows(rows),
-               [220, 240, 250, 850], row_h=48)
-
-    y = _section(y, "4. UPCOMING HIGH-IMPACT NEWS - FORECAST AGREEMENT")
-    y = _table(y, ["DUBAI", "EVENT", "FORECAST / PREVIOUS", "READ", "PANDA + ADV AGREE"],
-               _market_desk_news_rows(rows), [200, 425, 320, 155, 460], row_h=48)
-
-    y = _section(y, "5. EXECUTION ROUTINE")
-    y = _table(
-        y,
-        ["STEP", "RULE"],
+    y = _section(y, "5. EXECUTION ROUTINE" if report_type == "adv" else "3. EXECUTION ROUTINE")
+    routine = (
         [
+            ["1. TODAY", "Current D1/H4/H1 scores and gap are the actual live read, unchanged by ADV."],
+            ["2. ADV", "TMRW uses current D1/H4 + ADV H1; Friday/weekend WK uses current D1 + ADV H4/H1."],
+            ["3. MAP", "For each currency use its strongest score; projected gap is base minus quote, not a sum."],
+            ["4. VERIFY", "An ADV BUY/SELL is a forecast only. Confirm tomorrow's actual score, structure and Panda Line."],
+            ["5. NEWS", "Forecast vs previous is a conditional read. Actual release and market reaction can change it."],
+        ] if report_type == "adv" else [
             ["1. SCORE", "Classify currencies by strongest score: +4 to +6 STRONG, -4 to -6 WEAK, everything else NEUTRAL."],
             ["2. MAP", "Pair strongest vs weakest. Gap is base score minus quote score; no D1/H4/H1 summing."],
             ["3. FILTER", "Remove hard invalid, same-side conflict, neutral-vs-neutral, and unclear gap."],
             ["4. GAMEPLAY", "Apply the structure and Panda Line filters of your chosen gameplay before entry."],
             ["5. RISK", "News, spread, session timing, and invalidation come before any entry."],
-        ],
+        ]
+    )
+    y = _table(
+        y,
+        ["STEP", "RULE"],
+        routine,
         [215, 1345],
         row_h=48,
     )
 
-    y = _section(y, "6. FUNDAMENTAL CATALYST CHECKLIST")
+    y = _section(y, "6. FUNDAMENTAL CATALYST CHECKLIST" if report_type == "adv" else "4. FUNDAMENTAL CATALYST CHECKLIST")
     y = _table(
         y,
         ["DRIVER", "WHAT TO MONITOR", "WHY IT MATTERS"],
@@ -3238,7 +3268,7 @@ def generate_market_desk_report(rows):
     y += 48
     draw.text((margin, y), f"PANDA ENGINE v3.0 | {datetime.now().strftime('%Y-%m-%d %H:%M')}", fill=black, font=font_sm)
 
-    path = "panda_market_desk.png"
+    path = "panda_market_desk_adv.png" if report_type == "adv" else "panda_market_desk.png"
     img.crop((0, 0, width, min(height, y + 60))).save(path, quality=95)
     return path
 
@@ -3291,7 +3321,7 @@ def build_snapshot_caption(buy_count, sell_count, yellow_count, white_count, now
         f"Watch: {yellow_count} | Idle: {white_count}"
     )
 
-def send_daily_market_desk():
+def send_daily_market_desk(report_type="current"):
     if not telegram_circuit.allow():
         print(f"[MARKET DESK BLOCKED] Circuit breaker locked — failures: {telegram_circuit.failures}")
         return False
@@ -3301,10 +3331,14 @@ def send_daily_market_desk():
         if not data:
             print("[MARKET DESK] No dashboard rows available")
             return False
-        report_path = generate_market_desk_report(data)
+        report_path = generate_market_desk_report(data, report_type)
+        stamp = datetime.now().strftime('%Y-%m-%d %H:%M')
+        caption = (f"PANDA MARKET DESK\n{stamp} Dubai\nNext-session ADV scoring + upcoming news forecast"
+                   if report_type == "adv" else
+                   f"PANDA MARKET DESK\n{stamp}\nDaily 2 AM pre-market score -> structure map")
         ok, response = _send_telegram_photo(
             report_path,
-            f"PANDA MARKET DESK\n{datetime.now().strftime('%Y-%m-%d %H:%M')} Dubai\nADV watchlist + upcoming news forecast",
+            caption,
             component="Market Desk",
         )
         try:
@@ -3818,7 +3852,7 @@ def hourly_snapshot_due(now, last_hour_mark, last_attempt=None):
     return True, hour_mark
 
 def daily_market_desk_due(now, last_day_mark):
-    """Send at 22:01, 23:01, 00:01 and the existing 02:01 Dubai slot."""
+    """ADV desk at 22/23/00; actual-score desk at 02, once per Dubai slot."""
     if is_market_closed():
         return False, last_day_mark
     if now.hour not in (22, 23, 0, 2):
@@ -3827,6 +3861,11 @@ def daily_market_desk_due(now, last_day_mark):
     if last_day_mark == day_mark:
         return False, last_day_mark
     return True, day_mark
+
+
+def market_desk_report_type(now):
+    """The 2 AM desk stays on actual scores; evening desks forecast ahead."""
+    return "current" if now.hour == 2 else "adv"
 
 def load_snapshot_hour_mark():
     try:
@@ -4629,7 +4668,8 @@ async def master_scheduler():
                                     print("[MARKET DESK] Circuit breaker was locked — auto-resetting for daily report")
                                     telegram_circuit.failures = 0
                                     telegram_circuit.locked_until = 0
-                                market_desk_ok = await asyncio.to_thread(send_daily_market_desk)
+                                report_type = market_desk_report_type(now)
+                                market_desk_ok = await asyncio.to_thread(send_daily_market_desk, report_type)
                                 if market_desk_ok:
                                     persist_market_desk_day_mark(day_mark)
                                     LAST_MARKET_DESK_DAY = day_mark
@@ -4749,11 +4789,11 @@ def telegram_reset():
 
 @app.get("/weekly-market-desk")
 def weekly_market_desk():
-    """Force-send the Panda Market Desk report to the main Telegram snapshot group."""
+    """Force-send the 2 AM actual-score Market Desk to the main Telegram group."""
     telegram_circuit.failures = 0
     telegram_circuit.locked_until = 0
     ok = send_daily_market_desk()
-    if ok:
+    if ok and datetime.now().hour == 2:
         now = datetime.now()
         day_mark = now.strftime("%Y-%m-%dT%H")
         persist_market_desk_day_mark(day_mark)
