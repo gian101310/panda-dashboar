@@ -2500,6 +2500,42 @@ def snapshot_pair_levels(row):
     return f"{'STACKED' if stacked else 'NEAR'} {side} ({names})"
 
 
+def snapshot_adv_forecast(row, now=None):
+    """Compact display-only ADV gap, using the Pair Card's horizon inputs."""
+    now = now or datetime.now(timezone.utc)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    dubai_day = (now.astimezone(timezone.utc) + timedelta(hours=4)).weekday()
+    if dubai_day <= 3:
+        horizon = "TMRW"
+        base_keys = ("base_d1", "base_h4", "adv_base_h1")
+        quote_keys = ("quote_d1", "quote_h4", "adv_quote_h1")
+    else:
+        horizon = "WK"
+        base_keys = ("base_d1", "adv_base_h4", "adv_base_h1")
+        quote_keys = ("quote_d1", "adv_quote_h4", "adv_quote_h1")
+
+    def currency_score(keys):
+        try:
+            values = [float(row[key]) for key in keys]
+        except (KeyError, TypeError, ValueError):
+            return None
+        if not all(math.isfinite(value) for value in values):
+            return None
+        positive = max((value for value in values if value > 0), default=0)
+        negative = min((value for value in values if value < 0), default=0)
+        if positive == -negative:
+            return 0
+        return positive if positive > -negative else negative
+
+    base_score = currency_score(base_keys)
+    quote_score = currency_score(quote_keys)
+    if base_score is None or quote_score is None:
+        return None
+    gap = base_score - quote_score
+    return f"{horizon} {gap:+g}" if gap else f"{horizon} 0"
+
+
 def snapshot_pl_verdict(bias, status):
     """Read-only PL confirmation of a displayed BUY/SELL bias."""
     if bias not in ("BUY", "SELL"):
@@ -2596,7 +2632,8 @@ def generate_snapshot(pair_data):
     font_sm    = _load_snapshot_font("arial.ttf",   44)
     font_match = _load_snapshot_font("arial.ttf",   38)
     font_label = _load_snapshot_font("arialbd.ttf", 42)
-    font_level = _load_snapshot_font("arialbd.ttf", 60)
+    font_level = [_load_snapshot_font("arialbd.ttf", size) for size in (60, 54, 48, 42)]
+    font_adv = _load_snapshot_font("arialbd.ttf", 48)
     font_xtf = [_load_snapshot_font("arial.ttf", size) for size in (54, 48, 42, 36)]
 
     # ---- Header ----
@@ -2692,8 +2729,16 @@ def generate_snapshot(pair_data):
         draw.text((x, level_y + 6), "LEVEL", fill=tc, font=font_sm)
         nearby = p.get("level")
         level_text = "N/A" if nearby is None else nearby or "NO NEAR LEVEL"
-        draw.text((x + 210, level_y), level_text, fill=tc,
-                  font=font_level if nearby else font_data)
+        adv_text = f"ADV {p['adv_forecast']}" if p.get("adv_forecast") else ""
+        adv_width = draw.textbbox((0, 0), adv_text, font=font_adv)[2] if adv_text else 0
+        adv_x = x_card + CARD_W - 26 - adv_width
+        level_width = (adv_x - 30 if adv_text else x_card + CARD_W - 26) - (x + 210)
+        level_font = next((font for font in font_level
+                           if draw.textbbox((0, 0), level_text, font=font)[2] <= level_width),
+                          font_level[-1]) if nearby else font_data
+        draw.text((x + 210, level_y), level_text, fill=tc, font=level_font)
+        if adv_text:
+            draw.text((adv_x, level_y + 8), adv_text, fill=tc, font=font_adv)
 
     # ---- Footer (clean — legend lives on the dashboard Overview tab) ----
     footer_y = height - FOOTER_H
@@ -3328,6 +3373,7 @@ def send_snapshot():
             if _q_tf: _xtf_parts.append(f"{r.get('quote_currency') or symbol[3:6]} {_q_tf}")
             xtf_str = " | ".join(_xtf_parts) if _xtf_parts else "NONE"
             level = snapshot_pair_levels(r)
+            adv_forecast = snapshot_adv_forecast(r)
 
             pair_data.append({
                 "symbol": symbol,
@@ -3343,6 +3389,7 @@ def send_snapshot():
                 "category": category,
                 "xtf": xtf_str,
                 "level": level,
+                "adv_forecast": adv_forecast,
                 "matchup": _snapshot_pair_matchup(r),
             })
 
