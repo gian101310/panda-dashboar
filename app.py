@@ -3441,6 +3441,7 @@ def send_snapshot():
 
             abs_gap  = abs(gap)
             bias_val = "BUY" if gap >= 5 else "SELL" if gap <= -5 else "WAIT"
+            signal_bias = bias_val
 
             # Box Badge: H1 + H4 box trends from dashboard (shortened labels)
             _box_short = {"UPTREND": "UP", "DOWNTREND": "DOWN", "RANGING": "RANGE", "UNKNOWN": "-"}
@@ -3524,7 +3525,7 @@ def send_snapshot():
                 "box_h4": box_h4,
                 "pl_zone": pl_zone_v,
                 "pl_status": pl_status_v,
-                "pl_verdict": snapshot_pl_verdict(bias_val, pl_status_v),
+                "pl_verdict": snapshot_pl_verdict(signal_bias, pl_status_v),
                 "pdr": pdr_display,
                 "category": category,
                 "xtf": xtf_str,
