@@ -2648,7 +2648,7 @@ def generate_snapshot(pair_data):
     font_sm    = _load_snapshot_font("arial.ttf",   44)
     font_match = _load_snapshot_font("arial.ttf",   38)
     font_label = _load_snapshot_font("arialbd.ttf", 42)
-    font_level = [_load_snapshot_font("arialbd.ttf", size) for size in (60, 54, 48, 42)]
+    font_level = [_load_snapshot_font("arialbd.ttf", size) for size in (60, 54, 48, 42, 36)]
     font_adv = _load_snapshot_font("arialbd.ttf", 40)
     font_xtf = [_load_snapshot_font("arial.ttf", size) for size in (54, 48, 42, 36)]
 
@@ -2720,8 +2720,6 @@ def generate_snapshot(pair_data):
         else:
             draw.text((x, box_y + 8), "BOX", fill=TEXT_MUTED, font=font_label)
             draw.text((x + 155, box_y), str(p.get("box_badge") or "-"), fill=TEXT_DATA, font=font_data)
-        draw.text((x + 760, box_y + 8), "PDR", fill=TEXT_MUTED, font=font_label)
-        draw.text((x + 900, box_y), str(p.get("pdr") or "-"), fill=TEXT_DATA, font=font_data)
         adv_text = f"ADV {p['adv_forecast']}" if p.get("adv_forecast") else ""
         if adv_text:
             adv_width = draw.textbbox((0, 0), adv_text, font=font_adv)[2]
@@ -2750,11 +2748,22 @@ def generate_snapshot(pair_data):
         draw.text((x, level_y + 6), "LEVEL", fill=TEXT_MUTED, font=font_sm)
         nearby = p.get("level")
         level_text = "N/A" if nearby is None else nearby or "NO NEAR LEVEL"
-        level_width = x_card + CARD_W - 28 - (x + 210)
+        pdr_text = str(p.get("pdr") or "-")
+        pdr_label_width = draw.textbbox((0, 0), "PDR", font=font_label)[2]
+        pdr_value_width = draw.textbbox((0, 0), pdr_text, font=font_data)[2]
+        pdr_x = x_card + CARD_W - 28 - pdr_label_width - 18 - pdr_value_width
+        level_width = pdr_x - 30 - (x + 210)
         level_font = next((font for font in font_level
                            if draw.textbbox((0, 0), level_text, font=font)[2] <= level_width),
                           font_level[-1]) if nearby else font_data
+        if draw.textbbox((0, 0), level_text, font=level_font)[2] > level_width:
+            while level_text and draw.textbbox((0, 0), level_text + "…", font=level_font)[2] > level_width:
+                level_text = level_text[:-1]
+            level_text += "…"
         draw.text((x + 210, level_y), level_text, fill=TEXT_DATA, font=level_font)
+        draw.text((pdr_x, level_y + 8), "PDR", fill=TEXT_MUTED, font=font_label)
+        draw.text((pdr_x + pdr_label_width + 18, level_y), pdr_text,
+                  fill=TEXT_DATA, font=font_data)
 
     # ---- Footer (clean — legend lives on the dashboard Overview tab) ----
     footer_y = height - FOOTER_H
@@ -3340,8 +3349,8 @@ def build_snapshot_caption(buy_count, sell_count, yellow_count, white_count, now
     return (
         "PANDA ENGINE v3.0\n"
         f"{ts}\n"
-        f"BUY: {buy_count} | SELL: {sell_count}\n"
-        f"Watch: {yellow_count} | Idle: {white_count}"
+        f"Green BUY: {buy_count} | Red SELL: {sell_count}\n"
+        f"Yellow: {yellow_count} | Idle: {white_count}"
     )
 
 def send_daily_market_desk(report_type="current"):
@@ -3470,11 +3479,10 @@ def send_snapshot():
             same_side_conflict = bool(base_extreme_signs and quote_extreme_signs and base_extreme_signs == quote_extreme_signs)
             has_watch_currency = (base_extreme or quote_extreme) and not same_side_conflict
 
-            # A valid +/-5 gap stays a signal bias, but appears as WATCH in the snapshot.
-            if is_valid and abs_gap == 5:
+            # Valid gaps of 5 or 6 keep BUY/SELL text on a yellow card.
+            if is_valid and abs_gap < 7:
                 category = "YELLOW"
                 yellow_count += 1
-                bias_val = "WATCH"
             elif is_valid:
                 category = "BUY" if bias_val == "BUY" else "SELL"
                 if bias_val == "BUY":
