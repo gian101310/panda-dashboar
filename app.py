@@ -86,6 +86,9 @@ SUPABASE_KEY          = os.environ.get("SUPABASE_SERVICE_KEY", "")
 MAX_FILE_AGE_SECONDS  = 300   # 5 mins — mt4 files update every ~2 mins
 TRACK_SIGNAL_RESULTS  = os.environ.get("PANDA_TRACK_SIGNAL_RESULTS", "0").lower() in ("1", "true", "yes", "on")
 TRACK_SHADOW_RESULTS  = os.environ.get("PANDA_TRACK_SHADOW_RESULTS", "0").lower() in ("1", "true", "yes", "on")
+# Paused by Boss-G on 2026-10-29; re-enable only on request.
+ADV_SNAPSHOT_ENABLED = False
+AI_MARKET_UPDATE_ENABLED = False
 
 LOGIN_ALERT_BOT_TOKEN = os.environ.get("LOGIN_ALERT_BOT_TOKEN", "")
 LOGIN_ALERT_CHAT_ID   = os.environ.get("LOGIN_ALERT_CHAT_ID", "")
@@ -3574,23 +3577,24 @@ def send_snapshot():
         if sent_ok:
             telegram_circuit.success()
             _log_snapshot_event("telegram_snapshot_ok")
-            try:
-                adv_path = generate_adv_scorecard(data)
-                adv_ok, adv_response = _send_telegram_photo(
-                    adv_path,
-                    f"PANDA ADV SCORECARD\n{datetime.now().strftime('%Y-%m-%d %H:%M')}\nRaw + ADV D1/H4/H1",
-                    component="ADV scorecard",
-                )
-                if adv_ok:
-                    _log_snapshot_event("telegram_adv_scorecard_ok")
-                else:
-                    _log_snapshot_event(
-                        "telegram_adv_scorecard_fail",
-                        adv_response.text[:500] if adv_response else "no response",
+            if ADV_SNAPSHOT_ENABLED:
+                try:
+                    adv_path = generate_adv_scorecard(data)
+                    adv_ok, adv_response = _send_telegram_photo(
+                        adv_path,
+                        f"PANDA ADV SCORECARD\n{datetime.now().strftime('%Y-%m-%d %H:%M')}\nRaw + ADV D1/H4/H1",
+                        component="ADV scorecard",
                     )
-            except Exception as adv_err:
-                print(f"[ADV SNAPSHOT ERROR]: {adv_err}")
-                _log_snapshot_event("telegram_adv_scorecard_exception", str(adv_err)[:500])
+                    if adv_ok:
+                        _log_snapshot_event("telegram_adv_scorecard_ok")
+                    else:
+                        _log_snapshot_event(
+                            "telegram_adv_scorecard_fail",
+                            adv_response.text[:500] if adv_response else "no response",
+                        )
+                except Exception as adv_err:
+                    print(f"[ADV SNAPSHOT ERROR]: {adv_err}")
+                    _log_snapshot_event("telegram_adv_scorecard_exception", str(adv_err)[:500])
         else:
             telegram_circuit.failure()
             _log_snapshot_event(
@@ -4482,6 +4486,8 @@ def send_ai_snapshot():
     Narrator mode only — describes data, no trade recommendations.
     Non-blocking: any failure is logged and ignored.
     """
+    if not AI_MARKET_UPDATE_ENABLED:
+        return
     if is_market_closed():
         print(f"[AI SNAPSHOT] Market closed - skipped ({market_time_label()})")
         return
@@ -4679,13 +4685,14 @@ async def master_scheduler():
                         else:
                             print("[HOURLY] Snapshot not confirmed; will retry in 60 seconds")
                         if first_attempt:
-                            # AI and Market Desk retain their hourly/daily cadence
+                            # Optional AI update and daily Desk keep their cadence
                             # even when the main snapshot needs another attempt.
-                            if not telegram_circuit.allow():
-                                print("[HOURLY] Circuit breaker tripped during snapshot — resetting for AI market update")
-                                telegram_circuit.failures = 0
-                                telegram_circuit.locked_until = 0
-                            await run_scheduler_step("hourly-ai-update", send_ai_snapshot)
+                            if AI_MARKET_UPDATE_ENABLED:
+                                if not telegram_circuit.allow():
+                                    print("[HOURLY] Circuit breaker tripped during snapshot — resetting for AI market update")
+                                    telegram_circuit.failures = 0
+                                    telegram_circuit.locked_until = 0
+                                await run_scheduler_step("hourly-ai-update", send_ai_snapshot)
                             daily_desk_due, day_mark = daily_market_desk_due(now, LAST_MARKET_DESK_DAY)
                             if daily_desk_due:
                                 if not telegram_circuit.allow():
