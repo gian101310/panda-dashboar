@@ -2616,21 +2616,24 @@ def generate_snapshot(pair_data):
     LINE_OFFSETS = layout["line_offsets"]
 
     # ---- Palette (light theme with high-visibility signal rows) ----
-    BG_PAGE   = (214, 220, 226)
-    BG_CARD   = (236, 239, 243)
-    BG_CARD2  = (226, 231, 236)
-    BG_BUY    = (125, 210, 160)
-    BG_BUY2   = (105, 195, 145)
-    BG_SELL   = (248, 130, 152)
-    BG_SELL2  = (232, 108, 132)
-    BG_YELLOW = (255, 210, 72)
-    BG_YELLOW2= (242, 190, 42)
+    BG_PAGE   = (235, 240, 245)
+    BG_CARD   = (255, 255, 255)
+    BG_CARD2  = (249, 251, 253)
+    BG_BUY    = (235, 248, 241)
+    BG_BUY2   = (230, 245, 237)
+    BG_SELL   = (255, 239, 243)
+    BG_SELL2  = (252, 234, 239)
+    BG_YELLOW = (255, 249, 231)
+    BG_YELLOW2= (253, 245, 220)
     TEXT_HEAD = (24, 30, 42)
+    TEXT_DATA = (38, 49, 65)
+    TEXT_MUTED = (91, 105, 122)
+    BORDER = (211, 220, 229)
     ACCENT    = (0, 110, 205)
-    C_BUY     = (0,  88, 44)
-    C_SELL    = (170, 0,  28)
-    C_YELLOW  = (118, 62, 0)
-    C_WHITE   = (70, 82, 102)
+    C_BUY     = (0, 113, 72)
+    C_SELL    = (177, 35, 65)
+    C_YELLOW  = (150, 98, 0)
+    C_WHITE   = (85, 98, 113)
 
     img  = Image.new("RGB", (width, height), BG_PAGE)
     draw = ImageDraw.Draw(img)
@@ -2646,7 +2649,7 @@ def generate_snapshot(pair_data):
     font_match = _load_snapshot_font("arial.ttf",   38)
     font_label = _load_snapshot_font("arialbd.ttf", 42)
     font_level = [_load_snapshot_font("arialbd.ttf", size) for size in (60, 54, 48, 42)]
-    font_adv = _load_snapshot_font("arialbd.ttf", 48)
+    font_adv = _load_snapshot_font("arialbd.ttf", 40)
     font_xtf = [_load_snapshot_font("arial.ttf", size) for size in (54, 48, 42, 36)]
 
     # ---- Header ----
@@ -2654,7 +2657,7 @@ def generate_snapshot(pair_data):
     draw.rectangle([0, HEADER_H - 4, width, HEADER_H], fill=ACCENT)
     draw.text((MARGIN, 40), "PANDA ENGINE v3.0", fill=TEXT_HEAD, font=font_title)
     draw.text((MARGIN, 120), "LIVE PAIR SNAPSHOT  |  NEARBY LEVELS WITHIN 30 PIPS",
-              fill=TEXT_HEAD, font=font_hdr)
+              fill=TEXT_MUTED, font=font_hdr)
 
     # ---- Data rows ----
     for idx, p in enumerate(pair_data):
@@ -2674,8 +2677,8 @@ def generate_snapshot(pair_data):
             bg = BG_YELLOW if idx % 2 == 0 else BG_YELLOW2
         else:
             bg = BG_CARD if idx % 2 == 0 else BG_CARD2
-        draw.rectangle([x_card, y_card, x_card + CARD_W, y_end], fill=bg)
-        draw.rectangle([x_card, y_end - 1, x_card + CARD_W, y_end], fill=(200, 205, 215))
+        draw.rounded_rectangle([x_card, y_card, x_card + CARD_W, y_end],
+                               radius=18, fill=bg, outline=BORDER, width=2)
 
         # Thick accent bar
         if cat == "BUY":
@@ -2699,33 +2702,38 @@ def generate_snapshot(pair_data):
         box_y = y_card + LINE_OFFSETS["box"]
         metrics_y = y_card + LINE_OFFSETS["metrics"]
 
-        draw.text((x, top_y), str(p.get("symbol", "")), fill=tc, font=font_pair)
-        draw.text((x + TOP_OFFSETS["gap_label"], top_y + 23), "GAP", fill=tc, font=font_label)
+        draw.text((x, top_y), str(p.get("symbol", "")), fill=TEXT_HEAD, font=font_pair)
+        draw.text((x + TOP_OFFSETS["gap_label"], top_y + 23), "GAP", fill=TEXT_MUTED, font=font_label)
         draw.text((x + TOP_OFFSETS["gap_value"], top_y + 5), gap_str, fill=tc, font=font_bold)
         if bias_text in ("INVALID", "OFFLINE"):
             draw.text((x + TOP_OFFSETS["bias"], top_y + 5), bias_text, fill=tc, font=font_bold)
         else:
             draw.text((x + TOP_OFFSETS["bias"], top_y - 2), bias_text, fill=tc, font=font_bias)
         draw.text((x + TOP_OFFSETS["matchup"], top_y + 30), str(p.get("matchup") or "-"),
-                  fill=tc, font=font_match)
+                  fill=TEXT_MUTED, font=font_match)
 
         if "box_h1" in p:
-            draw.text((x, box_y + 8), "H1", fill=tc, font=font_label)
-            draw.text((x + 115, box_y), p["box_h1"], fill=tc, font=font_data)
-            draw.text((x + 360, box_y + 8), "H4", fill=tc, font=font_label)
-            draw.text((x + 475, box_y), p["box_h4"], fill=tc, font=font_data)
+            draw.text((x, box_y + 8), "H1", fill=TEXT_MUTED, font=font_label)
+            draw.text((x + 115, box_y), p["box_h1"], fill=TEXT_DATA, font=font_data)
+            draw.text((x + 360, box_y + 8), "H4", fill=TEXT_MUTED, font=font_label)
+            draw.text((x + 475, box_y), p["box_h4"], fill=TEXT_DATA, font=font_data)
         else:
-            draw.text((x, box_y + 8), "BOX", fill=tc, font=font_label)
-            draw.text((x + 155, box_y), str(p.get("box_badge") or "-"), fill=tc, font=font_data)
-        draw.text((x + 800, box_y + 8), "PDR", fill=tc, font=font_label)
-        draw.text((x + 950, box_y), str(p.get("pdr") or "-"), fill=tc, font=font_data)
+            draw.text((x, box_y + 8), "BOX", fill=TEXT_MUTED, font=font_label)
+            draw.text((x + 155, box_y), str(p.get("box_badge") or "-"), fill=TEXT_DATA, font=font_data)
+        draw.text((x + 760, box_y + 8), "PDR", fill=TEXT_MUTED, font=font_label)
+        draw.text((x + 900, box_y), str(p.get("pdr") or "-"), fill=TEXT_DATA, font=font_data)
+        adv_text = f"ADV {p['adv_forecast']}" if p.get("adv_forecast") else ""
+        if adv_text:
+            adv_width = draw.textbbox((0, 0), adv_text, font=font_adv)[2]
+            draw.text((x_card + CARD_W - 28 - adv_width, box_y + 8), adv_text,
+                      fill=TEXT_MUTED, font=font_adv)
         pl_verdict = p.get("pl_verdict") or "N/A"
-        pl_color = C_YELLOW if pl_verdict in ("NEAR", "INVALID") else C_WHITE if pl_verdict == "N/A" else tc
-        draw.text((x, metrics_y + 8), "PL", fill=tc, font=font_label)
+        pl_color = C_YELLOW if pl_verdict == "NEAR" else C_SELL if pl_verdict == "INVALID" else C_WHITE if pl_verdict == "N/A" else C_BUY
+        draw.text((x, metrics_y + 8), "PL", fill=TEXT_MUTED, font=font_label)
         draw.text((x + 110, metrics_y), pl_verdict, fill=pl_color, font=font_data)
 
         # EXTREME TF line (v9) — timeframes at ±4/5/6 per currency, e.g. "GBP D1+5 H4+5 | JPY H1-5"
-        draw.text((x + 550, metrics_y + 8), "XTF", fill=tc, font=font_label)
+        draw.text((x + 550, metrics_y + 8), "XTF", fill=TEXT_MUTED, font=font_label)
         xtf_text = str(p.get("xtf") or "-")
         xtf_width = CARD_W - 760
         xtf_font = next((font for font in font_xtf
@@ -2735,23 +2743,18 @@ def generate_snapshot(pair_data):
             xtf_text = xtf_text[:-1]
         if xtf_text != full_xtf:
             xtf_text += "…"
-        draw.text((x + 680, metrics_y), xtf_text, fill=tc, font=xtf_font)
+        draw.text((x + 680, metrics_y), xtf_text, fill=TEXT_DATA, font=xtf_font)
 
         level_y = y_card + LINE_OFFSETS["levels"]
-        draw.line((x, level_y - 12, x_card + CARD_W - 26, level_y - 12), fill=tc, width=2)
-        draw.text((x, level_y + 6), "LEVEL", fill=tc, font=font_sm)
+        draw.line((x, level_y - 12, x_card + CARD_W - 26, level_y - 12), fill=BORDER, width=2)
+        draw.text((x, level_y + 6), "LEVEL", fill=TEXT_MUTED, font=font_sm)
         nearby = p.get("level")
         level_text = "N/A" if nearby is None else nearby or "NO NEAR LEVEL"
-        adv_text = f"ADV {p['adv_forecast']}" if p.get("adv_forecast") else ""
-        adv_width = draw.textbbox((0, 0), adv_text, font=font_adv)[2] if adv_text else 0
-        adv_x = x_card + CARD_W - 26 - adv_width
-        level_width = (adv_x - 30 if adv_text else x_card + CARD_W - 26) - (x + 210)
+        level_width = x_card + CARD_W - 28 - (x + 210)
         level_font = next((font for font in font_level
                            if draw.textbbox((0, 0), level_text, font=font)[2] <= level_width),
                           font_level[-1]) if nearby else font_data
-        draw.text((x + 210, level_y), level_text, fill=tc, font=level_font)
-        if adv_text:
-            draw.text((adv_x, level_y + 8), adv_text, fill=tc, font=font_adv)
+        draw.text((x + 210, level_y), level_text, fill=TEXT_DATA, font=level_font)
 
     # ---- Footer (clean — legend lives on the dashboard Overview tab) ----
     footer_y = height - FOOTER_H
