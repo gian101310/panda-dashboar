@@ -3463,8 +3463,12 @@ def send_snapshot():
             same_side_conflict = bool(base_extreme_signs and quote_extreme_signs and base_extreme_signs == quote_extreme_signs)
             has_watch_currency = (base_extreme or quote_extreme) and not same_side_conflict
 
-            # Categorize for coloring
-            if is_valid:
+            # A valid +/-5 gap stays a signal bias, but appears as WATCH in the snapshot.
+            if is_valid and abs_gap == 5:
+                category = "YELLOW"
+                yellow_count += 1
+                bias_val = "WATCH"
+            elif is_valid:
                 category = "BUY" if bias_val == "BUY" else "SELL"
                 if bias_val == "BUY":
                     buy_count += 1
