@@ -3635,7 +3635,7 @@ function SignalFlashcard({ data, trends }) {
 
 const ALL_TABS_SET = new Set([...TABS, 'ENGINE']);
 
-export default function Dashboard() {
+export default function Dashboard({ accessUser }) {
   const router = useRouter();
   const [data,       setData]       = useState([]);
   const [trends,     setTrends]     = useState({});
@@ -3687,8 +3687,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (urlTab && ALL_TABS_SET.has(urlTab) && urlTab !== tab) setTabRaw(urlTab);
   }, [urlTab]);
-  const [logSub,     setLogSub]     = useState('Signal Log');
-  const [user,       setUser]       = useState(null);
+  const user = accessUser;
   const isAdmin = user?.role === 'admin';
   const [showAlertSettings, setShowAlertSettings] = useState(false);
   const [popup,      setPopup]      = useState(null);
@@ -3818,12 +3817,7 @@ export default function Dashboard() {
   },[fetchSpikes]);
   useEffect(()=>{if(tab==='RESEARCH'&&cotData.length===0) fetchCot();},[tab,cotData.length,fetchCot]);
   useEffect(()=>{fetchCot();},[fetchCot]);
-  useEffect(()=>{
-    fetch('/api/me')
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { setUser(d && d.role ? d : null); if(d && d.username) setShowWelcome(true); })
-      .catch(() => setUser(null));
-  },[]);
+  useEffect(()=>{ if(user?.username) setShowWelcome(true); },[user?.username]);
   useEffect(()=>{ if(showWelcome){ const t=setTimeout(()=>setShowWelcome(false),4500); return()=>clearTimeout(t); } },[showWelcome]);
   useEffect(()=>{fetch('/api/page-visibility').then(r=>r.json()).then(d=>setPageVis(d)).catch(()=>{});},[]);
 

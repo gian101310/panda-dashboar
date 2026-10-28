@@ -1,4 +1,3 @@
-import { supabase } from '../../lib/supabase';
 import { validateSession } from '../../lib/auth';
 
 export default async function handler(req, res) {
@@ -6,13 +5,7 @@ export default async function handler(req, res) {
   const session = await validateSession(token);
   if (!session) return res.status(401).json({ error: 'Unauthorized' });
 
-  const { data: user } = await supabase
-    .from('panda_users')
-    .select('id, username, role, feature_access, max_devices, maintenance_bypass')
-    .eq('id', session.user_id)
-    .single();
-
-  if (!user) return res.status(401).json({ error: 'User not found' });
+  const user = session.panda_users;
 
   return res.status(200).json({
     id: user.id,

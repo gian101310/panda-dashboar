@@ -4,6 +4,12 @@
 
 ---
 
+## Oct 29, 2026 — Pause unused signal analytics
+
+- Removed the Overview signal tracker and hid Analytics, Shadow, and archived Signal Log views. Spike Log remains available.
+- Paused signal result, shadow, tracker, and historical signal snapshot writes while leaving live scoring and Telegram snapshots active.
+- Reused the initial session lookup in the dashboard, ran access and maintenance checks concurrently, and reduced session activity writes to once every two minutes.
+
 ## Oct 23, 2026 — Recover missed hourly Panda score snapshots
 
 - Hourly Telegram snapshots now use the latest 5-minute score cycle instead of waiting for a second score pass.

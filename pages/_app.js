@@ -18,8 +18,8 @@ async function fetchAccess(url) {
   }
 }
 
-function CheckingAccessScreen() {
-  return <div style={{minHeight:'100vh',background:'#0a0a14',display:'flex',alignItems:'center',justifyContent:'center',color:'#8892b0',fontFamily:"'Share Tech Mono',monospace",fontSize:12,letterSpacing:2}}>CHECKING ACCESS...</div>;
+function LoadingScreen() {
+  return <div style={{minHeight:'100vh',background:'#0a0a14',display:'flex',alignItems:'center',justifyContent:'center',color:'#8892b0',fontFamily:"'Share Tech Mono',monospace",fontSize:12,letterSpacing:2}}>LOADING PANDA ENGINE...</div>;
 }
 
 function MaintenanceScreen() {
@@ -68,6 +68,7 @@ export default function App({ Component, pageProps }) {
   const router = useRouter();
   const [checked, setChecked] = useState(false);
   const [accessDecision, setAccessDecision] = useState('checking');
+  const [accessUser, setAccessUser] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -95,19 +96,24 @@ export default function App({ Component, pageProps }) {
         return;
       }
 
-      // 1) Check who the user is (if logged in)
+      // Check session and maintenance concurrently so the entry screen does not wait twice.
+      const [userResult, maintenanceResult] = await Promise.allSettled([
+        fetchAccess('/api/me'),
+        fetchAccess('/api/maintenance'),
+      ]);
+      let currentUser = null;
       try {
-        const uRes = await fetchAccess('/api/me');
+        const uRes = userResult.status === 'fulfilled' ? userResult.value : null;
         if (uRes.ok) {
           const uData = await uRes.json();
+          currentUser = uData;
           if (uData.role === 'admin') isAdmin = true;
           if (uData.maintenance_bypass === true) hasMaintBypass = true;
         }
       } catch {}
 
-      // 2) Maintenance check
       try {
-        const mRes = await fetchAccess('/api/maintenance');
+        const mRes = maintenanceResult.status === 'fulfilled' ? maintenanceResult.value : null;
         if (mRes.ok) {
           const mData = await mRes.json();
           maintenanceEnabled = mData.maintenance === true;
@@ -137,6 +143,7 @@ export default function App({ Component, pageProps }) {
       }
 
       if (cancelled) return;
+      setAccessUser(currentUser);
       setAccessDecision(getPageAccessDecision({
         isAdmin,
         hasMaintenanceBypass: hasMaintBypass,
@@ -153,9 +160,9 @@ export default function App({ Component, pageProps }) {
     return () => { cancelled = true; };
   }, [router.pathname]);
 
-  if (!checked || accessDecision === 'checking') return <CheckingAccessScreen />;
+  if (!checked || accessDecision === 'checking') return <LoadingScreen />;
   if (accessDecision === 'maintenance') return <MaintenanceScreen />;
   if (accessDecision === 'coming_soon') return <ComingSoonScreen />;
 
-  return <Component {...pageProps} />;
+  return <Component {...pageProps} accessUser={accessUser} />;
 }
