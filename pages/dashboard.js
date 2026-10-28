@@ -3707,6 +3707,30 @@ export default function Dashboard() {
 
   // Mobile detection
   const [isMobile, setIsMobile] = useState(false);
+  const headerRef = useRef(null);
+  const sidebarRef = useRef(null);
+  const [headerHeight, setHeaderHeight] = useState(0);
+  useEffect(() => {
+    const header = headerRef.current;
+    if (!header) return;
+    const measure = () => setHeaderHeight(header.getBoundingClientRect().height);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, []);
+  useEffect(() => {
+    const sidebar = sidebarRef.current;
+    if (isMobile || !sidebar) return;
+    const scrollPage = (event) => {
+      if (event.ctrlKey || !event.deltaY || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
+      event.preventDefault();
+      const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1;
+      window.scrollBy({ top: event.deltaY * unit, behavior: 'instant' });
+    };
+    sidebar.addEventListener('wheel', scrollPage, { passive: false });
+    return () => sidebar.removeEventListener('wheel', scrollPage);
+  }, [isMobile]);
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
     check();
@@ -3886,7 +3910,7 @@ export default function Dashboard() {
       <Head>
         <title>PANDA ENGINE — {isMarketOpen()?'LIVE':'CLOSED'}</title>
         <meta name="viewport" content="width=device-width,initial-scale=1"/>
-        <style>{`@media print{body{visibility:hidden!important;}} *{-webkit-touch-callout:none;} @media(max-width:767px){*::-webkit-scrollbar{height:3px!important;width:3px!important;} button{min-height:32px;} select,input[type=date]{min-height:32px;} table{font-size:9px!important;}} @keyframes fadeIn{from{opacity:0}to{opacity:1}} @keyframes scaleIn{from{opacity:0;transform:scale(0.85)}to{opacity:1;transform:scale(1)}}`}</style>
+        <style>{`html body{overflow-x:clip;} @media print{body{visibility:hidden!important;}} *{-webkit-touch-callout:none;} @media(max-width:767px){*::-webkit-scrollbar{height:3px!important;width:3px!important;} button{min-height:32px;} select,input[type=date]{min-height:32px;} table{font-size:9px!important;}} @keyframes fadeIn{from{opacity:0}to{opacity:1}} @keyframes scaleIn{from{opacity:0;transform:scale(0.85)}to{opacity:1;transform:scale(1)}}`}</style>
       </Head>
 
       {/* WELCOME POPUP */}
@@ -3920,7 +3944,7 @@ export default function Dashboard() {
         <div style={{position:'fixed',inset:0,backgroundImage:'linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,rgba(0,180,255,0.025) 1px,transparent 1px)',backgroundSize:'40px 40px',pointerEvents:'none',zIndex:0}}/>
 
         {/* HEADER */}
-        <header style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:isMobile?'8px 12px':'10px 20px',background:'var(--bg-secondary)',borderBottom:'1px solid var(--border)',position:'sticky',top:0,zIndex:100,flexWrap:isMobile?'wrap':'nowrap',gap:isMobile?8:0}}>
+        <header ref={headerRef} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:isMobile?'8px 12px':'10px 20px',background:'var(--bg-secondary)',borderBottom:'1px solid var(--border)',position:'sticky',top:0,zIndex:100,flexWrap:isMobile?'wrap':'nowrap',gap:isMobile?8:0}}>
           <div style={{display:'flex',alignItems:'center',gap:10}}>
             {isMobile&&<button onClick={()=>setSidebarOpen(o=>!o)} aria-label="Menu" style={{background:'rgba(0,180,255,0.08)',border:'1px solid #1e3060',borderRadius:6,color:'#00b4ff',fontSize:16,lineHeight:1,padding:'4px 9px',cursor:'pointer'}}>☰</button>}
             <span style={{fontSize:isMobile?18:22}}>🐼</span>
@@ -3955,9 +3979,9 @@ export default function Dashboard() {
           )}
 
           {/* SIDEBAR NAV */}
-          <aside style={isMobile
-            ?{position:'fixed',top:0,left:0,bottom:0,width:230,maxHeight:'100dvh',zIndex:90,background:'var(--bg-secondary)',borderRight:'1px solid var(--border)',padding:'58px 10px 16px',display:'flex',flexDirection:'column',gap:4,transform:sidebarOpen?'translateX(0)':'translateX(-105%)',transition:'transform 0.25s ease',boxShadow:sidebarOpen?'4px 0 24px rgba(0,0,0,0.5)':'none',overflowY:'auto',WebkitOverflowScrolling:'touch',overscrollBehaviorY:'contain',touchAction:'pan-y'}
-            :{width:190,flexShrink:0,background:'var(--bg-secondary)',borderRight:'1px solid var(--border)',padding:'14px 8px',display:'flex',flexDirection:'column',gap:3,alignSelf:'stretch',position:'sticky',top:0,maxHeight:'100vh',overflowY:'auto'}}>
+          <aside ref={sidebarRef} aria-label="Dashboard navigation" style={isMobile
+            ?{position:'fixed',top:headerHeight,left:0,bottom:0,width:230,maxHeight:`calc(100dvh - ${headerHeight}px)`,zIndex:90,background:'var(--bg-secondary)',borderRight:'1px solid var(--border)',padding:'14px 10px 16px',display:'flex',flexDirection:'column',gap:4,transform:sidebarOpen?'translateX(0)':'translateX(-105%)',transition:'transform 0.25s ease',boxShadow:sidebarOpen?'4px 0 24px rgba(0,0,0,0.5)':'none',overflowY:'auto',WebkitOverflowScrolling:'touch',overscrollBehaviorY:'contain',touchAction:'pan-y'}
+            :{width:190,flexShrink:0,background:'var(--bg-secondary)',borderRight:'1px solid var(--border)',padding:'14px 8px',display:'flex',flexDirection:'column',gap:3,alignSelf:'flex-start',position:'sticky',top:headerHeight,maxHeight:`calc(100dvh - ${headerHeight}px)`,overflowY:'auto'}}>
             <div style={{fontFamily:mono,fontSize:8,letterSpacing:3,color:'var(--text-muted)',padding:'2px 12px 8px'}}>NAVIGATION</div>
             {(()=>{const ICON={'OVERVIEW':'🏠','PANELS':'🧩','SIGNALS':'📡','TABLE':'📋','GAP CHART':'📈','RESEARCH':'🔬','CALCULATOR':'🧮','SETUPS':'🎯','PHASE GUIDE':'🧭','VALID PAIRS':'✅','CHART':'📉','ANALYTICS':'📊','SHADOW':'🌑','LOGS':'📜','PANDA AI':'🐼','ENGINE':'🏥'};
             const items=TABS.filter(t=>{ const feat=TAB_FEATURE[t]; if(!feat) return true; if(isAdmin) return true; const fa=user?.feature_access||[]; if(t==='SHADOW') return fa.includes('shadow'); return fa.includes(feat)||fa.includes('dashboard');});

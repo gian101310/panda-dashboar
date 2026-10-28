@@ -1,3 +1,8 @@
+## 2026-10-28 - Keep dashboard navigation visible while scrolling
+- Fixed dashboard overflow so the header and desktop navigation remain visible as the page scrolls.
+- Desktop wheel scrolling over navigation moves the main page; lower menu items remain reachable with the scrollbar or keyboard on short screens.
+- Positioned desktop navigation and the mobile drawer below the measured header height.
+
 ## 2026-10-28 - Guarded cTrader journal sync
 - Added authenticated account checks, account-scoped trade IDs, preserved broker pips, and new-trade-only writes.
 - Added a scheduled task runner with a local log.
