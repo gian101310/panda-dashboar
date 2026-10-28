@@ -3,6 +3,8 @@ import { validateSession } from '../../lib/auth';
 
 const TWELVEDATA_KEY = process.env.TWELVEDATA_API_KEY || '';
 const ENGINE_SECRET = process.env.ENGINE_SECRET || '';
+// Paused by Boss-G on 2026-10-29; re-enable only on request.
+const TRACKER_UPDATES_ENABLED = false;
 
 // Fetch spot prices from Twelve Data (free tier: 800/day, 8/min)
 async function fetchPrices(symbols) {
@@ -219,6 +221,7 @@ export default async function handler(req, res) {
     const incomingSecret = req.headers['x-engine-secret'] || '';
     const validEngine = ENGINE_SECRET && incomingSecret === ENGINE_SECRET;
     if (!session && !validEngine) return res.status(401).json({ error: 'Unauthorized' });
+    if (!TRACKER_UPDATES_ENABLED) return res.status(200).json({ paused: true });
 
     try {
       const { action } = req.body || {};

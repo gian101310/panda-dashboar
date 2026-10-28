@@ -84,8 +84,10 @@ SIGNAL_CHAT_ID        = os.environ.get("SIGNAL_CHAT_ID", TELEGRAM_CHAT_ID)
 SUPABASE_URL          = os.environ.get("SUPABASE_URL", "")
 SUPABASE_KEY          = os.environ.get("SUPABASE_SERVICE_KEY", "")
 MAX_FILE_AGE_SECONDS  = 300   # 5 mins — mt4 files update every ~2 mins
-TRACK_SIGNAL_RESULTS  = os.environ.get("PANDA_TRACK_SIGNAL_RESULTS", "0").lower() in ("1", "true", "yes", "on")
-TRACK_SHADOW_RESULTS  = os.environ.get("PANDA_TRACK_SHADOW_RESULTS", "0").lower() in ("1", "true", "yes", "on")
+# Paused by Boss-G on 2026-10-29; re-enable only on request.
+ANALYTICS_TRACKING_ENABLED = False
+TRACK_SIGNAL_RESULTS  = ANALYTICS_TRACKING_ENABLED and os.environ.get("PANDA_TRACK_SIGNAL_RESULTS", "0").lower() in ("1", "true", "yes", "on")
+TRACK_SHADOW_RESULTS  = ANALYTICS_TRACKING_ENABLED and os.environ.get("PANDA_TRACK_SHADOW_RESULTS", "0").lower() in ("1", "true", "yes", "on")
 # Paused by Boss-G on 2026-10-29; re-enable only on request.
 ADV_SNAPSHOT_ENABLED = False
 AI_MARKET_UPDATE_ENABLED = False
@@ -1978,7 +1980,7 @@ def run_gap_once():
             print(f"[CROSS-HEDGE] Setup snapshot unavailable: {export_error}")
 
     # ---- SIGNAL SNAPSHOTS: Log all 21 pairs every cycle ----
-    if dashboard_payload:
+    if ANALYTICS_TRACKING_ENABLED and dashboard_payload:
         try:
             snap_ts = datetime.utcnow().isoformat()
             # Allowlist of columns that actually exist in the signal_snapshots table.
@@ -2103,13 +2105,14 @@ def run_gap_once():
         evaluate_pending_shadows(all_scores, all_pl_map)
 
     # ---- Signal Tracker: update cycle via Vercel API ----
-    try:
-        import requests as _req
-        _req.post("https://pandaengine.app/api/signal-tracker", json={},
-                  headers={"X-Engine-Secret": ENGINE_SECRET}, timeout=10)
-        print("[TRACKER] Update cycle triggered")
-    except Exception as e:
-        print(f"[TRACKER] Skipped: {e}")
+    if ANALYTICS_TRACKING_ENABLED:
+        try:
+            import requests as _req
+            _req.post("https://pandaengine.app/api/signal-tracker", json={},
+                      headers={"X-Engine-Secret": ENGINE_SECRET}, timeout=10)
+            print("[TRACKER] Update cycle triggered")
+        except Exception as e:
+            print(f"[TRACKER] Skipped: {e}")
 
     # ---- Engine Heartbeat: write cycle completion to Supabase ----
     try:

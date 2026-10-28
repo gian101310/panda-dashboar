@@ -3143,11 +3143,8 @@ function OvTrackerSummary({ trackers, closed }) {
 }
 
 function OverviewTab({ data, trends, pdrData, upcomingNews, spikes, confidenceMap, memoryIndex, onSelectPair, isMobile, lastUpdate }) {
-  const [trackers,setTrackers]=useState([]);
-  const [closedTrackers,setClosedTrackers]=useState([]);
   const [time,setTime]=useState(new Date());
   useEffect(()=>{const t=setInterval(()=>setTime(new Date()),10000);return()=>clearInterval(t);},[]);
-  useEffect(()=>{(async()=>{try{const[oR,cR]=await Promise.all([fetch('/api/signal-tracker?status=OPEN').then(r=>r.json()),fetch('/api/signal-tracker?status=CLOSED&limit=5').then(r=>r.json())]);setTrackers(oR.trackers||[]);setClosedTrackers(cR.trackers||[]);}catch{}})();},[]);
 
   // Normalize pairs from dashboard data into enriched objects
   const pairs = useMemo(()=> data.map(row => ({
@@ -3339,9 +3336,6 @@ function OverviewTab({ data, trends, pdrData, upcomingNews, spikes, confidenceMa
         </div>
       </div>
 
-      {/* ROW 4 — TRACKER SUMMARY */}
-      <OvTrackerSummary trackers={trackers} closed={closedTrackers}/>
-
       </div>
       {/* CSS Animations */}
       <style jsx>{`
@@ -3355,7 +3349,7 @@ function OverviewTab({ data, trends, pdrData, upcomingNews, spikes, confidenceMa
 }
 
 
-const TABS = ['OVERVIEW','PANELS','SIGNALS','TABLE','GAP CHART','RESEARCH','CALCULATOR','SETUPS','PHASE GUIDE','VALID PAIRS','CHART','ANALYTICS','SHADOW','LOGS','PANDA AI'];
+const TABS = ['OVERVIEW','PANELS','SIGNALS','TABLE','GAP CHART','RESEARCH','CALCULATOR','SETUPS','PHASE GUIDE','VALID PAIRS','CHART','LOGS','PANDA AI'];
 // Maps each tab to the feature_access key that controls it
 const TAB_FEATURE = {
   'OVERVIEW':    'overview',
@@ -3370,9 +3364,7 @@ const TAB_FEATURE = {
   'SPIKE LOG':   'spike_log',
   'ENGINE':      'engine',
   'CHART':       'chart',
-  'ANALYTICS':   'analytics',
-  'SHADOW':      'shadow',
-  'LOGS':        'signal_log',
+  'LOGS':        'spike_log',
   'PANDA AI':    'panda_ai',
 };
 const FILTERS = ['VALID','ALL','BUY','SELL','STRONG','⚠️ CLOSE'];
@@ -3983,8 +3975,8 @@ export default function Dashboard() {
             ?{position:'fixed',top:headerHeight,left:0,bottom:0,width:230,maxHeight:`calc(100dvh - ${headerHeight}px)`,zIndex:90,background:'var(--bg-secondary)',borderRight:'1px solid var(--border)',padding:'14px 10px 16px',display:'flex',flexDirection:'column',gap:4,transform:sidebarOpen?'translateX(0)':'translateX(-105%)',transition:'transform 0.25s ease',boxShadow:sidebarOpen?'4px 0 24px rgba(0,0,0,0.5)':'none',overflowY:'auto',WebkitOverflowScrolling:'touch',overscrollBehaviorY:'contain',touchAction:'pan-y'}
             :{width:190,flexShrink:0,background:'var(--bg-secondary)',borderRight:'1px solid var(--border)',padding:'14px 8px',display:'flex',flexDirection:'column',gap:3,alignSelf:'flex-start',position:'sticky',top:headerHeight,maxHeight:`calc(100dvh - ${headerHeight}px)`,overflowY:'auto'}}>
             <div style={{fontFamily:mono,fontSize:8,letterSpacing:3,color:'var(--text-muted)',padding:'2px 12px 8px'}}>NAVIGATION</div>
-            {(()=>{const ICON={'OVERVIEW':'🏠','PANELS':'🧩','SIGNALS':'📡','TABLE':'📋','GAP CHART':'📈','RESEARCH':'🔬','CALCULATOR':'🧮','SETUPS':'🎯','PHASE GUIDE':'🧭','VALID PAIRS':'✅','CHART':'📉','ANALYTICS':'📊','SHADOW':'🌑','LOGS':'📜','PANDA AI':'🐼','ENGINE':'🏥'};
-            const items=TABS.filter(t=>{ const feat=TAB_FEATURE[t]; if(!feat) return true; if(isAdmin) return true; const fa=user?.feature_access||[]; if(t==='SHADOW') return fa.includes('shadow'); return fa.includes(feat)||fa.includes('dashboard');});
+            {(()=>{const ICON={'OVERVIEW':'🏠','PANELS':'🧩','SIGNALS':'📡','TABLE':'📋','GAP CHART':'📈','RESEARCH':'🔬','CALCULATOR':'🧮','SETUPS':'🎯','PHASE GUIDE':'🧭','VALID PAIRS':'✅','CHART':'📉','LOGS':'📜','PANDA AI':'🐼','ENGINE':'🏥'};
+            const items=TABS.filter(t=>{ const feat=TAB_FEATURE[t]; if(!feat) return true; if(isAdmin) return true; const fa=user?.feature_access||[]; return fa.includes(feat)||fa.includes('dashboard');});
             const navStyle=(t,active,accent)=>({display:'flex',alignItems:'center',gap:9,background:active?(accent==='#ffd166'?'rgba(255,209,102,0.12)':'rgba(0,180,255,0.12)'):'transparent',borderLeft:`3px solid ${active?accent:'transparent'}`,color:active?accent:'#c8ddf0',fontFamily:mono,fontSize:10,fontWeight:active?700:500,letterSpacing:1.5,padding:'9px 11px',borderRadius:6,cursor:'pointer',textDecoration:'none',whiteSpace:'nowrap'});
             return(<>
               {items.map(t=>(<a key={t} href={`/dashboard?tab=${t.toLowerCase().replace(/\s+/g,'-')}`} onClick={(e)=>{e.preventDefault();setTab(t);}} style={navStyle(t,tab===t,'#00b4ff')}><span style={{fontSize:12,width:16,textAlign:'center'}}>{ICON[t]||'▸'}</span>{t}</a>))}
@@ -4120,17 +4112,8 @@ export default function Dashboard() {
               </div></>
           ):tab==='SETUPS'?(<ValidSetupsTab data={data} trends={trends} cotMap={cotMap} confidenceMap={confidenceMap}/>
 ):tab==='VALID PAIRS'?(<ValidPairsTab data={data} trends={trends} cotMap={cotMap} confidenceMap={confidenceMap}/>
-):tab==='SHADOW'&&(isAdmin||(user?.feature_access||[]).includes('shadow'))?(
-<ShadowTab/>
-          ):tab==='SPIKE LOG'||tab==='LOGS'?(
-<div>
-  <div style={{display:'flex',gap:8,marginBottom:12}}>
-    {['Signal Log','Spike Log'].map(st=>(
-      <button key={st} onClick={()=>setLogSub(st)} style={{fontFamily:mono,fontSize:10,letterSpacing:2,padding:'5px 14px',borderRadius:6,border:'1px solid',borderColor:logSub===st?'#00b4ff':'var(--border)',background:logSub===st?'#00b4ff15':'transparent',color:logSub===st?'#00b4ff':'var(--text-muted)',cursor:'pointer'}}>{st}</button>
-    ))}
-  </div>
-  {logSub==='Signal Log'?<SignalLogTab/>:<SpikeLogTab/>}
-</div>
+):tab==='SPIKE LOG'||tab==='LOGS'?(
+<SpikeLogTab/>
 ):tab==='CHART'?(<ChartTab data={data}/>
 ):tab==='SIGNALS'?(
 <div style={{display:'flex',flexDirection:'column',gap:24}}>
@@ -4235,11 +4218,6 @@ export default function Dashboard() {
     <span style={{fontFamily:raj,fontSize:16,color:'rgba(255,209,102,0.9)',letterSpacing:1,fontWeight:600}}>For educational purposes only — not financial advice.  Watch. Analyze. Decide.</span>
   </div>
 
-</div>
-):tab==='ANALYTICS'?(
-<div style={{display:'flex',flexDirection:'column',gap:24}}>
-<TrackerPanel/>
-<SignalAnalytics/>
 </div>
 ):tab==='PANDA AI'?(
 <PandaAIChat userId={user?.id} isAdmin={isAdmin}/>
