@@ -2652,7 +2652,7 @@ def generate_snapshot(pair_data):
     font_match = _load_snapshot_font("arial.ttf",   38)
     font_label = _load_snapshot_font("arialbd.ttf", 42)
     font_level = [_load_snapshot_font("arialbd.ttf", size) for size in (60, 54, 48, 42, 36)]
-    font_adv = _load_snapshot_font("arialbd.ttf", 40)
+    font_adv = _load_snapshot_font("arialbd.ttf", 50)
     font_xtf = [_load_snapshot_font("arial.ttf", size) for size in (54, 48, 42, 36)]
 
     # ---- Header ----
@@ -2725,9 +2725,16 @@ def generate_snapshot(pair_data):
             draw.text((x + 155, box_y), str(p.get("box_badge") or "-"), fill=TEXT_DATA, font=font_data)
         adv_text = f"ADV {p['adv_forecast']}" if p.get("adv_forecast") else ""
         if adv_text:
-            adv_width = draw.textbbox((0, 0), adv_text, font=font_adv)[2]
-            draw.text((x_card + CARD_W - 28 - adv_width, box_y + 8), adv_text,
-                      fill=TEXT_MUTED, font=font_adv)
+            adv_bounds = draw.textbbox((0, 0), adv_text, font=font_adv)
+            badge_w = adv_bounds[2] - adv_bounds[0] + 36
+            badge_h = 72
+            badge_x = x_card + CARD_W - 28 - badge_w
+            badge_y = box_y + 2
+            draw.rounded_rectangle((badge_x, badge_y, badge_x + badge_w, badge_y + badge_h),
+                                   radius=12, fill=TEXT_HEAD)
+            draw.text((badge_x + 18 - adv_bounds[0],
+                       badge_y + (badge_h - (adv_bounds[3] - adv_bounds[1])) // 2 - adv_bounds[1]),
+                      adv_text, fill=(255, 255, 255), font=font_adv)
         pl_verdict = p.get("pl_verdict") or "N/A"
         pl_color = C_YELLOW if pl_verdict == "NEAR" else C_SELL if pl_verdict == "INVALID" else C_WHITE if pl_verdict == "N/A" else C_BUY
         draw.text((x, metrics_y + 8), "PL", fill=TEXT_MUTED, font=font_label)
