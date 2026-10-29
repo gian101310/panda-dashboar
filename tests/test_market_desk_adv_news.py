@@ -66,6 +66,23 @@ class MarketDeskAdvNewsTests(unittest.TestCase):
         self.assertEqual(reference, datetime(2026, 10, 29, 18, 1, tzinfo=timezone.utc))
         self.assertEqual(reference.weekday(), 3)
 
+    def test_month_boundary_uses_adv_d1_for_next_trading_session(self):
+        app = _load_app()
+        row = {
+            "base_d1": 6, "base_h4": 0, "adv_base_d1": -6,
+            "adv_base_h4": 0, "adv_base_h1": 0,
+            "quote_d1": 0, "quote_h4": 0, "adv_quote_d1": 0,
+            "adv_quote_h4": 0, "adv_quote_h1": 0,
+        }
+        self.assertEqual(app.snapshot_adv_forecast(
+            row, datetime(2026, 10, 30, 18, tzinfo=timezone.utc)), "MTH -6")
+        self.assertEqual(app.snapshot_adv_forecast(
+            row, datetime(2026, 10, 31, 18, tzinfo=timezone.utc)), "MTH -6")
+        self.assertEqual(app.snapshot_adv_forecast(
+            row, datetime(2026, 11, 1, 18, tzinfo=timezone.utc)), "WK +6")
+        self.assertEqual(app.snapshot_adv_forecast(
+            row, datetime(2026, 10, 29, 18, tzinfo=timezone.utc)), "TMRW +6")
+
 
 if __name__ == "__main__":
     unittest.main()

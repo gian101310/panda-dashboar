@@ -453,17 +453,19 @@ function advScore(row, now = new Date()) {
   const nextWeek = projectedGap(weekBase, weekQuote);
   const nextMonth = projectedGap(monthBase, monthQuote);
 
-  // Panda operates on Dubai time: next day Mon-Thu, and the Friday next-week
-  // forecast remains visible through the weekend. Month-end is additive.
+  // Use the next weekday session in Dubai time to choose the forecast horizon.
+  // A Friday/weekend forecast crossing a month boundary uses ADV D1 too.
   const dubaiNow = new Date(now.getTime() + 4 * 60 * 60 * 1000);
   const day = dubaiNow.getUTCDay();
-  const showMonth = dubaiNow.getUTCDate() >= 30;
+  const daysToSession = day === 5 ? 3 : day === 6 ? 2 : 1;
+  const nextSession = new Date(Date.UTC(dubaiNow.getUTCFullYear(), dubaiNow.getUTCMonth(), dubaiNow.getUTCDate() + daysToSession));
+  const nextSessionIsNewMonth = nextSession.getUTCMonth() !== dubaiNow.getUTCMonth();
   const currentBias = row.hard_invalid ? 'WAIT' : (row.gap ?? 0) >= 5 ? 'BUY' : (row.gap ?? 0) <= -5 ? 'SELL' : 'WAIT';
   const keepsBias = gap => currentBias === 'BUY' ? gap >= 5 : gap <= -5;
   const forecasts = [];
-  if (day >= 1 && day <= 4) forecasts.push({ name: 'TMRW', gap: nextDay, baseScores: base, quoteScores: quote, sources: ['D1 current', 'H4 current', 'ADV H1'] });
-  if (day === 5 || day === 6 || day === 0) forecasts.push({ name: 'WK', gap: nextWeek, baseScores: weekBase, quoteScores: weekQuote, sources: ['D1 current', 'ADV H4', 'ADV H1'] });
-  if (showMonth) forecasts.push({ name: 'MTH', gap: nextMonth, baseScores: monthBase, quoteScores: monthQuote, sources: ['ADV D1', 'ADV H4', 'ADV H1'] });
+  if (nextSessionIsNewMonth) forecasts.push({ name: 'MTH', gap: nextMonth, baseScores: monthBase, quoteScores: monthQuote, sources: ['ADV D1', 'ADV H4', 'ADV H1'] });
+  else if (day >= 1 && day <= 4) forecasts.push({ name: 'TMRW', gap: nextDay, baseScores: base, quoteScores: quote, sources: ['D1 current', 'H4 current', 'ADV H1'] });
+  else forecasts.push({ name: 'WK', gap: nextWeek, baseScores: weekBase, quoteScores: weekQuote, sources: ['D1 current', 'ADV H4', 'ADV H1'] });
   if (!forecasts.length) return null;
   const weak = currentBias === 'WAIT' ? [] : forecasts.filter(item => !keepsBias(item.gap));
   const fmt = value => (value > 0 ? '+' : '') + value;

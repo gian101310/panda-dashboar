@@ -1,3 +1,7 @@
+## 2026-10-30 - Use month ADV when next session crosses a month
+- Dashboard and Telegram ADV forecasts now use ADV D1/H4/H1 when the next Dubai trading day is in a new month, including 30-31 October 2026.
+- Next-day and next-week projections remain tied to the next trading session within the current month.
+
 ## 2026-10-30 - Place H1 ProfitTrail stops beyond recent swings
 - Set the MT5 ProfitTrail EA's initial stop 2 pips beyond the latest confirmed H1 swing low for buys or swing high for sells.
 - Trail to newer confirmed swings without loosening the stop; retain the existing 1R and net-positive protection.

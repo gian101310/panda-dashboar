@@ -2521,8 +2521,15 @@ def snapshot_adv_forecast(row, now=None):
     now = now or datetime.now(timezone.utc)
     if now.tzinfo is None:
         now = now.replace(tzinfo=timezone.utc)
-    dubai_day = (now.astimezone(timezone.utc) + timedelta(hours=4)).weekday()
-    if dubai_day <= 3:
+    dubai_date = now.astimezone(DUBAI_TZ).date()
+    dubai_day = dubai_date.weekday()
+    days_to_session = 7 - dubai_day if dubai_day >= 4 else 1
+    next_session = dubai_date + timedelta(days=days_to_session)
+    if next_session.month != dubai_date.month:
+        horizon = "MTH"
+        base_keys = ("adv_base_d1", "adv_base_h4", "adv_base_h1")
+        quote_keys = ("adv_quote_d1", "adv_quote_h4", "adv_quote_h1")
+    elif dubai_day <= 3:
         horizon = "TMRW"
         base_keys = ("base_d1", "base_h4", "adv_base_h1")
         quote_keys = ("quote_d1", "quote_h4", "adv_quote_h1")
@@ -3060,7 +3067,7 @@ def _market_desk_forecast_reference(now=None):
 
 
 def _market_desk_adv_rows(rows, now=None):
-    """Projected next-day/next-week pairs, independent of today's valid bias."""
+    """Projected next-session pairs, independent of today's valid bias."""
     out = []
     forecast_now = _market_desk_forecast_reference(now)
     for row in rows:
@@ -3260,9 +3267,9 @@ def generate_market_desk_report(rows, report_type="current"):
     routine = (
         [
             ["1. TODAY", "Current D1/H4/H1 scores and gap are the actual live read, unchanged by ADV."],
-            ["2. ADV", "TMRW uses current D1/H4 + ADV H1; Friday/weekend WK uses current D1 + ADV H4/H1."],
+            ["2. ADV", "TMRW uses ADV H1; WK uses ADV H4/H1; when the next trading day enters a new month, MTH uses ADV D1/H4/H1."],
             ["3. MAP", "For each currency use its strongest score; projected gap is base minus quote, not a sum."],
-            ["4. VERIFY", "An ADV BUY/SELL is a forecast only. Confirm tomorrow's actual score, structure and Panda Line."],
+            ["4. VERIFY", "An ADV BUY/SELL is a forecast only. Confirm the next session's actual score, structure and Panda Line."],
             ["5. NEWS", "Forecast vs previous is a conditional read. Actual release and market reaction can change it."],
         ] if report_type == "adv" else [
             ["1. SCORE", "Classify currencies by strongest score: +4 to +6 STRONG, -4 to -6 WEAK, everything else NEUTRAL."],
