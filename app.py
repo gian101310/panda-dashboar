@@ -3753,6 +3753,12 @@ def dispatch_signal_candidates(cycle_at, structure, gaps, early, spikes, gold,
             continue  # quiet observation; the phase digest carries it
         symbol = candidate["symbol"]
         pl = fresh_pl_map.get(symbol)
+        if candidate["alert_type"] != "gold":
+            candidate["pl_status"] = (
+                panda_lines_status(pl.get("pl_zone"), pl.get("pl_price"),
+                                   pl.get("pl_st"), pl.get("pl_fl"), symbol)
+                if pl else "UNVERIFIED"
+            )
         parsed = (parsed_map or {}).get(symbol)
         if parsed and pl:
             try:

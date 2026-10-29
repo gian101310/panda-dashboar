@@ -85,7 +85,7 @@ def render_immediate_message(rows):
         "gap_zone": "Confirmed gap zone", "early_entry": "Gap change",
         "momentum": "Momentum watch",
     }
-    lines = ["🐼 <b>PANDA SIGNAL UPDATE</b>"]
+    blocks = []
     for row in rows:
         symbol = html.escape(str(row.get("symbol") or "?"))
         kind = html.escape(labels.get(row.get("alert_type"), "Market update"))
@@ -93,18 +93,25 @@ def render_immediate_message(rows):
         detail = html.escape(str(row.get("detail") or ""))
         gap = row.get("gap")
         gap_text = f" | gap {gap:+.0f}" if isinstance(gap, (int, float)) else ""
+        pl_status = row.get("pl_status") if row.get("alert_type") != "gold" else None
+        pl_text = f" | PL {html.escape(str(pl_status))}" if pl_status else ""
         level_priority = row.get("level_priority") if not row.get("conflict") else None
-        level_tag = " · LOW PRIORITY: LEVELS" if level_priority == "LOW PRIORITY" else " · LEVEL REVIEW" if level_priority in ("CAUTION", "REVIEW") else ""
-        lines.append(f"\n<b>{symbol}</b> · {kind} · {bias}{gap_text}{level_tag}")
+        level_tag = "LOW PRIORITY: LEVELS" if level_priority == "LOW PRIORITY" else "LEVEL REVIEW" if level_priority in ("CAUTION", "REVIEW") else ""
+        block = [f"<b>{symbol}</b> · {kind}", f"{bias}{gap_text}{pl_text}"]
+        if level_tag:
+            block.append(level_tag)
         if detail:
-            lines.append(detail)
+            block.append(detail)
         if row.get("price_context") and not row.get("conflict"):
-            lines.append(html.escape(str(row["price_context"])))
+            block.append(html.escape(str(row["price_context"])))
         if row.get("conflict"):
-            lines.append("Mixed directional evidence; verify the chart before drawing a setup conclusion.")
+            block.append("Mixed directional evidence; verify the chart before drawing a setup conclusion.")
         supporting = [e["detail"] for e in row.get("evidence", [])
                       if e.get("type") != row.get("alert_type") and e.get("detail")]
         if supporting:
-            lines.append("Also: " + html.escape("; ".join(dict.fromkeys(supporting))))
-    lines.append("\nObserved setup state; confirm on chart before acting.")
-    return "\n".join(lines)
+            block.append("Also: " + html.escape("; ".join(dict.fromkeys(supporting))))
+        blocks.append("\n".join(block))
+    message = "🐼 <b>PANDA SIGNAL UPDATE</b>"
+    if blocks:
+        message += "\n\n" + "\n\n━━━━━━━━━━━━━━━━━━━━\n\n".join(blocks)
+    return message + "\n\nObserved setup state; confirm on chart before acting."

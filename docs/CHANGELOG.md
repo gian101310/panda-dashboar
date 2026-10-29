@@ -4,6 +4,11 @@
 
 ---
 
+## Oct 29, 2026 — Clearer Spike/Signal Telegram alerts
+
+- Immediate pair alerts now show the current Panda Lines status, including `UNVERIFIED` when the exporter file is not fresh.
+- Grouped Telegram posts place each pair in a separate block with spacing and a divider; gap changes, status, and nearby-level context stay together.
+
 ## Oct 29, 2026 — Pause unused signal analytics
 
 - Removed the Overview signal tracker and hid Analytics, Shadow, and archived Signal Log views. Spike Log remains available.

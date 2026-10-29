@@ -82,6 +82,28 @@ class SignalAlertIntegrationTests(unittest.TestCase):
         self.assertEqual(queued[0]["detail"],
                          "GAP SURGE: gap +1 → +9 (magnitude +8 since previous cycle)")
 
+    def test_gap_change_includes_fresh_pl_status_and_marks_stale_pl_unverified(self):
+        app = _load_app()
+        queued = []
+        app.enqueue_alert = lambda client, candidate, **kwargs: queued.append(candidate) or {"id": "queued"}
+        app._fresh_signal_level_file = lambda symbol: symbol == "EURUSD"
+        app.dispatch_signal_candidates(
+            "2026-10-21T00:45:00+00:00", [], [],
+            [{"symbol": "EURUSD", "gap": 9, "bias": "BUY", "reason": "GAP SURGE", "prev_gap": 6},
+             {"symbol": "GBPUSD", "gap": 6, "bias": "BUY", "reason": "GAP CROSSOVER", "prev_gap": 4}],
+            [], None, pl_map={
+                "EURUSD": {"pl_zone": "ABOVE", "pl_price": 1.1020, "pl_st": 1.1000, "pl_fl": 1.0990},
+                "GBPUSD": {"pl_zone": "ABOVE", "pl_price": 1.3020, "pl_st": 1.3000, "pl_fl": 1.2990},
+            },
+        )
+        by_symbol = {item["symbol"]: item for item in queued}
+        self.assertEqual(by_symbol["EURUSD"]["pl_status"], "BELOW")
+        self.assertEqual(by_symbol["GBPUSD"]["pl_status"], "UNVERIFIED")
+        from lib.signal_alerts import render_immediate_message
+        rendered = render_immediate_message(queued)
+        self.assertIn("EURUSD</b> · Gap change\nBUY | gap +9 | PL BELOW", rendered)
+        self.assertIn("GBPUSD</b> · Gap change\nBUY | gap +6 | PL UNVERIFIED", rendered)
+
     def test_level_review_enriches_alert_and_bias_digest_without_blocking(self):
         app = _load_app()
         app._fresh_signal_level_file = lambda _: True

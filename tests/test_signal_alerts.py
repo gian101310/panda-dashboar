@@ -53,6 +53,8 @@ class SignalAlertTests(unittest.TestCase):
         self.assertIn("EURUSD", text)
         self.assertIn("GBPUSD", text)
         self.assertIn("&lt;confirmed&gt;", text)
+        self.assertIn("\n\n━━━━━━━━━━━━━━━━━━━━\n\n", text)
+        self.assertIn("EURUSD</b> · Structure change\nBUY | gap +9", text)
         self.assertNotIn("ENTER NOW", text)
         self.assertLess(len(text), 4000)
 
