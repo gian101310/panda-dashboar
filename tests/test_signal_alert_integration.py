@@ -82,27 +82,35 @@ class SignalAlertIntegrationTests(unittest.TestCase):
         self.assertEqual(queued[0]["detail"],
                          "GAP SURGE: gap +1 → +9 (magnitude +8 since previous cycle)")
 
-    def test_gap_change_includes_fresh_pl_status_and_marks_stale_pl_unverified(self):
+    def test_gap_change_includes_bias_based_pl_verdict_and_marks_stale_pl_unverified(self):
         app = _load_app()
         queued = []
         app.enqueue_alert = lambda client, candidate, **kwargs: queued.append(candidate) or {"id": "queued"}
-        app._fresh_signal_level_file = lambda symbol: symbol == "EURUSD"
+        app._fresh_signal_level_file = lambda symbol: symbol != "AUDUSD"
         app.dispatch_signal_candidates(
             "2026-10-21T00:45:00+00:00", [], [],
             [{"symbol": "EURUSD", "gap": 9, "bias": "BUY", "reason": "GAP SURGE", "prev_gap": 6},
-             {"symbol": "GBPUSD", "gap": 6, "bias": "BUY", "reason": "GAP CROSSOVER", "prev_gap": 4}],
+             {"symbol": "GBPUSD", "gap": 6, "bias": "BUY", "reason": "GAP CROSSOVER", "prev_gap": 4},
+             {"symbol": "USDJPY", "gap": 6, "bias": "BUY", "reason": "GAP CROSSOVER", "prev_gap": 4},
+             {"symbol": "AUDUSD", "gap": 6, "bias": "BUY", "reason": "GAP CROSSOVER", "prev_gap": 4}],
             [], None, pl_map={
                 "EURUSD": {"pl_zone": "ABOVE", "pl_price": 1.1020, "pl_st": 1.1000, "pl_fl": 1.0990},
-                "GBPUSD": {"pl_zone": "ABOVE", "pl_price": 1.3020, "pl_st": 1.3000, "pl_fl": 1.2990},
+                "GBPUSD": {"pl_zone": "BELOW", "pl_price": 1.2980, "pl_st": 1.3000, "pl_fl": 1.3010},
+                "USDJPY": {"pl_zone": "ABOVE", "pl_price": 150.005, "pl_st": 150.000, "pl_fl": 149.980},
+                "AUDUSD": {"pl_zone": "ABOVE", "pl_price": 0.7020, "pl_st": 0.7000, "pl_fl": 0.6990},
             },
         )
         by_symbol = {item["symbol"]: item for item in queued}
-        self.assertEqual(by_symbol["EURUSD"]["pl_status"], "BELOW")
-        self.assertEqual(by_symbol["GBPUSD"]["pl_status"], "UNVERIFIED")
+        self.assertEqual(by_symbol["EURUSD"]["pl_verdict"], "VALID")
+        self.assertEqual(by_symbol["GBPUSD"]["pl_verdict"], "INVALID")
+        self.assertEqual(by_symbol["USDJPY"]["pl_verdict"], "NEAR")
+        self.assertEqual(by_symbol["AUDUSD"]["pl_verdict"], "UNVERIFIED")
         from lib.signal_alerts import render_immediate_message
         rendered = render_immediate_message(queued)
-        self.assertIn("EURUSD</b> · Gap change\nBUY | gap +9 | PL BELOW", rendered)
-        self.assertIn("GBPUSD</b> · Gap change\nBUY | gap +6 | PL UNVERIFIED", rendered)
+        self.assertIn("EURUSD</b> · Gap change\nBUY | gap +9 | PL VALID", rendered)
+        self.assertIn("GBPUSD</b> · Gap change\nBUY | gap +6 | PL INVALID", rendered)
+        self.assertIn("USDJPY</b> · Gap change\nBUY | gap +6 | PL NEAR", rendered)
+        self.assertIn("AUDUSD</b> · Gap change\nBUY | gap +6 | PL UNVERIFIED", rendered)
 
     def test_level_review_enriches_alert_and_bias_digest_without_blocking(self):
         app = _load_app()

@@ -93,8 +93,8 @@ def render_immediate_message(rows):
         detail = html.escape(str(row.get("detail") or ""))
         gap = row.get("gap")
         gap_text = f" | gap {gap:+.0f}" if isinstance(gap, (int, float)) else ""
-        pl_status = row.get("pl_status") if row.get("alert_type") != "gold" else None
-        pl_text = f" | PL {html.escape(str(pl_status))}" if pl_status else ""
+        pl_verdict = row.get("pl_verdict") if row.get("alert_type") != "gold" else None
+        pl_text = f" | PL {html.escape(str(pl_verdict))}" if pl_verdict else ""
         level_priority = row.get("level_priority") if not row.get("conflict") else None
         level_tag = "LOW PRIORITY: LEVELS" if level_priority == "LOW PRIORITY" else "LEVEL REVIEW" if level_priority in ("CAUTION", "REVIEW") else ""
         block = [f"<b>{symbol}</b> · {kind}", f"{bias}{gap_text}{pl_text}"]

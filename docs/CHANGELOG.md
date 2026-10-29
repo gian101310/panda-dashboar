@@ -6,7 +6,7 @@
 
 ## Oct 29, 2026 — Clearer Spike/Signal Telegram alerts
 
-- Immediate pair alerts now show the current Panda Lines status, including `UNVERIFIED` when the exporter file is not fresh.
+- Immediate pair alerts now show Panda Lines validity against the displayed BUY/SELL bias: `VALID`, `INVALID`, `NEAR`, or `UNVERIFIED` when the exporter file is not fresh.
 - Grouped Telegram posts place each pair in a separate block with spacing and a divider; gap changes, status, and nearby-level context stay together.
 
 ## Oct 29, 2026 — Pause unused signal analytics

@@ -3703,7 +3703,8 @@ def dispatch_signal_candidates(cycle_at, structure, gaps, early, spikes, gold,
                                                               pl.get("pl_st"), pl.get("pl_fl"), item["symbol"])
         candidates.append({"symbol": item["symbol"], "alert_type": "gap_zone",
                            "cycle_at": cycle_at, "gap": item["gap"], "bias": item["bias"],
-                           "detail": f"PL {status} confirms gap zone" if status in ("BELOW", "ABOVE") else f"PL {status}; buffer unconfirmed"})
+                           "detail": "Gap 9–12 with Panda Lines aligned at scoring"
+                           if status in ("BELOW", "ABOVE") else "Gap 9–12; Panda Lines buffer unconfirmed"})
     for item in early:
         candidates.append({"symbol": item["symbol"], "alert_type": "early_entry",
                            "cycle_at": cycle_at, "gap": item["gap"], "bias": item["bias"],
@@ -3754,10 +3755,13 @@ def dispatch_signal_candidates(cycle_at, structure, gaps, early, spikes, gold,
         symbol = candidate["symbol"]
         pl = fresh_pl_map.get(symbol)
         if candidate["alert_type"] != "gold":
-            candidate["pl_status"] = (
-                panda_lines_status(pl.get("pl_zone"), pl.get("pl_price"),
-                                   pl.get("pl_st"), pl.get("pl_fl"), symbol)
-                if pl else "UNVERIFIED"
+            status = (panda_lines_status(pl.get("pl_zone"), pl.get("pl_price"),
+                                         pl.get("pl_st"), pl.get("pl_fl"), symbol)
+                      if pl else "UNVERIFIED")
+            verdict = snapshot_pl_verdict(candidate.get("bias"), status)
+            candidate["pl_verdict"] = (
+                "UNVERIFIED" if candidate.get("conflict") or verdict in ("N/A", "—")
+                else verdict
             )
         parsed = (parsed_map or {}).get(symbol)
         if parsed and pl:
