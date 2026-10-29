@@ -1,3 +1,7 @@
+## 2026-10-30 - Place H1 ProfitTrail stops beyond recent swings
+- Set the MT5 ProfitTrail EA's initial stop 2 pips beyond the latest confirmed H1 swing low for buys or swing high for sells.
+- Trail to newer confirmed swings without loosening the stop; retain the existing 1R and net-positive protection.
+
 ## 2026-10-28 - Keep dashboard navigation visible while scrolling
 - Fixed dashboard overflow so the header and desktop navigation remain visible as the page scrolls.
 - Desktop wheel scrolling over navigation moves the main page; lower menu items remain reachable with the scrollbar or keyboard on short screens.

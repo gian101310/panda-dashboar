@@ -4,7 +4,7 @@
 //| Requires current panda_score_<PAIR>.txt in Terminal\Common\Files |
 //+------------------------------------------------------------------+
 #property copyright "Panda Engine"
-#property version   "1.20"
+#property version   "1.21"
 #property strict
 #property tester_indicator "Panda Lines v4.1 MT5.ex5"
 
@@ -15,14 +15,11 @@ input double   InpSTMultiplier   = 3.0;
 input bool     InpSTUseATR       = true;
 input bool     InpSTShowSignals  = false; // Keep the debugging chart to Panda Lines only
 input double   InpLots          = 0.01;
-input double   InpStopOffsetPips = 30.0;
 input double   InpEntryBufferPips = 10.0; // Initial entry; reentry uses no fixed buffer
 input double   InpCostCushionPips = 2.0;  // Extra cushion beyond estimated round-trip costs
 input int      InpSwingStrength  = 2;     // Closed H1 bars on each side of a swing
 input int      InpSwingLookback  = 40;    // Closed H1 bars to search
-input int      InpATRPeriod      = 14;
-input double   InpSwingBufferATR = 0.20;  // Space beyond the last confirmed H1 swing
-input double   InpMaxGivebackATR = 1.50;  // Peak-price trail while swings develop
+input double   InpSwingBufferPips = 2.0;  // Space beyond the latest confirmed H1 swing
 input double   InpPipSize       = 0.0;    // 0 = forex digits rule; set explicitly for gold/indices
 input int      InpMaxBiasAgeMin = 20;
 input int      InpConfirmMinGapMin = 4;  // Distinct engine updates must be about one cycle apart
@@ -34,7 +31,6 @@ input int      InpDeviationPts  = 30;
 
 CTrade trade;
 int g_st = INVALID_HANDLE;
-int g_atr = INVALID_HANDLE;
 bool g_overlayAdded = false;
 int g_candidateBias = 0;
 int g_confirmedBias = 0;
@@ -324,12 +320,6 @@ bool StopAllowed(const int dir,const double sl,const MqlTick &tick,const bool mo
    return sl>tick.ask+minDistance;
 }
 
-string PeakKey(const ulong positionId)
-{
-   return "PandaH1.Peak."+IntegerToString((long)AccountInfoInteger(ACCOUNT_LOGIN))+"."+
-          _Symbol+"."+IntegerToString((long)InpMagic)+"."+IntegerToString((long)positionId);
-}
-
 string LastExitKey()
 {
    return "PandaH1.Exit."+IntegerToString((long)AccountInfoInteger(ACCOUNT_LOGIN))+"."+
@@ -359,24 +349,6 @@ string ArmedKey(const ulong positionId)
 {
    return "PandaH1.Armed."+IntegerToString((long)AccountInfoInteger(ACCOUNT_LOGIN))+"."+
           _Symbol+"."+IntegerToString((long)InpMagic)+"."+IntegerToString((long)positionId);
-}
-
-double UpdatePeak(const ulong positionId,const int dir,const double executablePrice)
-{
-   string key=PeakKey(positionId);
-   double peak=GlobalVariableCheck(key) ? GlobalVariableGet(key) : executablePrice;
-   if((dir==1 && executablePrice>peak) || (dir==-1 && executablePrice<peak))
-      peak=executablePrice;
-   GlobalVariableSet(key,peak);
-   return peak;
-}
-
-double ClosedH1ATR()
-{
-   double value[1];
-   if(g_atr==INVALID_HANDLE || CopyBuffer(g_atr,0,1,1,value)!=1 || value[0]<=0.0)
-      return 0.0;
-   return value[0];
 }
 
 double ConfirmedH1Swing(const int dir)
@@ -445,7 +417,6 @@ void TrailPosition(const ulong ticket,const ulong positionId,const int dir,
 {
    if(oldSL<=0.0) return;
    double executable=dir==1 ? tick.bid : tick.ask;
-   double peak=UpdatePeak(positionId,dir,executable);
    double floor=NetPositiveFloor(positionId,dir,openPrice,volume);
    if(floor<=0.0) return;
    bool protectedProfit=dir*(oldSL-openPrice)>_Point/2.0;
@@ -464,23 +435,12 @@ void TrailPosition(const ulong ticket,const ulong positionId,const int dir,
    if(!GlobalVariableCheck(ArmedKey(positionId)))
       GlobalVariableSet(ArmedKey(positionId),(double)TimeCurrent());
    double candidate=dir==1 ? MathMax(oldSL,floor) : MathMin(oldSL,floor);
-   double atr=ClosedH1ATR();
-   if(atr>0.0)
+   double swing=ConfirmedH1Swing(dir);
+   if(swing>0.0)
    {
-      double swing=ConfirmedH1Swing(dir);
-      if(swing>0.0)
-      {
-         double swingSL=swing-dir*InpSwingBufferATR*atr;
-         candidate=dir==1 ? MathMax(candidate,swingSL) : MathMin(candidate,swingSL);
-      }
-      double peakSL=peak-dir*InpMaxGivebackATR*atr;
-      candidate=dir==1 ? MathMax(candidate,peakSL) : MathMin(candidate,peakSL);
+      double swingSL=swing-dir*InpSwingBufferPips*PipSize();
+      candidate=dir==1 ? MathMax(candidate,swingSL) : MathMin(candidate,swingSL);
    }
-   long stops=SymbolInfoInteger(_Symbol,SYMBOL_TRADE_STOPS_LEVEL);
-   long freeze=SymbolInfoInteger(_Symbol,SYMBOL_TRADE_FREEZE_LEVEL);
-   double clearance=(double)MathMax(stops,freeze)*_Point+2.0*_Point;
-   candidate=dir==1 ? MathMin(candidate,tick.bid-clearance) :
-                       MathMax(candidate,tick.ask+clearance);
    candidate=NormalizeDouble(candidate,_Digits);
    if(dir*(candidate-floor)<-_Point/2.0 ||
       dir*(candidate-oldSL)<=_Point/2.0 ||
@@ -554,10 +514,9 @@ int OnInit()
       Print("Panda H1 Profit Trail EA must be attached to an H1 chart.");
       return INIT_PARAMETERS_INCORRECT;
    }
-   if(InpLots<=0.0 || InpStopOffsetPips<=0.0 || InpEntryBufferPips<0.0 ||
+   if(InpLots<=0.0 || InpEntryBufferPips<0.0 ||
       InpCostCushionPips<=0.0 || InpSwingStrength<1 ||
-      InpSwingLookback<=InpSwingStrength+1 || InpATRPeriod<2 ||
-      InpSwingBufferATR<0.0 || InpMaxGivebackATR<=0.0 ||
+      InpSwingLookback<=InpSwingStrength+1 || InpSwingBufferPips<=0.0 ||
       InpBasketPips<=0.0 || InpBasketUSD<=0.0 ||
       InpMaxBiasAgeMin<=0 || InpConfirmMinGapMin<=0 ||
       InpConfirmMaxGapMin<InpConfirmMinGapMin ||
@@ -588,14 +547,6 @@ int OnInit()
       PrintFormat("Panda Lines v4.1 MT5 could not load. Error %d",GetLastError());
       return INIT_FAILED;
    }
-   g_atr=iATR(_Symbol,PERIOD_H1,InpATRPeriod);
-   if(g_atr==INVALID_HANDLE)
-   {
-      PrintFormat("Panda H1 ATR could not load. Error %d",GetLastError());
-      IndicatorRelease(g_st);
-      g_st=INVALID_HANDLE;
-      return INIT_FAILED;
-   }
    // Reuse a Panda Lines overlay already on this chart. The EA's separate
    // iCustom handle still uses clean settings for entry decisions.
    bool chartHasPandaLines=false;
@@ -612,8 +563,6 @@ int OnInit()
       PrintFormat("Panda Lines could not be shown on chart. Error %d",GetLastError());
       IndicatorRelease(g_st);
       g_st=INVALID_HANDLE;
-       IndicatorRelease(g_atr);
-       g_atr=INVALID_HANDLE;
       return INIT_FAILED;
    }
    g_overlayAdded=!chartHasPandaLines;
@@ -630,7 +579,6 @@ void OnDeinit(const int reason)
    Comment("");
    if(g_overlayAdded) ChartIndicatorDelete(0,0,"Panda Lines v4.1 MT5");
    if(g_st!=INVALID_HANDLE) IndicatorRelease(g_st);
-    if(g_atr!=INVALID_HANDLE) IndicatorRelease(g_atr);
 }
 
 void OnTradeTransaction(const MqlTradeTransaction &trans,
@@ -643,9 +591,7 @@ void OnTradeTransaction(const MqlTradeTransaction &trans,
    if(entry!=DEAL_ENTRY_OUT && entry!=DEAL_ENTRY_OUT_BY) return;
    GlobalVariableSet(LastExitKey(),(double)HistoryDealGetInteger(trans.deal,DEAL_TIME));
    ulong positionId=(ulong)HistoryDealGetInteger(trans.deal,DEAL_POSITION_ID);
-   string key=PeakKey(positionId);
-   if(GlobalVariableCheck(key)) GlobalVariableDel(key);
-   key=ArmedKey(positionId);
+   string key=ArmedKey(positionId);
    if(GlobalVariableCheck(key)) GlobalVariableDel(key);
 }
 
@@ -678,10 +624,16 @@ void OnTick()
    int bias;
    if(!ConfirmedBias(bias) || bias!=signal) return;
    if(AnySymbolPosition()) return;
-   double sl=NormalizeDouble(line-signal*InpStopOffsetPips*PipSize(),_Digits);
+   double swing=ConfirmedH1Swing(signal);
+   if(swing<=0.0)
+   {
+      Print("Panda signal skipped: no confirmed H1 swing for the initial stop.");
+      return;
+   }
+   double sl=NormalizeDouble(swing-signal*InpSwingBufferPips*PipSize(),_Digits);
    if(!StopAllowed(signal,sl,tick,false))
    {
-      Print("Panda signal skipped: SuperTrend stop is on the wrong side or too close.");
+      Print("Panda signal skipped: swing stop is on the wrong side or too close.");
       return;
    }
    bool sent=(signal==1) ? trade.Buy(InpLots,_Symbol,0.0,sl,0.0,"Panda H1 Profit Trail")
