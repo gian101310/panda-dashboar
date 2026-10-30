@@ -24,6 +24,14 @@ foreach($portPid in $portPids){
 }
 
 Start-Sleep -Seconds 2
+$remainingPortPids = @(Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue |
+  Select-Object -ExpandProperty OwningProcess -Unique)
+if($remainingPortPids.Count -gt 0){
+  Write-Error ("Engine restart aborted: port 8000 is still owned by PID " +
+    ($remainingPortPids -join ', ') + ". Run RESTART_ENGINE.bat as administrator.")
+  exit 1
+}
+
 Start-Process -FilePath 'cmd.exe' `
   -ArgumentList '/c', ('"' + (Join-Path $root 'START_PANDA.bat') + '"') `
   -WorkingDirectory $root -WindowStyle Hidden
