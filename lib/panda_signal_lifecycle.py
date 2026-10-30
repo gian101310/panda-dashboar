@@ -149,7 +149,8 @@ def build_lifecycle_snapshot(rows, parsed_map, previous=None, now=None):
               support >= 3 and support > conflict and related_confirmed and
               gap_change is not None and gap_change >= 0 and
               (price_change_pips is None or price_change_pips >= 0)):
-            phase = "STRONG CONTINUATION"
+            phase = ("STRONG CONTINUATION" if trend_age_hours is not None and trend_age_hours >= 1
+                     else "STRONG ALIGNMENT / EARLY")
         elif (gap_change is not None and gap_change > 0) or (price_change_pips is not None and price_change_pips > 1):
             phase = "STRENGTHENING"
         elif trend_age_hours is not None and trend_age_hours >= 4 and (gap_change <= 0 or conflict >= support):
@@ -164,6 +165,7 @@ def build_lifecycle_snapshot(rows, parsed_map, previous=None, now=None):
             "box_position": positions, "gap_change_with_bias": gap_change,
             "nearest_opposing_level": (None if nearest_level is None else
                                        {"name": nearest_level[1], "distance_pips": round(nearest_level[0], 1)}),
+            "level_review": bool(valid and nearest_level and nearest_level[0] <= 5),
             "price_change_pips_with_bias": round(price_change_pips, 1) if price_change_pips is not None else None,
             "base_breadth": base, "quote_breadth": quote, "reasons": reasons,
         }

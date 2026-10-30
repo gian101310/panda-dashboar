@@ -1,3 +1,7 @@
+## 2026-10-30 - Clarify signal lifecycle phase and level review
+- Require one hour of observations before calling strong alignment a continuation; show early alignment separately.
+- Highlight an opposing level within five pips and enlarge the cTrader panel text.
+
 ## 2026-10-30 - Schedule local lifecycle feed fallback
 - Added a five-minute local exporter from existing score and price files so the cTrader lifecycle panel remains current while an older elevated engine process is active.
 

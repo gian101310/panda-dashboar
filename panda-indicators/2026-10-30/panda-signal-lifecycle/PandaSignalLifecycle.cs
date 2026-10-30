@@ -12,30 +12,32 @@ namespace cAlgo
         [Parameter("Refresh (seconds)", DefaultValue = 15, MinValue = 5, MaxValue = 60)]
         public int RefreshSeconds { get; set; }
 
-        private TextBlock _heading, _phase, _read, _related, _status;
+        private TextBlock _heading, _phase, _levelWarning, _read, _related, _status;
 
         protected override void Initialize()
         {
             var panel = new StackPanel {
-                Orientation = Orientation.Vertical, Width = 390, Margin = 8,
+                Orientation = Orientation.Vertical, Width = 440, Margin = 8,
                 BackgroundColor = Color.FromHex("#111923"),
                 HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Top
             };
             _heading = Line("PANDA  |  SIGNAL LIFECYCLE", Color.FromHex("#00b4ff"), 15);
-            _phase = Line("Loading...", Color.FromHex("#abb9c9"), 13);
-            _read = Line("", Color.FromHex("#abb9c9"), 11);
-            _related = Line("", Color.FromHex("#abb9c9"), 10);
+            _phase = Line("Loading...", Color.FromHex("#abb9c9"), 15);
+            _levelWarning = Line("", Color.FromHex("#ffd166"), 12);
+            _read = Line("", Color.FromHex("#abb9c9"), 12);
+            _related = Line("", Color.FromHex("#abb9c9"), 11);
             _status = Line("", Color.FromHex("#abb9c9"), 10);
             panel.AddChild(_heading);
             panel.AddChild(_phase);
+            panel.AddChild(_levelWarning);
             panel.AddChild(_read);
             panel.AddChild(_related);
             panel.AddChild(_status);
             panel.AddChild(Line("Evidence read only; percentages await validation.", Color.FromHex("#abb9c9"), 9));
             var scroll = new ScrollViewer {
-                Content = panel, Width = 410,
-                Height = Math.Max(170, Math.Min(Chart.Height - 30, 260)),
+                Content = panel, Width = 460,
+                Height = Math.Max(200, Math.Min(Chart.Height - 30, 315)),
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto
             };
             var draggable = Chart.Draggables.Add();
@@ -84,6 +86,11 @@ namespace cAlgo
                     _phase.Text = pair + "  " + bias + "  GAP " + gap.ToString("0.#") + "\n" + phase;
                     _phase.ForegroundColor = bias == "BUY" ? Color.FromHex("#00ff9f") :
                         bias == "SELL" ? Color.FromHex("#ff4d6d") : Color.FromHex("#ffd166");
+                    var level = item.GetProperty("nearest_opposing_level");
+                    _levelWarning.Text = item.GetProperty("level_review").GetBoolean() &&
+                        level.ValueKind == JsonValueKind.Object ?
+                        "LEVEL REVIEW: " + level.GetProperty("name").GetString() + " " +
+                        level.GetProperty("distance_pips").GetDouble().ToString("0.#") + " pips ahead" : "";
                     var reasons = item.GetProperty("reasons").EnumerateArray()
                         .Select(x => x.GetString()).Where(x => !string.IsNullOrEmpty(x)).ToArray();
                     var boxes = item.GetProperty("box_position");
@@ -119,6 +126,7 @@ namespace cAlgo
             _phase.Text = "NO CURRENT READING";
             _phase.ForegroundColor = Color.FromHex("#ffd166");
             _read.Text = "";
+            _levelWarning.Text = "";
             _related.Text = "";
             _status.Text = message;
         }

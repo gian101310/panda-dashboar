@@ -8,13 +8,16 @@ currency are summarized separately so the display does not present 21 related
 pairs as independent probability votes.
 
 Phases are deterministic evidence labels: baseline, starting, strengthening,
-strong continuation, continuing, mixed/slowing, mature/mixed, and weakening/
+strong alignment/early, strong continuation, continuing, mixed/slowing, mature/mixed, and weakening/
 possible end. They are not calibrated probabilities, entry rules, or trade
 recommendations. The panel never sends orders or changes Panda scoring, BB,
 INTRA, or cross-hedge eligibility. A missing or older-than-20-minute snapshot
 displays no current reading. Price and zone context is excluded if its TBG file
 has not updated for 20 minutes. The first fresh snapshot after a long gap is
 marked baseline because a trend start cannot be inferred from it.
+Strong continuation requires at least one hour of continuous observations;
+earlier agreement is labelled strong alignment/early. A level within five
+pips ahead receives an amber review line without changing Panda's BUY/SELL bias.
 
 The engine exports `panda_lifecycle_snapshot.json` every scoring cycle to
 `Documents/cAlgo/Data/Indicators/Panda Signal Lifecycle/`. It also writes

@@ -30,10 +30,20 @@ class LifecycleTests(unittest.TestCase):
                               "EURJPY": {"price": 159.9}, "EURGBP": {"price": .869},
                               "GBPUSD": {"price": 1.249}, "AUDUSD": {"price": .659}}}
         result = build_lifecycle_snapshot(rows, boxes, previous, NOW)["pairs"]["EURUSD"]
-        self.assertEqual(result["phase"], "STRONG CONTINUATION")
+        self.assertEqual(result["phase"], "STRONG ALIGNMENT / EARLY")
         self.assertEqual(result["base_breadth"]["agree"], 2)
         self.assertEqual(result["quote_breadth"]["agree"], 2)
         self.assertEqual(result["box_position"]["H1"], "ABOVE")
+        previous["pairs"]["EURUSD"]["trend_start_utc"] = (NOW - timedelta(hours=2)).isoformat()
+        mature = build_lifecycle_snapshot(rows, boxes, previous, NOW)["pairs"]["EURUSD"]
+        self.assertEqual(mature["phase"], "STRONG CONTINUATION")
+
+    def test_near_opposing_level_is_prominent_context(self):
+        current = build_lifecycle_snapshot(
+            [row("GBPUSD", "BUY", 7, 1.33840, pdh=1.33845)], {}, now=NOW)["pairs"]["GBPUSD"]
+        self.assertTrue(current["level_review"])
+        self.assertEqual(current["nearest_opposing_level"],
+                         {"name": "PDH", "distance_pips": 0.5})
 
     def test_fading_buy_and_stale_previous(self):
         rows = [row("EURUSD", "BUY", 5, 1.10), row("EURJPY", "SELL", -6, 160),
