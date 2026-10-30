@@ -4,13 +4,15 @@ This is a read-only fallback when the running engine has not loaded the newer
 app.py exporter. It does not score pairs, call Supabase, or send alerts.
 """
 
+import os
 import time
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app import MT4_PATH, PAIRS, parse_mt4_file, parse_pl_file
+from dotenv import load_dotenv
+
 from lib.panda_signal_lifecycle import export_lifecycle_snapshot
 
 
@@ -30,7 +32,18 @@ def read_score(path):
 
 
 def main():
-    source = Path(MT4_PATH)
+    root = Path(__file__).resolve().parents[1]
+    load_dotenv(root / ".env")
+    source = Path(os.environ.get("MT4_PATH") or
+                  Path.home() / "AppData" / "Roaming" / "MetaQuotes" / "Terminal" / "Common" / "Files")
+    target = (Path.home() / "Documents" / "cAlgo" / "Data" / "Indicators" /
+              "Panda Signal Lifecycle" / "panda_lifecycle_snapshot.json")
+    score_files = list(source.glob("panda_score_*.txt"))
+    if target.exists() and score_files and target.stat().st_mtime >= max(p.stat().st_mtime for p in score_files):
+        print("Lifecycle snapshot already current")
+        return
+    from app import PAIRS, parse_mt4_file, parse_pl_file
+
     rows, parsed, score_times = [], {}, []
     for symbol in PAIRS:
         score_file = source / f"panda_score_{symbol}.txt"
@@ -49,8 +62,6 @@ def main():
         raise RuntimeError(f"Only {len(rows)}/{len(PAIRS)} fresh score files; snapshot withheld")
     if max(score_times) - min(score_times) > 60:
         raise RuntimeError("Score files span different engine cycles; snapshot withheld")
-    target = (Path.home() / "Documents" / "cAlgo" / "Data" / "Indicators" /
-              "Panda Signal Lifecycle" / "panda_lifecycle_snapshot.json")
     if target.exists() and target.stat().st_mtime >= max(score_times):
         print("Lifecycle snapshot already current")
         return

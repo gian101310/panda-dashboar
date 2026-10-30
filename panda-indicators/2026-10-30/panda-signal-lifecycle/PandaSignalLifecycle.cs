@@ -13,6 +13,7 @@ namespace cAlgo
         public int RefreshSeconds { get; set; }
 
         private TextBlock _heading, _phase, _levelWarning, _read, _related, _status;
+        private ScrollViewer _scroll;
 
         protected override void Initialize()
         {
@@ -35,13 +36,13 @@ namespace cAlgo
             panel.AddChild(_related);
             panel.AddChild(_status);
             panel.AddChild(Line("Evidence read only; percentages await validation.", Color.FromHex("#abb9c9"), 9));
-            var scroll = new ScrollViewer {
+            _scroll = new ScrollViewer {
                 Content = panel, Width = 460,
                 Height = Math.Max(200, Math.Min(Chart.Height - 30, 315)),
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto
             };
             var draggable = Chart.Draggables.Add();
-            draggable.Child = scroll;
+            draggable.Child = _scroll;
             draggable.ShowGrip = true;
             draggable.X = 8;
             draggable.Y = 8;
@@ -102,7 +103,12 @@ namespace cAlgo
                     var quoteBreadth = item.GetProperty("quote_breadth");
                     _related.Text = "BASE: " + Breadth(baseBreadth) + "\nQUOTE: " + Breadth(quoteBreadth);
                     _status.Text = "Panda snapshot " + generated.ToString("HH:mm") + " UTC | no orders sent";
+                    _scroll.Height = Math.Max(200, Math.Min(Chart.Height - 30, 315));
                 }
+            }
+            catch (FileNotFoundException)
+            {
+                Clear("Waiting for local Panda snapshot; auto-refreshes");
             }
             catch (Exception ex)
             {
@@ -129,6 +135,7 @@ namespace cAlgo
             _levelWarning.Text = "";
             _related.Text = "";
             _status.Text = message;
+            _scroll.Height = Math.Max(145, Math.Min(Chart.Height - 30, 170));
         }
     }
 }

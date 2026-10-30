@@ -1,3 +1,7 @@
+## 2026-10-30 - Recover lifecycle snapshot after cTrader reinstall
+- Restored the local feed after cTrader cleared the indicator data folder on reinstall.
+- Changed the fallback task to check each minute and made the panel wait for a missing file without showing an exception.
+
 ## 2026-10-30 - Clarify signal lifecycle phase and level review
 - Require one hour of observations before calling strong alignment a continuation; show early alignment separately.
 - Highlight an opposing level within five pips and enlarge the cTrader panel text.
