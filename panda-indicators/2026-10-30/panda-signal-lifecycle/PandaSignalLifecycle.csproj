@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AssemblyName>PandaSignalLifecycle</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="PandaSignalLifecycle.cs" />
+    <PackageReference Include="cTrader.Automate" Version="1.0.17" />
+  </ItemGroup>
+</Project>

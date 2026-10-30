@@ -1,0 +1,126 @@
+using System;
+using System.IO;
+using System.Linq;
+using System.Text.Json;
+using cAlgo.API;
+
+namespace cAlgo
+{
+    [Indicator(IsOverlay = true, TimeZone = TimeZones.UTC, AutoRescale = false, AccessRights = AccessRights.None)]
+    public class PandaSignalLifecycle : Indicator
+    {
+        [Parameter("Refresh (seconds)", DefaultValue = 15, MinValue = 5, MaxValue = 60)]
+        public int RefreshSeconds { get; set; }
+
+        private TextBlock _heading, _phase, _read, _related, _status;
+
+        protected override void Initialize()
+        {
+            var panel = new StackPanel {
+                Orientation = Orientation.Vertical, Width = 390, Margin = 8,
+                BackgroundColor = Color.FromHex("#111923"),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Top
+            };
+            _heading = Line("PANDA  |  SIGNAL LIFECYCLE", Color.FromHex("#00b4ff"), 15);
+            _phase = Line("Loading...", Color.FromHex("#abb9c9"), 13);
+            _read = Line("", Color.FromHex("#abb9c9"), 11);
+            _related = Line("", Color.FromHex("#abb9c9"), 10);
+            _status = Line("", Color.FromHex("#abb9c9"), 10);
+            panel.AddChild(_heading);
+            panel.AddChild(_phase);
+            panel.AddChild(_read);
+            panel.AddChild(_related);
+            panel.AddChild(_status);
+            panel.AddChild(Line("Evidence read only; percentages await validation.", Color.FromHex("#abb9c9"), 9));
+            var scroll = new ScrollViewer {
+                Content = panel, Width = 410,
+                Height = Math.Max(170, Math.Min(Chart.Height - 30, 260)),
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+            };
+            var draggable = Chart.Draggables.Add();
+            draggable.Child = scroll;
+            draggable.ShowGrip = true;
+            draggable.X = 8;
+            draggable.Y = 8;
+            Timer.TimerTick += Refresh;
+            Timer.Start(RefreshSeconds);
+            Refresh();
+        }
+
+        public override void Calculate(int index) { }
+
+        private static TextBlock Line(string text, Color color, double size)
+        {
+            return new TextBlock { Text = text, ForegroundColor = color, FontSize = size, Margin = 2 };
+        }
+
+        private void Refresh()
+        {
+            try
+            {
+                using (var document = JsonDocument.Parse(System.IO.File.ReadAllText("panda_lifecycle_snapshot.json")))
+                {
+                    var root = document.RootElement;
+                    var generated = DateTime.Parse(root.GetProperty("generated_utc").GetString()).ToUniversalTime();
+                    if (generated > Server.TimeInUtc.AddMinutes(1) || Server.TimeInUtc - generated > TimeSpan.FromMinutes(20))
+                    {
+                        Clear("Panda snapshot older than 20 minutes");
+                        return;
+                    }
+                    var letters = new string(Symbol.Name.ToUpperInvariant().Where(char.IsLetter).ToArray());
+                    var pairs = root.GetProperty("pairs");
+                    var matches = pairs.EnumerateObject().Select(x => x.Name)
+                        .Where(x => letters.Contains(x)).ToArray();
+                    if (matches.Length != 1 || !pairs.TryGetProperty(matches[0], out var item))
+                    {
+                        Clear("Pair outside Panda list or broker symbol ambiguous");
+                        return;
+                    }
+                    var pair = matches[0];
+                    var bias = item.GetProperty("bias").GetString();
+                    var phase = item.GetProperty("phase").GetString();
+                    var gap = item.GetProperty("gap").GetDouble();
+                    _phase.Text = pair + "  " + bias + "  GAP " + gap.ToString("0.#") + "\n" + phase;
+                    _phase.ForegroundColor = bias == "BUY" ? Color.FromHex("#00ff9f") :
+                        bias == "SELL" ? Color.FromHex("#ff4d6d") : Color.FromHex("#ffd166");
+                    var reasons = item.GetProperty("reasons").EnumerateArray()
+                        .Select(x => x.GetString()).Where(x => !string.IsNullOrEmpty(x)).ToArray();
+                    var boxes = item.GetProperty("box_position");
+                    _read.Text = string.Join("\n", reasons.Take(7)) +
+                        "\nBOX H1 " + boxes.GetProperty("H1").GetString() +
+                        " / H4 " + boxes.GetProperty("H4").GetString() +
+                        " / D1 " + boxes.GetProperty("D1").GetString();
+                    var baseBreadth = item.GetProperty("base_breadth");
+                    var quoteBreadth = item.GetProperty("quote_breadth");
+                    _related.Text = "BASE: " + Breadth(baseBreadth) + "\nQUOTE: " + Breadth(quoteBreadth);
+                    _status.Text = "Panda snapshot " + generated.ToString("HH:mm") + " UTC | no orders sent";
+                }
+            }
+            catch (Exception ex)
+            {
+                Clear("Panda snapshot unavailable: " + ex.GetType().Name);
+            }
+        }
+
+        private static string Breadth(JsonElement item)
+        {
+            var examples = item.GetProperty("examples").EnumerateArray()
+                .Select(x => x.GetString()).Where(x => !string.IsNullOrEmpty(x)).ToArray();
+            return item.GetProperty("agree").GetInt32() + " agree / " +
+                item.GetProperty("oppose").GetInt32() + " oppose; " +
+                item.GetProperty("box_confirmed").GetInt32() + " H1 box / " +
+                item.GetProperty("price_advancing").GetInt32() + " advancing" +
+                (examples.Length > 0 ? " (" + string.Join(", ", examples) + ")" : "");
+        }
+
+        private void Clear(string message)
+        {
+            _phase.Text = "NO CURRENT READING";
+            _phase.ForegroundColor = Color.FromHex("#ffd166");
+            _read.Text = "";
+            _related.Text = "";
+            _status.Text = message;
+        }
+    }
+}

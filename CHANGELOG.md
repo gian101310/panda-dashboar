@@ -1,3 +1,7 @@
+## 2026-10-30 - Add read-only Panda signal lifecycle indicator
+- Added a separate cTrader panel for explainable BUY/SELL phases using fresh prices, gaps, box positions, and related currency breadth.
+- Exported a local 21-pair snapshot and compact daily observations for later four-hour probability calibration without changing locked strategy logic.
+
 ## 2026-10-30 - Use month ADV when next session crosses a month
 - Dashboard and Telegram ADV forecasts now use ADV D1/H4/H1 when the next Dubai trading day is in a new month, including 30-31 October 2026.
 - Next-day and next-week projections remain tied to the next trading session within the current month.

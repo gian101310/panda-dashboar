@@ -40,6 +40,7 @@ from lib.signal_alerts import RecoveryGate, consolidate_candidates, classify_gap
 from lib.signal_alert_outbox import enqueue_alert, dispatch_pending
 from lib.signal_price_levels import assess_price_levels, related_h4_breadth, summarize_nearby_levels
 from lib.panda_hedge_bias_export import export_hedge_bias_snapshot
+from lib.panda_signal_lifecycle import export_lifecycle_snapshot
 
 load_dotenv()
 
@@ -1978,6 +1979,12 @@ def run_gap_once():
             print(f"[CROSS-HEDGE] Exported {exported} Panda setup rows")
         except Exception as export_error:
             print(f"[CROSS-HEDGE] Setup snapshot unavailable: {export_error}")
+
+        try:
+            exported = export_lifecycle_snapshot(dashboard_payload, all_parsed_map, price_source_dir=MT4_PATH)
+            print(f"[LIFECYCLE] Exported {exported} pair readings")
+        except Exception as export_error:
+            print(f"[LIFECYCLE] Snapshot unavailable: {export_error}")
 
     # ---- SIGNAL SNAPSHOTS: Log all 21 pairs every cycle ----
     if ANALYTICS_TRACKING_ENABLED and dashboard_payload:

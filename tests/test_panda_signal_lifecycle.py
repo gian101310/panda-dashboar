@@ -1,0 +1,69 @@
+import json
+import tempfile
+import unittest
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+from lib.panda_signal_lifecycle import build_lifecycle_snapshot, export_lifecycle_snapshot
+
+
+NOW = datetime(2026, 10, 30, 10, 0, tzinfo=timezone.utc)
+
+
+def row(symbol, bias, gap, price, **extra):
+    return {"symbol": symbol, "bias": bias, "gap": gap, "pl_price": price,
+            "hard_invalid": False, "pl_zone": "ABOVE" if bias == "BUY" else "BELOW", **extra}
+
+
+class LifecycleTests(unittest.TestCase):
+    def test_related_currency_breadth_and_strong_continuation(self):
+        rows = [row("EURUSD", "BUY", 9, 1.11), row("EURJPY", "BUY", 8, 160),
+                row("EURGBP", "BUY", 6, .87), row("GBPUSD", "BUY", 7, 1.25),
+                row("AUDUSD", "BUY", 7, .66)]
+        boxes = {"EURUSD": {"boxes": [
+            {"start_ts": 1000000, "end_ts": 1000000 + 2 * 86400,
+             "open_price": 1.09, "close_price": 1.10},
+            {"start_ts": 1000000, "end_ts": 1000000 + 14 * 86400,
+             "open_price": 1.08, "close_price": 1.105}]}}
+        previous = {"generated_utc": (NOW - timedelta(minutes=5)).isoformat(),
+                    "pairs": {"EURUSD": {"bias": "BUY", "gap": 8, "price": 1.108},
+                              "EURJPY": {"price": 159.9}, "EURGBP": {"price": .869},
+                              "GBPUSD": {"price": 1.249}, "AUDUSD": {"price": .659}}}
+        result = build_lifecycle_snapshot(rows, boxes, previous, NOW)["pairs"]["EURUSD"]
+        self.assertEqual(result["phase"], "STRONG CONTINUATION")
+        self.assertEqual(result["base_breadth"]["agree"], 2)
+        self.assertEqual(result["quote_breadth"]["agree"], 2)
+        self.assertEqual(result["box_position"]["H1"], "ABOVE")
+
+    def test_fading_buy_and_stale_previous(self):
+        rows = [row("EURUSD", "BUY", 5, 1.10), row("EURJPY", "SELL", -6, 160),
+                row("GBPUSD", "SELL", -6, 1.25)]
+        previous = {"generated_utc": (NOW - timedelta(minutes=5)).isoformat(),
+                    "pairs": {"EURUSD": {"bias": "BUY", "gap": 8, "price": 1.101}}}
+        current = build_lifecycle_snapshot(rows, {}, previous, NOW)["pairs"]["EURUSD"]
+        self.assertEqual(current["phase"], "WEAKENING / POSSIBLE END")
+        self.assertEqual(current["base_breadth"]["oppose"], 1)
+        self.assertEqual(current["quote_breadth"]["oppose"], 1)
+        previous["generated_utc"] = (NOW - timedelta(minutes=21)).isoformat()
+        stale = build_lifecycle_snapshot(rows, {}, previous, NOW)["pairs"]["EURUSD"]
+        self.assertEqual(stale["phase"], "BASELINE / UNCONFIRMED")
+        self.assertIsNone(stale["gap_change_with_bias"])
+
+    def test_export_excludes_stale_price_file(self):
+        with tempfile.TemporaryDirectory() as folder:
+            target = Path(folder) / "panda_lifecycle_snapshot.json"
+            export_lifecycle_snapshot([row("EURUSD", "BUY", 9, 1.11)], {}, target,
+                                      NOW, price_source_dir=folder)
+            saved = json.loads(target.read_text(encoding="utf-8"))["pairs"]["EURUSD"]
+            self.assertIsNone(saved["price"])
+            self.assertEqual(saved["box_position"]["H1"], "UNKNOWN")
+
+    def test_new_valid_bias_is_starting(self):
+        prior = {"generated_utc": (NOW - timedelta(minutes=5)).isoformat(),
+                 "pairs": {"EURUSD": {"bias": "BUY", "valid": False, "gap": 0, "price": 1.10}}}
+        current = build_lifecycle_snapshot([row("EURUSD", "BUY", 5, 1.101)], {}, prior, NOW)
+        self.assertEqual(current["pairs"]["EURUSD"]["phase"], "STARTING / UNCONFIRMED")
+
+
+if __name__ == "__main__":
+    unittest.main()
