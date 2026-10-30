@@ -1,3 +1,7 @@
+## 2026-10-30 - Capture lifecycle analytics evidence
+- Added local per-cycle records for 21 pairs: Dubai session and time, prices and pip movement, current and ADV timeframe scores, box and level distances, related pairs, and source freshness.
+- Kept the existing compact four-hour calibration history separate; unavailable source fields are recorded explicitly.
+
 ## 2026-10-30 - Improve lifecycle phases and four-hour outcome evidence
 - Stabilized lifecycle labels so a flat gap or brief pullback does not imply trend maturity; new bias and invalidated signal states are clearer.
 - Added today's high/low and box edges to nearby-level review, including the USDCAD day-low case.

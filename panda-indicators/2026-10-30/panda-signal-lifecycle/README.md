@@ -32,6 +32,15 @@ without changing Panda's BUY/SELL bias.
 The engine exports `panda_lifecycle_snapshot.json` every scoring cycle to
 `Documents/cAlgo/Data/Indicators/Panda Signal Lifecycle/`. It also writes
 compact local daily observations under that folder's `history/` directory.
+Each cycle also appends a richer local record to `history/analytics/YYYY-MM-DD.jsonl`.
+It records the Dubai time and trading session, price and pip movement, current
+and ADV D1/H4/H1 scores, box boundaries and price distance to each edge,
+support/resistance level distances, Panda Line readings, related-pair context,
+and source file timestamps. Unavailable or stale inputs are marked explicitly.
+The richer files are for later research; they do not change the indicator's
+four-hour calculation or show an unvalidated probability. MT4 must export the
+chart's WagBox objects for box boundaries to be present; a missing box is
+recorded as unavailable rather than inferred from a trend label.
 The history feeds a local four-hour outcome test. A successful outcome means
 the Panda bias remains valid four hours later and price moved at least three
 pips with that bias.

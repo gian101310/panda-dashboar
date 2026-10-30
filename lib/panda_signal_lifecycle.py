@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from lib.panda_lifecycle_calibration import daily_report, phase_family
+from lib.panda_lifecycle_history import build_history_observation
 from lib.signal_price_levels import box_bounds
 
 
@@ -212,6 +213,8 @@ def build_lifecycle_snapshot(rows, parsed_map, previous=None, now=None):
                                        {"name": nearest_level[1], "distance_pips": round(nearest_level[0], 1)}),
             "level_review": bool(valid and nearest_level and nearest_level[0] <= 5),
             "price_change_pips_with_bias": round(price_change_pips, 1) if price_change_pips is not None else None,
+            "price_change_pips": (round((price - prior_price) / pip, 1)
+                                  if price is not None and prior_price is not None else None),
             "base_breadth": base, "quote_breadth": quote, "reasons": reasons,
         }
     return {"version": 2, "generated_utc": now.isoformat().replace("+00:00", "Z"), "pairs": results}
@@ -283,4 +286,12 @@ def export_lifecycle_snapshot(rows, parsed_map, target=None, now=None, price_sou
     }}
     with history_file.open("a", encoding="utf-8") as stream:
         stream.write(json.dumps(observation, separators=(",", ":")) + "\n")
+    # Keep rich analytics separate so the four-hour calibrator reads only compact history.
+    analytics_dir = history_dir / "analytics"
+    analytics_dir.mkdir(exist_ok=True)
+    analytics_file = analytics_dir / (snapshot["generated_utc"][:10] + ".jsonl")
+    analytics = build_history_observation(snapshot, rows, parsed_map, price_source_dir,
+                                          now or datetime.now(timezone.utc))
+    with analytics_file.open("a", encoding="utf-8") as stream:
+        stream.write(json.dumps(analytics, separators=(",", ":")) + "\n")
     return len(snapshot["pairs"])
