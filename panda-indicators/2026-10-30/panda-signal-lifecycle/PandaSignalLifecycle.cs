@@ -12,7 +12,7 @@ namespace cAlgo
         [Parameter("Refresh (seconds)", DefaultValue = 15, MinValue = 5, MaxValue = 60)]
         public int RefreshSeconds { get; set; }
 
-        private TextBlock _heading, _phase, _levelWarning, _read, _related, _status;
+        private TextBlock _heading, _phase, _levelWarning, _probability, _read, _related, _status;
         private ScrollViewer _scroll;
 
         protected override void Initialize()
@@ -26,16 +26,18 @@ namespace cAlgo
             _heading = Line("PANDA  |  SIGNAL LIFECYCLE", Color.FromHex("#00b4ff"), 15);
             _phase = Line("Loading...", Color.FromHex("#abb9c9"), 15);
             _levelWarning = Line("", Color.FromHex("#ffd166"), 12);
+            _probability = Line("4h outcome: collecting history", Color.FromHex("#ffd166"), 11);
             _read = Line("", Color.FromHex("#abb9c9"), 12);
             _related = Line("", Color.FromHex("#abb9c9"), 11);
             _status = Line("", Color.FromHex("#abb9c9"), 10);
             panel.AddChild(_heading);
             panel.AddChild(_phase);
             panel.AddChild(_levelWarning);
+            panel.AddChild(_probability);
             panel.AddChild(_read);
             panel.AddChild(_related);
             panel.AddChild(_status);
-            panel.AddChild(Line("Evidence read only; percentages await validation.", Color.FromHex("#abb9c9"), 9));
+            panel.AddChild(Line("4h outcome = bias valid + at least 3 pips with bias; no orders.", Color.FromHex("#abb9c9"), 9));
             _scroll = new ScrollViewer {
                 Content = panel, Width = 460,
                 Height = Math.Max(200, Math.Min(Chart.Height - 30, 315)),
@@ -92,6 +94,21 @@ namespace cAlgo
                         level.ValueKind == JsonValueKind.Object ?
                         "LEVEL REVIEW: " + level.GetProperty("name").GetString() + " " +
                         level.GetProperty("distance_pips").GetDouble().ToString("0.#") + " pips ahead" : "";
+                    if (item.TryGetProperty("four_hour_evidence", out var evidence))
+                    {
+                        var status = evidence.GetProperty("status").GetString();
+                        var sampleCount = evidence.GetProperty("samples").GetInt32();
+                        var days = evidence.GetProperty("days").GetInt32();
+                        _probability.Text = status == "VALIDATED" ?
+                            "4h historical outcome: " + evidence.GetProperty("percent").GetInt32() +
+                            "% (range " + evidence.GetProperty("low").GetInt32() + "–" +
+                            evidence.GetProperty("high").GetInt32() + "%; " + sampleCount + " samples)" :
+                            status == "NO SIGNAL" ? "4h outcome: no valid Panda signal" :
+                            status == "UNSTABLE" ? "4h outcome: history unstable; percentage withheld" :
+                            "4h outcome: collecting independent history (" + sampleCount +
+                            " samples across " + days + " days)";
+                    }
+                    else _probability.Text = "4h outcome: collecting history";
                     var reasons = item.GetProperty("reasons").EnumerateArray()
                         .Select(x => x.GetString()).Where(x => !string.IsNullOrEmpty(x)).ToArray();
                     var boxes = item.GetProperty("box_position");
@@ -133,6 +150,7 @@ namespace cAlgo
             _phase.ForegroundColor = Color.FromHex("#ffd166");
             _read.Text = "";
             _levelWarning.Text = "";
+            _probability.Text = "";
             _related.Text = "";
             _status.Text = message;
             _scroll.Height = Math.Max(145, Math.Min(Chart.Height - 30, 170));

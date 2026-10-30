@@ -10,6 +10,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+from lib.panda_lifecycle_calibration import daily_report, phase_family
 from lib.signal_price_levels import box_bounds
 
 
@@ -107,12 +108,19 @@ def build_lifecycle_snapshot(rows, parsed_map, previous=None, now=None):
         pip = 0.01 if "JPY" in symbol else 0.0001
         opposing_levels = []
         if price is not None:
-            for level_name in ("pdh", "pdl", "pwh", "pwl", "pmh", "pml"):
+            for level_name in ("pdh", "pdl", "pwh", "pwl", "pmh", "pml", "dayh", "dayl"):
                 level = _number(row.get(level_name))
                 if level is not None:
                     distance = side * (level - price) / pip
                     if 0 <= distance <= 30:
                         opposing_levels.append((distance, level_name.upper()))
+            for tf in ("H1", "H4", "D1"):
+                bounds = box_bounds(parsed, tf)
+                if bounds:
+                    edge = bounds[1] if side == 1 else bounds[0]
+                    distance = side * (edge - price) / pip
+                    if 0 <= distance <= 30:
+                        opposing_levels.append((distance, f"{tf} BOX"))
         nearest_level = min(opposing_levels) if opposing_levels else None
         valid = not row.get("hard_invalid") and ((bias == "BUY" and gap >= 5) or (bias == "SELL" and gap <= -5))
         reasons = []
@@ -136,25 +144,30 @@ def build_lifecycle_snapshot(rows, parsed_map, previous=None, now=None):
                 reasons.append("Panda Line zone unconfirmed")
             if nearest_level:
                 reasons.append(f"{nearest_level[1]} {nearest_level[0]:.1f} pips ahead")
+        adverse = ((gap_change is not None and gap_change <= -1) or
+                   (price_change_pips is not None and price_change_pips <= -3) or
+                   conflict > support or opposing_boxes > 0)
+        adverse_streak = (int(prior.get("adverse_streak") or 0) + 1) if adverse else 0
         if not valid:
-            phase = "NO VALID SIGNAL"
-        elif ((gap_change is not None and gap_change <= -2) or
+            phase = "PANDA SIGNAL ENDED" if prior.get("valid") is True else "NO VALID SIGNAL"
+            adverse_streak = 0
+        elif adverse_streak >= 3 and ((gap_change is not None and gap_change <= -2) or
               (price_change_pips is not None and price_change_pips <= -3)) and (conflict >= support or opposing_boxes):
             phase = "WEAKENING / POSSIBLE END"
         elif prior_gap is None:
             phase = "BASELINE / UNCONFIRMED"
-        elif prior.get("bias") != bias or prior.get("valid") is False:
+        elif prior.get("bias") != bias or prior.get("valid") is False or (
+                trend_age_hours is not None and trend_age_hours < 0.25):
             phase = "STARTING / UNCONFIRMED"
+        elif adverse_streak >= 2:
+            phase = "MIXED / SLOWING"
         elif (aligned_boxes == 2 and base["agree"] >= 1 and quote["agree"] >= 1 and
               support >= 3 and support > conflict and related_confirmed and
-              gap_change is not None and gap_change >= 0 and
-              (price_change_pips is None or price_change_pips >= 0)):
+              gap_change is not None and gap_change >= 0):
             phase = ("STRONG CONTINUATION" if trend_age_hours is not None and trend_age_hours >= 1
                      else "STRONG ALIGNMENT / EARLY")
         elif (gap_change is not None and gap_change > 0) or (price_change_pips is not None and price_change_pips > 1):
             phase = "STRENGTHENING"
-        elif trend_age_hours is not None and trend_age_hours >= 4 and (gap_change <= 0 or conflict >= support):
-            phase = "MATURE / MIXED"
         elif gap_change is not None and gap_change < 0 or conflict > support:
             phase = "MIXED / SLOWING"
         else:
@@ -162,6 +175,7 @@ def build_lifecycle_snapshot(rows, parsed_map, previous=None, now=None):
         results[symbol] = {
             "bias": bias, "gap": gap, "price": price, "phase": phase, "valid": valid,
             "trend_start_utc": trend_start,
+            "adverse_streak": adverse_streak,
             "box_position": positions, "gap_change_with_bias": gap_change,
             "nearest_opposing_level": (None if nearest_level is None else
                                        {"name": nearest_level[1], "distance_pips": round(nearest_level[0], 1)}),
@@ -169,7 +183,7 @@ def build_lifecycle_snapshot(rows, parsed_map, previous=None, now=None):
             "price_change_pips_with_bias": round(price_change_pips, 1) if price_change_pips is not None else None,
             "base_breadth": base, "quote_breadth": quote, "reasons": reasons,
         }
-    return {"version": 1, "generated_utc": now.isoformat().replace("+00:00", "Z"), "pairs": results}
+    return {"version": 2, "generated_utc": now.isoformat().replace("+00:00", "Z"), "pairs": results}
 
 
 def export_lifecycle_snapshot(rows, parsed_map, target=None, now=None, price_source_dir=None):
@@ -193,10 +207,32 @@ def export_lifecycle_snapshot(rows, parsed_map, target=None, now=None, price_sou
             if not fresh:
                 current["pl_price"] = None
                 current["pl_zone"] = None
+            else:
+                try:
+                    for line in source.read_text(encoding="utf-8").splitlines():
+                        key, separator, value = line.partition(":")
+                        key = key.strip().lower()
+                        if separator and key in ("dayh", "dayl"):
+                            current[key] = _number(value.strip())
+                except OSError:
+                    pass
             current_rows.append(current)
         rows = current_rows
     snapshot = build_lifecycle_snapshot(rows, parsed_map, previous, now)
     target.parent.mkdir(parents=True, exist_ok=True)
+    history_dir = target.parent / "history"
+    history_dir.mkdir(exist_ok=True)
+    try:
+        evidence = daily_report(history_dir, now or datetime.now(timezone.utc))
+    except (OSError, ValueError):
+        evidence = {}
+    for symbol, item in snapshot["pairs"].items():
+        if not item["valid"]:
+            item["four_hour_evidence"] = {"status": "NO SIGNAL", "samples": 0, "days": 0}
+            continue
+        family = phase_family(item["phase"])
+        item["four_hour_evidence"] = (evidence.get(symbol) or {}).get(family) or {
+            "status": "COLLECTING", "samples": 0, "days": 0}
     temporary = target.with_name(target.name + ".tmp")
     try:
         temporary.write_text(json.dumps(snapshot, separators=(",", ":")), encoding="utf-8")
@@ -205,10 +241,8 @@ def export_lifecycle_snapshot(rows, parsed_map, target=None, now=None, price_sou
         if temporary.exists():
             temporary.unlink()
     # Local observations for later four-hour outcome calibration. No Supabase writes.
-    history_dir = target.parent / "history"
-    history_dir.mkdir(exist_ok=True)
     history_file = history_dir / (snapshot["generated_utc"][:10] + ".jsonl")
-    observation = {"generated_utc": snapshot["generated_utc"], "pairs": {
+    observation = {"version": snapshot["version"], "generated_utc": snapshot["generated_utc"], "pairs": {
         symbol: {"price": item["price"], "gap": item["gap"], "bias": item["bias"],
                  "valid": item["valid"],
                  "phase": item["phase"], "box_position": item["box_position"],

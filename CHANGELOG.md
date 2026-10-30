@@ -1,3 +1,8 @@
+## 2026-10-30 - Improve lifecycle phases and four-hour outcome evidence
+- Stabilized lifecycle labels so a flat gap or brief pullback does not imply trend maturity; new bias and invalidated signal states are clearer.
+- Added today's high/low and box edges to nearby-level review, including the USDCAD day-low case.
+- Added local, nonoverlapping four-hour outcome calibration with a later-date holdout gate; percentages remain hidden until sufficient stable history exists.
+
 ## 2026-10-30 - Recover lifecycle snapshot after cTrader reinstall
 - Restored the local feed after cTrader cleared the indicator data folder on reinstall.
 - Changed the fallback task to check each minute and made the panel wait for a missing file without showing an exception.

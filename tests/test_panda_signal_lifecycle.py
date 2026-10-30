@@ -51,9 +51,10 @@ class LifecycleTests(unittest.TestCase):
         previous = {"generated_utc": (NOW - timedelta(minutes=5)).isoformat(),
                     "pairs": {"EURUSD": {"bias": "BUY", "gap": 8, "price": 1.101}}}
         current = build_lifecycle_snapshot(rows, {}, previous, NOW)["pairs"]["EURUSD"]
-        self.assertEqual(current["phase"], "WEAKENING / POSSIBLE END")
+        self.assertEqual(current["phase"], "MIXED / SLOWING")
         self.assertEqual(current["base_breadth"]["oppose"], 1)
         self.assertEqual(current["quote_breadth"]["oppose"], 1)
+        self.assertEqual(current["adverse_streak"], 1)
         previous["generated_utc"] = (NOW - timedelta(minutes=21)).isoformat()
         stale = build_lifecycle_snapshot(rows, {}, previous, NOW)["pairs"]["EURUSD"]
         self.assertEqual(stale["phase"], "BASELINE / UNCONFIRMED")
@@ -67,12 +68,44 @@ class LifecycleTests(unittest.TestCase):
             saved = json.loads(target.read_text(encoding="utf-8"))["pairs"]["EURUSD"]
             self.assertIsNone(saved["price"])
             self.assertEqual(saved["box_position"]["H1"], "UNKNOWN")
+            self.assertEqual(saved["four_hour_evidence"]["status"], "COLLECTING")
 
     def test_new_valid_bias_is_starting(self):
         prior = {"generated_utc": (NOW - timedelta(minutes=5)).isoformat(),
                  "pairs": {"EURUSD": {"bias": "BUY", "valid": False, "gap": 0, "price": 1.10}}}
         current = build_lifecycle_snapshot([row("EURUSD", "BUY", 5, 1.101)], {}, prior, NOW)
         self.assertEqual(current["pairs"]["EURUSD"]["phase"], "STARTING / UNCONFIRMED")
+        recent = {"generated_utc": (NOW - timedelta(minutes=5)).isoformat(),
+                  "pairs": {"EURUSD": {"bias": "BUY", "valid": True, "gap": 5,
+                                       "price": 1.10,
+                                       "trend_start_utc": (NOW - timedelta(minutes=10)).isoformat()}}}
+        persisted = build_lifecycle_snapshot([row("EURUSD", "BUY", 5, 1.101)], {}, recent, NOW)
+        self.assertEqual(persisted["pairs"]["EURUSD"]["phase"], "STARTING / UNCONFIRMED")
+
+    def test_invalidated_signal_is_labeled_ended_once(self):
+        prior = {"generated_utc": (NOW - timedelta(minutes=5)).isoformat(),
+                 "pairs": {"EURUSD": {"bias": "BUY", "valid": True, "gap": 5, "price": 1.10}}}
+        ended = build_lifecycle_snapshot([row("EURUSD", "WAIT", 3, 1.10)], {}, prior, NOW)
+        self.assertEqual(ended["pairs"]["EURUSD"]["phase"], "PANDA SIGNAL ENDED")
+
+    def test_flat_gap_and_small_pullback_do_not_mark_trend_mature(self):
+        rows = [row("USDCAD", "SELL", -9, 1.39627, dayl=1.39582),
+                row("GBPUSD", "BUY", 9, 1.34), row("AUDCAD", "SELL", -5, 0.91),
+                row("EURCAD", "SELL", -10, 1.51)]
+        boxes = {"USDCAD": {"boxes": [
+            {"start_ts": 1000000, "end_ts": 1000000 + 2 * 86400,
+             "open_price": 1.39890, "close_price": 1.40685},
+            {"start_ts": 1000000, "end_ts": 1000000 + 14 * 86400,
+             "open_price": 1.39890, "close_price": 1.41343}]}}
+        prior = {"generated_utc": (NOW - timedelta(minutes=5)).isoformat(),
+                 "pairs": {"USDCAD": {"bias": "SELL", "valid": True, "gap": -9,
+                                      "price": 1.39619, "trend_start_utc": (NOW - timedelta(hours=8)).isoformat()},
+                           "GBPUSD": {"price": 1.339}, "AUDCAD": {"price": .911},
+                           "EURCAD": {"price": 1.511}}}
+        current = build_lifecycle_snapshot(rows, boxes, prior, NOW)["pairs"]["USDCAD"]
+        self.assertEqual(current["phase"], "STRONG CONTINUATION")
+        self.assertEqual(current["nearest_opposing_level"], {"name": "DAYL", "distance_pips": 4.5})
+        self.assertTrue(current["level_review"])
 
 
 if __name__ == "__main__":

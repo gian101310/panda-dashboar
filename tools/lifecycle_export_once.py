@@ -57,7 +57,8 @@ def main():
         pl = parse_pl_file(symbol) or {}
         rows.append({"symbol": symbol, **score, "pl_price": pl.get("pl_price"),
                      "pl_zone": pl.get("pl_zone"),
-                     **{name: pl.get(name) for name in ("pdh", "pdl", "pwh", "pwl", "pmh", "pml")}})
+                     **{name: pl.get(name) for name in ("pdh", "pdl", "pwh", "pwl", "pmh", "pml",
+                                                          "dayh", "dayl")}})
     if len(rows) != len(PAIRS):
         raise RuntimeError(f"Only {len(rows)}/{len(PAIRS)} fresh score files; snapshot withheld")
     if max(score_times) - min(score_times) > 60:

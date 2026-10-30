@@ -8,22 +8,36 @@ currency are summarized separately so the display does not present 21 related
 pairs as independent probability votes.
 
 Phases are deterministic evidence labels: baseline, starting, strengthening,
-strong alignment/early, strong continuation, continuing, mixed/slowing, mature/mixed, and weakening/
-possible end. They are not calibrated probabilities, entry rules, or trade
+strong alignment/early, strong continuation, continuing, mixed/slowing,
+weakening/possible end, and Panda signal ended. A new valid bias is marked
+starting for its first 15 minutes. Brief counter-direction moves do not by
+themselves mark a trend mature or ended; weakening requires repeated adverse
+readings, while signal ended means Panda eligibility ceased. These labels are
+not entry rules or trade
 recommendations. The panel never sends orders or changes Panda scoring, BB,
 INTRA, or cross-hedge eligibility. A missing or older-than-20-minute snapshot
 displays no current reading. Price and zone context is excluded if its TBG file
 has not updated for 20 minutes. The first fresh snapshot after a long gap is
 marked baseline because a trend start cannot be inferred from it.
 Strong continuation requires at least one hour of continuous observations;
-earlier agreement is labelled strong alignment/early. A level within five
-pips ahead receives an amber review line without changing Panda's BUY/SELL bias.
+earlier agreement is labelled strong alignment/early. A day high/low, previous
+high/low, or box edge within five pips ahead receives an amber review line
+without changing Panda's BUY/SELL bias.
 
 The engine exports `panda_lifecycle_snapshot.json` every scoring cycle to
 `Documents/cAlgo/Data/Indicators/Panda Signal Lifecycle/`. It also writes
 compact local daily observations under that folder's `history/` directory.
-The history is input for later four-hour outcome testing; the indicator does
-not claim a numeric probability until real outcomes have been evaluated.
+The history feeds a local four-hour outcome test. A successful outcome means
+the Panda bias remains valid four hours later and price moved at least three
+pips with that bias.
+Only nonoverlapping pair observations are counted. A pair/phase percentage is
+shown only after at least 30 earlier observations, 15 later holdout observations,
+10 distinct days, and stable early-versus-later results. Otherwise the panel
+shows the sample count and withholds the percentage. The displayed percentage
+is historical frequency for that exact outcome, not a guaranteed forecast.
+The chart timeframe does not change the inputs: scores update every engine
+cycle, H1/H4 boxes confirm direction, D1 supplies broader context, and the
+outcome horizon is four hours.
 
 If an older elevated engine process still owns port 8000, the Windows task
 `Panda Signal Lifecycle Export` checks `tools/lifecycle_export_once.py` every
