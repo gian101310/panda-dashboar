@@ -2,7 +2,8 @@
 
 This read-only chart panel explains the current Panda BUY/SELL phase for any of
 the 21 supported pairs. It shows gap and recent price direction, H1/H4/D1 box
-position, and related-pair agreement for both currencies. Related readings
+position, any H1/H4/D1 box transition since the prior fresh reading, and
+related-pair agreement for both currencies. Related readings
 include gap, H1 box confirmation, and price movement. A pair's base and quote
 currency are summarized separately so the display does not present 21 related
 pairs as independent probability votes.

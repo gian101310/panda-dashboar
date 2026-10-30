@@ -112,10 +112,14 @@ namespace cAlgo
                     var reasons = item.GetProperty("reasons").EnumerateArray()
                         .Select(x => x.GetString()).Where(x => !string.IsNullOrEmpty(x)).ToArray();
                     var boxes = item.GetProperty("box_position");
+                    var boxChanges = item.TryGetProperty("box_changes", out var changes) ?
+                        changes.EnumerateArray().Select(x => x.GetString()).Where(x => !string.IsNullOrEmpty(x)).ToArray() :
+                        Array.Empty<string>();
                     _read.Text = string.Join("\n", reasons.Take(7)) +
                         "\nBOX H1 " + boxes.GetProperty("H1").GetString() +
                         " / H4 " + boxes.GetProperty("H4").GetString() +
-                        " / D1 " + boxes.GetProperty("D1").GetString();
+                        " / D1 " + boxes.GetProperty("D1").GetString() +
+                        (boxChanges.Length > 0 ? "\nBOX CHANGE: " + string.Join("; ", boxChanges) : "");
                     var baseBreadth = item.GetProperty("base_breadth");
                     var quoteBreadth = item.GetProperty("quote_breadth");
                     _related.Text = "BASE: " + Breadth(baseBreadth) + "\nQUOTE: " + Breadth(quoteBreadth);

@@ -94,6 +94,12 @@ def build_lifecycle_snapshot(rows, parsed_map, previous=None, now=None):
         target_position = "ABOVE" if side == 1 else "BELOW"
         parsed = parsed_map.get(symbol) or {}
         positions = {tf: _box_position(price, box_bounds(parsed, tf)) for tf in ("H1", "H4", "D1")}
+        prior_positions = prior.get("box_position") or {}
+        box_changes = [f"{tf} {prior_positions[tf]} -> {positions[tf]}"
+                       for tf in ("H1", "H4", "D1")
+                       if prior_positions.get(tf) in ("ABOVE", "INSIDE", "BELOW")
+                       and positions[tf] in ("ABOVE", "INSIDE", "BELOW")
+                       and prior_positions[tf] != positions[tf]]
         base = _currency_read(by_symbol, parsed_map, prior_rows, symbol, symbol[:3], side)
         quote = _currency_read(by_symbol, parsed_map, prior_rows, symbol, symbol[3:], -side)
         support = base["agree"] + quote["agree"]
@@ -177,6 +183,7 @@ def build_lifecycle_snapshot(rows, parsed_map, previous=None, now=None):
             "trend_start_utc": trend_start,
             "adverse_streak": adverse_streak,
             "box_position": positions, "gap_change_with_bias": gap_change,
+            "box_changes": box_changes,
             "nearest_opposing_level": (None if nearest_level is None else
                                        {"name": nearest_level[1], "distance_pips": round(nearest_level[0], 1)}),
             "level_review": bool(valid and nearest_level and nearest_level[0] <= 5),

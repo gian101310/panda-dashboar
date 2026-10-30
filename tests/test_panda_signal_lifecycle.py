@@ -26,7 +26,8 @@ class LifecycleTests(unittest.TestCase):
             {"start_ts": 1000000, "end_ts": 1000000 + 14 * 86400,
              "open_price": 1.08, "close_price": 1.105}]}}
         previous = {"generated_utc": (NOW - timedelta(minutes=5)).isoformat(),
-                    "pairs": {"EURUSD": {"bias": "BUY", "gap": 8, "price": 1.108},
+                    "pairs": {"EURUSD": {"bias": "BUY", "gap": 8, "price": 1.108,
+                                       "box_position": {"H1": "INSIDE", "H4": "ABOVE", "D1": "UNKNOWN"}},
                               "EURJPY": {"price": 159.9}, "EURGBP": {"price": .869},
                               "GBPUSD": {"price": 1.249}, "AUDUSD": {"price": .659}}}
         result = build_lifecycle_snapshot(rows, boxes, previous, NOW)["pairs"]["EURUSD"]
@@ -34,6 +35,7 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(result["base_breadth"]["agree"], 2)
         self.assertEqual(result["quote_breadth"]["agree"], 2)
         self.assertEqual(result["box_position"]["H1"], "ABOVE")
+        self.assertEqual(result["box_changes"], ["H1 INSIDE -> ABOVE"])
         previous["pairs"]["EURUSD"]["trend_start_utc"] = (NOW - timedelta(hours=2)).isoformat()
         mature = build_lifecycle_snapshot(rows, boxes, previous, NOW)["pairs"]["EURUSD"]
         self.assertEqual(mature["phase"], "STRONG CONTINUATION")
