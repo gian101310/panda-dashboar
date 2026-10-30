@@ -59,6 +59,9 @@ minute and exports when new score files arrive, using the existing local
 `panda_score_*.txt`, MT4, and TBG files.
 It skips a cycle when the main engine exporter has already written the snapshot.
 The task never starts or stops the engine and never sends orders or alerts.
+When an older engine already wrote the chart snapshot, the task also appends
+the matching analytics record once per snapshot, so collection continues
+without an engine restart.
 Reinstalling the indicator can clear its cTrader data folder; the task restores
 the snapshot at its next check, and the panel waits instead of showing a file error.
 
