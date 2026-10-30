@@ -6,7 +6,7 @@ Missing source data stays missing; no score or trade decision is inferred here.
 
 import math
 import re
-from datetime import timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from lib.signal_price_levels import _box_timeframe, box_bounds
@@ -113,7 +113,11 @@ def _box_record(parsed, timeframe, price, pip):
 
 def build_history_observation(snapshot, rows, parsed_map, source_dir, now):
     """Capture all available 21-pair inputs without changing lifecycle decisions."""
-    local = now.astimezone(DUBAI_TZ)
+    try:
+        signal_time = datetime.fromisoformat(snapshot["generated_utc"].replace("Z", "+00:00"))
+    except (KeyError, AttributeError, ValueError):
+        signal_time = now
+    local = signal_time.astimezone(DUBAI_TZ)
     by_symbol = {str(row.get("symbol") or "").upper(): row for row in rows if row.get("symbol")}
     observed = {}
     for symbol, item in snapshot["pairs"].items():
@@ -198,6 +202,8 @@ def build_history_observation(snapshot, rows, parsed_map, source_dir, now):
         }
     return {"version": snapshot["version"], "record_schema": 3,
             "generated_utc": snapshot["generated_utc"],
+            "captured_utc": now.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
             "generated_dubai": local.isoformat(), "dubai_date": local.date().isoformat(),
-            "dubai_weekday": local.strftime("%A"), "session": _session(now.astimezone(timezone.utc).hour),
+            "dubai_weekday": local.strftime("%A"),
+            "session": _session(signal_time.astimezone(timezone.utc).hour),
             "pairs": observed}

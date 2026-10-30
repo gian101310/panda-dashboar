@@ -2,7 +2,7 @@ import json
 import os
 import tempfile
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from lib.panda_lifecycle_history import build_history_observation
@@ -43,6 +43,14 @@ class LifecycleHistoryTests(unittest.TestCase):
             self.assertEqual(history["record_schema"], 3)
             self.assertEqual(history["session"], "NEW_YORK")
             self.assertEqual(history["generated_dubai"], "2026-10-30T19:00:00+04:00")
+            delayed = build_history_observation(snapshot, rows, parsed, source,
+                                                NOW + timedelta(minutes=2))
+            self.assertEqual(delayed["generated_dubai"], history["generated_dubai"])
+            self.assertEqual(delayed["captured_utc"], "2026-10-30T15:02:00Z")
+            boundary = build_history_observation(
+                {**snapshot, "generated_utc": "2026-10-30T13:59:00Z"}, rows, parsed, source,
+                datetime(2026, 10, 30, 14, 1, tzinfo=timezone.utc))
+            self.assertEqual(boundary["session"], "LONDON")
             self.assertEqual(item["scores"]["base"]["current_components"]["D1"], [5, -1])
             self.assertEqual(item["scores"]["base"]["adv_components"]["D1"], [3])
             self.assertEqual(item["levels"]["PDH"]["level_minus_price_pips"], 10)
