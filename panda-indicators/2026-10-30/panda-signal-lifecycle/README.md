@@ -34,9 +34,11 @@ The task never starts or stops the engine and never sends orders or alerts.
 Reinstalling the indicator can clear its cTrader data folder; the task restores
 the snapshot at its next check, and the panel waits instead of showing a file error.
 
-Build with `dotnet build PandaSignalLifecycle.csproj -c Release`. A local
-install copy is available at `dist/Panda Signal Lifecycle.algo`; install that
-package in cTrader Desktop and attach `PandaSignalLifecycle` to a supported
-pair chart. Re-add the indicator after an update, then verify the displayed
+Build with `C:\Program Files\dotnet\dotnet.exe build PandaSignalLifecycle.csproj -c Release`.
+The build produces and installs `Panda Signal Lifecycle.algo` directly; do not
+rename the dated package from an older build. A local install copy is available
+at `dist/Panda Signal Lifecycle.algo`; attach `Panda Signal Lifecycle` from
+cTrader's Add Indicator list to a supported pair chart. Re-add the indicator
+after an update, then verify the displayed
 timestamp and related symbols against the fresh local snapshot. Build success
 does not verify chart rendering or live broker symbols.
