@@ -1,3 +1,6 @@
+## 2026-10-30 - Schedule local lifecycle feed fallback
+- Added a five-minute local exporter from existing score and price files so the cTrader lifecycle panel remains current while an older elevated engine process is active.
+
 ## 2026-10-30 - Add read-only Panda signal lifecycle indicator
 - Added a separate cTrader panel for explainable BUY/SELL phases using fresh prices, gaps, box positions, and related currency breadth.
 - Exported a local 21-pair snapshot and compact daily observations for later four-hour probability calibration without changing locked strategy logic.

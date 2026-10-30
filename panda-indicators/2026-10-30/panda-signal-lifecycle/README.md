@@ -22,6 +22,12 @@ compact local daily observations under that folder's `history/` directory.
 The history is input for later four-hour outcome testing; the indicator does
 not claim a numeric probability until real outcomes have been evaluated.
 
+If an older elevated engine process still owns port 8000, the Windows task
+`Panda Signal Lifecycle Export` runs `tools/lifecycle_export_once.py` every
+five minutes from the existing local `panda_score_*.txt`, MT4, and TBG files.
+It skips a cycle when the main engine exporter has already written the snapshot.
+The task never starts or stops the engine and never sends orders or alerts.
+
 Build with `dotnet build PandaSignalLifecycle.csproj -c Release`. A local
 install copy is available at `dist/Panda Signal Lifecycle.algo`; install that
 package in cTrader Desktop and attach `PandaSignalLifecycle` to a supported
