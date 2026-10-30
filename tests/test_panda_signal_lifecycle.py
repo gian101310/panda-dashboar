@@ -90,6 +90,21 @@ class LifecycleTests(unittest.TestCase):
         ended = build_lifecycle_snapshot([row("EURUSD", "WAIT", 3, 1.10)], {}, prior, NOW)
         self.assertEqual(ended["pairs"]["EURUSD"]["phase"], "PANDA SIGNAL ENDED")
 
+    def test_d1_h1_conflict_remains_visible_when_signal_is_invalid(self):
+        previous = {"generated_utc": (NOW - timedelta(minutes=5)).isoformat(),
+                    "pairs": {"EURUSD": {"bias": "BUY", "valid": True, "gap": 9,
+                                          "price": 1.11, "box_position": {"H1": "ABOVE"}}}}
+        parsed = {"EURUSD": {"base_cur": "EUR", "raw_base_line": "EUR D1: +5 H4: +4 H1: -4",
+                             "quote_cur": "USD", "raw_quote_line": "USD D1: -4 H4: -4 H1: -4",
+                             "boxes": [{"start_ts": 1000000, "end_ts": 1000000 + 2 * 86400,
+                                        "open_price": 1.105, "close_price": 1.108}]}}
+        invalid = row("EURUSD", "HARD_INVALID", 0, 1.103)
+        invalid["hard_invalid"] = True
+        current = build_lifecycle_snapshot([invalid], parsed, previous, NOW)["pairs"]["EURUSD"]
+        self.assertEqual(current["phase"], "PANDA SIGNAL ENDED")
+        self.assertEqual(current["timeframe_conflicts"], ["EUR D1 +5 vs H1 -4"])
+        self.assertEqual(current["box_changes"], ["H1 ABOVE -> BELOW"])
+
     def test_flat_gap_and_small_pullback_do_not_mark_trend_mature(self):
         rows = [row("USDCAD", "SELL", -9, 1.39627, dayl=1.39582),
                 row("GBPUSD", "BUY", 9, 1.34), row("AUDCAD", "SELL", -5, 0.91),

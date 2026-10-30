@@ -7,6 +7,10 @@ related-pair agreement for both currencies. Related readings
 include gap, H1 box confirmation, and price movement. A pair's base and quote
 currency are summarized separately so the display does not present 21 related
 pairs as independent probability votes.
+When a currency has opposing extreme D1 and H1 readings, the panel names the
+timeframe conflict even while Panda marks the pair invalid. An H1 box break
+against the former bias is shown as a box transition. This is an early
+countertrend clue; H4 and D1 follow-through determine whether it develops.
 
 Phases are deterministic evidence labels: baseline, starting, strengthening,
 strong alignment/early, strong continuation, continuing, mixed/slowing,

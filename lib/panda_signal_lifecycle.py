@@ -6,6 +6,7 @@ This module consumes completed engine rows. It never changes scores or eligibili
 import json
 import math
 import os
+import re
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -33,6 +34,27 @@ def _box_position(price, bounds):
     if price < bounds[0]:
         return "BELOW"
     return "INSIDE"
+
+
+def _timeframe_conflicts(parsed):
+    """Describe opposing extreme D1/H1 reads; never feed this into scoring."""
+    conflicts = []
+    for side in ("base", "quote"):
+        currency = parsed.get(f"{side}_cur")
+        line = parsed.get(f"raw_{side}_line") or ""
+        values = {"D1": [], "H1": []}
+        for tf, first, second in re.findall(r"(D1|H4|H1)\s*:\s*([+-]?\d+)(?:/([+-]?\d+))?", line):
+            if tf in values:
+                values[tf].extend(int(v) for v in (first, second) if v)
+        for d1 in values["D1"]:
+            for h1 in values["H1"]:
+                if abs(d1) >= 4 and abs(h1) >= 4 and d1 * h1 < 0:
+                    conflicts.append(f"{currency or side.upper()} D1 {d1:+d} vs H1 {h1:+d}")
+                    break
+            else:
+                continue
+            break
+    return conflicts
 
 
 def _currency_read(rows, parsed_map, prior_rows, symbol, currency, wanted):
@@ -94,6 +116,7 @@ def build_lifecycle_snapshot(rows, parsed_map, previous=None, now=None):
         target_position = "ABOVE" if side == 1 else "BELOW"
         parsed = parsed_map.get(symbol) or {}
         positions = {tf: _box_position(price, box_bounds(parsed, tf)) for tf in ("H1", "H4", "D1")}
+        timeframe_conflicts = _timeframe_conflicts(parsed)
         prior_positions = prior.get("box_position") or {}
         box_changes = [f"{tf} {prior_positions[tf]} -> {positions[tf]}"
                        for tf in ("H1", "H4", "D1")
@@ -184,6 +207,7 @@ def build_lifecycle_snapshot(rows, parsed_map, previous=None, now=None):
             "adverse_streak": adverse_streak,
             "box_position": positions, "gap_change_with_bias": gap_change,
             "box_changes": box_changes,
+            "timeframe_conflicts": timeframe_conflicts,
             "nearest_opposing_level": (None if nearest_level is None else
                                        {"name": nearest_level[1], "distance_pips": round(nearest_level[0], 1)}),
             "level_review": bool(valid and nearest_level and nearest_level[0] <= 5),
