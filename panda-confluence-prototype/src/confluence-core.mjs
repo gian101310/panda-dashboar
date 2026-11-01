@@ -388,3 +388,17 @@ export function buildSwingRiskPlan({
     draw: true,
   };
 }
+
+export function shouldDrawRiskPlan({ mode = 'CONTEXT READY', decision = '', state = '', lineState = '', execution = 'NONE' } = {}) {
+  const ready = decision === 'BUY READY' || decision === 'SELL READY';
+  if (ready) return true;
+  if (lineState !== 'CONFIRMED' || execution === 'NONE' ||
+      state === 'NO SETUP' || state === 'SETUP INVALIDATED' || state === 'RANGE — NO TRADE' ||
+      state.includes('UNAVAILABLE') || state.startsWith('DATA')) return false;
+  const normalized = String(mode).toUpperCase();
+  if (normalized === 'READY ONLY') return false;
+  if (normalized === 'ALWAYS') return true;
+  return state.startsWith('PULLBACK ACTIVE') || state.startsWith('APPROACHING') ||
+    state.startsWith('AT PANDA LEVEL') || state === 'PULLBACK ENDING' ||
+    state.startsWith('CONTEXT READY') || state === 'MARKET ELIGIBLE';
+}

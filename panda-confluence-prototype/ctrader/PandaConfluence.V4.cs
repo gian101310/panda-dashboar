@@ -9,6 +9,13 @@ using cAlgo.API.Internals;
 
 namespace cAlgo
 {
+    public enum RiskPlanVisibility
+    {
+        ReadyOnly,
+        ContextReady,
+        Always
+    }
+
     internal sealed class ConfluenceV4FeedPair
     {
         [JsonPropertyName("symbol")] public string Symbol { get; set; }
@@ -61,6 +68,12 @@ namespace cAlgo
 
         [Parameter("Show risk/reward drawing", DefaultValue = true, Group = "V4 Trade Plan")]
         public bool ShowRiskReward { get; set; }
+
+        [Parameter("Plan preview mode", DefaultValue = RiskPlanVisibility.ContextReady, Group = "V4 Trade Plan")]
+        public RiskPlanVisibility PlanPreviewMode { get; set; }
+
+        [Parameter("Plan lot size", DefaultValue = 0.01, MinValue = 0.01, MaxValue = 100, Step = 0.01, Group = "V4 Trade Plan")]
+        public double PlanLots { get; set; }
 
         [Parameter("H1 swing buffer (pips)", DefaultValue = 3, MinValue = 0, MaxValue = 50, Step = 0.5, Group = "V4 Trade Plan")]
         public double SwingBufferPips { get; set; }
@@ -163,8 +176,10 @@ namespace cAlgo
             public double Target;
             public double StopPips;
             public double RewardRisk;
+            public double Lots;
             public string Status;
             public long TriggerKey;
+            public bool Preview;
         }
 
         private readonly List<TrendReading> _readings = new List<TrendReading>();
@@ -651,10 +666,12 @@ namespace cAlgo
             panel.AddChild(Row("CONTINUATION", result.Continuation, result.Continuation == "STRONG" ? Buy : result.Continuation == "MODERATE" ? Warn : Muted));
             if (_riskPlan != null)
             {
+                panel.AddChild(Row("PLAN TYPE", _riskPlan.Preview ? "PREVIEW — NOT READY" : "CONFIRMED", _riskPlan.Preview ? Warn : Buy));
                 panel.AddChild(Row("PLAN ENTRY", _riskPlan.Entry.ToString("F" + Symbol.Digits), Accent));
                 panel.AddChild(Row("H1 SWING SL", _riskPlan.SwingLabel + "  " + _riskPlan.Stop.ToString("F" + Symbol.Digits), Sell));
                 panel.AddChild(Row("STOP WIDTH", _riskPlan.StopPips.ToString("0.0") + " pips", _riskPlan.Status == "ACCEPTABLE" ? Buy : Sell));
                 panel.AddChild(Row("TARGET", _riskPlan.Target.ToString("F" + Symbol.Digits) + "  " + _riskPlan.RewardRisk.ToString("0.00") + "R", Buy));
+                panel.AddChild(Row("LOT SIZE", _riskPlan.Lots.ToString("0.00") + " lots", Accent));
                 panel.AddChild(Row("PLAN STATUS", _riskPlan.Status, _riskPlan.Status == "ACCEPTABLE" ? Buy : Sell));
             }
             if (!string.IsNullOrEmpty(result.Warning)) panel.AddChild(Text(result.Warning, Warn, 10, true));
@@ -841,17 +858,24 @@ namespace cAlgo
 
             if (_riskPlan != null) SyncRiskPlanFromDrawing();
             bool ready = decision.Decision == "BUY READY" || decision.Decision == "SELL READY";
-            if (ready && m15Structure.EventIndex >= 0 && m15Structure.EventIndex < _m15.Count)
+            bool eligible = ShouldShowPlan(decision, ready);
+            if (!eligible && _riskPlan != null && _riskPlan.Preview)
+            {
+                _riskPlan = null;
+                Chart.RemoveObject(RiskRewardObjectName);
+            }
+            if (eligible)
             {
                 int side = _pandaBias == "BUY" ? 1 : -1;
-                long triggerKey = _m15.OpenTimes[m15Structure.EventIndex].Ticks * side;
-                if (_riskPlan == null || _riskPlan.TriggerKey != triggerKey)
+                if (_riskPlan == null)
                 {
                     var swing = h1Structure.Marks.Where(mark => mark.Direction == side)
                         .OrderByDescending(mark => mark.Index).FirstOrDefault();
                     if (swing != null)
                     {
-                        double entry = _m15.ClosePrices[m15Structure.EventIndex];
+                        int entryIndex = ready && m15Structure.EventIndex >= 0 && m15Structure.EventIndex < _m15.Count
+                            ? m15Structure.EventIndex : _m15.Count - 2;
+                        double entry = _m15.ClosePrices[entryIndex];
                         double stop = side > 0
                             ? swing.Price - SwingBufferPips * Symbol.PipSize
                             : swing.Price + SwingBufferPips * Symbol.PipSize;
@@ -868,21 +892,49 @@ namespace cAlgo
                                 Target = Math.Round(target, Symbol.Digits),
                                 StopPips = risk / Symbol.PipSize,
                                 RewardRisk = RewardRiskTarget,
-                                TriggerKey = triggerKey
+                                Lots = NormalizedPlanLots(),
+                                TriggerKey = _m15.OpenTimes[entryIndex].Ticks * side,
+                                Preview = !ready
                             };
                             UpdatePlanStatus();
                             Chart.RemoveObject(RiskRewardObjectName);
                         }
                     }
                 }
+                else if (ready && _riskPlan.Preview)
+                {
+                    // Preserve any manual drag edits made to the preview when confirmation arrives.
+                    _riskPlan.Preview = false;
+                }
             }
             RenderRiskReward();
+        }
+
+        private bool ShouldShowPlan(PullbackDecision decision, bool ready)
+        {
+            if (ready) return true;
+            if (decision.LineState != "CONFIRMED" || decision.Execution == "NONE" ||
+                decision.State == "NO SETUP" || decision.State == "SETUP INVALIDATED" || decision.State == "RANGE — NO TRADE" ||
+                decision.State.Contains("UNAVAILABLE") || decision.State.StartsWith("DATA")) return false;
+            if (PlanPreviewMode == RiskPlanVisibility.ReadyOnly) return false;
+            if (PlanPreviewMode == RiskPlanVisibility.Always) return true;
+            return decision.State.StartsWith("PULLBACK ACTIVE") || decision.State.StartsWith("APPROACHING") ||
+                decision.State.StartsWith("AT PANDA LEVEL") || decision.State == "PULLBACK ENDING" ||
+                decision.State.StartsWith("CONTEXT READY") || decision.State == "MARKET ELIGIBLE";
+        }
+
+        private double NormalizedPlanLots()
+        {
+            double units = Symbol.QuantityToVolumeInUnits(PlanLots);
+            units = Symbol.NormalizeVolumeInUnits(units, RoundingMode.ToNearest);
+            units = Math.Max(Symbol.VolumeInUnitsMin, Math.Min(Symbol.VolumeInUnitsMax, units));
+            return Symbol.VolumeInUnitsToQuantity(units);
         }
 
         private string PlannerDecision(string setupDecision)
         {
             bool ready = setupDecision == "BUY READY" || setupDecision == "SELL READY";
-            if (!ready) return setupDecision;
+            if (!ready) return _riskPlan != null && _riskPlan.Preview ? "PREVIEW — NOT READY" : setupDecision;
             if (_riskPlan == null) return "WAIT — NO CONFIRMED H1 SWING";
             if (_riskPlan.Status == "TOO WIDE") return "SKIP — STOP TOO WIDE";
             if (_riskPlan.Status != "ACCEPTABLE") return "WAIT — PLAN INVALID";
@@ -910,6 +962,8 @@ namespace cAlgo
             _riskPlan.Entry = drawing.EntryPrice;
             _riskPlan.Stop = drawing.StopLossPrice;
             _riskPlan.Target = drawing.TakeProfitPrice;
+            var fixedSize = drawing.Type as ChartRiskRewardFixedSizeType;
+            if (fixedSize != null) _riskPlan.Lots = Symbol.VolumeInUnitsToQuantity(fixedSize.VolumeInUnits);
             UpdatePlanStatus();
         }
 
@@ -929,9 +983,11 @@ namespace cAlgo
             if (interval <= TimeSpan.Zero || interval > TimeSpan.FromDays(1)) interval = TimeSpan.FromHours(1);
             DateTime start = Bars.OpenTimes[Math.Max(0, last - Math.Max(1, RiskRewardWidthBars - 3))];
             DateTime end = step + TimeSpan.FromTicks(interval.Ticks * 3);
+            double units = Symbol.NormalizeVolumeInUnits(Symbol.QuantityToVolumeInUnits(_riskPlan.Lots), RoundingMode.ToNearest);
+            units = Math.Max(Symbol.VolumeInUnitsMin, Math.Min(Symbol.VolumeInUnitsMax, units));
             drawing = Chart.DrawRiskReward(RiskRewardObjectName, start, end, _riskPlan.Entry,
                 OrderType.Market, _riskPlan.Side == "BUY" ? TradeType.Buy : TradeType.Sell,
-                new ChartRiskRewardFixedSizeType(Symbol.VolumeInUnitsMin));
+                new ChartRiskRewardFixedSizeType(units));
             drawing.IsFixedRatio = false;
             drawing.StopLossPrice = _riskPlan.Stop;
             drawing.TakeProfitPrice = _riskPlan.Target;

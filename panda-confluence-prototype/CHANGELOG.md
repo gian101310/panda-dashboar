@@ -1,5 +1,11 @@
 # Panda Confluence Prototype Changelog
 
+## 2026-11-01 — V4 preview drawing and lot size
+
+- Added `READY ONLY`, `CONTEXT READY`, and `ALWAYS` risk-plan visibility modes; `CONTEXT READY` is the default.
+- Preview drawings are marked `PREVIEW — NOT READY`, stay draggable, and preserve manual edits when confirmation arrives.
+- Added configurable lot size with broker volume normalization and panel display.
+
 ## 2026-11-01 — V4 H1 swing trade planner
 
 - Added separate read-only cTrader V2, V3, and V4 artifacts without changing Panda scoring or locked strategy definitions.

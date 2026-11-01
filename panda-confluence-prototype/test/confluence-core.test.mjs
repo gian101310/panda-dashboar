@@ -10,6 +10,7 @@ import {
   nearestDirectionalLevel,
   openFairValueGaps,
   pandaLineConfirmation,
+  shouldDrawRiskPlan,
   pullbackState,
   executionDecision,
   classifyStructure,
@@ -329,4 +330,20 @@ test('swing risk plan rejects a swing on the wrong side of entry', () => {
   assert.equal(buildSwingRiskPlan({
     side: 'BUY', entry: 1.1050, swing: 1.1060, pipSize: 0.0001,
   }), null);
+});
+
+test('risk plan preview modes control when a drawing becomes visible', () => {
+  const context = { decision: 'WAIT', state: 'CONTEXT READY — WAIT FOR M15', lineState: 'CONFIRMED', execution: 'PULLBACK' };
+  assert.equal(shouldDrawRiskPlan({ ...context, mode: 'READY ONLY' }), false);
+  assert.equal(shouldDrawRiskPlan({ ...context, mode: 'CONTEXT READY' }), true);
+  assert.equal(shouldDrawRiskPlan({ ...context, mode: 'ALWAYS' }), true);
+  assert.equal(shouldDrawRiskPlan({ ...context, mode: 'CONTEXT READY', state: 'PULLBACK ACTIVE — WAIT' }), true);
+});
+
+test('risk plan preview never draws for invalid, missing-line, or no-setup states', () => {
+  assert.equal(shouldDrawRiskPlan({ mode: 'ALWAYS', decision: 'WAIT', state: 'NO SETUP', lineState: 'CONFIRMED', execution: 'NONE' }), false);
+  assert.equal(shouldDrawRiskPlan({ mode: 'ALWAYS', decision: 'WAIT', state: 'LINE DATA UNAVAILABLE', lineState: 'UNAVAILABLE', execution: 'PULLBACK' }), false);
+  assert.equal(shouldDrawRiskPlan({ mode: 'ALWAYS', decision: 'WAIT', state: 'SETUP INVALIDATED', lineState: 'CONFIRMED', execution: 'PULLBACK' }), false);
+  assert.equal(shouldDrawRiskPlan({ mode: 'ALWAYS', decision: 'WAIT', state: 'RANGE — NO TRADE', lineState: 'CONFIRMED', execution: 'PULLBACK' }), false);
+  assert.equal(shouldDrawRiskPlan({ mode: 'READY ONLY', decision: 'BUY READY', state: 'ENTRY TRIGGER', lineState: 'CONFIRMED', execution: 'PULLBACK' }), true);
 });

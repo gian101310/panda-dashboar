@@ -112,6 +112,19 @@ V4 parameters under `V4 Trade Plan` control drawing visibility, swing buffer,
 reward/risk target, maximum stop width, and drawing width. A new trigger
 replaces the previous drawing. Structural/Panda invalidation removes it.
 
+The `Plan preview mode` parameter controls when the drawing appears:
+
+- `ReadyOnly`: draw only after a confirmed BUY/SELL READY trigger.
+- `ContextReady` (default): draw during a valid pullback/market context before
+  the M15 trigger, clearly labelled `PREVIEW — NOT READY`.
+- `Always`: draw whenever Panda direction and Panda Lines are valid and the
+  setup is not blocked or invalidated.
+
+Preview drawings remain draggable and manual entry/SL/TP adjustments are
+preserved when the setup becomes confirmed. `Plan lot size` sets the native
+risk/reward drawing's fixed volume (default 0.01 lots); the broker's minimum,
+maximum, and volume step are applied automatically.
+
 Run the deterministic calculation checks with:
 
 ```sh
