@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  buildPullbackZone,
   buildSwingRiskPlan,
   classifyGapExecution,
   confluenceStatus,
@@ -346,4 +347,42 @@ test('risk plan preview never draws for invalid, missing-line, or no-setup state
   assert.equal(shouldDrawRiskPlan({ mode: 'ALWAYS', decision: 'WAIT', state: 'SETUP INVALIDATED', lineState: 'CONFIRMED', execution: 'PULLBACK' }), false);
   assert.equal(shouldDrawRiskPlan({ mode: 'ALWAYS', decision: 'WAIT', state: 'RANGE — NO TRADE', lineState: 'CONFIRMED', execution: 'PULLBACK' }), false);
   assert.equal(shouldDrawRiskPlan({ mode: 'READY ONLY', decision: 'BUY READY', state: 'ENTRY TRIGGER', lineState: 'CONFIRMED', execution: 'PULLBACK' }), true);
+});
+
+test('pullback zone uses the larger of minimum pips and H1 ATR width', () => {
+  assert.deepEqual(buildPullbackZone({
+    pandaBias: 'BUY', level: { label: 'PDL', price: 1.1000 }, price: 1.1040,
+    h1Atr: 0.0020, pipSize: 0.0001, minimumPips: 3, atrPercent: 10,
+  }), {
+    label: 'PDL', anchor: 1.1, low: 1.0997, high: 1.1003,
+    halfWidthPips: 3, state: 'APPROACHING', side: 'BUY',
+  });
+  assert.equal(buildPullbackZone({
+    pandaBias: 'BUY', level: { label: 'PWL', price: 1.1000 }, price: 1.1040,
+    h1Atr: 0.0080, pipSize: 0.0001, minimumPips: 3, atrPercent: 10,
+  }).halfWidthPips, 8);
+});
+
+test('pullback zone identifies inside and failed BUY states', () => {
+  const input = {
+    pandaBias: 'BUY', level: { label: 'PDL', price: 1.1000 }, h1Atr: 0.0020,
+    pipSize: 0.0001, minimumPips: 3, atrPercent: 10,
+  };
+  assert.equal(buildPullbackZone({ ...input, price: 1.1001 }).state, 'INSIDE ZONE — WAIT');
+  assert.equal(buildPullbackZone({ ...input, price: 1.0990 }).state, 'ZONE FAILED');
+});
+
+test('pullback zone mirrors approach and failure for SELL', () => {
+  const input = {
+    pandaBias: 'SELL', level: { label: 'PDH', price: 1.2000 }, h1Atr: 0.0020,
+    pipSize: 0.0001, minimumPips: 3, atrPercent: 10,
+  };
+  assert.equal(buildPullbackZone({ ...input, price: 1.1960 }).state, 'APPROACHING');
+  assert.equal(buildPullbackZone({ ...input, price: 1.2001 }).state, 'INSIDE ZONE — WAIT');
+  assert.equal(buildPullbackZone({ ...input, price: 1.2010 }).state, 'ZONE FAILED');
+});
+
+test('pullback zone returns unavailable when required market data is missing', () => {
+  assert.equal(buildPullbackZone({ pandaBias: 'BUY', level: null, price: 1.1, h1Atr: 0.002, pipSize: 0.0001 }), null);
+  assert.equal(buildPullbackZone({ pandaBias: 'WAIT', level: { label: 'PDL', price: 1.1 }, price: 1.1, h1Atr: 0.002, pipSize: 0.0001 }), null);
 });

@@ -125,6 +125,30 @@ preserved when the setup becomes confirmed. `Plan lot size` sets the native
 risk/reward drawing's fixed volume (default 0.01 lots); the broker's minimum,
 maximum, and volume step are applied automatically.
 
+## V5 Possible Pullback Area
+
+`PandaConfluenceV5` keeps the complete V4 trade planner and adds a projected
+possible pullback area. The area is informational: it does not create a READY
+signal, change Panda scoring, place an order, or predict that price must return.
+
+- BUY anchors to the nearest directional Panda support level; SELL anchors to
+  the nearest directional Panda resistance level.
+- The half-width is the larger of 3 pips or 10% of confirmed H1 ATR by default,
+  so the area adapts to volatility without becoming too narrow.
+- `APPROACHING` means price remains on the valid side and may retrace toward
+  the area. `INSIDE ZONE — WAIT` means price has reached it but still needs an
+  H1 rejection and fresh M15 continuation event. `ZONE FAILED` means price
+  crossed through the far edge; it is not an entry signal.
+- The chosen level is retained for the current bias so a failed zone does not
+  silently jump to another level. Invalidation or a bias change removes it.
+- The panel shows `PB AREA` with the level and price range plus `PB ZONE` with
+  the live state. Parameters under `V5 Pullback Area` control visibility,
+  minimum half-width, ATR percentage, and forward projection.
+
+The V5 risk/reward drawing remains independently configurable under
+`V5 Trade Plan`. Use the pullback area to plan where to watch; use Panda Lines,
+H1 rejection, and a fresh M15 event to decide whether the setup is confirmed.
+
 Run the deterministic calculation checks with:
 
 ```sh

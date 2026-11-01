@@ -402,3 +402,24 @@ export function shouldDrawRiskPlan({ mode = 'CONTEXT READY', decision = '', stat
     state.startsWith('AT PANDA LEVEL') || state === 'PULLBACK ENDING' ||
     state.startsWith('CONTEXT READY') || state === 'MARKET ELIGIBLE';
 }
+
+export function buildPullbackZone({
+  pandaBias, level, price, h1Atr, pipSize, minimumPips = 3, atrPercent = 10,
+} = {}) {
+  if (!['BUY', 'SELL'].includes(pandaBias) || !level?.label || !finiteNumber(level.price) ||
+      !finiteNumber(price) || !finiteNumber(h1Atr) || !finiteNumber(pipSize) || Number(pipSize) <= 0) return null;
+  const pip = Number(pipSize);
+  const anchor = Number(level.price);
+  const halfWidthPips = Math.max(Number(minimumPips) || 0, (Number(h1Atr) / pip) * (Number(atrPercent) || 0) / 100);
+  const digits = Math.max(0, Math.round(-Math.log10(pip)) + 1);
+  const low = Number((anchor - halfWidthPips * pip).toFixed(digits));
+  const high = Number((anchor + halfWidthPips * pip).toFixed(digits));
+  const current = Number(price);
+  const state = pandaBias === 'BUY'
+    ? current < low ? 'ZONE FAILED' : current <= high ? 'INSIDE ZONE — WAIT' : 'APPROACHING'
+    : current > high ? 'ZONE FAILED' : current >= low ? 'INSIDE ZONE — WAIT' : 'APPROACHING';
+  return {
+    label: String(level.label), anchor, low, high,
+    halfWidthPips: Number(halfWidthPips.toFixed(1)), state, side: pandaBias,
+  };
+}

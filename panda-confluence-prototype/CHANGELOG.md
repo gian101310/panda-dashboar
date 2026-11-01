@@ -1,5 +1,12 @@
 # Panda Confluence Prototype Changelog
 
+## 2026-11-01 — V5 possible pullback area
+
+- Added a separate V5 indicator while preserving V4 and all locked Panda scoring and strategy behavior.
+- Added a volatility-aware possible pullback area around the nearest directional Panda Level, with `APPROACHING`, `INSIDE ZONE — WAIT`, and `ZONE FAILED` states.
+- Kept the selected area stable for the active bias and added panel rows plus visibility, width, ATR, and projection parameters.
+- Retained the V4 draggable risk/reward preview and lot-size controls in V5.
+
 ## 2026-11-01 — V4 preview drawing and lot size
 
 - Added `READY ONLY`, `CONTEXT READY`, and `ALWAYS` risk-plan visibility modes; `CONTEXT READY` is the default.
