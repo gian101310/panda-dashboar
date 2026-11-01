@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AssemblyName>PandaConfluenceV3</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../PandaConfluence.V3.cs" Link="PandaConfluenceV3.cs" />
+    <PackageReference Include="cTrader.Automate" Version="1.*" />
+  </ItemGroup>
+</Project>
