@@ -174,7 +174,7 @@ namespace cAlgo
             public string LineState = "UNAVAILABLE";
             public string LevelState = "UNAVAILABLE";
             public string State = "NO SETUP";
-            public string Continuation = "WEAK";
+            public string Continuation = "NOT ASSESSED";
             public string Decision = "WAIT";
             public string Warning = "";
             public LevelReading Level;
@@ -656,7 +656,9 @@ namespace cAlgo
             var result = EvaluateH1Pullback(h1Structure, m15Structure);
             UpdatePullbackZone(result);
             UpdateRiskPlan(result, h1Structure, m15Structure);
-            string displayDecision = PlannerDecision(result.Decision);
+            string displayDecision = result.State == "RANGE — NO TRADE" ? "WAIT • H1 RANGE FILTER" :
+                result.State == "MARKET ELIGIBLE" && string.IsNullOrEmpty(result.Warning) && (_riskPlan == null || !_riskPlan.Preview)
+                    ? _pandaBias + " MARKET CONTEXT • NO V5 TRIGGER" : PlannerDecision(result.Decision);
             var panel = new StackPanel
             {
                 Width = _minimized ? 235 : 300,
@@ -684,7 +686,9 @@ namespace cAlgo
             panel.AddChild(Row("PANDA LEVEL", levelText, result.Level == null ? Muted : Warn));
             panel.AddChild(Row("LEVEL STATE", result.LevelState, result.LevelState == "REJECTED" ? Buy : result.LevelState == "AT LEVEL" ? Warn : Muted));
             panel.AddChild(Row("PANDA STATE", result.State, PullbackColor(result.State)));
-            panel.AddChild(Row("EXECUTION", result.Execution, result.Execution == "MARKET" ? Buy : result.Execution == "PULLBACK" ? Warn : Muted));
+            panel.AddChild(Row("GAP PATH", result.Execution == "MARKET" ? "9+ MARKET CONTEXT" :
+                result.Execution == "PULLBACK" ? "5–8 PULLBACK LEVEL" : "BELOW 5 • NONE",
+                result.Execution == "MARKET" ? Buy : result.Execution == "PULLBACK" ? Warn : Muted));
             panel.AddChild(Row("DECISION", PlainDecision(result), result.Decision.EndsWith("READY") && _riskPlan != null && _riskPlan.Status == "ACCEPTABLE" ? Buy : Warn));
             panel.AddChild(Row("NEXT", NextStep(result), Muted));
             panel.AddChild(Row("PLAN DRAW", PlanDrawStatus(result, h1Structure), _riskPlan != null && string.IsNullOrEmpty(_planDrawError) ? Buy : Warn));
@@ -697,7 +701,7 @@ namespace cAlgo
                 !m15.Ready ? Warn : m15.Direction > 0 ? Buy : Sell));
             panel.AddChild(Row("H1 STRUCT", h1Structure.Event, h1Structure.Direction > 0 ? Buy : h1Structure.Direction < 0 ? Sell : Muted));
             panel.AddChild(Row("M15 EVENT", m15Structure.Event, m15Structure.Direction > 0 ? Buy : m15Structure.Direction < 0 ? Sell : Muted));
-            panel.AddChild(Row("FVG", gap == null ? "NONE" : gap.Direction > 0 ? "BULLISH OPEN" : "BEARISH OPEN", gap == null ? Muted : gap.Direction > 0 ? Buy : Sell));
+            panel.AddChild(Row("FVG (INFO)", gap == null ? "NONE" : gap.Direction > 0 ? "BULLISH OPEN" : "BEARISH OPEN", gap == null ? Muted : gap.Direction > 0 ? Buy : Sell));
             panel.AddChild(Row("CONTINUATION", result.Continuation, result.Continuation == "STRONG" ? Buy : result.Continuation == "MODERATE" ? Warn : Muted));
             if (_pullbackZone != null)
             {
@@ -1059,7 +1063,7 @@ namespace cAlgo
                     _riskPlan.Status != "ACCEPTABLE" ? "WAIT • PLAN INVALID" : _pandaBias + " PULLBACK READY";
             if (decision.Execution == "MARKET" && decision.State == "MARKET ELIGIBLE")
                 return string.IsNullOrEmpty(decision.Warning) ? _pandaBias + " MARKET CONTEXT" : "WAIT • REVIEW WARNINGS";
-            return "WAIT • " + decision.State;
+            return decision.State == "RANGE — NO TRADE" ? "WAIT • H1 RANGE FILTER" : "WAIT • " + decision.State;
         }
 
         private string NextStep(PullbackDecision decision)
@@ -1076,7 +1080,7 @@ namespace cAlgo
             if (decision.State == "PULLBACK ENDING" || decision.State == "CONTEXT READY — WAIT FOR M15") return "Wait for fresh M15 BOS";
             if (decision.State == "LEVEL DATA UNAVAILABLE") return "Load previous levels";
             if (decision.State == "H1 DATA UNAVAILABLE") return "Load H1 candles";
-            return decision.State == "RANGE — NO TRADE" ? "H1 range or ADX below 15" : "Read Panda state above";
+            return decision.State == "RANGE — NO TRADE" ? "H1 box ranging or ADX <15" : "Read Panda state above";
         }
 
         private string PlanDrawStatus(PullbackDecision decision, StructureReading h1Structure)

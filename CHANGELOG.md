@@ -1,3 +1,7 @@
+## 2026-11-03 - Clarify Confluence V5 entry labels
+- Renamed the execution row to GAP PATH, identified FVG as informational, and showed when an H1 range filter blocks a valid Panda path.
+- Replaced the default continuation grade with NOT ASSESSED until V5 evaluates it, and clarified that market context has no V5 timing trigger. Scoring and entry rules are unchanged.
+
 ## 2026-11-03 - Keep Lifecycle phase visible when minimized
 - The MT4 Lifecycle bar now shows pair, BUY/SELL bias, gap, and phase while minimized; stale data shows NO CURRENT READING.
 
