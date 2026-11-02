@@ -1,3 +1,6 @@
+## 2026-11-02 - Align Market Desk current reads with snapshot exclusions
+- Mark currencies with opposing strong timeframe scores INVALID in the Market Desk and display gaps 0, +/-1, and +/-10 as INVALID in both reports; locked scoring remains unchanged.
+
 ## 2026-11-02 - Exclude snapshot gaps zero, one, and ten
 - Telegram snapshot alone now displays gaps 0, +/-1, and +/-10 as white INVALID; engine scoring and strategy eligibility remain unchanged.
 

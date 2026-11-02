@@ -2570,11 +2570,17 @@ def snapshot_adv_forecast(row, now=None):
     return f"{horizon} {gap:+g}" if gap else f"{horizon} 0"
 
 
+def report_excludes_gap(gap):
+    """Operator display override shared by Telegram snapshot and Market Desk."""
+    magnitude = abs(gap)
+    return magnitude <= 1 or magnitude == 10
+
+
 def snapshot_card_classification(is_valid, hard_invalid, abs_gap, has_watch_currency, bias):
     """Display-only Telegram category; keep the operator's excluded gaps white."""
     if hard_invalid:
         return "WHITE", "INVALID"
-    if abs_gap <= 1 or abs_gap == 10:
+    if report_excludes_gap(abs_gap):
         return "WHITE", "INVALID"
     if is_valid and abs_gap < 7:
         return "YELLOW", bias
@@ -2987,17 +2993,30 @@ def _market_desk_currency_rows(rows):
             d1 = int(r.get(f"{prefix}_d1") or 0)
             h4 = int(r.get(f"{prefix}_h4") or 0)
             h1 = int(r.get(f"{prefix}_h1") or 0)
+            tf_scores = (("D1", d1), ("H4", h4), ("H1", h1))
+            raw_extremes = re.findall(r"(D1|H4|H1)([+-]\d+)", r.get(f"{prefix}_score_tf") or "")
+            extremes = [(tf, int(value)) for tf, value in raw_extremes] or tf_scores
+            positive_extremes = [(tf, value) for tf, value in extremes if value >= 4]
+            negative_extremes = [(tf, value) for tf, value in extremes if value <= -4]
+            invalid = bool(positive_extremes and negative_extremes)
             explicit_score = r.get(f"{prefix}_score")
             score = int(explicit_score) if explicit_score is not None else _desk_score_read([d1, h4, h1])
             existing = by_cur.get(cur)
-            if existing is None or abs(score) > abs(existing["score"]):
-                by_cur[cur] = {"cur": cur, "d1": d1, "h4": h4, "h1": h1, "score": score}
+            if existing is None or (invalid and not existing["invalid"]) or (
+                invalid == existing["invalid"] and abs(score) > abs(existing["score"])
+            ):
+                conflict = (f"{negative_extremes[0][0]} {_desk_fmt_score(negative_extremes[0][1])} / "
+                            f"{positive_extremes[0][0]} {_desk_fmt_score(positive_extremes[0][1])}") if invalid else ""
+                by_cur[cur] = {"cur": cur, "d1": d1, "h4": h4, "h1": h1,
+                               "score": score, "invalid": invalid, "conflict": conflict}
     out = []
     for cur in sorted(by_cur):
         item = by_cur[cur]
         score = item["score"]
-        cls = _desk_score_class(score)
-        if cls == "STRONG":
+        cls = "INVALID" if item["invalid"] else _desk_score_class(score)
+        if item["invalid"]:
+            note = f"opposing strong scores: {item['conflict']}"
+        elif cls == "STRONG":
             note = "score strength catalyst"
         elif cls == "WEAK":
             note = "score weakness catalyst"
@@ -3008,7 +3027,7 @@ def _market_desk_currency_rows(rows):
             _desk_fmt_score(item["d1"]),
             _desk_fmt_score(item["h4"]),
             _desk_fmt_score(item["h1"]),
-            _desk_fmt_score(score),
+            "—" if item["invalid"] else _desk_fmt_score(score),
             cls,
             note,
         ])
@@ -3020,7 +3039,7 @@ def _market_desk_pair_rows(rows):
         symbol = r.get("symbol") or ""
         gap = r.get("gap") or 0
         bias = r.get("bias") or "INVALID"
-        if r.get("hard_invalid") or bias not in ("BUY", "SELL") or abs(gap) < 5:
+        if r.get("hard_invalid") or report_excludes_gap(gap) or bias not in ("BUY", "SELL") or abs(gap) < 5:
             continue
         base_cur = r.get("base_currency") or symbol[:3]
         quote_cur = r.get("quote_currency") or symbol[3:6]
@@ -3111,6 +3130,8 @@ def _market_desk_adv_rows(rows, now=None):
             continue
         gap = float(row.get("gap") or 0)
         current = row.get("bias") or "WAIT"
+        if not row.get("hard_invalid") and report_excludes_gap(gap):
+            current = "INVALID"
         if row.get("hard_invalid") or current not in ("BUY", "SELL", "WAIT"):
             read = "Current invalid; verify live score"
         elif current == projected:

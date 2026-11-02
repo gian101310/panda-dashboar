@@ -16,7 +16,7 @@ class MarketDeskAdvNewsTests(unittest.TestCase):
         app.summarize_nearby_levels = lambda *_: {"label": "", "names": ""}
         rows = [
             {"symbol": "EURJPY", "bias": "WAIT", "gap": 2, "base_score": 3, "quote_score": 1},
-            {"symbol": "GBPJPY", "bias": "BUY", "gap": 10, "base_score": 6, "quote_score": -4},
+            {"symbol": "GBPJPY", "bias": "BUY", "gap": 9, "base_score": 5, "quote_score": -4},
         ]
         watch = app._market_desk_pair_rows(rows)
         self.assertEqual(watch[0][1], "GBPJPY")
@@ -116,6 +116,38 @@ class MarketDeskAdvNewsTests(unittest.TestCase):
             True, False, 9, True, "BUY"), ("BUY", "BUY"))
         self.assertEqual(app.snapshot_card_classification(
             True, False, 6, True, "BUY"), ("YELLOW", "BUY"))
+
+    def test_market_desk_marks_opposing_currency_scores_invalid(self):
+        app = _load_app()
+        rows = [
+            {"symbol": "EURUSD", "base_currency": "EUR", "base_d1": -5,
+             "base_h4": -1, "base_h1": 4, "base_score": -5,
+             "quote_currency": "USD", "quote_d1": 2, "quote_h4": 0,
+             "quote_h1": 1, "quote_score": 2},
+            {"symbol": "EURAUD", "base_currency": "EUR", "base_d1": -6,
+             "base_h4": -1, "base_h1": -1, "base_score": -6,
+             "quote_currency": "AUD", "quote_d1": 1, "quote_h4": 0,
+             "quote_h1": -4, "quote_score": -4},
+        ]
+        eur = next(item for item in app._market_desk_currency_rows(rows) if item[0] == "EUR")
+        self.assertEqual(eur[:6], ["EUR", "-5", "-1", "+4", "—", "INVALID"])
+        self.assertIn("D1 -5 / H1 +4", eur[6])
+        split = [{"symbol": "EURUSD", "base_d1": 0, "base_h4": 0,
+                  "base_h1": 5, "base_score_tf": "H1+5 H1-4"}]
+        eur_split = next(item for item in app._market_desk_currency_rows(split) if item[0] == "EUR")
+        self.assertEqual(eur_split[5], "INVALID")
+
+    def test_market_desk_excludes_snapshot_only_ten_gap(self):
+        app = _load_app()
+        app.summarize_nearby_levels = lambda *_: {"label": "", "names": ""}
+        row = {"symbol": "GBPAUD", "bias": "BUY", "gap": 10,
+               "base_score": 5, "quote_score": -5,
+               "base_currency": "GBP", "quote_currency": "AUD"}
+        self.assertEqual(app._market_desk_pair_rows([row])[0][1], "NO SETUP")
+        app.snapshot_adv_forecast = lambda *_: "TMRW +7"
+        projected = app._market_desk_adv_rows([row])[0]
+        self.assertEqual(projected[1], "INVALID +10")
+        self.assertIn("Current invalid", projected[3])
 
 
 if __name__ == "__main__":
