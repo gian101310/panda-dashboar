@@ -1,3 +1,6 @@
+## 2026-11-03 - Restore hourly Panda Raw Score image
+- Re-enabled the second Telegram score image beside the scheduled signal snapshot, renamed it PANDA RAW SCORE, and kept excluded display gaps INVALID.
+
 ## 2026-11-02 - Align Market Desk current reads with snapshot exclusions
 - Mark currencies with opposing strong timeframe scores INVALID in the Market Desk and display gaps 0, +/-1, and +/-10 as INVALID in both reports; locked scoring remains unchanged.
 

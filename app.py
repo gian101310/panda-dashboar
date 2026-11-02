@@ -85,12 +85,12 @@ SIGNAL_CHAT_ID        = os.environ.get("SIGNAL_CHAT_ID", TELEGRAM_CHAT_ID)
 SUPABASE_URL          = os.environ.get("SUPABASE_URL", "")
 SUPABASE_KEY          = os.environ.get("SUPABASE_SERVICE_KEY", "")
 MAX_FILE_AGE_SECONDS  = 300   # 5 mins — mt4 files update every ~2 mins
-# Paused by Boss-G on 2026-10-29; re-enable only on request.
+# Re-enabled by Boss-G for the hourly Panda Raw Score image.
 ANALYTICS_TRACKING_ENABLED = False
 TRACK_SIGNAL_RESULTS  = ANALYTICS_TRACKING_ENABLED and os.environ.get("PANDA_TRACK_SIGNAL_RESULTS", "0").lower() in ("1", "true", "yes", "on")
 TRACK_SHADOW_RESULTS  = ANALYTICS_TRACKING_ENABLED and os.environ.get("PANDA_TRACK_SHADOW_RESULTS", "0").lower() in ("1", "true", "yes", "on")
 # Paused by Boss-G on 2026-10-29; re-enable only on request.
-ADV_SNAPSHOT_ENABLED = False
+ADV_SNAPSHOT_ENABLED = True
 AI_MARKET_UPDATE_ENABLED = False
 
 LOGIN_ALERT_BOT_TOKEN = os.environ.get("LOGIN_ALERT_BOT_TOKEN", "")
@@ -2871,7 +2871,7 @@ def generate_adv_scorecard(rows):
 
     draw.rectangle([0, 0, width, header_h], fill=bg_card)
     draw.rectangle([0, header_h - 4, width, header_h], fill=accent)
-    draw.text((margin, 38), "PANDA ADV SCORECARD", fill=text_head, font=font_title)
+    draw.text((margin, 38), "PANDA RAW SCORE", fill=text_head, font=font_title)
     draw.text((margin, 122), "PAIR  GAP  BIAS    BASE/QUOTE RAW TF     ADV BASE/QUOTE TF",
               fill=text_head, font=font_hdr)
 
@@ -2881,7 +2881,7 @@ def generate_adv_scorecard(rows):
     def _adv_row_category(r):
         gap = r.get("gap") or 0
         bias = r.get("bias") or ""
-        if r.get("hard_invalid"):
+        if r.get("hard_invalid") or report_excludes_gap(gap):
             return "WHITE"
         if not r.get("hard_invalid") and bias == "BUY" and abs(gap) >= 5:
             return "BUY"
@@ -2920,7 +2920,7 @@ def generate_adv_scorecard(rows):
         bias = r.get("bias") or "INVALID"
         if cat == "YELLOW":
             bias = "WATCH"
-        elif bias not in ("BUY", "SELL") or abs(gap) < 5 or r.get("hard_invalid"):
+        elif bias not in ("BUY", "SELL") or abs(gap) < 5 or r.get("hard_invalid") or report_excludes_gap(gap):
             bias = "INVALID"
         base_cur = r.get("base_currency") or symbol[:3]
         quote_cur = r.get("quote_currency") or symbol[3:6]
@@ -2945,11 +2945,11 @@ def generate_adv_scorecard(rows):
     footer_y = height - footer_h
     draw.rectangle([0, footer_y, width, footer_y + footer_h], fill=bg_card)
     draw.rectangle([0, footer_y, width, footer_y + 4], fill=accent)
-    draw.text((margin, footer_y + 28), f"PANDA ENGINE v3.0  |  ADV SCORECARD  |  {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+    draw.text((margin, footer_y + 28), f"PANDA ENGINE v3.0  |  RAW SCORE  |  {datetime.now().strftime('%Y-%m-%d %H:%M')}",
               fill=text_head, font=font_sm)
 
-    img.save("snapshot_adv.png", quality=95)
-    return "snapshot_adv.png"
+    img.save("panda_raw_score.png", quality=95)
+    return "panda_raw_score.png"
 
 def _desk_score_read(values):
     vals = [int(v or 0) for v in values]
@@ -3657,8 +3657,8 @@ def send_snapshot():
                     adv_path = generate_adv_scorecard(data)
                     adv_ok, adv_response = _send_telegram_photo(
                         adv_path,
-                        f"PANDA ADV SCORECARD\n{datetime.now().strftime('%Y-%m-%d %H:%M')}\nRaw + ADV D1/H4/H1",
-                        component="ADV scorecard",
+                        f"PANDA RAW SCORE\n{datetime.now().strftime('%Y-%m-%d %H:%M')} Dubai\nRaw + ADV D1/H4/H1",
+                        component="Panda Raw Score",
                     )
                     if adv_ok:
                         _log_snapshot_event("telegram_adv_scorecard_ok")
