@@ -1,3 +1,6 @@
+## 2026-11-03 - Improve Panda Confluence V5 context panel
+- Moved Panda Lines, nearest Panda Level, and state to the top of V5, added scrolling, and rebuilt the cTrader package. Signal Lifecycle export remains active and collecting calibration history.
+
 ## 2026-11-03 - Restore hourly Panda Raw Score image
 - Re-enabled the second Telegram score image beside the scheduled signal snapshot, renamed it PANDA RAW SCORE, and kept excluded display gaps INVALID.
 

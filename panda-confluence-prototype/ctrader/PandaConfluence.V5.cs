@@ -674,6 +674,16 @@ namespace cAlgo
                 return new Border { Child = panel, BorderColor = Color.FromHex("#1a2940"), BorderThickness = 1, CornerRadius = 5 };
             }
             panel.AddChild(Text(SymbolName + "  |  confirmed candles", Muted, 10, false));
+            string gapText = _pandaGap.HasValue ? _pandaGap.Value.ToString("+0.0;-0.0;0.0") : "—";
+            panel.AddChild(Row("PANDA BIAS", gapText + "  " + _pandaBias, BiasColor()));
+            panel.AddChild(Row("FEED", EffectiveFeedStatus(), EffectiveFeedStatus() == "LIVE" ? Buy : Warn));
+            panel.AddChild(Row("PANDA LINES", _pandaLineZone + " / " + result.LineState,
+                result.LineState == "CONFIRMED" ? Buy : result.LineState == "UNAVAILABLE" ? Muted : Sell));
+            string levelText = result.Level == null ? "UNAVAILABLE" : result.Level.Label + "  " + result.Level.Price.ToString("F" + Symbol.Digits) + "  " + result.Level.DistancePips.ToString("0") + "p";
+            panel.AddChild(Row("PANDA LEVEL", levelText, result.Level == null ? Muted : Warn));
+            panel.AddChild(Row("LEVEL STATE", result.LevelState, result.LevelState == "REJECTED" ? Buy : result.LevelState == "AT LEVEL" ? Warn : Muted));
+            panel.AddChild(Row("PANDA STATE", result.State, PullbackColor(result.State)));
+            panel.AddChild(Row("EXECUTION", result.Execution, result.Execution == "MARKET" ? Buy : result.Execution == "PULLBACK" ? Warn : Muted));
             var h1 = _readings.First(item => item.Label == "H1");
             panel.AddChild(Row("H1", h1.Ready ? (h1.Direction > 0 ? "UP" : "DOWN") + "  " + h1.Strength.ToString("0") + "%  ADX " + h1.Adx.ToString("0") : "LOADING",
                 !h1.Ready ? Warn : h1.Direction > 0 ? Buy : Sell));
@@ -683,15 +693,6 @@ namespace cAlgo
             panel.AddChild(Row("H1 STRUCT", h1Structure.Event, h1Structure.Direction > 0 ? Buy : h1Structure.Direction < 0 ? Sell : Muted));
             panel.AddChild(Row("M15 EVENT", m15Structure.Event, m15Structure.Direction > 0 ? Buy : m15Structure.Direction < 0 ? Sell : Muted));
             panel.AddChild(Row("FVG", gap == null ? "NONE" : gap.Direction > 0 ? "BULLISH OPEN" : "BEARISH OPEN", gap == null ? Muted : gap.Direction > 0 ? Buy : Sell));
-            string gapText = _pandaGap.HasValue ? _pandaGap.Value.ToString("+0.0;-0.0;0.0") : "—";
-            panel.AddChild(Row("PANDA BIAS", gapText + "  " + _pandaBias, BiasColor()));
-            panel.AddChild(Row("FEED", EffectiveFeedStatus(), EffectiveFeedStatus() == "LIVE" ? Buy : Warn));
-            panel.AddChild(Row("EXECUTION", result.Execution, result.Execution == "MARKET" ? Buy : result.Execution == "PULLBACK" ? Warn : Muted));
-            panel.AddChild(Row("PANDA LINES", result.LineState, result.LineState == "CONFIRMED" ? Buy : result.LineState == "UNAVAILABLE" ? Muted : Sell));
-            string levelText = result.Level == null ? "UNAVAILABLE" : result.Level.Label + "  " + result.Level.Price.ToString("F" + Symbol.Digits) + "  " + result.Level.DistancePips.ToString("0") + "p";
-            panel.AddChild(Row("PANDA LEVEL", levelText, result.Level == null ? Muted : Warn));
-            panel.AddChild(Row("LEVEL STATE", result.LevelState, result.LevelState == "REJECTED" ? Buy : result.LevelState == "AT LEVEL" ? Warn : Muted));
-            panel.AddChild(Row("PULLBACK", result.State, PullbackColor(result.State)));
             panel.AddChild(Row("CONTINUATION", result.Continuation, result.Continuation == "STRONG" ? Buy : result.Continuation == "MODERATE" ? Warn : Muted));
             if (_pullbackZone != null)
             {
@@ -711,7 +712,12 @@ namespace cAlgo
             if (!string.IsNullOrEmpty(result.Warning)) panel.AddChild(Text(result.Warning, Warn, 10, true));
             panel.AddChild(Text(displayDecision, DecisionColor(displayDecision), 16, true));
             panel.AddChild(Text("Updated " + ShortUpdatedAt() + " • no orders • scoring unchanged", Muted, 9, false));
-            return new Border { Child = panel, BorderColor = Color.FromHex("#1a2940"), BorderThickness = 1, CornerRadius = 5 };
+            var scroll = new ScrollViewer {
+                Content = panel, Width = 320,
+                Height = Math.Max(180, Math.Min(Chart.Height - 30, 540)),
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+            };
+            return new Border { Child = scroll, BorderColor = Color.FromHex("#1a2940"), BorderThickness = 1, CornerRadius = 5 };
         }
 
         private void ToggleMinimize(ButtonClickEventArgs args)
@@ -831,14 +837,25 @@ namespace cAlgo
             if ((_pandaBias != "BUY" && _pandaBias != "SELL") || result.Execution == "NONE") return result;
             int side = _pandaBias == "BUY" ? 1 : -1;
             result.LineState = FeedLinesConfirmed() ? "CONFIRMED" : _pandaLineZone == "UNKNOWN" ? "UNAVAILABLE" : "UNCONFIRMED";
+            var h1 = _readings.FirstOrDefault(item => item.Label == "H1");
+            if (h1 != null && h1.Ready && _h1 != null && _h1.Count >= 2)
+            {
+                double contextPrice = _h1.ClosePrices[_h1.Count - 2];
+                result.Level = NearestDirectionalLevel(contextPrice, side);
+                if (result.Level != null)
+                {
+                    bool contextTouched = LevelWasTouched(result.Level, side);
+                    bool contextRejected = contextTouched && RejectionConfirmed(result.Level, side);
+                    result.LevelState = contextRejected ? "REJECTED" : contextTouched ? "AT LEVEL" :
+                        result.Level.DistancePips <= LevelProximityPips ? "APPROACHING" : "DISTANT";
+                }
+            }
             if (result.LineState == "UNAVAILABLE") { result.State = "LINE DATA UNAVAILABLE"; return result; }
             if (result.LineState != "CONFIRMED") { result.State = "SETUP INVALIDATED"; result.Decision = "WAIT — PANDA LINES UNCONFIRMED"; return result; }
-            var h1 = _readings.FirstOrDefault(item => item.Label == "H1");
             if (h1 == null || !h1.Ready) { result.State = "H1 DATA UNAVAILABLE"; return result; }
             if (_boxH1Trend == "RANGING" || h1.Adx < 15) { result.State = "RANGE — NO TRADE"; return result; }
             if (h1Structure.Direction == -side) { result.State = "SETUP INVALIDATED"; result.Decision = "WAIT — H1 STRUCTURE AGAINST"; return result; }
             double price = _h1.ClosePrices[_h1.Count - 2];
-            result.Level = NearestDirectionalLevel(price, side);
             if (result.Level == null) { result.State = "LEVEL DATA UNAVAILABLE"; return result; }
             bool touched = LevelWasTouched(result.Level, side);
             bool rejected = touched && RejectionConfirmed(result.Level, side);

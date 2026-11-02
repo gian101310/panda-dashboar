@@ -1,5 +1,10 @@
 # Panda Confluence Prototype Changelog
 
+## 2026-11-03 - Show V5 Panda context on shorter charts
+
+- Moved Panda Lines, level, and setup state to the top of the V5 panel and added scrolling.
+- Kept nearest-level context visible while unconfirmed Lines block a setup; rebuilt the cTrader package.
+
 ## 2026-11-01 — V5 possible pullback area
 
 - Added a separate V5 indicator while preserving V4 and all locked Panda scoring and strategy behavior.

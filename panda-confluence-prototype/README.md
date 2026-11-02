@@ -149,6 +149,11 @@ The V5 risk/reward drawing remains independently configurable under
 `V5 Trade Plan`. Use the pullback area to plan where to watch; use Panda Lines,
 H1 rejection, and a fresh M15 event to decide whether the setup is confirmed.
 
+The V5 panel places Panda bias, feed, Lines zone, nearest directional level,
+level state, and setup state at the top. The rest of the panel scrolls on shorter
+charts. Level context remains visible when Panda Lines block a setup; this does
+not make the setup eligible. A missing level remains labelled unavailable.
+
 Run the deterministic calculation checks with:
 
 ```sh
