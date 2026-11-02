@@ -2995,7 +2995,7 @@ def _market_desk_currency_rows(rows):
             h1 = int(r.get(f"{prefix}_h1") or 0)
             tf_scores = (("D1", d1), ("H4", h4), ("H1", h1))
             raw_extremes = re.findall(r"(D1|H4|H1)([+-]\d+)", r.get(f"{prefix}_score_tf") or "")
-            extremes = [(tf, int(value)) for tf, value in raw_extremes] or tf_scores
+            extremes = list(tf_scores) + [(tf, int(value)) for tf, value in raw_extremes]
             positive_extremes = [(tf, value) for tf, value in extremes if value >= 4]
             negative_extremes = [(tf, value) for tf, value in extremes if value <= -4]
             invalid = bool(positive_extremes and negative_extremes)

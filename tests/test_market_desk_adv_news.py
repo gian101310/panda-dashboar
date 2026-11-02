@@ -121,7 +121,7 @@ class MarketDeskAdvNewsTests(unittest.TestCase):
         app = _load_app()
         rows = [
             {"symbol": "EURUSD", "base_currency": "EUR", "base_d1": -5,
-             "base_h4": -1, "base_h1": 4, "base_score": -5,
+             "base_h4": -1, "base_h1": 4, "base_score": -5, "base_score_tf": "D1-5",
              "quote_currency": "USD", "quote_d1": 2, "quote_h4": 0,
              "quote_h1": 1, "quote_score": 2},
             {"symbol": "EURAUD", "base_currency": "EUR", "base_d1": -6,
