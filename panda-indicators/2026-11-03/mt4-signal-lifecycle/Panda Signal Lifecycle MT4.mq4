@@ -1,6 +1,6 @@
 #property strict
 #property indicator_chart_window
-#property version "1.02"
+#property version "1.03"
 
 // Read-only mirror of Panda Engine's lifecycle export. No trading or scoring.
 input bool ShowPanel = true;
@@ -122,27 +122,35 @@ void DrawPanel()
    ClearObjects();
    if(!ShowPanel) return;
    Background(minimized ? 38 : 273);
+   bool loaded = pairName != "" && LoadReading();
+   int age = loaded ? (int)(TimeGMT() - (datetime)StrToInteger(Field("GENERATED_EPOCH"))) : 0;
+   bool fresh = loaded && age >= -60 && age <= 1200;
+   string bias = fresh ? Field("BIAS") : "";
+   color biasColor = bias == "BUY" ? clrLime : bias == "SELL" ? clrTomato : clrGold;
+   if(minimized)
+   {
+      string summary = fresh ? pairName + "  " + bias + "  GAP " + Field("GAP") + "  |  " + Field("PHASE") :
+         pairName + "  |  NO CURRENT READING";
+      Label(0, ShortText(summary, 56), 9, biasColor, 11);
+      ChartRedraw(); return;
+   }
    Label(0, "PANDA | SIGNAL LIFECYCLE  " + pairName, 9, clrDeepSkyBlue, 11);
-   if(minimized) { ChartRedraw(); return; }
    if(pairName == "")
    {
       Label(1, "NO CURRENT READING | pair outside Panda list", 44, clrGold);
       ChartRedraw(); return;
    }
-   if(!LoadReading())
+   if(!loaded)
    {
       Label(1, "NO CURRENT READING | waiting for MT4 Common Files export", 44, clrGold);
       ChartRedraw(); return;
    }
-   int age = (int)(TimeGMT() - (datetime)StrToInteger(Field("GENERATED_EPOCH")));
-   if(age < -60 || age > 1200)
+   if(!fresh)
    {
       Label(1, "NO CURRENT READING | snapshot older than 20 minutes", 44, clrGold);
       Label(2, "Last export: " + Field("GENERATED_UTC"), 66, clrSilver);
       ChartRedraw(); return;
    }
-   string bias = Field("BIAS");
-   color biasColor = bias == "BUY" ? clrLime : bias == "SELL" ? clrTomato : clrGold;
    Label(1, bias + "  GAP " + Field("GAP") + "  |  " + Field("PHASE"), 39, biasColor, 11);
    Label(2, "BOX H1 " + Field("BOX_H1") + "  H4 " + Field("BOX_H4") + "  D1 " + Field("BOX_D1"), 64, clrWhite);
    Label(3, "LEVEL: " + ShortText(Field("LEVEL")), 88, Field("LEVEL_REVIEW") == "1" ? clrGold : clrSilver);

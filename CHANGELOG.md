@@ -1,3 +1,6 @@
+## 2026-11-03 - Keep Lifecycle phase visible when minimized
+- The MT4 Lifecycle bar now shows pair, BUY/SELL bias, gap, and phase while minimized; stale data shows NO CURRENT READING.
+
 ## 2026-11-03 - Make MT4 Lifecycle panel draggable
 - Added chart-local dragging and snapshot-change-only redraws to the MT4 Signal Lifecycle panel while keeping the X/Y inputs as its starting position.
 

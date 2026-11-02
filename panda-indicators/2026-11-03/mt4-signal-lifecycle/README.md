@@ -14,6 +14,10 @@ nearby opposing level, related currency breadth, four-hour evidence, and a
 short reason. The four-hour percentage remains withheld until the existing
 sample and holdout requirements are met. `ShowPanel=false` hides the panel;
 the `-` button minimizes it and `+` expands it.
+When minimized, one line keeps the pair, BUY/SELL bias, gap, and lifecycle
+phase visible. `CONTINUING / UNCONFIRMED` means the valid Panda bias has
+persisted, while the current cycle has not met the stricter strengthening or
+strong-continuation evidence. It is not a predicted continuation probability.
 Drag the panel's dark background to move it on that chart. `PanelX` and
 `PanelY` remain the starting position when the indicator is reloaded.
 The timer checks one small local file every 15 seconds by default and redraws
