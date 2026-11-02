@@ -105,6 +105,16 @@ class MarketDeskAdvNewsTests(unittest.TestCase):
         self.assertEqual(app.snapshot_card_classification(
             False, False, 2, True, "WAIT"), ("YELLOW", "WATCH"))
         self.assertEqual(app.snapshot_card_classification(
+            False, False, 1, True, "WAIT"), ("WHITE", "INVALID"))
+        self.assertEqual(app.snapshot_card_classification(
+            False, False, 0, True, "WAIT"), ("WHITE", "INVALID"))
+        self.assertEqual(app.snapshot_card_classification(
+            True, False, 10, True, "BUY"), ("WHITE", "INVALID"))
+        self.assertEqual(app.snapshot_card_classification(
+            True, False, 10, True, "SELL"), ("WHITE", "INVALID"))
+        self.assertEqual(app.snapshot_card_classification(
+            True, False, 9, True, "BUY"), ("BUY", "BUY"))
+        self.assertEqual(app.snapshot_card_classification(
             True, False, 6, True, "BUY"), ("YELLOW", "BUY"))
 
 

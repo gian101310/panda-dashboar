@@ -1,3 +1,6 @@
+## 2026-11-02 - Exclude snapshot gaps zero, one, and ten
+- Telegram snapshot alone now displays gaps 0, +/-1, and +/-10 as white INVALID; engine scoring and strategy eligibility remain unchanged.
+
 ## 2026-11-02 - Keep invalid EUR conflicts out of snapshot ADV scores
 - Show ADV INVALID for opposing extreme forecast inputs and render hard-invalid live pairs as white INVALID, not yellow WATCH.
 

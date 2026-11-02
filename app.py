@@ -2571,8 +2571,10 @@ def snapshot_adv_forecast(row, now=None):
 
 
 def snapshot_card_classification(is_valid, hard_invalid, abs_gap, has_watch_currency, bias):
-    """Display-only Telegram category; hard-invalid pairs are never WATCH."""
+    """Display-only Telegram category; keep the operator's excluded gaps white."""
     if hard_invalid:
+        return "WHITE", "INVALID"
+    if abs_gap <= 1 or abs_gap == 10:
         return "WHITE", "INVALID"
     if is_valid and abs_gap < 7:
         return "YELLOW", bias
@@ -3504,7 +3506,6 @@ def send_snapshot():
 
             abs_gap  = abs(gap)
             bias_val = "BUY" if gap >= 5 else "SELL" if gap <= -5 else "WAIT"
-            signal_bias = bias_val
 
             # Box Badge: H1 + H4 box trends from dashboard (shortened labels)
             _box_short = {"UPTREND": "UP", "DOWNTREND": "DOWN", "RANGING": "RANGE", "UNKNOWN": "-"}
@@ -3530,6 +3531,7 @@ def send_snapshot():
             # Valid gaps of 5 or 6 keep BUY/SELL text on yellow; hard invalid is white.
             category, bias_val = snapshot_card_classification(
                 is_valid, hard_inv, abs_gap, has_watch_currency, bias_val)
+            signal_bias = bias_val
             if category == "BUY":
                 buy_count += 1
             elif category == "SELL":
