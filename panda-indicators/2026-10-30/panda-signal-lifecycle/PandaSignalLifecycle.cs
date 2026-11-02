@@ -12,8 +12,19 @@ namespace cAlgo
         [Parameter("Refresh (seconds)", DefaultValue = 15, MinValue = 5, MaxValue = 60)]
         public int RefreshSeconds { get; set; }
 
+        [Parameter("Show panel", DefaultValue = true, Group = "Display")]
+        public bool ShowPanel { get; set; }
+
+        [Output("Visibility Sentinel", LineColor = "Transparent", PlotType = PlotType.Line, Thickness = 1)]
+        public IndicatorDataSeries VisibilitySentinel { get; set; }
+
         private TextBlock _heading, _phase, _levelWarning, _probability, _read, _related, _status;
         private ScrollViewer _scroll;
+        private ChartDraggable _draggable;
+        private StackPanel _details;
+        private Button _minimizeButton;
+        private bool _minimized;
+        private const string MinimizedKey = "Panda Signal Lifecycle Panel Minimized";
 
         protected override void Initialize()
         {
@@ -24,36 +35,86 @@ namespace cAlgo
                 VerticalAlignment = VerticalAlignment.Top
             };
             _heading = Line("PANDA  |  SIGNAL LIFECYCLE", Color.FromHex("#00b4ff"), 15);
+            var header = new StackPanel { Orientation = Orientation.Horizontal };
+            header.AddChild(_heading);
+            _minimizeButton = new Button { Width = 28, Height = 22, Margin = 2 };
+            _minimizeButton.Click += ToggleMinimize;
+            header.AddChild(_minimizeButton);
+            panel.AddChild(header);
+            _details = new StackPanel { Orientation = Orientation.Vertical };
             _phase = Line("Loading...", Color.FromHex("#abb9c9"), 15);
             _levelWarning = Line("", Color.FromHex("#ffd166"), 12);
             _probability = Line("4h outcome: collecting history", Color.FromHex("#ffd166"), 11);
             _read = Line("", Color.FromHex("#abb9c9"), 12);
             _related = Line("", Color.FromHex("#abb9c9"), 11);
             _status = Line("", Color.FromHex("#abb9c9"), 10);
-            panel.AddChild(_heading);
-            panel.AddChild(_phase);
-            panel.AddChild(_levelWarning);
-            panel.AddChild(_probability);
-            panel.AddChild(_read);
-            panel.AddChild(_related);
-            panel.AddChild(_status);
-            panel.AddChild(Line("4h outcome = bias valid + at least 3 pips with bias; no orders.", Color.FromHex("#abb9c9"), 9));
+            _details.AddChild(_phase);
+            _details.AddChild(_levelWarning);
+            _details.AddChild(_probability);
+            _details.AddChild(_read);
+            _details.AddChild(_related);
+            _details.AddChild(_status);
+            _details.AddChild(Line("4h outcome = bias valid + at least 3 pips with bias; no orders.", Color.FromHex("#abb9c9"), 9));
+            panel.AddChild(_details);
             _scroll = new ScrollViewer {
                 Content = panel, Width = 460,
                 Height = Math.Max(200, Math.Min(Chart.Height - 30, 315)),
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto
             };
-            var draggable = Chart.Draggables.Add();
-            draggable.Child = _scroll;
-            draggable.ShowGrip = true;
-            draggable.X = 8;
-            draggable.Y = 8;
-            Timer.TimerTick += Refresh;
+            _draggable = Chart.Draggables.Add();
+            _draggable.Child = _scroll;
+            _draggable.ShowGrip = true;
+            _draggable.X = 8;
+            _draggable.Y = 8;
+            _minimized = LocalStorage.GetString(MinimizedKey, LocalStorageScope.Instance) == "1";
+            ApplyPanelSize(315);
+            Timer.TimerTick += OnTimerTick;
             Timer.Start(RefreshSeconds);
+            Refresh();
+            UpdatePanelVisibility();
+        }
+
+        public override void Calculate(int index)
+        {
+            VisibilitySentinel[index] = double.NaN;
+            UpdatePanelVisibility();
+        }
+
+        private void OnTimerTick()
+        {
+            UpdatePanelVisibility();
             Refresh();
         }
 
-        public override void Calculate(int index) { }
+        private void UpdatePanelVisibility()
+        {
+            if (_draggable == null) return;
+            bool indicatorVisible = true;
+            try
+            {
+                var chartIndicator = ChartIndicators[InstanceId];
+                if (chartIndicator != null && chartIndicator.LineOutputs.Count > 0)
+                    indicatorVisible = chartIndicator.LineOutputs[0].IsVisible;
+            }
+            catch { }
+            _draggable.IsVisible = ShowPanel && indicatorVisible;
+        }
+
+        private void ToggleMinimize(ButtonClickEventArgs args)
+        {
+            _minimized = !_minimized;
+            LocalStorage.SetString(MinimizedKey, _minimized ? "1" : "0", LocalStorageScope.Instance);
+            LocalStorage.Flush(LocalStorageScope.Instance);
+            ApplyPanelSize(315);
+        }
+
+        private void ApplyPanelSize(int expandedHeight)
+        {
+            _minimizeButton.Text = _minimized ? "+" : "−";
+            _details.IsVisible = !_minimized;
+            var minimumHeight = expandedHeight == 170 ? 145 : 200;
+            _scroll.Height = _minimized ? 48 : Math.Max(minimumHeight, Math.Min(Chart.Height - 30, expandedHeight));
+        }
 
         private static TextBlock Line(string text, Color color, double size)
         {
@@ -130,7 +191,7 @@ namespace cAlgo
                     var quoteBreadth = item.GetProperty("quote_breadth");
                     _related.Text = "BASE: " + Breadth(baseBreadth) + "\nQUOTE: " + Breadth(quoteBreadth);
                     _status.Text = "Panda snapshot " + generated.ToString("HH:mm") + " UTC | no orders sent";
-                    _scroll.Height = Math.Max(200, Math.Min(Chart.Height - 30, 315));
+                    ApplyPanelSize(315);
                 }
             }
             catch (FileNotFoundException)
@@ -163,7 +224,7 @@ namespace cAlgo
             _probability.Text = "";
             _related.Text = "";
             _status.Text = message;
-            _scroll.Height = Math.Max(145, Math.Min(Chart.Height - 30, 170));
+            ApplyPanelSize(170);
         }
     }
 }

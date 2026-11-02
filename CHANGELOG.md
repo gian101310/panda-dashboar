@@ -1,3 +1,6 @@
+## 2026-11-02 - Add Signal Lifecycle panel controls
+- Added Show panel, indicator-list visibility syncing, and per-chart minimize/expand to the cTrader indicator.
+
 ## 2026-10-30 - Keep lifecycle analytics collecting on the existing engine
 - Extended the one-minute local fallback task to append rich history when the running engine has already written the chart snapshot.
 

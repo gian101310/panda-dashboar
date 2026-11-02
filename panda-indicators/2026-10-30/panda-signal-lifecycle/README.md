@@ -53,6 +53,11 @@ The chart timeframe does not change the inputs: scores update every engine
 cycle, H1/H4 boxes confirm direction, D1 supplies broader context, and the
 outcome horizon is four hours.
 
+Under `Display`, `Show panel` hides or restores the chart panel. The indicator
+list's visibility control also hides the panel. Use the `−` button in the
+panel heading to minimize it and `+` to expand it; this choice is saved for
+that chart instance.
+
 If an older elevated engine process still owns port 8000, the Windows task
 `Panda Signal Lifecycle Export` checks `tools/lifecycle_export_once.py` every
 minute and exports when new score files arrive, using the existing local
