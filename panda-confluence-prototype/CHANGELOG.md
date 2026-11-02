@@ -1,5 +1,10 @@
 # Panda Confluence Prototype Changelog
 
+## 2026-11-03 - Explain V5 decisions and trade plan visibility
+
+- Added decision, next-step, and trade-plan drawing status rows to the V5 panel.
+- Exposed drawing failures and reasons a preview cannot be plotted, while keeping Panda eligibility and entries unchanged.
+
 ## 2026-11-03 - Show V5 Panda context on shorter charts
 
 - Moved Panda Lines, level, and setup state to the top of the V5 panel and added scrolling.

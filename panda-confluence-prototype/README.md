@@ -153,6 +153,11 @@ The V5 panel places Panda bias, feed, Lines zone, nearest directional level,
 level state, and setup state at the top. The rest of the panel scrolls on shorter
 charts. Level context remains visible when Panda Lines block a setup; this does
 not make the setup eligible. A missing level remains labelled unavailable.
+`DECISION` and `NEXT` summarize the current V5 checks. `PLAN DRAW` says whether
+the risk/reward plan is shown or identifies a missing swing, blocked setup,
+preview setting, disabled drawing, or drawing error. H1 trend percentage is a
+local strength score, and ADX is a separate trend-strength measure; neither is
+a probability or a standalone entry instruction.
 
 Run the deterministic calculation checks with:
 

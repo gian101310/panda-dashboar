@@ -1,3 +1,6 @@
+## 2026-11-03 - Explain Confluence V5 decisions and missing plans
+- Added compact decision, next-step, and plan-drawing diagnostics to the V5 cTrader panel; Panda scoring and entry rules are unchanged.
+
 ## 2026-11-03 - Improve Panda Confluence V5 context panel
 - Moved Panda Lines, nearest Panda Level, and state to the top of V5, added scrolling, and rebuilt the cTrader package. Signal Lifecycle export remains active and collecting calibration history.
 

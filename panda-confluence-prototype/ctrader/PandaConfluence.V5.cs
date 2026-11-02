@@ -229,6 +229,7 @@ namespace cAlgo
         private bool _pandaLinesValid;
         private string _boxH1Trend = "UNKNOWN";
         private RiskPlan _riskPlan;
+        private string _planDrawError = "";
         private const string RiskRewardObjectName = "PandaConfluenceV5.RiskReward";
         private PullbackZone _pullbackZone;
         private const string PullbackZoneObjectName = "PandaConfluenceV5.PullbackZone";
@@ -684,6 +685,10 @@ namespace cAlgo
             panel.AddChild(Row("LEVEL STATE", result.LevelState, result.LevelState == "REJECTED" ? Buy : result.LevelState == "AT LEVEL" ? Warn : Muted));
             panel.AddChild(Row("PANDA STATE", result.State, PullbackColor(result.State)));
             panel.AddChild(Row("EXECUTION", result.Execution, result.Execution == "MARKET" ? Buy : result.Execution == "PULLBACK" ? Warn : Muted));
+            panel.AddChild(Row("DECISION", PlainDecision(result), result.Decision.EndsWith("READY") && _riskPlan != null && _riskPlan.Status == "ACCEPTABLE" ? Buy : Warn));
+            panel.AddChild(Row("NEXT", NextStep(result), Muted));
+            panel.AddChild(Row("PLAN DRAW", PlanDrawStatus(result, h1Structure), _riskPlan != null && string.IsNullOrEmpty(_planDrawError) ? Buy : Warn));
+            panel.AddChild(Text("H1 % = trend score, not odds. ADX = trend strength, not %.", Muted, 9, false));
             var h1 = _readings.First(item => item.Label == "H1");
             panel.AddChild(Row("H1", h1.Ready ? (h1.Direction > 0 ? "UP" : "DOWN") + "  " + h1.Strength.ToString("0") + "%  ADX " + h1.Adx.ToString("0") : "LOADING",
                 !h1.Ready ? Warn : h1.Direction > 0 ? Buy : Sell));
@@ -1030,7 +1035,62 @@ namespace cAlgo
                     _riskPlan.Preview = false;
                 }
             }
-            RenderRiskReward();
+            try
+            {
+                RenderRiskReward();
+                _planDrawError = "";
+            }
+            catch (Exception ex)
+            {
+                _planDrawError = ex.GetType().Name;
+                Chart.RemoveObject(RiskRewardObjectName);
+            }
+        }
+
+        private string PlainDecision(PullbackDecision decision)
+        {
+            if (EffectiveFeedStatus() != "LIVE") return "WAIT • FEED";
+            if (_hardInvalid) return "INVALID • PANDA";
+            if (_pandaBias != "BUY" && _pandaBias != "SELL") return "WAIT • NO BIAS";
+            if (decision.Execution == "NONE") return "WAIT • GAP BELOW 5";
+            if (decision.LineState != "CONFIRMED") return "WAIT • PANDA LINES";
+            if (decision.Decision == "BUY READY" || decision.Decision == "SELL READY")
+                return _riskPlan == null ? "WAIT • NO PLAN" : _riskPlan.Status == "TOO WIDE" ? "SKIP • STOP TOO WIDE" :
+                    _riskPlan.Status != "ACCEPTABLE" ? "WAIT • PLAN INVALID" : _pandaBias + " PULLBACK READY";
+            if (decision.Execution == "MARKET" && decision.State == "MARKET ELIGIBLE")
+                return string.IsNullOrEmpty(decision.Warning) ? _pandaBias + " MARKET CONTEXT" : "WAIT • REVIEW WARNINGS";
+            return "WAIT • " + decision.State;
+        }
+
+        private string NextStep(PullbackDecision decision)
+        {
+            if (EffectiveFeedStatus() != "LIVE") return "Restore live feed";
+            if (_hardInvalid) return "Wait for valid Panda score";
+            if (_pandaBias != "BUY" && _pandaBias != "SELL") return "Wait for Panda bias";
+            if (decision.Execution == "NONE") return "Wait for gap 5+";
+            if (decision.LineState != "CONFIRMED") return "Confirm Panda Lines";
+            if (decision.State == "MARKET ELIGIBLE") return string.IsNullOrEmpty(decision.Warning) ? "No V5 timing trigger" : "Check warning and risk";
+            if (decision.Decision == "BUY READY" || decision.Decision == "SELL READY") return "Review plan and price";
+            if (decision.State == "PULLBACK ACTIVE — WAIT" || decision.State == "APPROACHING PANDA LEVEL") return "Watch directional level";
+            if (decision.State == "AT PANDA LEVEL — WAIT FOR REJECTION") return "Wait for H1 rejection";
+            if (decision.State == "PULLBACK ENDING" || decision.State == "CONTEXT READY — WAIT FOR M15") return "Wait for fresh M15 BOS";
+            if (decision.State == "LEVEL DATA UNAVAILABLE") return "Load previous levels";
+            if (decision.State == "H1 DATA UNAVAILABLE") return "Load H1 candles";
+            return decision.State == "RANGE — NO TRADE" ? "H1 range or ADX below 15" : "Read Panda state above";
+        }
+
+        private string PlanDrawStatus(PullbackDecision decision, StructureReading h1Structure)
+        {
+            if (!ShowRiskReward) return "OFF IN SETTINGS";
+            if (!string.IsNullOrEmpty(_planDrawError)) return "DRAW ERROR • " + _planDrawError;
+            if (_riskPlan != null)
+                return Chart.FindObject(RiskRewardObjectName) == null ? "DRAWING MISSING" :
+                    _riskPlan.Preview ? "PREVIEW SHOWN" : "CONFIRMED SHOWN";
+            bool ready = decision.Decision == "BUY READY" || decision.Decision == "SELL READY";
+            if (!ready && PlanPreviewMode == RiskPlanVisibility.ReadyOnly) return "READY ONLY MODE";
+            if (!ShouldShowPlan(decision, ready)) return "WAIT • SETUP BLOCKED";
+            int side = _pandaBias == "BUY" ? 1 : -1;
+            return h1Structure.Marks.Any(mark => mark.Direction == side) ? "SWING WRONG SIDE" : "NO CONFIRMED H1 SWING";
         }
 
         private bool ShouldShowPlan(PullbackDecision decision, bool ready)
