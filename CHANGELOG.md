@@ -1,3 +1,6 @@
+## 2026-11-03 - Add MT4 Signal Lifecycle panel
+- Added a read-only MT4 indicator fed by per-pair Common Files exported from the existing Lifecycle snapshot; the cTrader panel remains available.
+
 ## 2026-11-03 - Explain Confluence V5 decisions and missing plans
 - Added compact decision, next-step, and plan-drawing diagnostics to the V5 cTrader panel; Panda scoring and entry rules are unchanged.
 

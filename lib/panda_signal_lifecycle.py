@@ -220,6 +220,59 @@ def build_lifecycle_snapshot(rows, parsed_map, previous=None, now=None):
     return {"version": 2, "generated_utc": now.isoformat().replace("+00:00", "Z"), "pairs": results}
 
 
+def export_mt4_lifecycle_snapshot(snapshot, common_files_dir):
+    """Mirror the read-only lifecycle view as simple per-pair MT4 Common Files."""
+    common_files_dir = Path(common_files_dir)
+    common_files_dir.mkdir(parents=True, exist_ok=True)
+    generated = snapshot["generated_utc"]
+    epoch = int(datetime.fromisoformat(generated.replace("Z", "+00:00")).timestamp())
+
+    def plain(value):
+        return str(value if value is not None else "-").replace("\r", " ").replace("\n", " ").encode(
+            "ascii", errors="replace").decode("ascii")
+
+    for symbol, item in snapshot["pairs"].items():
+        boxes = item.get("box_position") or {}
+        level = item.get("nearest_opposing_level") or {}
+        evidence = item.get("four_hour_evidence") or {}
+        base = item.get("base_breadth") or {}
+        quote = item.get("quote_breadth") or {}
+        fields = {
+            "GENERATED_UTC": generated,
+            "GENERATED_EPOCH": epoch,
+            "SYMBOL": symbol,
+            "BIAS": item.get("bias"),
+            "GAP": f"{item.get('gap') or 0:+g}",
+            "PHASE": item.get("phase"),
+            "VALID": int(bool(item.get("valid"))),
+            "BOX_H1": boxes.get("H1"),
+            "BOX_H4": boxes.get("H4"),
+            "BOX_D1": boxes.get("D1"),
+            "LEVEL": (f"{level['name']} {level['distance_pips']:g} pips ahead" if level else "-"),
+            "LEVEL_REVIEW": int(bool(item.get("level_review"))),
+            "BASE_BREADTH": f"{base.get('agree', 0)} agree / {base.get('oppose', 0)} oppose",
+            "QUOTE_BREADTH": f"{quote.get('agree', 0)} agree / {quote.get('oppose', 0)} oppose",
+            "EVIDENCE": (f"{evidence.get('status', 'COLLECTING')} | {evidence.get('samples', 0)} samples / "
+                         f"{evidence.get('days', 0)} days" +
+                         (f" | {evidence['percent']}%" if evidence.get("status") == "VALIDATED" else "")),
+            "CONFLICTS": "; ".join(item.get("timeframe_conflicts") or []) or "-",
+            "BOX_CHANGES": "; ".join(item.get("box_changes") or []) or "-",
+            "REASONS": " | ".join((item.get("reasons") or [])[:5]) or "-",
+        }
+        content = "".join(f"{key}={plain(value)}\n" for key, value in fields.items())
+        path = common_files_dir / f"panda_lifecycle_{symbol}.txt"
+        if path.exists() and path.read_text(encoding="ascii") == content:
+            continue
+        temporary = path.with_name(path.name + ".tmp")
+        try:
+            temporary.write_text(content, encoding="ascii")
+            os.replace(temporary, path)
+        finally:
+            if temporary.exists():
+                temporary.unlink()
+    return len(snapshot["pairs"])
+
+
 def export_lifecycle_snapshot(rows, parsed_map, target=None, now=None, price_source_dir=None):
     target = Path(target or (Path.home() / "Documents" / "cAlgo" / "Data" / "Indicators" /
                              "Panda Signal Lifecycle" / "panda_lifecycle_snapshot.json"))
@@ -274,6 +327,8 @@ def export_lifecycle_snapshot(rows, parsed_map, target=None, now=None, price_sou
     finally:
         if temporary.exists():
             temporary.unlink()
+    if price_source_dir is not None:
+        export_mt4_lifecycle_snapshot(snapshot, price_source_dir)
     # Local observations for later four-hour outcome calibration. No Supabase writes.
     history_file = history_dir / (snapshot["generated_utc"][:10] + ".jsonl")
     observation = {"version": snapshot["version"], "generated_utc": snapshot["generated_utc"], "pairs": {

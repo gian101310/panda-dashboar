@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from dotenv import load_dotenv
 
-from lib.panda_signal_lifecycle import export_lifecycle_snapshot
+from lib.panda_signal_lifecycle import export_lifecycle_snapshot, export_mt4_lifecycle_snapshot
 from lib.panda_lifecycle_history import build_history_observation
 
 
@@ -47,6 +47,7 @@ def main():
     snapshot_mtime = target.stat().st_mtime if snapshot_current else None
     current_snapshot = json.loads(target.read_text(encoding="utf-8")) if snapshot_current else None
     if snapshot_current:
+        export_mt4_lifecycle_snapshot(current_snapshot, source)
         analytics_file = (target.parent / "history" / "analytics" /
                           (current_snapshot["generated_utc"][:10] + ".jsonl"))
         if analytics_file.exists() and analytics_file.stat().st_mtime >= target.stat().st_mtime:

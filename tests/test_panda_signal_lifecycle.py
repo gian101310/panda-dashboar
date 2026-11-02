@@ -4,7 +4,8 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from lib.panda_signal_lifecycle import build_lifecycle_snapshot, export_lifecycle_snapshot
+from lib.panda_signal_lifecycle import (build_lifecycle_snapshot, export_lifecycle_snapshot,
+                                        export_mt4_lifecycle_snapshot)
 
 
 NOW = datetime(2026, 10, 30, 10, 0, tzinfo=timezone.utc)
@@ -71,6 +72,22 @@ class LifecycleTests(unittest.TestCase):
             self.assertIsNone(saved["price"])
             self.assertEqual(saved["box_position"]["H1"], "UNKNOWN")
             self.assertEqual(saved["four_hour_evidence"]["status"], "COLLECTING")
+            self.assertTrue((Path(folder) / "panda_lifecycle_EURUSD.txt").exists())
+
+    def test_mt4_mirror_contains_fresh_pair_reading_and_evidence(self):
+        with tempfile.TemporaryDirectory() as folder:
+            snapshot = build_lifecycle_snapshot([row("GBPJPY", "BUY", 7, 211.75)], {}, now=NOW)
+            snapshot["pairs"]["GBPJPY"]["four_hour_evidence"] = {
+                "status": "COLLECTING", "samples": 2, "days": 1}
+            export_mt4_lifecycle_snapshot(snapshot, folder)
+            path = Path(folder) / "panda_lifecycle_GBPJPY.txt"
+            text = path.read_text(encoding="ascii")
+            self.assertIn("GENERATED_EPOCH=", text)
+            self.assertIn("BIAS=BUY\nGAP=+7\n", text)
+            self.assertIn("EVIDENCE=COLLECTING | 2 samples / 1 days", text)
+            modified = path.stat().st_mtime_ns
+            export_mt4_lifecycle_snapshot(snapshot, folder)
+            self.assertEqual(path.stat().st_mtime_ns, modified)
 
     def test_new_valid_bias_is_starting(self):
         prior = {"generated_utc": (NOW - timedelta(minutes=5)).isoformat(),
