@@ -14,6 +14,10 @@ nearby opposing level, related currency breadth, four-hour evidence, and a
 short reason. The four-hour percentage remains withheld until the existing
 sample and holdout requirements are met. `ShowPanel=false` hides the panel;
 the `-` button minimizes it and `+` expands it.
+Drag the panel's dark background to move it on that chart. `PanelX` and
+`PanelY` remain the starting position when the indicator is reloaded.
+The timer checks one small local file every 15 seconds by default and redraws
+only when the snapshot changes or crosses the 20-minute stale limit.
 
 Install `Panda Signal Lifecycle MT4.ex4` in the active MT4 terminal's
 `MQL4/Indicators` folder, refresh Navigator, then attach it to any supported

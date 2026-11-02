@@ -1,3 +1,6 @@
+## 2026-11-03 - Make MT4 Lifecycle panel draggable
+- Added chart-local dragging and snapshot-change-only redraws to the MT4 Signal Lifecycle panel while keeping the X/Y inputs as its starting position.
+
 ## 2026-11-03 - Add MT4 Signal Lifecycle panel
 - Added a read-only MT4 indicator fed by per-pair Common Files exported from the existing Lifecycle snapshot; the cTrader panel remains available.
 

@@ -1,6 +1,6 @@
 #property strict
 #property indicator_chart_window
-#property version "1.00"
+#property version "1.02"
 
 // Read-only mirror of Panda Engine's lifecycle export. No trading or scoring.
 input bool ShowPanel = true;
@@ -15,6 +15,9 @@ string keys[32];
 string values[32];
 int fieldCount = 0;
 bool minimized = false;
+int panelXCurrent;
+int panelYCurrent;
+string lastRenderedKey = "";
 
 string SupportedPair()
 {
@@ -45,8 +48,8 @@ void Label(int index, string message, int y, color ink, int size=10)
    string name = prefix + IntegerToString(index);
    ObjectCreate(0, name, OBJ_LABEL, 0, 0, 0);
    ObjectSetInteger(0, name, OBJPROP_CORNER, PanelCorner);
-   ObjectSetInteger(0, name, OBJPROP_XDISTANCE, PanelX + 12);
-   ObjectSetInteger(0, name, OBJPROP_YDISTANCE, PanelY + y);
+   ObjectSetInteger(0, name, OBJPROP_XDISTANCE, panelXCurrent + 12);
+   ObjectSetInteger(0, name, OBJPROP_YDISTANCE, panelYCurrent + y);
    ObjectSetInteger(0, name, OBJPROP_COLOR, ink);
    ObjectSetInteger(0, name, OBJPROP_FONTSIZE, size);
    ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
@@ -60,21 +63,21 @@ void Background(int height)
    string name = prefix + "bg";
    ObjectCreate(0, name, OBJ_RECTANGLE_LABEL, 0, 0, 0);
    ObjectSetInteger(0, name, OBJPROP_CORNER, PanelCorner);
-   ObjectSetInteger(0, name, OBJPROP_XDISTANCE, PanelX);
-   ObjectSetInteger(0, name, OBJPROP_YDISTANCE, PanelY);
+   ObjectSetInteger(0, name, OBJPROP_XDISTANCE, panelXCurrent);
+   ObjectSetInteger(0, name, OBJPROP_YDISTANCE, panelYCurrent);
    ObjectSetInteger(0, name, OBJPROP_XSIZE, 490);
    ObjectSetInteger(0, name, OBJPROP_YSIZE, height);
    ObjectSetInteger(0, name, OBJPROP_BGCOLOR, C'17,25,35');
    ObjectSetInteger(0, name, OBJPROP_COLOR, C'0,180,255');
    ObjectSetInteger(0, name, OBJPROP_BORDER_TYPE, BORDER_FLAT);
    ObjectSetInteger(0, name, OBJPROP_BACK, false);
-   ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+   ObjectSetInteger(0, name, OBJPROP_SELECTABLE, true);
    ObjectSetInteger(0, name, OBJPROP_HIDDEN, true);
    string button = prefix + "toggle";
    ObjectCreate(0, button, OBJ_BUTTON, 0, 0, 0);
    ObjectSetInteger(0, button, OBJPROP_CORNER, PanelCorner);
-   ObjectSetInteger(0, button, OBJPROP_XDISTANCE, PanelX + 456);
-   ObjectSetInteger(0, button, OBJPROP_YDISTANCE, PanelY + 7);
+   ObjectSetInteger(0, button, OBJPROP_XDISTANCE, panelXCurrent + 456);
+   ObjectSetInteger(0, button, OBJPROP_YDISTANCE, panelYCurrent + 7);
    ObjectSetInteger(0, button, OBJPROP_XSIZE, 24);
    ObjectSetInteger(0, button, OBJPROP_YSIZE, 19);
    ObjectSetInteger(0, button, OBJPROP_BGCOLOR, C'36,49,62');
@@ -158,6 +161,8 @@ int OnInit()
 {
    prefix = "PandaLifecycleMT4_" + IntegerToString(ChartID()) + "_";
    pairName = SupportedPair();
+   panelXCurrent = PanelX;
+   panelYCurrent = PanelY;
    EventSetTimer(MathMax(5, RefreshSeconds));
    DrawPanel();
    return INIT_SUCCEEDED;
@@ -170,13 +175,31 @@ void OnDeinit(const int reason)
    ChartRedraw();
 }
 
-void OnTimer() { DrawPanel(); }
+void OnTimer()
+{
+   if(!ShowPanel || pairName == "") return;
+   string key = "MISSING";
+   if(LoadReading())
+   {
+      int age = (int)(TimeGMT() - (datetime)StrToInteger(Field("GENERATED_EPOCH")));
+      key = Field("GENERATED_EPOCH") + (age < -60 || age > 1200 ? "STALE" : "FRESH");
+   }
+   if(key == lastRenderedKey) return;
+   lastRenderedKey = key;
+   DrawPanel();
+}
 
 void OnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam)
 {
    if(id == CHARTEVENT_OBJECT_CLICK && sparam == prefix + "toggle")
    {
       minimized = !minimized;
+      DrawPanel();
+   }
+   if(id == CHARTEVENT_OBJECT_DRAG && sparam == prefix + "bg")
+   {
+      panelXCurrent = MathMax(0, (int)ObjectGetInteger(0, sparam, OBJPROP_XDISTANCE));
+      panelYCurrent = MathMax(0, (int)ObjectGetInteger(0, sparam, OBJPROP_YDISTANCE));
       DrawPanel();
    }
 }
