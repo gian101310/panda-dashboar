@@ -2549,21 +2549,38 @@ def snapshot_adv_forecast(row, now=None):
         try:
             values = [float(row[key]) for key in keys]
         except (KeyError, TypeError, ValueError):
-            return None
+            return None, False
         if not all(math.isfinite(value) for value in values):
-            return None
+            return None, False
+        if any(value >= 4 for value in values) and any(value <= -4 for value in values):
+            return 0, True
         positive = max((value for value in values if value > 0), default=0)
         negative = min((value for value in values if value < 0), default=0)
         if positive == -negative:
-            return 0
-        return positive if positive > -negative else negative
+            return 0, False
+        return (positive if positive > -negative else negative), False
 
-    base_score = currency_score(base_keys)
-    quote_score = currency_score(quote_keys)
+    base_score, base_invalid = currency_score(base_keys)
+    quote_score, quote_invalid = currency_score(quote_keys)
     if base_score is None or quote_score is None:
         return None
+    if base_invalid or quote_invalid:
+        return f"{horizon} INVALID"
     gap = base_score - quote_score
     return f"{horizon} {gap:+g}" if gap else f"{horizon} 0"
+
+
+def snapshot_card_classification(is_valid, hard_invalid, abs_gap, has_watch_currency, bias):
+    """Display-only Telegram category; hard-invalid pairs are never WATCH."""
+    if hard_invalid:
+        return "WHITE", "INVALID"
+    if is_valid and abs_gap < 7:
+        return "YELLOW", bias
+    if is_valid:
+        return bias, bias
+    if has_watch_currency:
+        return "YELLOW", "WATCH"
+    return "WHITE", "INVALID"
 
 
 def snapshot_pl_verdict(bias, status):
@@ -2856,6 +2873,8 @@ def generate_adv_scorecard(rows):
     def _adv_row_category(r):
         gap = r.get("gap") or 0
         bias = r.get("bias") or ""
+        if r.get("hard_invalid"):
+            return "WHITE"
         if not r.get("hard_invalid") and bias == "BUY" and abs(gap) >= 5:
             return "BUY"
         if not r.get("hard_invalid") and bias == "SELL" and abs(gap) >= 5:
@@ -3082,6 +3101,8 @@ def _market_desk_adv_rows(rows, now=None):
         if not forecast:
             continue
         horizon, value = forecast.split(" ", 1)
+        if value == "INVALID":
+            continue
         adv_gap = float(value)
         projected = "BUY" if adv_gap >= 5 else "SELL" if adv_gap <= -5 else "WAIT"
         if projected == "WAIT":
@@ -3140,7 +3161,10 @@ def _market_desk_news_rows(rows, now=None):
                 adv = snapshot_adv_forecast(row, forecast_now)
                 if not adv:
                     continue
-                adv_gap = float(adv.split(" ", 1)[1])
+                adv_value = adv.split(" ", 1)[1]
+                if adv_value == "INVALID":
+                    continue
+                adv_gap = float(adv_value)
                 projected = "BUY" if adv_gap >= 5 else "SELL" if adv_gap <= -5 else "WAIT"
                 if projected == "WAIT":
                     continue
@@ -3503,24 +3527,17 @@ def send_snapshot():
             same_side_conflict = bool(base_extreme_signs and quote_extreme_signs and base_extreme_signs == quote_extreme_signs)
             has_watch_currency = (base_extreme or quote_extreme) and not same_side_conflict
 
-            # Valid gaps of 5 or 6 keep BUY/SELL text on a yellow card.
-            if is_valid and abs_gap < 7:
-                category = "YELLOW"
+            # Valid gaps of 5 or 6 keep BUY/SELL text on yellow; hard invalid is white.
+            category, bias_val = snapshot_card_classification(
+                is_valid, hard_inv, abs_gap, has_watch_currency, bias_val)
+            if category == "BUY":
+                buy_count += 1
+            elif category == "SELL":
+                sell_count += 1
+            elif category == "YELLOW":
                 yellow_count += 1
-            elif is_valid:
-                category = "BUY" if bias_val == "BUY" else "SELL"
-                if bias_val == "BUY":
-                    buy_count += 1
-                else:
-                    sell_count += 1
-            elif has_watch_currency:
-                category = "YELLOW"
-                yellow_count += 1
-                bias_val = "WATCH"
             else:
-                category = "WHITE"
                 white_count += 1
-                bias_val = "INVALID"
 
             # PDR in plain words RELATIVE TO BIAS (live broker data preferred):
             #   SUPPORTS = yesterday moved with the bias and held (continuation backdrop)

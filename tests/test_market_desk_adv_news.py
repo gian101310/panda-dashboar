@@ -83,6 +83,30 @@ class MarketDeskAdvNewsTests(unittest.TestCase):
         self.assertEqual(app.snapshot_adv_forecast(
             row, datetime(2026, 10, 29, 18, tzinfo=timezone.utc)), "TMRW +6")
 
+    def test_opposing_extreme_forecast_scores_are_invalid(self):
+        app = _load_app()
+        monday = datetime(2026, 11, 2, 10, tzinfo=timezone.utc)
+        row = {
+            "symbol": "EURUSD", "bias": "HARD_INVALID", "hard_invalid": True,
+            "gap": 0, "base_d1": -5, "base_h4": -1, "base_h1": 4,
+            "adv_base_d1": 0, "adv_base_h4": 1, "adv_base_h1": 4,
+            "quote_d1": 2, "quote_h4": 0, "quote_h1": 1,
+            "adv_quote_d1": 0, "adv_quote_h4": 0, "adv_quote_h1": 1,
+        }
+        self.assertEqual(app.snapshot_adv_forecast(row, monday), "TMRW INVALID")
+        self.assertEqual(app._market_desk_adv_rows([row], monday)[0][1], "WAIT")
+        row["base_d1"] = -3
+        self.assertEqual(app.snapshot_adv_forecast(row, monday), "TMRW +2")
+
+    def test_hard_invalid_snapshot_card_is_not_yellow_watch(self):
+        app = _load_app()
+        self.assertEqual(app.snapshot_card_classification(
+            False, True, 0, True, "WAIT"), ("WHITE", "INVALID"))
+        self.assertEqual(app.snapshot_card_classification(
+            False, False, 2, True, "WAIT"), ("YELLOW", "WATCH"))
+        self.assertEqual(app.snapshot_card_classification(
+            True, False, 6, True, "BUY"), ("YELLOW", "BUY"))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,3 +1,6 @@
+## 2026-11-02 - Keep invalid EUR conflicts out of snapshot ADV scores
+- Show ADV INVALID for opposing extreme forecast inputs and render hard-invalid live pairs as white INVALID, not yellow WATCH.
+
 ## 2026-11-02 - Add Signal Lifecycle panel controls
 - Added Show panel, indicator-list visibility syncing, and per-chart minimize/expand to the cTrader indicator.
 
