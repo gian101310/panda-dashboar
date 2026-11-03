@@ -1,5 +1,11 @@
 # Panda Confluence Prototype Changelog
 
+## 2026-11-04 - Simplify the V5 chart panel
+
+- Made a 400-pixel simple view the default, with Panda direction, H1 strength and ADX, H1 and M15 events, Lines, level, alignment, decision, and next step.
+- Strong aligned SELL readings display red and BUY readings green; weak, old, or opposing readings display amber. The prior full diagnostics remain under the Details button.
+- Rebuilt the cTrader package without changing V5 decision rules, Panda scoring, or order behavior.
+
 ## 2026-11-04 - Show the full V5 panel at once
 
 - Arranged the V5 context, decision, structure, pullback, and plan details in two columns without a scroll viewer.

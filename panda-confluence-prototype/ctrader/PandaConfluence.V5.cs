@@ -216,6 +216,7 @@ namespace cAlgo
         private Bars _monthlyLevels;
         private ChartDraggable _draggable;
         private bool _minimized;
+        private bool _showDetails;
         private DateTime _lastRefresh = DateTime.MinValue;
         private DateTime _lastFeedRequest = DateTime.MinValue;
         private DateTime _feedReceivedAt = DateTime.MinValue;
@@ -663,19 +664,61 @@ namespace cAlgo
                     ? _pandaBias + " MARKET CONTEXT • NO V5 TRIGGER" : PlannerDecision(result.Decision);
             var panel = new StackPanel
             {
-                Width = _minimized ? 235 : 800,
+                Width = _minimized ? 235 : _showDetails ? 800 : 400,
                 BackgroundColor = Color.FromArgb(235, Color.FromHex("#070b12")),
                 Margin = 4
             };
-            var header = new Grid(1, 2) { Margin = 5 };
+            var header = new Grid(1, 3) { Margin = 5 };
             header.AddChild(Text("PANDA CONFLUENCE  •  V5", Accent, 13, true), 0, 0);
+            if (!_minimized)
+            {
+                var detailsToggle = new Button { Text = _showDetails ? "Simple" : "Details", Width = 58, Height = 22, Margin = 1 };
+                detailsToggle.Click += ToggleDetails;
+                header.AddChild(detailsToggle, 0, 1);
+            }
             var minimize = new Button { Text = _minimized ? "+" : "−", Width = 28, Height = 22, Margin = 1 };
             minimize.Click += ToggleMinimize;
-            header.AddChild(minimize, 0, 1);
+            header.AddChild(minimize, 0, 2);
             panel.AddChild(header);
             if (_minimized)
             {
                 panel.AddChild(Text(SymbolName + "  " + displayDecision, DecisionColor(displayDecision), 12, true));
+                return new Border { Child = panel, BorderColor = Color.FromHex("#1a2940"), BorderThickness = 1, CornerRadius = 5 };
+            }
+            if (!_showDetails)
+            {
+                int side = _pandaBias == "BUY" ? 1 : _pandaBias == "SELL" ? -1 : 0;
+                Color directionColor = side > 0 ? Buy : side < 0 ? Sell : Muted;
+                bool feedLive = EffectiveFeedStatus() == "LIVE" && !_hardInvalid;
+                var h1Trend = _readings.First(item => item.Label == "H1");
+                bool h1Strong = feedLive && side != 0 && h1Trend.Ready && h1Trend.Direction == side &&
+                    h1Trend.Strength >= 65 && h1Trend.Adx >= 25;
+                bool h1Aligned = feedLive && side != 0 && h1Structure.Direction == side;
+                int eventAge = _m15 == null || m15Structure.EventIndex < 0 ? int.MaxValue :
+                    (_m15.Count - 2) - m15Structure.EventIndex;
+                bool m15Fresh = eventAge >= 0 && eventAge <= M15EventExpiryBars;
+                bool m15Aligned = feedLive && side != 0 && m15Fresh && m15Structure.Direction == side;
+                string m15Event = m15Structure.EventIndex < 0 ? "NONE" :
+                    m15Structure.Event + (m15Fresh ? "  FRESH" : "  OLD");
+                string compactGapText = _pandaGap.HasValue ? _pandaGap.Value.ToString("+0.0;-0.0;0.0") : "—";
+                string level = result.Level == null ? "UNAVAILABLE" : result.Level.Label + "  " + result.LevelState;
+                string status = PlainDecision(result);
+                bool strongAlignment = h1Strong && h1Aligned && m15Aligned && result.LineState == "CONFIRMED";
+                bool pullbackReady = status == _pandaBias + " PULLBACK READY";
+
+                panel.AddChild(Text(SymbolName + "  •  " + EffectiveFeedStatus(), Muted, 10, false));
+                panel.AddChild(Row("PANDA", _pandaBias + "  GAP " + compactGapText, feedLive && side != 0 ? directionColor : Warn));
+                panel.AddChild(Row("H1 TREND", h1Trend.Ready ?
+                    (h1Trend.Direction > 0 ? "UP" : "DOWN") + "  " + h1Trend.Strength.ToString("0") + "%  ADX " + h1Trend.Adx.ToString("0") : "LOADING",
+                    h1Strong ? directionColor : Warn));
+                panel.AddChild(Row("H1 STRUCT", h1Structure.Event, h1Aligned ? directionColor : Warn));
+                panel.AddChild(Row("M15 EVENT", m15Event, m15Aligned ? directionColor : Warn));
+                panel.AddChild(Row("LINES", result.LineState, feedLive && result.LineState == "CONFIRMED" ? directionColor : Warn));
+                panel.AddChild(Row("LEVEL", level, feedLive && result.LevelState == "REJECTED" ? directionColor : Warn));
+                panel.AddChild(Row("ALIGNMENT", strongAlignment ? "STRONG " + _pandaBias : "CHECK AMBER ROWS", strongAlignment ? directionColor : Warn));
+                panel.AddChild(Row("DECISION", status, (pullbackReady || strongAlignment && status.StartsWith(_pandaBias + " ")) ? directionColor : Warn));
+                panel.AddChild(Row("NEXT", NextStep(result), Muted));
+                panel.AddChild(Text("H1 % = trend score, not odds • V5 places no orders", Muted, 9, false));
                 return new Border { Child = panel, BorderColor = Color.FromHex("#1a2940"), BorderThickness = 1, CornerRadius = 5 };
             }
             var columns = new Grid(1, 2);
@@ -739,6 +782,12 @@ namespace cAlgo
             _minimized = !_minimized;
             LocalStorage.SetString(MinimizedKey, _minimized ? "1" : "0", LocalStorageScope.Instance);
             LocalStorage.Flush(LocalStorageScope.Instance);
+            Refresh();
+        }
+
+        private void ToggleDetails(ButtonClickEventArgs args)
+        {
+            _showDetails = !_showDetails;
             Refresh();
         }
 

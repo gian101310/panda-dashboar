@@ -149,10 +149,13 @@ The V5 risk/reward drawing remains independently configurable under
 `V5 Trade Plan`. Use the pullback area to plan where to watch; use Panda Lines,
 H1 rejection, and a fresh M15 event to decide whether the setup is confirmed.
 
-The V5 panel places Panda bias, feed, Lines zone, nearest directional level,
-level state, and setup state at the top. The rest of the panel scrolls on shorter
-charts. Level context remains visible when Panda Lines block a setup; this does
-not make the setup eligible. A missing level remains labelled unavailable.
+The V5 panel defaults to a compact view: Panda direction, H1 strength and ADX,
+H1 structure, the latest M15 CHOCH/BOS event with freshness, Lines, level,
+alignment, decision, and next step. Strong readings aligned with SELL display
+red and those aligned with BUY display green; weak, old, and opposing readings
+display amber. The Details button opens the full two-column diagnostics without
+scrolling. Level context remains visible when Panda Lines block a setup; this
+does not make the setup eligible. A missing level remains labelled unavailable.
 `DECISION` and `NEXT` summarize the current V5 checks. `PLAN DRAW` says whether
 the risk/reward plan is shown or identifies a missing swing, blocked setup,
 preview setting, disabled drawing, or drawing error. H1 trend percentage is a
