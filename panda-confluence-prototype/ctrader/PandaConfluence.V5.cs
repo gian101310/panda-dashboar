@@ -244,6 +244,8 @@ namespace cAlgo
         private static readonly Color Accent = Color.FromHex("#00b4ff");
         private static readonly Color Warn = Color.FromHex("#ffd166");
         private static readonly Color Muted = Color.FromHex("#9aa4b2");
+        private static readonly Color RiskDrawingColor = Color.FromArgb(255, 254, 0, 0);
+        private static readonly Color RewardDrawingColor = Color.FromArgb(255, 1, 255, 1);
 
         protected override void Initialize()
         {
@@ -1162,7 +1164,12 @@ namespace cAlgo
                 return;
             }
             var drawing = Chart.FindObject(RiskRewardObjectName) as ChartRiskReward;
-            if (drawing != null) return;
+            if (drawing != null)
+            {
+                drawing.RiskColor = RiskDrawingColor;
+                drawing.RewardColor = RewardDrawingColor;
+                return;
+            }
             int last = Math.Max(1, Bars.Count - 1);
             DateTime step = Bars.OpenTimes[last] > Bars.OpenTimes[last - 1]
                 ? Bars.OpenTimes[last] : Server.Time;
@@ -1178,8 +1185,8 @@ namespace cAlgo
             drawing.IsFixedRatio = false;
             drawing.StopLossPrice = _riskPlan.Stop;
             drawing.TakeProfitPrice = _riskPlan.Target;
-            drawing.RiskColor = Color.FromArgb(55, 255, 77, 109);
-            drawing.RewardColor = Color.FromArgb(55, 0, 255, 159);
+            drawing.RiskColor = RiskDrawingColor;
+            drawing.RewardColor = RewardDrawingColor;
             drawing.RiskThickness = 2;
             drawing.RewardThickness = 2;
             drawing.IsInteractive = true;
