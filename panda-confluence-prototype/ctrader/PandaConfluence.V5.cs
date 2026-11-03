@@ -663,7 +663,7 @@ namespace cAlgo
                     ? _pandaBias + " MARKET CONTEXT • NO V5 TRIGGER" : PlannerDecision(result.Decision);
             var panel = new StackPanel
             {
-                Width = _minimized ? 235 : 300,
+                Width = _minimized ? 235 : 800,
                 BackgroundColor = Color.FromArgb(235, Color.FromHex("#070b12")),
                 Margin = 4
             };
@@ -678,57 +678,60 @@ namespace cAlgo
                 panel.AddChild(Text(SymbolName + "  " + displayDecision, DecisionColor(displayDecision), 12, true));
                 return new Border { Child = panel, BorderColor = Color.FromHex("#1a2940"), BorderThickness = 1, CornerRadius = 5 };
             }
-            panel.AddChild(Text(SymbolName + "  |  confirmed candles", Muted, 10, false));
+            var columns = new Grid(1, 2);
+            columns.Columns[0].SetWidthInPixels(400);
+            columns.Columns[1].SetWidthInPixels(400);
+            var context = new StackPanel { Width = 400 };
+            var details = new StackPanel { Width = 400 };
+            columns.AddChild(context, 0, 0);
+            columns.AddChild(details, 0, 1);
+            panel.AddChild(columns);
+            context.AddChild(Text(SymbolName + "  |  confirmed candles", Muted, 10, false));
             string gapText = _pandaGap.HasValue ? _pandaGap.Value.ToString("+0.0;-0.0;0.0") : "—";
-            panel.AddChild(Row("PANDA BIAS", gapText + "  " + _pandaBias, BiasColor()));
-            panel.AddChild(Row("FEED", EffectiveFeedStatus(), EffectiveFeedStatus() == "LIVE" ? Buy : Warn));
-            panel.AddChild(Row("PANDA LINES", _pandaLineZone + " / " + result.LineState,
+            context.AddChild(Row("PANDA BIAS", gapText + "  " + _pandaBias, BiasColor()));
+            context.AddChild(Row("FEED", EffectiveFeedStatus(), EffectiveFeedStatus() == "LIVE" ? Buy : Warn));
+            context.AddChild(Row("PANDA LINES", _pandaLineZone + " / " + result.LineState,
                 result.LineState == "CONFIRMED" ? Buy : result.LineState == "UNAVAILABLE" ? Muted : Sell));
             string levelText = result.Level == null ? "UNAVAILABLE" : result.Level.Label + "  " + result.Level.Price.ToString("F" + Symbol.Digits) + "  " + result.Level.DistancePips.ToString("0") + "p";
-            panel.AddChild(Row("PANDA LEVEL", levelText, result.Level == null ? Muted : Warn));
-            panel.AddChild(Row("LEVEL STATE", result.LevelState, result.LevelState == "REJECTED" ? Buy : result.LevelState == "AT LEVEL" ? Warn : Muted));
-            panel.AddChild(Row("PANDA STATE", result.State, PullbackColor(result.State)));
-            panel.AddChild(Row("GAP PATH", result.Execution == "MARKET" ? "9+ MARKET CONTEXT" :
+            context.AddChild(Row("PANDA LEVEL", levelText, result.Level == null ? Muted : Warn));
+            context.AddChild(Row("LEVEL STATE", result.LevelState, result.LevelState == "REJECTED" ? Buy : result.LevelState == "AT LEVEL" ? Warn : Muted));
+            context.AddChild(Row("PANDA STATE", result.State, PullbackColor(result.State)));
+            context.AddChild(Row("GAP PATH", result.Execution == "MARKET" ? "9+ MARKET CONTEXT" :
                 result.Execution == "PULLBACK" ? "5–8 PULLBACK LEVEL" : "BELOW 5 • NONE",
                 result.Execution == "MARKET" ? Buy : result.Execution == "PULLBACK" ? Warn : Muted));
-            panel.AddChild(Row("DECISION", PlainDecision(result), result.Decision.EndsWith("READY") && _riskPlan != null && _riskPlan.Status == "ACCEPTABLE" ? Buy : Warn));
-            panel.AddChild(Row("NEXT", NextStep(result), Muted));
-            panel.AddChild(Row("PLAN DRAW", PlanDrawStatus(result, h1Structure), _riskPlan != null && string.IsNullOrEmpty(_planDrawError) ? Buy : Warn));
-            panel.AddChild(Text("H1 % = trend score, not odds. ADX = trend strength, not %.", Muted, 9, false));
+            context.AddChild(Row("DECISION", PlainDecision(result), result.Decision.EndsWith("READY") && _riskPlan != null && _riskPlan.Status == "ACCEPTABLE" ? Buy : Warn));
+            context.AddChild(Row("NEXT", NextStep(result), Muted));
+            context.AddChild(Row("PLAN DRAW", PlanDrawStatus(result, h1Structure), _riskPlan != null && string.IsNullOrEmpty(_planDrawError) ? Buy : Warn));
+            context.AddChild(Text("H1 % = trend score, not odds. ADX = trend strength, not %.", Muted, 9, false));
             var h1 = _readings.First(item => item.Label == "H1");
-            panel.AddChild(Row("H1", h1.Ready ? (h1.Direction > 0 ? "UP" : "DOWN") + "  " + h1.Strength.ToString("0") + "%  ADX " + h1.Adx.ToString("0") : "LOADING",
+            context.AddChild(Row("H1", h1.Ready ? (h1.Direction > 0 ? "UP" : "DOWN") + "  " + h1.Strength.ToString("0") + "%  ADX " + h1.Adx.ToString("0") : "LOADING",
                 !h1.Ready ? Warn : h1.Direction > 0 ? Buy : Sell));
             var m15 = _readings.First(item => item.Label == "M15");
-            panel.AddChild(Row("ENTRY M15", m15.Ready ? (m15.Direction > 0 ? "UP " : "DOWN ") + m15.Strength.ToString("0") + "%" : "LOADING",
+            context.AddChild(Row("ENTRY M15", m15.Ready ? (m15.Direction > 0 ? "UP " : "DOWN ") + m15.Strength.ToString("0") + "%" : "LOADING",
                 !m15.Ready ? Warn : m15.Direction > 0 ? Buy : Sell));
-            panel.AddChild(Row("H1 STRUCT", h1Structure.Event, h1Structure.Direction > 0 ? Buy : h1Structure.Direction < 0 ? Sell : Muted));
-            panel.AddChild(Row("M15 EVENT", m15Structure.Event, m15Structure.Direction > 0 ? Buy : m15Structure.Direction < 0 ? Sell : Muted));
-            panel.AddChild(Row("FVG (INFO)", gap == null ? "NONE" : gap.Direction > 0 ? "BULLISH OPEN" : "BEARISH OPEN", gap == null ? Muted : gap.Direction > 0 ? Buy : Sell));
-            panel.AddChild(Row("CONTINUATION", result.Continuation, result.Continuation == "STRONG" ? Buy : result.Continuation == "MODERATE" ? Warn : Muted));
+            details.AddChild(Row("H1 STRUCT", h1Structure.Event, h1Structure.Direction > 0 ? Buy : h1Structure.Direction < 0 ? Sell : Muted));
+            details.AddChild(Row("M15 EVENT", m15Structure.Event, m15Structure.Direction > 0 ? Buy : m15Structure.Direction < 0 ? Sell : Muted));
+            details.AddChild(Row("FVG (INFO)", gap == null ? "NONE" : gap.Direction > 0 ? "BULLISH OPEN" : "BEARISH OPEN", gap == null ? Muted : gap.Direction > 0 ? Buy : Sell));
+            details.AddChild(Row("CONTINUATION", result.Continuation, result.Continuation == "STRONG" ? Buy : result.Continuation == "MODERATE" ? Warn : Muted));
             if (_pullbackZone != null)
             {
-                panel.AddChild(Row("PB AREA", _pullbackZone.Label + "  " + _pullbackZone.Low.ToString("F" + Symbol.Digits) + "–" + _pullbackZone.High.ToString("F" + Symbol.Digits), Accent));
-                panel.AddChild(Row("PB ZONE", _pullbackZone.State, _pullbackZone.State == "ZONE FAILED" ? Sell : _pullbackZone.State.StartsWith("INSIDE") ? Warn : Accent));
+                details.AddChild(Row("PB AREA", _pullbackZone.Label + "  " + _pullbackZone.Low.ToString("F" + Symbol.Digits) + "–" + _pullbackZone.High.ToString("F" + Symbol.Digits), Accent));
+                details.AddChild(Row("PB ZONE", _pullbackZone.State, _pullbackZone.State == "ZONE FAILED" ? Sell : _pullbackZone.State.StartsWith("INSIDE") ? Warn : Accent));
             }
             if (_riskPlan != null)
             {
-                panel.AddChild(Row("PLAN TYPE", _riskPlan.Preview ? "PREVIEW — NOT READY" : "CONFIRMED", _riskPlan.Preview ? Warn : Buy));
-                panel.AddChild(Row("PLAN ENTRY", _riskPlan.Entry.ToString("F" + Symbol.Digits), Accent));
-                panel.AddChild(Row("H1 SWING SL", _riskPlan.SwingLabel + "  " + _riskPlan.Stop.ToString("F" + Symbol.Digits), Sell));
-                panel.AddChild(Row("STOP WIDTH", _riskPlan.StopPips.ToString("0.0") + " pips", _riskPlan.Status == "ACCEPTABLE" ? Buy : Sell));
-                panel.AddChild(Row("TARGET", _riskPlan.Target.ToString("F" + Symbol.Digits) + "  " + _riskPlan.RewardRisk.ToString("0.00") + "R", Buy));
-                panel.AddChild(Row("LOT SIZE", _riskPlan.Lots.ToString("0.00") + " lots", Accent));
-                panel.AddChild(Row("PLAN STATUS", _riskPlan.Status, _riskPlan.Status == "ACCEPTABLE" ? Buy : Sell));
+                details.AddChild(Row("PLAN TYPE", _riskPlan.Preview ? "PREVIEW — NOT READY" : "CONFIRMED", _riskPlan.Preview ? Warn : Buy));
+                details.AddChild(Row("PLAN ENTRY", _riskPlan.Entry.ToString("F" + Symbol.Digits), Accent));
+                details.AddChild(Row("H1 SWING SL", _riskPlan.SwingLabel + "  " + _riskPlan.Stop.ToString("F" + Symbol.Digits), Sell));
+                details.AddChild(Row("STOP WIDTH", _riskPlan.StopPips.ToString("0.0") + " pips", _riskPlan.Status == "ACCEPTABLE" ? Buy : Sell));
+                details.AddChild(Row("TARGET", _riskPlan.Target.ToString("F" + Symbol.Digits) + "  " + _riskPlan.RewardRisk.ToString("0.00") + "R", Buy));
+                details.AddChild(Row("LOT SIZE", _riskPlan.Lots.ToString("0.00") + " lots", Accent));
+                details.AddChild(Row("PLAN STATUS", _riskPlan.Status, _riskPlan.Status == "ACCEPTABLE" ? Buy : Sell));
             }
-            if (!string.IsNullOrEmpty(result.Warning)) panel.AddChild(Text(result.Warning, Warn, 10, true));
-            panel.AddChild(Text(displayDecision, DecisionColor(displayDecision), 16, true));
-            panel.AddChild(Text("Updated " + ShortUpdatedAt() + " • no orders • scoring unchanged", Muted, 9, false));
-            var scroll = new ScrollViewer {
-                Content = panel, Width = 320,
-                Height = Math.Max(180, Math.Min(Chart.Height - 30, 540)),
-                VerticalScrollBarVisibility = ScrollBarVisibility.Auto
-            };
-            return new Border { Child = scroll, BorderColor = Color.FromHex("#1a2940"), BorderThickness = 1, CornerRadius = 5 };
+            if (!string.IsNullOrEmpty(result.Warning)) details.AddChild(Text(result.Warning, Warn, 10, true));
+            details.AddChild(Text(displayDecision, DecisionColor(displayDecision), 16, true));
+            details.AddChild(Text("Updated " + ShortUpdatedAt() + " • no orders • scoring unchanged", Muted, 9, false));
+            return new Border { Child = panel, BorderColor = Color.FromHex("#1a2940"), BorderThickness = 1, CornerRadius = 5 };
         }
 
         private void ToggleMinimize(ButtonClickEventArgs args)

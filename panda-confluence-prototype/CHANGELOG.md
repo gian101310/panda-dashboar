@@ -1,5 +1,10 @@
 # Panda Confluence Prototype Changelog
 
+## 2026-11-04 - Show the full V5 panel at once
+
+- Arranged the V5 context, decision, structure, pullback, and plan details in two columns without a scroll viewer.
+- Rebuilt and installed the cTrader package locally. Signal rules and scoring are unchanged.
+
 ## 2026-11-03 - Explain V5 decisions and trade plan visibility
 
 - Added decision, next-step, and trade-plan drawing status rows to the V5 panel.
