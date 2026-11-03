@@ -115,6 +115,10 @@ class MarketDeskAdvNewsTests(unittest.TestCase):
         self.assertEqual(app.snapshot_card_classification(
             True, False, 9, True, "BUY"), ("BUY", "BUY"))
         self.assertEqual(app.snapshot_card_classification(
+            True, False, 8, True, "BUY"), ("WHITE", "INVALID"))
+        self.assertEqual(app.snapshot_card_classification(
+            True, False, 8, True, "SELL"), ("WHITE", "INVALID"))
+        self.assertEqual(app.snapshot_card_classification(
             True, False, 6, True, "BUY"), ("YELLOW", "BUY"))
 
     def test_market_desk_marks_opposing_currency_scores_invalid(self):

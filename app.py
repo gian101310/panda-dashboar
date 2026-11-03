@@ -2580,6 +2580,8 @@ def snapshot_card_classification(is_valid, hard_invalid, abs_gap, has_watch_curr
     """Display-only Telegram category; keep the operator's excluded gaps white."""
     if hard_invalid:
         return "WHITE", "INVALID"
+    if abs_gap == 8:
+        return "WHITE", "INVALID"
     if report_excludes_gap(abs_gap):
         return "WHITE", "INVALID"
     if is_valid and abs_gap < 7:
@@ -2825,7 +2827,7 @@ def generate_snapshot(pair_data):
     img.save("snapshot.png", quality=95)
     return "snapshot.png"
 
-def generate_adv_scorecard(rows):
+def generate_adv_scorecard(rows, snapshot_cards=None):
     """
     Renders a second Telegram image focused on score internals:
     BASE/QUOTE D1-H4-H1 plus ADV D1-H4-H1. Visual only; scoring is unchanged.
@@ -2843,9 +2845,9 @@ def generate_adv_scorecard(rows):
     width = margin * 2 + card_w * columns + gutter * (columns - 1)
     height = header_h + rows_per_col * (row_h + row_gap) + footer_h
 
-    bg_page = (214, 220, 226)
-    bg_card = (236, 239, 243)
-    bg_card2 = (226, 231, 236)
+    bg_page = (235, 240, 245)
+    bg_card = (255, 255, 255)
+    bg_card2 = (249, 251, 253)
     bg_buy = (125, 210, 160)
     bg_buy2 = (105, 195, 145)
     bg_sell = (248, 130, 152)
@@ -2859,6 +2861,7 @@ def generate_adv_scorecard(rows):
     sell_col = (170, 0, 28)
     watch_col = (118, 62, 0)
     muted_col = (70, 82, 102)
+    card_by_symbol = {card["symbol"]: card for card in (snapshot_cards or [])}
 
     img = Image.new("RGB", (width, height), bg_page)
     draw = ImageDraw.Draw(img)
@@ -2881,7 +2884,7 @@ def generate_adv_scorecard(rows):
     def _adv_row_category(r):
         gap = r.get("gap") or 0
         bias = r.get("bias") or ""
-        if r.get("hard_invalid") or report_excludes_gap(gap):
+        if r.get("hard_invalid") or report_excludes_gap(gap) or abs(gap) == 8:
             return "WHITE"
         if not r.get("hard_invalid") and bias == "BUY" and abs(gap) >= 5:
             return "BUY"
@@ -2902,7 +2905,8 @@ def generate_adv_scorecard(rows):
         x_card = margin + col * (card_w + gutter)
         y_card = header_h + row * (row_h + row_gap) + row_gap
         y_end = y_card + row_h
-        cat = _adv_row_category(r)
+        snapshot_card = card_by_symbol.get(r.get("symbol"))
+        cat = snapshot_card["category"] if snapshot_card else _adv_row_category(r)
         if cat == "BUY":
             fill = bg_buy if idx % 2 == 0 else bg_buy2
             tc = buy_col
@@ -2917,16 +2921,19 @@ def generate_adv_scorecard(rows):
             tc = muted_col
         symbol = r.get("symbol") or "-"
         gap = r.get("gap") or 0
-        bias = r.get("bias") or "INVALID"
-        if cat == "YELLOW":
-            bias = "WATCH"
-        elif bias not in ("BUY", "SELL") or abs(gap) < 5 or r.get("hard_invalid") or report_excludes_gap(gap):
-            bias = "INVALID"
+        bias = snapshot_card["bias"] if snapshot_card else (r.get("bias") or "INVALID")
+        if not snapshot_card:
+            if cat == "YELLOW":
+                bias = "WATCH"
+            elif bias not in ("BUY", "SELL") or abs(gap) < 5 or r.get("hard_invalid") or report_excludes_gap(gap) or abs(gap) == 8:
+                bias = "INVALID"
         base_cur = r.get("base_currency") or symbol[:3]
         quote_cur = r.get("quote_currency") or symbol[3:6]
 
-        draw.rectangle([x_card, y_card, x_card + card_w, y_end], fill=fill)
-        draw.rectangle([x_card, y_card, x_card + 16, y_end], fill=tc)
+        draw.rounded_rectangle([x_card, y_card, x_card + card_w, y_end], radius=18, fill=fill,
+                               outline=(211, 220, 229), width=2)
+        if cat != "WHITE":
+            draw.rectangle([x_card, y_card, x_card + 16, y_end], fill=tc)
         x = x_card + 42
         draw.text((x, y_card + 22), symbol, fill=tc, font=font_pair)
         draw.text((x + 360, y_card + 28), f"{gap:+.0f}" if gap else "0", fill=tc, font=font_bold)
@@ -3654,7 +3661,7 @@ def send_snapshot():
             _log_snapshot_event("telegram_snapshot_ok")
             if ADV_SNAPSHOT_ENABLED:
                 try:
-                    adv_path = generate_adv_scorecard(data)
+                    adv_path = generate_adv_scorecard(data, pair_data)
                     adv_ok, adv_response = _send_telegram_photo(
                         adv_path,
                         f"PANDA RAW SCORE\n{datetime.now().strftime('%Y-%m-%d %H:%M')} Dubai\nRaw + ADV D1/H4/H1",
