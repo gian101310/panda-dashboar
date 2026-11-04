@@ -2571,18 +2571,16 @@ def snapshot_adv_forecast(row, now=None):
 
 
 def report_excludes_gap(gap):
-    """Operator display override shared by Telegram snapshot and Market Desk."""
+    """Operator display override for Market Desk."""
     magnitude = abs(gap)
     return magnitude <= 1 or magnitude == 10
 
 
 def snapshot_card_classification(is_valid, hard_invalid, abs_gap, has_watch_currency, bias):
-    """Display-only Telegram category; keep the operator's excluded gaps white."""
+    """Display-only Telegram category; valid gaps 8 and 10 keep their bias."""
     if hard_invalid:
         return "WHITE", "INVALID"
-    if abs_gap == 8:
-        return "WHITE", "INVALID"
-    if report_excludes_gap(abs_gap):
+    if abs_gap <= 1:
         return "WHITE", "INVALID"
     if is_valid and abs_gap < 7:
         return "YELLOW", bias
@@ -2884,7 +2882,7 @@ def generate_adv_scorecard(rows, snapshot_cards=None):
     def _adv_row_category(r):
         gap = r.get("gap") or 0
         bias = r.get("bias") or ""
-        if r.get("hard_invalid") or report_excludes_gap(gap) or abs(gap) == 8:
+        if r.get("hard_invalid") or abs(gap) <= 1:
             return "WHITE"
         if not r.get("hard_invalid") and bias == "BUY" and abs(gap) >= 5:
             return "BUY"
@@ -2925,7 +2923,7 @@ def generate_adv_scorecard(rows, snapshot_cards=None):
         if not snapshot_card:
             if cat == "YELLOW":
                 bias = "WATCH"
-            elif bias not in ("BUY", "SELL") or abs(gap) < 5 or r.get("hard_invalid") or report_excludes_gap(gap) or abs(gap) == 8:
+            elif bias not in ("BUY", "SELL") or abs(gap) < 5 or r.get("hard_invalid"):
                 bias = "INVALID"
         base_cur = r.get("base_currency") or symbol[:3]
         quote_cur = r.get("quote_currency") or symbol[3:6]
