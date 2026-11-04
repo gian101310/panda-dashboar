@@ -191,7 +191,8 @@ const buyPullbackInput = {
   proximityPips: 15,
   touchPips: 2,
   h1Adx: 24,
-  h1Ranging: false,
+  boxH1Trend: 'RANGING',
+  boxH4Trend: 'RANGING',
   h1Structure: 1,
   levelWasTouched: false,
   rejectionConfirmed: false,
@@ -242,7 +243,7 @@ test('H1 pullback decision blocks a late continuation trigger after price leaves
   assert.equal(result.decision, 'WAIT');
 });
 
-test('H1 pullback decision expires stale M15 events and blocks ranging conditions', () => {
+test('H1 pullback decision expires stale M15 events but allows ranging boxes', () => {
   const stale = h1PullbackDecision({
     ...buyPullbackInput, levelWasTouched: true, rejectionConfirmed: true, m15Event: 'BOS_UP', m15EventAgeBars: 4,
   });
@@ -250,10 +251,22 @@ test('H1 pullback decision expires stale M15 events and blocks ranging condition
   assert.notEqual(stale.state, 'ENTRY TRIGGER');
 
   const range = h1PullbackDecision({
-    ...buyPullbackInput, h1Ranging: true, levelWasTouched: true, rejectionConfirmed: true, m15Event: 'BOS_UP',
+    ...buyPullbackInput, boxH1Trend: 'RANGING', boxH4Trend: 'RANGING', levelWasTouched: true, rejectionConfirmed: true, m15Event: 'BOS_UP',
   });
-  assert.equal(range.state, 'RANGE — NO TRADE');
-  assert.equal(range.decision, 'WAIT');
+  assert.equal(range.decision, 'BUY READY');
+  const weakAdx = h1PullbackDecision({ ...buyPullbackInput, h1Adx: 14 });
+  assert.equal(weakAdx.decision, 'WAIT — H1 ADX <15');
+});
+
+test('opposing H1 or H4 box vetoes BUY and SELL on both gap paths', () => {
+  for (const gap of [7, 9]) {
+    assert.equal(h1PullbackDecision({ ...buyPullbackInput, gap, boxH1Trend: 'DOWNTREND' }).decision, 'WAIT — H1 BOX AGAINST');
+    assert.equal(h1PullbackDecision({ ...buyPullbackInput, gap, boxH4Trend: 'DOWNTREND' }).decision, 'WAIT — H4 BOX AGAINST');
+    assert.equal(h1PullbackDecision({ ...buyPullbackInput, gap: -gap, pandaBias: 'SELL', price: 1.0990,
+      superTrend: 1.1030, followLine: 1.1010, boxH1Trend: 'UPTREND' }).decision, 'WAIT — H1 BOX AGAINST');
+    assert.equal(h1PullbackDecision({ ...buyPullbackInput, gap: -gap, pandaBias: 'SELL', price: 1.0990,
+      superTrend: 1.1030, followLine: 1.1010, boxH4Trend: 'UPTREND' }).decision, 'WAIT — H4 BOX AGAINST');
+  }
 });
 
 test('H1 pullback decision blocks line data loss, line loss, and opposing structure', () => {
@@ -278,15 +291,16 @@ test('market eligibility warns when price is overextended or a Panda Level is ne
   assert.deepEqual(result.warnings, ['OVEREXTENDED FROM PANDA LINES', 'NEARBY PANDA LEVEL PDH']);
 });
 
-test('market context follows momentum and structure even when H1 box ranges and no level exists', () => {
+test('market context follows momentum and structure when boxes range and no level exists', () => {
   const input = {
-    ...buyPullbackInput, gap: 9, h1Ranging: true, levels: [],
+    ...buyPullbackInput, gap: 9, boxH1Trend: 'RANGING', levels: [],
     h1TrendDirection: 1, h1TrendStrength: 70, h1Adx: 27,
     m15TrendDirection: 1, m15TrendStrength: 55,
   };
   const buy = h1PullbackDecision(input);
   assert.equal(buy.state, 'MARKET ELIGIBLE');
   assert.equal(buy.decision, 'BUY MARKET CONTEXT');
+  assert.equal(h1PullbackDecision({ ...input, boxH1Trend: 'UPTREND', boxH4Trend: 'UPTREND' }).state, 'MARKET ELIGIBLE');
   const sell = h1PullbackDecision({
     ...input, pandaBias: 'SELL', gap: -9, price: 1.0990,
     superTrend: 1.1030, followLine: 1.1010,
@@ -379,7 +393,8 @@ test('risk plan preview never draws for invalid, missing-line, or no-setup state
   assert.equal(shouldDrawRiskPlan({ mode: 'ALWAYS', decision: 'WAIT', state: 'NO SETUP', lineState: 'CONFIRMED', execution: 'NONE' }), false);
   assert.equal(shouldDrawRiskPlan({ mode: 'ALWAYS', decision: 'WAIT', state: 'LINE DATA UNAVAILABLE', lineState: 'UNAVAILABLE', execution: 'PULLBACK' }), false);
   assert.equal(shouldDrawRiskPlan({ mode: 'ALWAYS', decision: 'WAIT', state: 'SETUP INVALIDATED', lineState: 'CONFIRMED', execution: 'PULLBACK' }), false);
-  assert.equal(shouldDrawRiskPlan({ mode: 'ALWAYS', decision: 'WAIT', state: 'RANGE — NO TRADE', lineState: 'CONFIRMED', execution: 'PULLBACK' }), false);
+  assert.equal(shouldDrawRiskPlan({ mode: 'ALWAYS', decision: 'WAIT', state: 'BOX AGAINST BIAS', lineState: 'CONFIRMED', execution: 'PULLBACK' }), false);
+  assert.equal(shouldDrawRiskPlan({ mode: 'ALWAYS', decision: 'WAIT', state: 'H1 ADX WEAK', lineState: 'CONFIRMED', execution: 'PULLBACK' }), false);
   assert.equal(shouldDrawRiskPlan({ mode: 'READY ONLY', decision: 'BUY READY', state: 'ENTRY TRIGGER', lineState: 'CONFIRMED', execution: 'PULLBACK' }), true);
 });
 

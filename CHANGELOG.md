@@ -453,3 +453,7 @@
 ## 2026-11-04 - Release Panda Trend Confluence v1 licensing
 - Added separate cTrader and MT5 downloads with account-specific license tokens issued in Panda License Admin. Only token hashes are stored; rotating a token invalidates the previous one.
 - Added a dedicated licensed feed, cTrader V5-derived indicator, and MT5 decision indicator with a read-only feed bridge. No package contains a customer token.
+
+## 2026-11-04 - Treat opposing boxes as Trend Confluence vetoes
+- Updated cTrader V5, licensed cTrader v1, and MT5 v1: opposing H1/H4 boxes block both gap paths, ranging boxes are neutral, and aligned boxes display context without a probability claim.
+- Kept H1 ADX below 15 as a separate pullback wait and retained the market trend/momentum requirements. Panda scoring and BB/INTRA rules are unchanged.

@@ -21,7 +21,7 @@ const color SELL_COLOR=C'255,77,109';
 const color WARN_COLOR=C'255,209,102';
 const color MUTED_COLOR=C'150,165,184';
 int h1Adx=INVALID_HANDLE,m15Adx=INVALID_HANDLE;
-string feedStatus="CONNECTING",pandaBias="WAIT",pandaZone="UNKNOWN",boxH1="UNKNOWN";
+string feedStatus="CONNECTING",pandaBias="WAIT",pandaZone="UNKNOWN",boxH1="UNKNOWN",boxH4="UNKNOWN";
 double pandaGap=0;
 bool hardInvalid=true,pandaLinesValid=false;
 datetime feedUpdated=0;
@@ -87,6 +87,7 @@ void ReadFeed()
    pandaZone=JsonValue(row,"pl_zone");
    pandaLinesValid=JsonValue(row,"pl_g1_valid")=="true";
    boxH1=JsonValue(row,"box_h1_trend");
+   boxH4=JsonValue(row,"box_h4_trend");
    hardInvalid=JsonValue(row,"hard_invalid")=="true";
    feedStatus="LIVE";
 }
@@ -181,6 +182,27 @@ bool OpposingLevelNear(const int side,const double price,const double pip)
    }
    return false;
 }
+string ShortBox(const string trend)
+{
+   if(trend=="UPTREND") return "UP";
+   if(trend=="DOWNTREND") return "DOWN";
+   if(trend=="RANGING") return "RANGE";
+   return "?";
+}
+string OpposingBox(const int side)
+{
+   if(side==0) return "";
+   string opposing=side>0 ? "DOWNTREND" : "UPTREND";
+   if(boxH1==opposing) return "H1";
+   if(boxH4==opposing) return "H4";
+   return "";
+}
+int BoxAgreement(const int side)
+{
+   if(side==0) return 0;
+   string aligned=side>0 ? "UPTREND" : "DOWNTREND";
+   return (boxH1==aligned ? 1 : 0)+(boxH4==aligned ? 1 : 0);
+}
 void Label(const int row,const string caption,const color tint)
 {
    string name=PREFIX+IntegerToString(row);
@@ -201,7 +223,7 @@ void Render()
    ObjectSetInteger(0,PREFIX+"BG",OBJPROP_XDISTANCE,PanelX);
    ObjectSetInteger(0,PREFIX+"BG",OBJPROP_YDISTANCE,PanelY);
    ObjectSetInteger(0,PREFIX+"BG",OBJPROP_XSIZE,390);
-   ObjectSetInteger(0,PREFIX+"BG",OBJPROP_YSIZE,203);
+   ObjectSetInteger(0,PREFIX+"BG",OBJPROP_YSIZE,222);
    ObjectSetInteger(0,PREFIX+"BG",OBJPROP_BGCOLOR,C'14,21,37');
    ObjectSetInteger(0,PREFIX+"BG",OBJPROP_BORDER_COLOR,C'32,51,76');
    ObjectSetInteger(0,PREFIX+"BG",OBJPROP_BACK,false);
@@ -209,7 +231,7 @@ void Render()
    if(feedStatus!="LIVE")
    {
       Label(1,"FEED  "+feedStatus,WARN_COLOR);
-      for(int i=2;i<10;i++) Label(i,"",MUTED_COLOR);
+      for(int i=2;i<11;i++) Label(i,"",MUTED_COLOR);
       ChartRedraw(); return;
    }
    int side=pandaBias=="BUY" ? 1 : pandaBias=="SELL" ? -1 : 0;
@@ -224,15 +246,19 @@ void Render()
    Label(3,"H1     "+(h1.ready ? (h1.direction>0 ? "UP " : "DOWN ")+DoubleToString(h1.strength,0)+"%  ADX "+DoubleToString(h1.adx,0) : "LOADING"),h1.ready && h1.direction==side ? sideColor : WARN_COLOR);
    Label(4,"H1 STRUCTURE  "+hs.event,hs.direction==side ? sideColor : WARN_COLOR);
    Label(5,"M15    "+(m15.ready ? (m15.direction>0 ? "UP " : "DOWN ")+DoubleToString(m15.strength,0)+"%" : "LOADING")+"  "+ms.event,m15.ready && m15.direction==side ? sideColor : WARN_COLOR);
+   string opposingBox=OpposingBox(side);
+   Label(6,"BOXES  H1 "+ShortBox(boxH1)+" / H4 "+ShortBox(boxH4)+"  "+IntegerToString(BoxAgreement(side))+"/2 AGREE",
+         opposingBox!="" ? SELL_COLOR : BoxAgreement(side)==2 ? sideColor : MUTED_COLOR);
    string levelLabel=""; double level=DirectionalLevel(side,levelLabel);
    double pip=SymbolInfoDouble(_Symbol,SYMBOL_POINT);
    int digits=(int)SymbolInfoInteger(_Symbol,SYMBOL_DIGITS);
    if(digits==3 || digits==5) pip*=10;
    string levelText=level>0 ? levelLabel+" "+DoubleToString(level,digits) : "UNAVAILABLE";
-   Label(6,"PULLBACK LEVEL  "+levelText,MUTED_COLOR);
+   Label(7,"PULLBACK LEVEL  "+levelText,MUTED_COLOR);
    string decision="WAIT",detail="";
    if(hardInvalid || side==0 || execution=="NONE") detail="PANDA BIAS INVALID";
    else if(!lines) detail="PANDA LINES UNCONFIRMED";
+   else if(opposingBox!="") detail=opposingBox+" BOX AGAINST BIAS";
    else if(!h1.ready || !m15.ready) detail="TREND DATA LOADING";
    else if(execution=="MARKET")
    {
@@ -251,7 +277,7 @@ void Render()
    }
    else
    {
-      if(boxH1=="RANGING" || h1.adx<15) detail="RANGING H1";
+      if(h1.adx<15) detail="H1 ADX BELOW 15";
       else if(hs.direction==-side) detail="H1 STRUCTURE AGAINST";
       else if(level<=0) detail="LEVEL UNAVAILABLE";
       else
@@ -271,9 +297,9 @@ void Render()
          }
       }
    }
-   Label(7,"DECISION  "+decision,decision=="WAIT" ? WARN_COLOR : sideColor);
-   Label(8,"CHECK  "+(detail=="" ? "CONFIRMED" : detail),detail=="" ? sideColor : WARN_COLOR);
-   Label(9,"READ ONLY  |  H1 % IS TREND SCORE, NOT ODDS",MUTED_COLOR);
+   Label(8,"DECISION  "+decision,decision=="WAIT" ? WARN_COLOR : sideColor);
+   Label(9,"CHECK  "+(detail=="" ? "CONFIRMED" : detail),detail=="" ? sideColor : WARN_COLOR);
+   Label(10,"READ ONLY  |  H1 % IS TREND SCORE, NOT ODDS",MUTED_COLOR);
    ChartRedraw();
 }
 int OnInit()

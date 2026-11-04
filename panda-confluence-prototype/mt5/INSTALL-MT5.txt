@@ -23,5 +23,8 @@ Install
 The panel uses confirmed H1 and M15 trend, ADX, local structure, and Panda
 bias/Lines. Gap 9+ is the market path; gaps 5–8 are pullback review. A READY
 or MARKET CONTEXT label is decision support, not an order instruction.
+An H1 or H4 box trend opposite to Panda bias blocks either path. Ranging boxes
+are neutral. Two aligned boxes appear as 2/2 agreement, without implying a
+measured success probability. H1 ADX below 15 remains a separate pullback wait.
 The MT5 panel focuses on the decision checks. The cTrader edition also draws
 FVG, swing labels, pullback area, and a read-only risk plan on the chart.

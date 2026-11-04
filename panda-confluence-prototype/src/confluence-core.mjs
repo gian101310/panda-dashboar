@@ -294,7 +294,7 @@ export function h1PullbackDecision(input = {}) {
   const {
     feedStatus = 'LIVE', hardInvalid = false, pandaBias = 'WAIT', gap = 0,
     price, superTrend, followLine, levels = [], pipSize, proximityPips = 10,
-    touchPips = 2, h1Adx = 0, h1Ranging = false, h1Structure = 0,
+    touchPips = 2, h1Adx = 0, boxH1Trend = 'UNKNOWN', boxH4Trend = 'UNKNOWN', h1Structure = 0,
     levelWasTouched = false, rejectionConfirmed = false, m15Event = 'NONE',
     m15EventAgeBars = 99, eventExpiryBars = 3, distanceFromLinesPips = 0,
     overextensionPips = 30, h1TrendDirection = 0, h1TrendStrength = 0,
@@ -314,6 +314,11 @@ export function h1PullbackDecision(input = {}) {
   const lineState = pandaLineConfirmation({ pandaBias, price, superTrend, followLine });
   if (lineState === 'UNAVAILABLE') return { ...base, lineState, state: 'LINE DATA UNAVAILABLE' };
   if (lineState !== 'CONFIRMED') return { ...base, lineState, state: 'SETUP INVALIDATED', decision: 'WAIT — PANDA LINES UNCONFIRMED' };
+  const opposingTrend = side > 0 ? 'DOWNTREND' : 'UPTREND';
+  if (boxH1Trend === opposingTrend || boxH4Trend === opposingTrend) {
+    const box = boxH1Trend === opposingTrend ? 'H1' : 'H4';
+    return { ...base, lineState, state: 'BOX AGAINST BIAS', decision: `WAIT — ${box} BOX AGAINST` };
+  }
   if (execution === 'MARKET') {
     const wait = (reason) => ({ ...base, lineState, state: 'MARKET WAIT', decision: `WAIT — ${reason}` });
     if (h1TrendDirection !== side || Number(h1TrendStrength) < 65) return wait('H1 TREND');
@@ -338,7 +343,7 @@ export function h1PullbackDecision(input = {}) {
       decision: warnings.length ? 'WAIT — REVIEW WARNINGS' : `${pandaBias} MARKET CONTEXT`,
     };
   }
-  if (h1Ranging || Number(h1Adx) < 15) return { ...base, lineState, state: 'RANGE — NO TRADE' };
+  if (Number(h1Adx) < 15) return { ...base, lineState, state: 'H1 ADX WEAK', decision: 'WAIT — H1 ADX <15' };
   if (h1Structure === -side) return { ...base, lineState, state: 'SETUP INVALIDATED', decision: 'WAIT — H1 STRUCTURE AGAINST' };
 
   const level = nearestDirectionalLevel({ pandaBias, price, levels, pipSize });
@@ -399,7 +404,7 @@ export function shouldDrawRiskPlan({ mode = 'CONTEXT READY', decision = '', stat
   if (ready) return true;
   if (execution === 'MARKET' && state !== 'MARKET ELIGIBLE') return false;
   if (lineState !== 'CONFIRMED' || execution === 'NONE' ||
-      state === 'NO SETUP' || state === 'SETUP INVALIDATED' || state === 'RANGE — NO TRADE' ||
+      state === 'NO SETUP' || state === 'SETUP INVALIDATED' || state === 'BOX AGAINST BIAS' || state === 'H1 ADX WEAK' ||
       state.includes('UNAVAILABLE') || state.startsWith('DATA')) return false;
   const normalized = String(mode).toUpperCase();
   if (normalized === 'READY ONLY') return false;

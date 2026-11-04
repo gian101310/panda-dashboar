@@ -1,5 +1,11 @@
 # Panda Confluence Prototype Changelog
 
+## 2026-11-04 - Align box checks with Panda bias
+
+- Opposing H1 or H4 box trends now block both market and pullback paths. Ranging boxes are neutral, including on the 5-8 pullback path.
+- H1 ADX below 15 remains a separately labelled pullback wait. The 9+ market path does not require box agreement, but shows 0/2, 1/2, or 2/2 support.
+- Updated the original cTrader V5, licensed cTrader v1, and MT5 indicator; Panda scoring and BB/INTRA rules are unchanged.
+
 ## 2026-11-04 - Confirm V5 market trend and momentum
 
 - Split gap 9+ market context from gap 5–8 pullback checks. Market context no longer depends on the H1 box classification or a previous-period level.

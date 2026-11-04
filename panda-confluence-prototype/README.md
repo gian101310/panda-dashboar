@@ -80,10 +80,12 @@ block an H1 setup.
 - A completed H1 rejection plus a fresh, matching M15 CHoCH reports
   `PULLBACK ENDING`. A fresh matching M15 BOS is required for `BUY READY` or
   `SELL READY`; the event expires after three completed M15 candles by default.
-- H1 range conditions, opposing H1 structure, stale/missing feed data, Panda
-  Line loss, and hard invalidation block READY.
-- Gap 9+ follows a separate trend-following market context. It ignores the H1
-  box classification and does not require a previous-period level, level
+- Opposing H1 or H4 box trends, opposing H1 structure, stale/missing feed data,
+  Panda Line loss, and hard invalidation block READY. Ranging boxes are neutral;
+  H1 ADX below 15 remains a separate pullback wait reason.
+- Gap 9+ follows a separate trend-following market context. H1/H4 box
+  agreement adds context but is not required; an opposing box blocks the
+  path. It does not require a previous-period level, level
   rejection, or fresh M15 BOS/CHoCH. It requires the H1 trend to match Panda
   direction with strength at least 65 and ADX at least 25, matching H1
   structure, and a matching M15 trend with strength at least 50. A fresh
@@ -163,7 +165,8 @@ checks above. `MARKET CONTEXT` means those checks passed. V5 remains read-only,
 and the market context does not submit an order.
 
 The V5 panel defaults to a compact view: Panda direction, H1 strength and ADX,
-H1 structure, the latest M15 CHOCH/BOS event with freshness, Lines, level,
+H1 structure, the latest M15 CHOCH/BOS event with freshness, Lines, H1/H4 box
+agreement, level,
 alignment, decision, and next step. Strong readings aligned with SELL display
 red and those aligned with BUY display green; weak, old, and opposing readings
 display amber. The Details button opens the full two-column diagnostics without
