@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Head from 'next/head';
-import { CTRADER_OVERLAY_PRODUCT_CODE, CTRADER_PANDA_LEVELS_PRODUCT_CODE, CTRADER_TRADE_PLAN_V13_PRODUCT_CODE, INDICATOR_PRODUCTS, isMt5OfflineLevelsProduct, MT4_OVERLAY_PRODUCT_CODE, MT5_OVERLAY_PRODUCT_CODE, MT5_PANDA_LEVELS_PRODUCT_CODE, MT5_PANDA_LEVELS_VIP_PRODUCT_CODE } from '../../lib/indicatorProducts.mjs';
+import { CTRADER_OVERLAY_PRODUCT_CODE, CTRADER_PANDA_LEVELS_PRODUCT_CODE, CTRADER_TRADE_PLAN_V13_PRODUCT_CODE, CTRADER_TREND_CONFLUENCE_PRODUCT_CODE, INDICATOR_PRODUCTS, isMt5OfflineLevelsProduct, isTrendConfluenceProduct, MT4_OVERLAY_PRODUCT_CODE, MT5_OVERLAY_PRODUCT_CODE, MT5_PANDA_LEVELS_PRODUCT_CODE, MT5_PANDA_LEVELS_VIP_PRODUCT_CODE, MT5_TREND_CONFLUENCE_PRODUCT_CODE } from '../../lib/indicatorProducts.mjs';
 import { generateIndicatorToken } from '../../lib/indicatorTokenGenerator.mjs';
 
 const mono = "'Share Tech Mono', monospace";
@@ -12,6 +12,7 @@ const downloadGroups = [
     platform: 'MT5',
     color: '#ffd166',
     items: [
+      { code: MT5_TREND_CONFLUENCE_PRODUCT_CODE, title: 'PANDA TREND CONFLUENCE v1', file: 'panda-trend-confluence-v1-mt5.zip', kind: '.ZIP', href: `/api/indicator-download?product=${MT5_TREND_CONFLUENCE_PRODUCT_CODE}`, description: 'Licensed MT5 edition. Approve the account, issue its individual token below, then give the client the ZIP and token.' },
       { code: MT5_OVERLAY_PRODUCT_CODE, title: 'PANDA SCORING DASHBOARD', file: 'panda-scoring-dashboard-mt5-licensed.zip', kind: '.ZIP', href: `/api/indicator-download?product=${MT5_OVERLAY_PRODUCT_CODE}`, description: 'Compact ALL / PAIR scoring indicator and licensed feed EA. Approve the MT5 account; the feed checks its license online.' },
       { code: MT5_PANDA_LEVELS_PRODUCT_CODE, title: 'PANDA LEVELS · OFFLINE', file: 'Panda Levels MT5 Licensed Offline.zip', kind: '.ZIP', href: '/api/admin/panda-levels-download?platform=mt5', description: 'Windows + macOS · one account license for both. Approve a paid MT5 account, set EXPIRY below, then download its license file.' },
       { code: MT5_PANDA_LEVELS_VIP_PRODUCT_CODE, title: 'PANDA LEVEL MT5 VIP', file: 'Panda Level MT5 VIP.zip', kind: '.ZIP', href: '/api/admin/panda-levels-download?platform=mt5-vip', description: 'Windows + macOS · one VIP account license for both. Show Panda Lines controls SuperTrend and Follow Line together.' },
@@ -21,6 +22,7 @@ const downloadGroups = [
     platform: 'cTRADER',
     color: '#00b4ff',
     items: [
+      { code: CTRADER_TREND_CONFLUENCE_PRODUCT_CODE, title: 'PANDA TREND CONFLUENCE v1', file: 'panda-trend-confluence-v1-ctrader.algo', kind: '.ALGO', href: `/api/indicator-download?product=${CTRADER_TREND_CONFLUENCE_PRODUCT_CODE}`, description: 'Licensed cTrader V5 strategy edition. Approve the account, issue its individual token below, then give the client the .algo and token.' },
       { code: CTRADER_OVERLAY_PRODUCT_CODE, title: 'PANDA SCORING DASHBOARD', file: 'panda-scoring-dashboard-ctrader-licensed.algo', kind: '.ALGO', href: `/api/indicator-download?product=${CTRADER_OVERLAY_PRODUCT_CODE}`, description: 'Licensed chart-pair scoring panel. Approve the cTrader account; no manual license key is needed.' },
       { code: CTRADER_PANDA_LEVELS_PRODUCT_CODE, title: 'PANDA LEVELS V2', file: 'Panda Levels V2 cTrader Licensed.algo', kind: '.ALGO', href: '/api/admin/panda-levels-download?platform=ctrader', description: 'Admin download. Create and approve the trading account license; disable or set an expiry here when needed.' },
       { code: CTRADER_TRADE_PLAN_V13_PRODUCT_CODE, title: 'PANDA TRADE PLAN v1.3', file: 'Panda Trade Plan v1.3.algo', kind: '.ALGO', href: '/api/admin/trade-plan-download', description: 'Admin-only .algo. Send it to your client, then create and approve their account license.' },
@@ -84,6 +86,7 @@ export default function LicenseAdminPage() {
   const [deviceBusy, setDeviceBusy] = useState(false);
   const [revealedToken, setRevealedToken] = useState('');
   const [revealStatus, setRevealStatus] = useState('REVEAL & COPY ACTIVE TOKEN');
+  const [confluenceToken, setConfluenceToken] = useState(null);
   const revealTimerRef = useRef(null);
   const [form, setForm] = useState({ customer_name: '', contact: '', telegram_username: '', mt4_account_id: '', trading_account_number: '', platform: 'MT4', product_code: INDICATOR_PRODUCTS[0].code, paid_confirmed: false, expires_at: '', price_override: '', notes: '' });
 
@@ -184,6 +187,18 @@ export default function LicenseAdminPage() {
     setShowCreate(false);
     setCreating(false);
     await load();
+  }
+
+  async function issueConfluenceToken(license) {
+    if (!confirm(`Issue a new token for ${license.customer_name} (${license.trading_account_number})? Any previous token for this license stops working.`)) return;
+    setError('');
+    const res = await fetch('/api/admin/trend-confluence-token', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ license_id: license.id }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { setError(data.error || 'Token issue failed'); return; }
+    setConfluenceToken({ ...data, customer: license.customer_name });
   }
 
   function openProductLicenseCreate(productCode) {
@@ -580,6 +595,8 @@ export default function LicenseAdminPage() {
                             {license.status === 'DISABLED' ? 'ENABLE' : 'DISABLE'}
                           </button>
                           {isMt5OfflineLevelsProduct(license.product_code) && <button type="button" onClick={() => downloadMt5PandaLevelsLicense(license)} style={smallBtn('#00b4ff')}>DOWNLOAD LICENSE FILE</button>}
+                          {isTrendConfluenceProduct(license.product_code) && <button type="button" onClick={() => issueConfluenceToken(license)} style={smallBtn('#00b4ff')}>ISSUE / ROTATE TOKEN</button>}
+                          {isTrendConfluenceProduct(license.product_code) && <Badge label={license.confluence_token_issued_at ? `TOKEN ${formatDate(license.confluence_token_issued_at)}` : 'TOKEN NOT ISSUED'} color={license.confluence_token_issued_at ? '#00ff9f' : '#ffd166'} />}
                           <button onClick={() => deleteLicense(license.id, license.customer_name)} style={smallBtn('#ff9944')}>DELETE</button>
                         </div>
                       </td>
@@ -590,6 +607,19 @@ export default function LicenseAdminPage() {
             </table>
           </div>
 
+          {confluenceToken && (
+            <div role="dialog" aria-modal="true" aria-label="Trend Confluence license token" style={{ position: 'fixed', inset: 0, background: 'rgba(2,5,12,0.88)', zIndex: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+              <div style={{ width: 'min(640px,100%)', background: '#0e1525', border: '1px solid #00b4ff66', borderRadius: 10, padding: 20 }}>
+                <div style={{ fontFamily: orb, fontSize: 12, color: '#00b4ff' }}>PANDA TREND CONFLUENCE v1 TOKEN</div>
+                <p style={{ fontFamily: raj, color: '#c8d5e7' }}>For {confluenceToken.customer} · {confluenceToken.platform} account {confluenceToken.account}. Copy this token now; Panda stores only its hash and cannot reveal it later.</p>
+                <textarea readOnly value={confluenceToken.token} onFocus={(e) => e.target.select()} style={{ ...input, width: '100%', minHeight: 65, fontFamily: mono, overflowWrap: 'anywhere' }} />
+                <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                  <button type="button" onClick={async () => { try { await navigator.clipboard.writeText(confluenceToken.token); } catch { setError('Select and copy the visible token manually'); } }} style={smallBtn('#00ff9f')}>COPY TOKEN</button>
+                  <button type="button" onClick={() => setConfluenceToken(null)} style={smallBtn('#ff4d6d')}>CLOSE & CLEAR</button>
+                </div>
+              </div>
+            </div>
+          )}
           {selectedLicense && (
             <div role="dialog" aria-modal="true" aria-label="Active devices" style={{ position: 'fixed', inset: 0, background: 'rgba(2,5,12,0.86)', zIndex: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
               <div style={{ width: 'min(760px,100%)', maxHeight: '85vh', overflowY: 'auto', background: '#0e1525', border: '1px solid #1a2540', borderRadius: 10, padding: 18 }}>

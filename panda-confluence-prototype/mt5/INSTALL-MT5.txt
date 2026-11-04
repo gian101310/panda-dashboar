@@ -1,0 +1,27 @@
+PANDA TREND CONFLUENCE v1 — MT5
+
+Package contents
+  PandaTrendConfluenceV1.ex5       Read-only chart indicator
+  PandaTrendConfluenceFeedV1.ex5   Licensed feed bridge (EA; no order code)
+
+License
+  Ask the Panda operator to approve your MT5 account and issue your individual
+  Trend Confluence token. The token is not inside this ZIP. A copied package
+  alone cannot read the Panda feed.
+
+Install
+  1. MT5 > File > Open Data Folder. Copy the indicator .ex5 to MQL5/Indicators
+     and the feed .ex5 to MQL5/Experts. Restart MT5 or refresh Navigator.
+  2. Tools > Options > Expert Advisors > allow WebRequest for
+     https://pandaengine.app
+  3. Attach PandaTrendConfluenceFeedV1 to one chart. Enable Algo Trading so
+     MT5 permits the feed request. Enter the token supplied by the operator
+     in LicenseToken. This EA has no trade functions or order execution.
+  4. Attach PandaTrendConfluenceV1 indicator to a supported forex chart.
+     The panel reads the licensed feed from the common MT5 data folder.
+
+The panel uses confirmed H1 and M15 trend, ADX, local structure, and Panda
+bias/Lines. Gap 9+ is the market path; gaps 5–8 are pullback review. A READY
+or MARKET CONTEXT label is decision support, not an order instruction.
+The MT5 panel focuses on the decision checks. The cTrader edition also draws
+FVG, swing labels, pullback area, and a read-only risk plan on the chart.

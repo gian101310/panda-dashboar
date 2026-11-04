@@ -449,3 +449,7 @@
 - Added Panda Dashboard Overlay Personal and account-licensed editions for MT4 and MT5.
 - Added fixed Panda Engine MT4/MT5 feed routes with separate platform product approvals and shared Personal token authentication.
 - Added terminal-wide one-minute snapshot caching, movable/minimizable panels, compiled release artifacts, checksums, and operator handoff documentation.
+
+## 2026-11-04 - Release Panda Trend Confluence v1 licensing
+- Added separate cTrader and MT5 downloads with account-specific license tokens issued in Panda License Admin. Only token hashes are stored; rotating a token invalidates the previous one.
+- Added a dedicated licensed feed, cTrader V5-derived indicator, and MT5 decision indicator with a read-only feed bridge. No package contains a customer token.

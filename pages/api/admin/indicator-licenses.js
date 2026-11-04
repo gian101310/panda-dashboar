@@ -17,7 +17,11 @@ export default async function handler(req, res) {
       .order('created_at', { ascending: false })
       .limit(250);
     if (error) return res.status(500).json({ error: error.message });
-    return res.status(200).json({ licenses: data || [] });
+    const { data: confluenceTokens, error: tokenError } = await supabase
+      .from('indicator_confluence_tokens').select('license_id,issued_at');
+    if (tokenError) return res.status(500).json({ error: tokenError.message });
+    const issued = new Map((confluenceTokens || []).map((row) => [row.license_id, row.issued_at]));
+    return res.status(200).json({ licenses: (data || []).map((row) => ({ ...row, confluence_token_issued_at: issued.get(row.id) || null })) });
   }
 
   if (req.method === 'PATCH') {
