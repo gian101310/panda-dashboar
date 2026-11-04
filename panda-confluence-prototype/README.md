@@ -82,9 +82,16 @@ block an H1 setup.
   `SELL READY`; the event expires after three completed M15 candles by default.
 - H1 range conditions, opposing H1 structure, stale/missing feed data, Panda
   Line loss, and hard invalidation block READY.
-- Gap 9+ displays `MARKET ELIGIBLE`, but overextension from locally calculated
-  H1 SuperTrend/Follow Line values and nearby opposing Panda Levels produce a
-  review warning instead of an entry instruction.
+- Gap 9+ follows a separate trend-following market context. It ignores the H1
+  box classification and does not require a previous-period level, level
+  rejection, or fresh M15 BOS/CHoCH. It requires the H1 trend to match Panda
+  direction with strength at least 65 and ADX at least 25, matching H1
+  structure, and a matching M15 trend with strength at least 50. A fresh
+  opposing M15 structure event blocks market context until it expires.
+- Market context uses the current chart bid to flag overextension of more than
+  30 pips from the local H1 SuperTrend/Follow Line or an opposing previous-period
+  level within 15 pips. These thresholds are review rules, not validated odds
+  or an entry instruction.
 
 The `CONTINUATION` row is a rule-based `WEAK`, `MODERATE`, or `STRONG`
 assessment. It is not a predicted probability or validated win rate. V3 is
@@ -150,12 +157,10 @@ The V5 risk/reward drawing remains independently configurable under
 `V5 Trade Plan`. Use the pullback area to plan where to watch; use Panda Lines,
 H1 rejection, and a fresh M15 event to decide whether the setup is confirmed.
 
-For the 9+ market path, V5 requires a live valid Panda BUY/SELL bias, confirmed
-directional Panda Lines, H1 data, an H1 box outside `RANGING`, H1 ADX at least
-15, no opposing H1 structure, and a directional previous-period level. It
-flags price more than 30 pips from the local H1 SuperTrend/Follow Line or an
-opposing level within 15 pips for review. Market context does not require an
-H1 level touch/rejection or M15 CHOCH/BOS and is not a V5 entry trigger.
+For the 9+ market path, V5 requires a live valid Panda BUY/SELL bias and
+confirmed directional Panda Lines before applying the trend and structure
+checks above. `MARKET CONTEXT` means those checks passed. V5 remains read-only,
+and the market context does not submit an order.
 
 The V5 panel defaults to a compact view: Panda direction, H1 strength and ADX,
 H1 structure, the latest M15 CHOCH/BOS event with freshness, Lines, level,

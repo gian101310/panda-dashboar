@@ -297,7 +297,8 @@ export function h1PullbackDecision(input = {}) {
     touchPips = 2, h1Adx = 0, h1Ranging = false, h1Structure = 0,
     levelWasTouched = false, rejectionConfirmed = false, m15Event = 'NONE',
     m15EventAgeBars = 99, eventExpiryBars = 3, distanceFromLinesPips = 0,
-    overextensionPips = 30,
+    overextensionPips = 30, h1TrendDirection = 0, h1TrendStrength = 0,
+    m15TrendDirection = 0, m15TrendStrength = 0, m15StructureDirection = 0,
   } = input;
   const execution = classifyGapExecution(gap);
   const base = {
@@ -313,6 +314,30 @@ export function h1PullbackDecision(input = {}) {
   const lineState = pandaLineConfirmation({ pandaBias, price, superTrend, followLine });
   if (lineState === 'UNAVAILABLE') return { ...base, lineState, state: 'LINE DATA UNAVAILABLE' };
   if (lineState !== 'CONFIRMED') return { ...base, lineState, state: 'SETUP INVALIDATED', decision: 'WAIT — PANDA LINES UNCONFIRMED' };
+  if (execution === 'MARKET') {
+    const wait = (reason) => ({ ...base, lineState, state: 'MARKET WAIT', decision: `WAIT — ${reason}` });
+    if (h1TrendDirection !== side || Number(h1TrendStrength) < 65) return wait('H1 TREND');
+    if (Number(h1Adx) < 25) return wait('H1 ADX');
+    if (h1Structure !== side) return wait('H1 STRUCTURE');
+    if (m15TrendDirection !== side || Number(m15TrendStrength) < 50) return wait('M15 MOMENTUM');
+    if (Number(m15EventAgeBars) >= 0 && Number(m15EventAgeBars) <= Number(eventExpiryBars) && m15StructureDirection === -side)
+      return wait('M15 REVERSAL');
+    const warnings = [];
+    if (Number(distanceFromLinesPips) > Number(overextensionPips)) warnings.push('OVEREXTENDED FROM PANDA LINES');
+    if (finiteNumber(price) && finiteNumber(pipSize)) {
+      const current = Number(price);
+      const opposing = cleanLevels(levels)
+        .filter((item) => side > 0 ? item.price > current : item.price < current)
+        .sort((a, b) => Math.abs(a.price - current) - Math.abs(b.price - current))[0];
+      if (opposing && Math.abs(opposing.price - current) / Number(pipSize) <= Number(proximityPips))
+        warnings.push(`NEARBY PANDA LEVEL ${opposing.label}`);
+    }
+    return {
+      ...base, lineState, warnings,
+      state: warnings.length ? 'MARKET REVIEW' : 'MARKET ELIGIBLE',
+      decision: warnings.length ? 'WAIT — REVIEW WARNINGS' : `${pandaBias} MARKET CONTEXT`,
+    };
+  }
   if (h1Ranging || Number(h1Adx) < 15) return { ...base, lineState, state: 'RANGE — NO TRADE' };
   if (h1Structure === -side) return { ...base, lineState, state: 'SETUP INVALIDATED', decision: 'WAIT — H1 STRUCTURE AGAINST' };
 
@@ -325,26 +350,6 @@ export function h1PullbackDecision(input = {}) {
   const freshEvent = Number(m15EventAgeBars) <= Number(eventExpiryBars) ? String(m15Event) : 'NONE';
   const continuation = continuationGrade({ h1Adx, h1Structure, side, rejectionConfirmed, freshEvent });
   const shared = { ...base, execution, lineState, levelState, level, distancePips, continuation };
-
-  if (execution === 'MARKET') {
-    const warnings = [];
-    if (Number(distanceFromLinesPips) > Number(overextensionPips)) warnings.push('OVEREXTENDED FROM PANDA LINES');
-    if (finiteNumber(price) && finiteNumber(pipSize)) {
-      const current = Number(price);
-      const opposing = cleanLevels(levels)
-        .filter((item) => side > 0 ? item.price > current : item.price < current)
-        .sort((a, b) => Math.abs(a.price - current) - Math.abs(b.price - current))[0];
-      if (opposing && Math.abs(opposing.price - current) / Number(pipSize) <= Number(proximityPips)) {
-        warnings.push(`NEARBY PANDA LEVEL ${opposing.label}`);
-      }
-    }
-    return {
-      ...shared,
-      state: 'MARKET ELIGIBLE',
-      decision: warnings.length ? 'WAIT — REVIEW WARNINGS' : `${pandaBias} MARKET ELIGIBLE`,
-      warnings,
-    };
-  }
 
   if (levelWasTouched && rejectionConfirmed && distancePips > Number(proximityPips)) {
     return { ...shared, state: 'ENTRY MOVED — WAIT' };
@@ -392,6 +397,7 @@ export function buildSwingRiskPlan({
 export function shouldDrawRiskPlan({ mode = 'CONTEXT READY', decision = '', state = '', lineState = '', execution = 'NONE' } = {}) {
   const ready = decision === 'BUY READY' || decision === 'SELL READY';
   if (ready) return true;
+  if (execution === 'MARKET' && state !== 'MARKET ELIGIBLE') return false;
   if (lineState !== 'CONFIRMED' || execution === 'NONE' ||
       state === 'NO SETUP' || state === 'SETUP INVALIDATED' || state === 'RANGE — NO TRADE' ||
       state.includes('UNAVAILABLE') || state.startsWith('DATA')) return false;

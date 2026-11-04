@@ -266,14 +266,48 @@ test('market eligibility warns when price is overextended or a Panda Level is ne
   const result = h1PullbackDecision({
     ...buyPullbackInput,
     gap: 9,
+    h1TrendDirection: 1, h1TrendStrength: 72, h1Adx: 28,
+    m15TrendDirection: 1, m15TrendStrength: 58,
     price: 1.1010,
     levels: [{ label: 'PDL', price: 1.1000 }, { label: 'PDH', price: 1.1015 }],
     distanceFromLinesPips: 45,
     overextensionPips: 30,
   });
-  assert.equal(result.state, 'MARKET ELIGIBLE');
+  assert.equal(result.state, 'MARKET REVIEW');
   assert.equal(result.decision, 'WAIT — REVIEW WARNINGS');
   assert.deepEqual(result.warnings, ['OVEREXTENDED FROM PANDA LINES', 'NEARBY PANDA LEVEL PDH']);
+});
+
+test('market context follows momentum and structure even when H1 box ranges and no level exists', () => {
+  const input = {
+    ...buyPullbackInput, gap: 9, h1Ranging: true, levels: [],
+    h1TrendDirection: 1, h1TrendStrength: 70, h1Adx: 27,
+    m15TrendDirection: 1, m15TrendStrength: 55,
+  };
+  const buy = h1PullbackDecision(input);
+  assert.equal(buy.state, 'MARKET ELIGIBLE');
+  assert.equal(buy.decision, 'BUY MARKET CONTEXT');
+  const sell = h1PullbackDecision({
+    ...input, pandaBias: 'SELL', gap: -9, price: 1.0990,
+    superTrend: 1.1030, followLine: 1.1010,
+    h1TrendDirection: -1, h1Structure: -1, m15TrendDirection: -1,
+  });
+  assert.equal(sell.decision, 'SELL MARKET CONTEXT');
+});
+
+test('market context waits for strong H1 trend, ADX, structure, and M15 momentum', () => {
+  const input = {
+    ...buyPullbackInput, gap: 9, levels: [], h1TrendDirection: 1,
+    h1TrendStrength: 70, h1Adx: 27, m15TrendDirection: 1, m15TrendStrength: 55,
+  };
+  assert.equal(h1PullbackDecision({ ...input, h1TrendStrength: 64 }).decision, 'WAIT — H1 TREND');
+  assert.equal(h1PullbackDecision({ ...input, h1Adx: 24 }).decision, 'WAIT — H1 ADX');
+  assert.equal(h1PullbackDecision({ ...input, h1Structure: 0 }).decision, 'WAIT — H1 STRUCTURE');
+  assert.equal(h1PullbackDecision({ ...input, m15TrendDirection: -1 }).decision, 'WAIT — M15 MOMENTUM');
+  assert.equal(h1PullbackDecision({ ...input, m15TrendStrength: 49 }).decision, 'WAIT — M15 MOMENTUM');
+  assert.equal(h1PullbackDecision({ ...input, m15Event: 'CHOCH_DOWN', m15StructureDirection: -1 }).decision, 'WAIT — M15 REVERSAL');
+  assert.equal(h1PullbackDecision({ ...input, m15Event: 'CHOCH_DOWN', m15StructureDirection: -1, m15EventAgeBars: 4 }).state, 'MARKET ELIGIBLE');
+  assert.equal(shouldDrawRiskPlan({ mode: 'ALWAYS', execution: 'MARKET', state: 'MARKET WAIT', lineState: 'CONFIRMED' }), false);
 });
 
 test('SELL pullback mirrors BUY direction and uses bearish M15 confirmation', () => {

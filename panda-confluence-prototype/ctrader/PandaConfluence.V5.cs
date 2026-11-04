@@ -239,6 +239,9 @@ namespace cAlgo
         private const string FeedEndpoint = "https://pandaengine.app/api/ctrader-overlay";
         private const string PanelXKey = "PandaConfluence V5 Panel X";
         private const string PanelYKey = "PandaConfluence V5 Panel Y";
+        private const double MarketMinH1Strength = 65;
+        private const double MarketMinH1Adx = 25;
+        private const double MarketMinM15Strength = 50;
         private const string MinimizedKey = "PandaConfluence V5 Panel Minimized";
         private static readonly Color Buy = Color.FromHex("#00ff9f");
         private static readonly Color Sell = Color.FromHex("#ff4d6d");
@@ -660,8 +663,7 @@ namespace cAlgo
             UpdatePullbackZone(result);
             UpdateRiskPlan(result, h1Structure, m15Structure);
             string displayDecision = result.State == "RANGE — NO TRADE" ? "WAIT • H1 RANGE FILTER" :
-                result.State == "MARKET ELIGIBLE" && string.IsNullOrEmpty(result.Warning) && (_riskPlan == null || !_riskPlan.Preview)
-                    ? _pandaBias + " MARKET CONTEXT • NO V5 TRIGGER" : PlannerDecision(result.Decision);
+                result.State == "MARKET ELIGIBLE" ? _pandaBias + " MARKET CONTEXT • REVIEW RISK" : PlannerDecision(result.Decision);
             var panel = new StackPanel
             {
                 Width = _minimized ? 235 : _showDetails ? 800 : 400,
@@ -691,8 +693,11 @@ namespace cAlgo
                 Color directionColor = side > 0 ? Buy : side < 0 ? Sell : Muted;
                 bool feedLive = EffectiveFeedStatus() == "LIVE" && !_hardInvalid;
                 var h1Trend = _readings.First(item => item.Label == "H1");
+                var m15Trend = _readings.First(item => item.Label == "M15");
                 bool h1Strong = feedLive && side != 0 && h1Trend.Ready && h1Trend.Direction == side &&
-                    h1Trend.Strength >= 65 && h1Trend.Adx >= 25;
+                    h1Trend.Strength >= MarketMinH1Strength && h1Trend.Adx >= MarketMinH1Adx;
+                bool m15Momentum = feedLive && side != 0 && m15Trend.Ready && m15Trend.Direction == side &&
+                    m15Trend.Strength >= MarketMinM15Strength;
                 bool h1Aligned = feedLive && side != 0 && h1Structure.Direction == side;
                 int eventAge = _m15 == null || m15Structure.EventIndex < 0 ? int.MaxValue :
                     (_m15.Count - 2) - m15Structure.EventIndex;
@@ -703,7 +708,8 @@ namespace cAlgo
                 string compactGapText = _pandaGap.HasValue ? _pandaGap.Value.ToString("+0.0;-0.0;0.0") : "—";
                 string level = result.Level == null ? "UNAVAILABLE" : result.Level.Label + "  " + result.LevelState;
                 string status = PlainDecision(result);
-                bool strongAlignment = h1Strong && h1Aligned && m15Aligned && result.LineState == "CONFIRMED";
+                bool strongAlignment = result.Execution == "MARKET" ? result.State == "MARKET ELIGIBLE" :
+                    h1Strong && h1Aligned && m15Aligned && result.LineState == "CONFIRMED";
                 bool pullbackReady = status == _pandaBias + " PULLBACK READY";
 
                 panel.AddChild(Text(SymbolName + "  •  " + EffectiveFeedStatus(), Muted, 10, false));
@@ -711,10 +717,16 @@ namespace cAlgo
                 panel.AddChild(Row("H1 TREND", h1Trend.Ready ?
                     (h1Trend.Direction > 0 ? "UP" : "DOWN") + "  " + h1Trend.Strength.ToString("0") + "%  ADX " + h1Trend.Adx.ToString("0") : "LOADING",
                     h1Strong ? directionColor : Warn));
+                panel.AddChild(Row("M15 MOM", m15Trend.Ready ?
+                    (m15Trend.Direction > 0 ? "UP" : "DOWN") + "  " + m15Trend.Strength.ToString("0") + "%" : "LOADING",
+                    m15Momentum ? directionColor : Warn));
                 panel.AddChild(Row("H1 STRUCT", h1Structure.Event, h1Aligned ? directionColor : Warn));
-                panel.AddChild(Row("M15 EVENT", m15Event, m15Aligned ? directionColor : Warn));
+                panel.AddChild(Row("M15 EVENT", result.Execution == "MARKET" ? m15Event + "  INFO" : m15Event,
+                    result.Execution == "MARKET" ? m15Fresh && m15Structure.Direction == -side ? Warn : Muted :
+                    m15Aligned ? directionColor : Warn));
                 panel.AddChild(Row("LINES", result.LineState, feedLive && result.LineState == "CONFIRMED" ? directionColor : Warn));
-                panel.AddChild(Row("LEVEL", level, feedLive && result.LevelState == "REJECTED" ? directionColor : Warn));
+                panel.AddChild(Row("LEVEL", result.Execution == "MARKET" ? "INFO • " + level : level,
+                    result.Execution == "MARKET" ? Muted : feedLive && result.LevelState == "REJECTED" ? directionColor : Warn));
                 panel.AddChild(Row("ALIGNMENT", strongAlignment ? "STRONG " + _pandaBias : "CHECK AMBER ROWS", strongAlignment ? directionColor : Warn));
                 panel.AddChild(Row("DECISION", status, (pullbackReady || strongAlignment && status.StartsWith(_pandaBias + " ")) ? directionColor : Warn));
                 panel.AddChild(Row("NEXT", NextStep(result), Muted));
@@ -916,6 +928,8 @@ namespace cAlgo
             if (result.LineState == "UNAVAILABLE") { result.State = "LINE DATA UNAVAILABLE"; return result; }
             if (result.LineState != "CONFIRMED") { result.State = "SETUP INVALIDATED"; result.Decision = "WAIT — PANDA LINES UNCONFIRMED"; return result; }
             if (h1 == null || !h1.Ready) { result.State = "H1 DATA UNAVAILABLE"; return result; }
+            if (result.Execution == "MARKET")
+                return EvaluateMarketContext(result, h1, h1Structure, m15Structure, side);
             if (_boxH1Trend == "RANGING" || h1.Adx < 15) { result.State = "RANGE — NO TRADE"; return result; }
             if (h1Structure.Direction == -side) { result.State = "SETUP INVALIDATED"; result.Decision = "WAIT — H1 STRUCTURE AGAINST"; return result; }
             double price = _h1.ClosePrices[_h1.Count - 2];
@@ -930,22 +944,6 @@ namespace cAlgo
             bool choch = fresh && m15Structure.Event == "CHOCH " + suffix;
             result.Continuation = rejected && bos && h1.Adx >= 20 ? "STRONG" : rejected && (choch || h1.Adx >= 20) ? "MODERATE" : "WEAK";
 
-            if (result.Execution == "MARKET")
-            {
-                result.State = "MARKET ELIGIBLE";
-                var warnings = new List<string>();
-                double follow = FollowLine(_h1);
-                double nearestLine = side > 0 ? Math.Max(h1.Line, follow) : Math.Min(h1.Line, follow);
-                if (!double.IsNaN(nearestLine) && Math.Abs(price - nearestLine) / Symbol.PipSize > OverextensionPips)
-                    warnings.Add("OVEREXTENDED FROM PANDA LINES");
-                var opposing = PreviousLevels().Where(level => side > 0 ? level.Price > price : level.Price < price)
-                    .OrderBy(level => Math.Abs(level.Price - price)).FirstOrDefault();
-                if (opposing != null && Math.Abs(opposing.Price - price) / Symbol.PipSize <= LevelProximityPips)
-                    warnings.Add("NEARBY PANDA LEVEL " + opposing.Label);
-                result.Warning = string.Join(" • ", warnings);
-                result.Decision = warnings.Count > 0 ? "WAIT — REVIEW WARNINGS" : _pandaBias + " MARKET ELIGIBLE";
-                return result;
-            }
             if (touched && rejected && result.Level.DistancePips > LevelProximityPips)
             {
                 result.State = "ENTRY MOVED — WAIT";
@@ -957,6 +955,42 @@ namespace cAlgo
             if (bos) { result.State = "ENTRY TRIGGER"; result.Decision = _pandaBias + " READY"; return result; }
             if (choch) { result.State = "PULLBACK ENDING"; return result; }
             result.State = "CONTEXT READY — WAIT FOR M15";
+            return result;
+        }
+
+        private PullbackDecision EvaluateMarketContext(PullbackDecision result, TrendReading h1,
+            StructureReading h1Structure, StructureReading m15Structure, int side)
+        {
+            result.State = "MARKET WAIT";
+            if (h1.Direction != side || h1.Strength < MarketMinH1Strength)
+            { result.Decision = "WAIT — H1 TREND"; return result; }
+            if (h1.Adx < MarketMinH1Adx)
+            { result.Decision = "WAIT — H1 ADX"; return result; }
+            if (h1Structure.Direction != side)
+            { result.Decision = "WAIT — H1 STRUCTURE"; return result; }
+            var m15 = _readings.FirstOrDefault(item => item.Label == "M15");
+            if (m15 == null || !m15.Ready || m15.Direction != side || m15.Strength < MarketMinM15Strength)
+            { result.Decision = "WAIT — M15 MOMENTUM"; return result; }
+            int eventAge = m15Structure.EventIndex < 0 ? int.MaxValue : (_m15.Count - 2) - m15Structure.EventIndex;
+            if (eventAge >= 0 && eventAge <= M15EventExpiryBars && m15Structure.Direction == -side)
+            { result.Decision = "WAIT — M15 REVERSAL"; return result; }
+
+            // Confirmed H1 candles establish the trend; live price checks whether
+            // the current market has already stretched beyond the review limits.
+            double price = Symbol.Bid > 0 ? Symbol.Bid : _h1.ClosePrices[_h1.Count - 2];
+            var warnings = new List<string>();
+            double follow = FollowLine(_h1);
+            double nearestLine = double.IsNaN(follow) ? h1.Line :
+                side > 0 ? Math.Max(h1.Line, follow) : Math.Min(h1.Line, follow);
+            if (!double.IsNaN(nearestLine) && Math.Abs(price - nearestLine) / Symbol.PipSize > OverextensionPips)
+                warnings.Add("OVEREXTENDED FROM PANDA LINES");
+            var opposing = PreviousLevels().Where(level => side > 0 ? level.Price > price : level.Price < price)
+                .OrderBy(level => Math.Abs(level.Price - price)).FirstOrDefault();
+            if (opposing != null && Math.Abs(opposing.Price - price) / Symbol.PipSize <= LevelProximityPips)
+                warnings.Add("NEARBY PANDA LEVEL " + opposing.Label);
+            result.Warning = string.Join(" • ", warnings);
+            result.State = warnings.Count > 0 ? "MARKET REVIEW" : "MARKET ELIGIBLE";
+            result.Decision = warnings.Count > 0 ? "WAIT — REVIEW WARNINGS" : _pandaBias + " MARKET CONTEXT";
             return result;
         }
 
@@ -1124,8 +1158,10 @@ namespace cAlgo
             if (decision.Decision == "BUY READY" || decision.Decision == "SELL READY")
                 return _riskPlan == null ? "WAIT • NO PLAN" : _riskPlan.Status == "TOO WIDE" ? "SKIP • STOP TOO WIDE" :
                     _riskPlan.Status != "ACCEPTABLE" ? "WAIT • PLAN INVALID" : _pandaBias + " PULLBACK READY";
-            if (decision.Execution == "MARKET" && decision.State == "MARKET ELIGIBLE")
-                return string.IsNullOrEmpty(decision.Warning) ? _pandaBias + " MARKET CONTEXT" : "WAIT • REVIEW WARNINGS";
+            if (decision.Execution == "MARKET")
+                return decision.State == "MARKET ELIGIBLE" ? _pandaBias + " MARKET CONTEXT" :
+                    decision.State == "MARKET REVIEW" ? "WAIT • REVIEW WARNINGS" :
+                    decision.State == "MARKET WAIT" ? decision.Decision.Replace('—', '•') : "WAIT • " + decision.State;
             return decision.State == "RANGE — NO TRADE" ? "WAIT • H1 RANGE FILTER" : "WAIT • " + decision.State;
         }
 
@@ -1136,7 +1172,16 @@ namespace cAlgo
             if (_pandaBias != "BUY" && _pandaBias != "SELL") return "Wait for Panda bias";
             if (decision.Execution == "NONE") return "Wait for gap 5+";
             if (decision.LineState != "CONFIRMED") return "Confirm Panda Lines";
-            if (decision.State == "MARKET ELIGIBLE") return string.IsNullOrEmpty(decision.Warning) ? "No V5 timing trigger" : "Check warning and risk";
+            if (decision.Execution == "MARKET")
+            {
+                if (decision.State == "MARKET ELIGIBLE") return "Conditions met • review price and risk";
+                if (decision.State == "MARKET REVIEW") return "Review extension and nearby level";
+                if (decision.Decision == "WAIT — H1 TREND") return "H1 direction and 65% strength";
+                if (decision.Decision == "WAIT — H1 ADX") return "H1 ADX 25+";
+                if (decision.Decision == "WAIT — H1 STRUCTURE") return "H1 structure with Panda bias";
+                if (decision.Decision == "WAIT — M15 MOMENTUM") return "M15 direction and 50% strength";
+                if (decision.Decision == "WAIT — M15 REVERSAL") return "Wait for opposite M15 event to expire";
+            }
             if (decision.Decision == "BUY READY" || decision.Decision == "SELL READY") return "Review plan and price";
             if (decision.State == "PULLBACK ACTIVE — WAIT" || decision.State == "APPROACHING PANDA LEVEL") return "Watch directional level";
             if (decision.State == "AT PANDA LEVEL — WAIT FOR REJECTION") return "Wait for H1 rejection";
@@ -1163,6 +1208,7 @@ namespace cAlgo
         private bool ShouldShowPlan(PullbackDecision decision, bool ready)
         {
             if (ready) return true;
+            if (decision.Execution == "MARKET" && decision.State != "MARKET ELIGIBLE") return false;
             if (decision.LineState != "CONFIRMED" || decision.Execution == "NONE" ||
                 decision.State == "NO SETUP" || decision.State == "SETUP INVALIDATED" || decision.State == "RANGE — NO TRADE" ||
                 decision.State.Contains("UNAVAILABLE") || decision.State.StartsWith("DATA")) return false;

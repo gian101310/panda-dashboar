@@ -1,5 +1,11 @@
 # Panda Confluence Prototype Changelog
 
+## 2026-11-04 - Confirm V5 market trend and momentum
+
+- Split gap 9+ market context from gap 5–8 pullback checks. Market context no longer depends on the H1 box classification or a previous-period level.
+- Added aligned H1 trend strength 65+, H1 ADX 25+, aligned H1 structure, aligned M15 strength 50+, and a fresh opposing M15 event veto before market context appears.
+- Kept live-price overextension and nearby opposing-level review warnings. V5 remains read-only; Panda scoring and BB/INTRA rules are unchanged.
+
 ## 2026-11-04 - Keep V5 pullback drawing on the correct side
 
 - Checked the pullback drawing against the live chart bid, hiding a SELL area once price is above it or a BUY area once price is below it.
