@@ -135,12 +135,13 @@ signal, change Panda scoring, place an order, or predict that price must return.
   the nearest directional Panda resistance level.
 - The half-width is the larger of 3 pips or 10% of confirmed H1 ATR by default,
   so the area adapts to volatility without becoming too narrow.
-- `APPROACHING` means price remains on the valid side and may retrace toward
-  the area. `INSIDE ZONE — WAIT` means price has reached it but still needs an
-  H1 rejection and fresh M15 continuation event. `ZONE FAILED` means price
-  crossed through the far edge; it is not an entry signal.
-- The chosen level is retained for the current bias so a failed zone does not
-  silently jump to another level. Invalidation or a bias change removes it.
+- The drawing appears only for the 5–8 pullback path. `APPROACHING` means the
+  current chart bid remains on the valid side of the area. `INSIDE ZONE — WAIT`
+  means price has reached it but still needs an H1 rejection and fresh M15
+  continuation event. Once the live bid crosses beyond the far edge, the
+  possible pullback drawing is removed rather than left on the wrong side.
+- The chosen level is retained for the current bias while its area remains
+  relevant. Invalidation or a bias change removes it.
 - The panel shows `PB AREA` with the level and price range plus `PB ZONE` with
   the live state. Parameters under `V5 Pullback Area` control visibility,
   minimum half-width, ATR percentage, and forward projection.
@@ -148,6 +149,13 @@ signal, change Panda scoring, place an order, or predict that price must return.
 The V5 risk/reward drawing remains independently configurable under
 `V5 Trade Plan`. Use the pullback area to plan where to watch; use Panda Lines,
 H1 rejection, and a fresh M15 event to decide whether the setup is confirmed.
+
+For the 9+ market path, V5 requires a live valid Panda BUY/SELL bias, confirmed
+directional Panda Lines, H1 data, an H1 box outside `RANGING`, H1 ADX at least
+15, no opposing H1 structure, and a directional previous-period level. It
+flags price more than 30 pips from the local H1 SuperTrend/Follow Line or an
+opposing level within 15 pips for review. Market context does not require an
+H1 level touch/rejection or M15 CHOCH/BOS and is not a V5 entry trigger.
 
 The V5 panel defaults to a compact view: Panda direction, H1 strength and ADX,
 H1 structure, the latest M15 CHOCH/BOS event with freshness, Lines, level,

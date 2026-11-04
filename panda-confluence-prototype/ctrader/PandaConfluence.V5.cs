@@ -962,7 +962,7 @@ namespace cAlgo
 
         private void UpdatePullbackZone(PullbackDecision decision)
         {
-            bool blocked = decision.LineState != "CONFIRMED" || decision.Execution == "NONE" ||
+            bool blocked = decision.LineState != "CONFIRMED" || decision.Execution != "PULLBACK" ||
                 decision.State == "NO SETUP" || decision.State == "SETUP INVALIDATED" ||
                 decision.State == "RANGE — NO TRADE" || decision.State.Contains("UNAVAILABLE") ||
                 decision.State.StartsWith("DATA");
@@ -993,10 +993,19 @@ namespace cAlgo
                     HalfWidthPips = halfWidthPips
                 };
             }
-            double price = _h1.ClosePrices[_h1.Count - 2];
+            // The drawing sits on a live chart; the confirmed H1 close can be on the
+            // other side of the stored level after price moves during the current bar.
+            double price = Symbol.Bid > 0 ? Symbol.Bid : _h1.ClosePrices[_h1.Count - 2];
+            if ((_pullbackZone.Side == "SELL" && price > _pullbackZone.High) ||
+                (_pullbackZone.Side == "BUY" && price < _pullbackZone.Low))
+            {
+                _pullbackZone = null;
+                RemovePullbackZone();
+                return;
+            }
             _pullbackZone.State = _pullbackZone.Side == "BUY"
-                ? price < _pullbackZone.Low ? "ZONE FAILED" : price <= _pullbackZone.High ? "INSIDE ZONE — WAIT" : "APPROACHING"
-                : price > _pullbackZone.High ? "ZONE FAILED" : price >= _pullbackZone.Low ? "INSIDE ZONE — WAIT" : "APPROACHING";
+                ? price <= _pullbackZone.High ? "INSIDE ZONE — WAIT" : "APPROACHING"
+                : price >= _pullbackZone.Low ? "INSIDE ZONE — WAIT" : "APPROACHING";
             RenderPullbackZone();
         }
 
@@ -1012,14 +1021,14 @@ namespace cAlgo
             if (interval <= TimeSpan.Zero || interval > TimeSpan.FromHours(4)) interval = TimeSpan.FromHours(1);
             DateTime start = _h1.OpenTimes[Math.Max(0, last - 1)];
             DateTime end = _h1.OpenTimes[last] + TimeSpan.FromTicks(interval.Ticks * PullbackProjectionBars);
-            Color baseColor = _pullbackZone.State == "ZONE FAILED" ? Sell : _pullbackZone.Side == "BUY" ? Buy : Sell;
+            Color baseColor = _pullbackZone.Side == "BUY" ? Buy : Sell;
             var rectangle = Chart.DrawRectangle(PullbackZoneObjectName, start, _pullbackZone.High, end, _pullbackZone.Low, baseColor);
             rectangle.IsFilled = true;
-            rectangle.Color = Color.FromArgb(_pullbackZone.State == "ZONE FAILED" ? 28 : 45, baseColor);
+            rectangle.Color = Color.FromArgb(45, baseColor);
             rectangle.IsInteractive = false;
-            string labelText = _pullbackZone.State == "ZONE FAILED"
-                ? "PULLBACK ZONE FAILED • " + _pullbackZone.Label
-                : "POSSIBLE " + _pullbackZone.Side + " PULLBACK • " + _pullbackZone.Label + " • " + _pullbackZone.State;
+            string labelText = _pullbackZone.State == "INSIDE ZONE — WAIT"
+                ? _pullbackZone.Side + " PULLBACK AT LEVEL • " + _pullbackZone.Label + " • WAIT"
+                : "POSSIBLE " + _pullbackZone.Side + " PULLBACK • " + _pullbackZone.Label;
             var label = Chart.DrawText(PullbackZoneLabelName, labelText, start, _pullbackZone.High, baseColor);
             label.FontSize = 10;
             label.IsBold = true;

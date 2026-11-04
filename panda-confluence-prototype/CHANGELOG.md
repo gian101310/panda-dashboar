@@ -1,5 +1,11 @@
 # Panda Confluence Prototype Changelog
 
+## 2026-11-04 - Keep V5 pullback drawing on the correct side
+
+- Checked the pullback drawing against the live chart bid, hiding a SELL area once price is above it or a BUY area once price is below it.
+- Showed the pullback drawing only for gaps 5–8 and labelled an area already reached as `AT LEVEL • WAIT` instead of `POSSIBLE`.
+- Left Panda scoring, V5 decisions, and market-context checks unchanged.
+
 ## 2026-11-04 - Simplify the V5 chart panel
 
 - Made a 400-pixel simple view the default, with Panda direction, H1 strength and ADX, H1 and M15 events, Lines, level, alignment, decision, and next step.
