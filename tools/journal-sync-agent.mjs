@@ -48,8 +48,14 @@ function parseMcpText(result) {
 }
 
 async function mcpRequest(body, sessionId = null) {
-  const headers = { 'content-type': 'application/json' };
-  if (sessionId) headers['Mcp-Session-Id'] = sessionId;
+  const headers = {
+    'content-type': 'application/json',
+    accept: 'application/json, text/event-stream',
+  };
+  if (sessionId) {
+    headers['Mcp-Session-Id'] = sessionId;
+    headers['MCP-Protocol-Version'] = '2025-11-25';
+  }
   const res = await fetch(MCP_URL, { method: 'POST', headers, body: JSON.stringify(body) });
   if (!res.ok) throw new Error(`cTrader MCP ${res.status}: ${await res.text()}`);
   return { headers: res.headers, json: await res.json() };
@@ -61,7 +67,7 @@ async function createMcpClient() {
     id: 1,
     method: 'initialize',
     params: {
-      protocolVersion: '2024-11-05',
+      protocolVersion: '2025-11-25',
       capabilities: {},
       clientInfo: { name: 'panda-journal-sync', version: '1.0.0' },
     },
