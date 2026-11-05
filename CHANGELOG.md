@@ -1,3 +1,6 @@
+## 2026-11-06 - Add cTrader raw score chart panel
+- Added a read-only cTrader indicator showing live MT4 D1/H4/H1 and ADV lines, ATR, official Panda gap and bias, and cTrader spread. Stale data clears the score display. Panda scoring and trading rules are unchanged.
+
 ## 2026-11-03 - Clarify Confluence V5 entry labels
 - Renamed the execution row to GAP PATH, identified FVG as informational, and showed when an H1 range filter blocks a valid Panda path.
 - Replaced the default continuation grade with NOT ASSESSED until V5 evaluates it, and clarified that market context has no V5 timing trigger. Scoring and entry rules are unchanged.
