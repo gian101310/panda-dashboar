@@ -19,8 +19,9 @@ namespace cAlgo
             "NZDCAD", "NZDJPY", "NZDUSD", "USDCAD", "USDJPY"
         };
 
-        private static readonly Color Amber = Color.FromHex("#ffd166");
-        private static readonly Color Muted = Color.FromHex("#aab6c4");
+        private static readonly Color Text = Color.FromHex("#dce5ed");
+        private static readonly Color Heading = Color.FromHex("#8fc6df");
+        private static readonly Color Muted = Color.FromHex("#8b9aa8");
         private static readonly Color Buy = Color.FromHex("#00ff9f");
         private static readonly Color Sell = Color.FromHex("#ff4d6d");
         private static readonly Regex ScorePattern = new Regex(
@@ -33,14 +34,15 @@ namespace cAlgo
         [Parameter("Maximum data age (minutes)", DefaultValue = 20, MinValue = 5, MaxValue = 120)]
         public int MaximumAgeMinutes { get; set; }
 
-        [Parameter("Show panel", DefaultValue = true, Group = "Display")]
+        [Parameter("Show text", DefaultValue = true, Group = "Display")]
         public bool ShowPanel { get; set; }
 
         [Output("Visibility Sentinel", LineColor = "Transparent", PlotType = PlotType.Line)]
         public IndicatorDataSeries VisibilitySentinel { get; set; }
 
-        private ChartDraggable _panel;
+        private StackPanel _overlay;
         private TextBlock _title, _base, _quote, _advBase, _advQuote;
+        private TextBlock _currentHeading, _advHeading, _atrHeading;
         private TextBlock _atr, _spread, _rawScores, _gap, _bias, _execution, _status;
         private string _pair;
         private string _lastSourceKey;
@@ -51,31 +53,31 @@ namespace cAlgo
             var matches = SupportedPairs.Where(letters.Contains).ToArray();
             _pair = matches.Length == 1 ? matches[0] : null;
 
-            var root = new StackPanel {
-                Orientation = Orientation.Vertical, Width = 415, Margin = 8,
-                BackgroundColor = Color.FromHex("#10151d")
+            _overlay = new StackPanel {
+                Orientation = Orientation.Vertical, Width = 405, Margin = 12,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Top
             };
-            _title = Line("PANDA  |  RAW SCORE", Amber, 14, true);
-            _base = Line("", Amber);
-            _quote = Line("", Amber);
-            _advBase = Line("", Amber);
-            _advQuote = Line("", Amber);
-            _atr = Line("", Amber);
-            _spread = Line("", Amber);
-            _rawScores = Line("", Amber);
-            _gap = Line("", Amber, 13, true);
-            _bias = Line("", Amber, 13, true);
-            _execution = Line("", Amber);
+            _title = Line("PANDA RAW  |  " + (_pair ?? "NO PAIR"), Heading, 13, true);
+            _currentHeading = Line("CURRENT SCORE", Heading, 10, true);
+            _advHeading = Line("ADV FORECAST", Heading, 10, true);
+            _atrHeading = Line("ATR / SPREAD", Heading, 10, true);
+            _base = Line("", Text);
+            _quote = Line("", Text);
+            _advBase = Line("", Text);
+            _advQuote = Line("", Text);
+            _atr = Line("", Text);
+            _spread = Line("", Text);
+            _rawScores = Line("", Muted, 10);
+            _gap = Line("", Text, 12, true);
+            _bias = Line("", Text, 12, true);
+            _execution = Line("", Muted, 10);
             _status = Line("Loading Panda files...", Muted, 10);
-            foreach (var line in new[] { _title, _base, _quote, _advBase, _advQuote,
-                _atr, _spread, _rawScores, _gap, _bias, _execution, _status })
-                root.AddChild(line);
-
-            _panel = Chart.Draggables.Add();
-            _panel.Child = root;
-            _panel.ShowGrip = true;
-            _panel.X = Math.Max(8, Chart.Width - 435);
-            _panel.Y = 12;
+            foreach (var line in new[] { _title, Spacer(), _currentHeading, _base, _quote,
+                _rawScores, _gap, _bias, _execution, Spacer(), _advHeading, _advBase,
+                _advQuote, Spacer(), _atrHeading, _atr, _spread, Spacer(), _status })
+                _overlay.AddChild(line);
+            Chart.AddControl(_overlay);
 
             Timer.TimerTick += OnTimerTick;
             Timer.Start(RefreshSeconds);
@@ -92,8 +94,14 @@ namespace cAlgo
         {
             return new TextBlock {
                 Text = value, ForegroundColor = color, FontSize = size,
-                FontWeight = bold ? FontWeight.Bold : FontWeight.Normal, Margin = 2
+                FontWeight = bold ? FontWeight.Bold : FontWeight.Normal, Margin = 1,
+                HorizontalAlignment = HorizontalAlignment.Right
             };
+        }
+
+        private static TextBlock Spacer()
+        {
+            return new TextBlock { Text = " ", FontSize = 5, Margin = 0 };
         }
 
         private void OnTimerTick()
@@ -104,7 +112,7 @@ namespace cAlgo
 
         private void UpdateVisibility()
         {
-            if (_panel == null) return;
+            if (_overlay == null) return;
             var visible = ShowPanel;
             try
             {
@@ -113,7 +121,7 @@ namespace cAlgo
                     visible &= indicator.LineOutputs[0].IsVisible;
             }
             catch { }
-            _panel.IsVisible = visible;
+            _overlay.IsVisible = visible;
         }
 
         private void Refresh()
@@ -171,7 +179,7 @@ namespace cAlgo
                     _gap.Text = "ENGINE GAP: " + Signed(gap);
                     _bias.Text = "BIAS: " + score["BIAS"];
                     _bias.ForegroundColor = score["BIAS"] == "BUY" ? Buy :
-                        score["BIAS"] == "SELL" ? Sell : Amber;
+                        score["BIAS"] == "SELL" ? Sell : Heading;
                     _gap.ForegroundColor = _bias.ForegroundColor;
                     _execution.Text = "EXECUTION: " + Value(score, "EXECUTION") +
                         "   CONFIDENCE: " + Value(score, "CONFIDENCE");
@@ -252,7 +260,7 @@ namespace cAlgo
             _gap.Text = "ENGINE GAP: --";
             _bias.Text = "BIAS: --";
             _execution.Text = "EXECUTION: --   CONFIDENCE: --";
-            _gap.ForegroundColor = _bias.ForegroundColor = Amber;
+            _gap.ForegroundColor = _bias.ForegroundColor = Heading;
             _status.Text = reason;
         }
     }

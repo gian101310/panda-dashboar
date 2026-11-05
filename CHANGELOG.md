@@ -1,3 +1,6 @@
+## 2026-11-06 - Lighten cTrader raw score display
+- Replaced the dark draggable panel with transparent right-aligned chart text and separated current score, ADV forecast, and ATR/spread sections.
+
 ## 2026-11-06 - Add cTrader raw score chart panel
 - Added a read-only cTrader indicator showing live MT4 D1/H4/H1 and ADV lines, ATR, official Panda gap and bias, and cTrader spread. Stale data clears the score display. Panda scoring and trading rules are unchanged.
 

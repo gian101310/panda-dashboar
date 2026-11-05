@@ -1,6 +1,6 @@
-# Panda Raw Score Panel for cTrader
+# Panda Raw Score text for cTrader
 
-Read-only chart panel for the 21 Panda forex pairs. It mirrors the four raw
+Read-only right-aligned chart text for the 21 Panda forex pairs. It mirrors the four raw
 D1/H4/H1 and ADV lines plus ATR from the live `mt4_PAIR.txt` export. The gap,
 bias, execution, and confidence come from the engine's `panda_score_PAIR.txt`.
 The display-only BASE RAW and QUOTE RAW values are calculated from the chart's
@@ -9,7 +9,7 @@ the current cTrader bid and ask and shown in pips and broker tick points.
 
 The panel reads MT4 Common Files on the same Windows PC. Both files must be
 less than 20 minutes old by default. Stale or missing files clear the score
-and bias. The panel refreshes every five seconds, can be dragged, and sends no
+and bias. The text refreshes every five seconds and sends no
 orders, alerts, or file writes.
 
 Build from this directory:
