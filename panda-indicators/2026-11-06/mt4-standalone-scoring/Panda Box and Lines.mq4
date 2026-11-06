@@ -1,6 +1,6 @@
 #property strict
 #property indicator_chart_window
-#property version "1.32"
+#property version "1.33"
 #property description "Panda Box and Lines: standalone scores, bias, boxes and previous-period levels."
 
 input int    RefreshSeconds = 5;
@@ -61,10 +61,14 @@ bool AdvInvalid = false;
 
 int OnInit()
 {
-   string instance = IntegerToString(ChartID()) + "_" + IntegerToString((int)GetTickCount()) + "_";
-   Prefix = "PandaStandalonePanel_" + instance;
-   BoxPrefix = "PandaStandaloneBox_" + instance;
-   LevelPrefix = "PandaStandaloneLevel_" + instance;
+   // Chart objects are chart-local. Reuse stable names so template reloads
+   // cannot leave an older panel beside the new one.
+   Prefix = "PandaStandalonePanel_";
+   BoxPrefix = "PandaStandaloneBox_";
+   LevelPrefix = "PandaStandaloneLevel_";
+   RemoveObjectsByPrefix(Prefix);
+   RemoveObjectsByPrefix(BoxPrefix);
+   RemoveObjectsByPrefix(LevelPrefix);
    IndicatorShortName("Panda Box and Lines");
    InitPanelPosition();
    EventSetTimer(MathMax(1, RefreshSeconds));

@@ -1,6 +1,6 @@
 #property strict
 #property indicator_chart_window
-#property version "1.41"
+#property version "1.42"
 #property description "Panda Box and Lines Licensed: standalone scores, bias, boxes and previous-period levels."
 
 enum ENUM_PANDA_PANEL_POSITION { PANEL_UPPER_LEFT, PANEL_UPPER_RIGHT };
@@ -99,10 +99,12 @@ bool CheckLicense()
 
 int OnInit()
 {
-   string instance = IntegerToString(ChartID()) + "_" + IntegerToString((int)GetTickCount()) + "_";
-   Prefix = "PandaLicensedPanel_" + instance;
-   BoxPrefix = "PandaLicensedBox_" + instance;
-   LevelPrefix = "PandaLicensedLevel_" + instance;
+   Prefix = "PandaLicensedPanel_";
+   BoxPrefix = "PandaLicensedBox_";
+   LevelPrefix = "PandaLicensedLevel_";
+   RemoveObjectsByPrefix(Prefix);
+   RemoveObjectsByPrefix(BoxPrefix);
+   RemoveObjectsByPrefix(LevelPrefix);
    IndicatorShortName("Panda Box and Lines Licensed");
    InitPanelPosition();
    EventSetTimer(MathMax(1, RefreshSeconds));

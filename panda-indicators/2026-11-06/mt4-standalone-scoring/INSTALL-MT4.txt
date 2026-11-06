@@ -1,7 +1,10 @@
-PANDA BOX AND LINES - MT4 (v1.32)
+PANDA BOX AND LINES - MT4 (v1.33)
 
 Copy Panda Box and Lines.ex4 into MT4's Data Folder > MQL4 > Indicators.
 Refresh Navigator and attach it to a supported currency-pair chart.
+If replacing an earlier version, reattach the indicator or reload the chart
+template once. The new version removes panel, box, and level objects saved by
+older versions so only one panel remains after refresh.
 
 The panel shows current and ADV D1/H4/H1 net scores, current gap/bias,
 and a TMRW, WK, or MTH projected ADV gap/bias chosen by Dubai session.

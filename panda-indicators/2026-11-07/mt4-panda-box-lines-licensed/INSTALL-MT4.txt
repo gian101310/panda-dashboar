@@ -1,4 +1,4 @@
-PANDA BOX AND LINES LICENSED - MT4 (v1.41)
+PANDA BOX AND LINES LICENSED - MT4 (v1.42)
 
 1. In MT4, open File > Open Data Folder.
 2. Copy MQL4/Indicators/Panda Box and Lines Licensed.ex4 into MQL4/Indicators.
@@ -8,6 +8,8 @@ PANDA BOX AND LINES LICENSED - MT4 (v1.41)
 5. Refresh Navigator. Attach Panda Box and Lines License Feed to one chart. It does
    not open or manage trades. Attach Panda Box and Lines Licensed to the chart(s)
    where you want the scoring panel, boxes, and levels.
+   If replacing an earlier version, reattach the indicator or reload its chart
+   template once. Old saved chart objects are cleared on startup.
 6. In Panda Engine License Admin, create a Panda Box and Lines Licensed for MT4 license using
    the MT4 trading account number, then press Approve. No token is needed.
 

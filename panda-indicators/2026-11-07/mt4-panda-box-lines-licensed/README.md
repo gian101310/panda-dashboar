@@ -10,4 +10,6 @@ Install and activation steps are in `INSTALL-MT4.txt`. The package in `dist` con
 
 The licensed indicator exposes only upper-left/upper-right panel placement. Box calculation parameters are internal. Boxes default to yellow and panel text to blue. The license EA has no customer inputs.
 
+Panel, box, and level chart object names are stable per chart. Startup removes copies saved by previous template refreshes so a second panel does not accumulate.
+
 Account-number-only approval is a convenience control, not cryptographic proof of terminal identity. A modified local client could bypass it. This version is intended for account-approved distribution, while the original remains the owner's personal build.

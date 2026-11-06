@@ -1,3 +1,7 @@
+## 2026-11-07 - Fix duplicate MT4 Box and Lines panels after refresh
+- Reused chart-local object names in the personal and licensed indicators and cleared objects restored from saved templates on startup.
+- Rebuilt both MT4 packages without changing scoring, ADV bias, or exporter files.
+
 ## 2026-11-07 - Simplify licensed MT4 Box and Lines inputs
 - Exposed only upper-left or upper-right panel placement; kept box calculation and license EA settings internal.
 - Changed the three box outlines to yellow and all indicator text to blue; positioned the panel at the top of the chart.

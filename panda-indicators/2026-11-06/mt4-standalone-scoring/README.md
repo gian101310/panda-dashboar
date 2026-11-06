@@ -9,6 +9,6 @@ This indicator calculates its own scores directly from MT4 broker prices and his
 - The three monthly, weekly, and daily WagBoxes use the same main box windows and drawing rules as Scoring with Adv v1. The chart shows only the current pair's boxes, while the score still covers all 21 pairs.
 - Panda Levels are the previous day, week, month, and year highs/lows: PDH/PDL, PWH/PWL, PMH/PML, PYH/PYL. Their H1 previous-period aggregation and previous-year monthly aggregation follow the installed `Panda Levels MT5.mq5` display source. The levels are chart references and do not change scoring or bias.
 
-The panel, boxes, and levels can be toggled with indicator inputs. Boxes and levels default on. The panel strip can be dragged. All chart objects belong to this indicator instance and are removed when it is detached.
+The panel, boxes, and levels can be toggled with indicator inputs. Boxes and levels default on. The panel strip can be dragged. Chart objects use stable names per chart; startup clears old copies saved into MT4 templates, and detaching removes the active objects.
 
 Source: `Panda Box and Lines.mq4`. Compiled EX4 and installation ZIP: `dist/`. MetaEditor 4 compiled with 0 errors and 0 warnings; `check_dupes.py` and the Next.js build passed. A live side-by-side MT4 chart comparison remains pending.
