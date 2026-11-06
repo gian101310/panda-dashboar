@@ -1,0 +1,29 @@
+PANDA STANDALONE SCORING — MT4
+
+INSTALL
+1. In MT4 choose File > Open Data Folder.
+2. Copy PandaStandaloneScoringMT4.ex4 into MQL4/Indicators.
+3. Refresh Navigator (or restart MT4), then attach PandaStandaloneScoringMT4 to a supported forex chart.
+4. Allow time for MT4 to download H1 history for all 21 pairs. If prompted, open the named pair's H1 chart and load at least 3+ months of history (Home key or History Center). D1 history is also needed for ATR.
+
+No EA, DLL, WebRequest permission, API key, license token, Panda Engine, MT4 exporter or other indicator is needed. This is your standalone personal edition. It does not trade, send alerts, write exports or connect to Panda's website.
+
+SETTINGS
+- BrokerUtcOffsetHours: broker server UTC offset (default +3). Used for quote freshness. Set +2 if your broker is on winter UTC+2. Wrong offsets clear scores with a CHECK UTC OFFSET message.
+- MaximumQuoteAgeSeconds: default 300 seconds. All 21 pairs must have fresh quotes; stale/offline markets clear scores.
+- RefreshSeconds: default 5 seconds.
+- ShowBoxes: current chart long/medium/short boxes on/off.
+- PanelX/PanelY: distance from the chart's top-right corner.
+
+DISPLAY
+Current BASE/QUOTE D1/H4/H1 positive/negative components; strongest BASE/QUOTE values; GAP, BIAS, EXECUTION and CONFIDENCE; ADV values; completed-bar H1/D1 ATR(14) in broker points; live chart spread in pips and points.
+
+METHOD
+Each of 21 pairs votes +1 for base and -1 for quote above its box, reverses below, and contributes zero inside/on the boundary. Votes aggregate over seven currencies. D1/H4/H1 refer to long/medium/short box scores, not the chart period: all bounds use H1 highs/lows. Long: two calendar months offset one month; medium: two Monday-based weeks offset one week; short: two trading days offset one trading day. ADV uses the same spans with zero offset. Window starts are included, ends excluded. Broker/server timestamps define the windows.
+
+Split values are preserved (+3/-1 is not +2). The strongest signed component is selected across timeframes, equal opposites yield zero, and opposing significant values (+4 or above and -4 or below) invalidate the currency. Neutral-vs-neutral is blocked. Gap, bias, execution and confidence match the existing Panda engine rules.
+
+Incomplete symbol/history/quote data blocks the entire score calculation rather than silently computing from fewer than 21 pairs. Indicator may select the required symbols in Market Watch. Weekends and disconnected brokers normally show unavailable/stale data. Different brokers can have different highs/lows/bids and therefore different scores.
+
+VERIFIED
+MetaEditor 4 compile: 0 errors, 0 warnings. Actual arithmetic header tested against 2,000 locked-engine cases; main/ADV box windows tested for weekends and month/year rollover. Live chart appearance and broker-data parity have not yet been verified.

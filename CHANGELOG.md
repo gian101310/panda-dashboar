@@ -1,3 +1,8 @@
+## 2026-11-06 - Add independent standalone MT4 scoring panel
+- Added a single MT4 indicator calculating all 21 pair box votes, current/ADV scores, gap/bias/execution/confidence, ATR and spread without an EA, source indicator, license token or Panda engine feed.
+- Fail closed on incomplete history, missing symbols and stale quotes; include optional current-chart boxes and broker UTC-offset freshness checks.
+- Compiled with zero errors/warnings and compared the actual math against 2,000 locked-engine cases. Existing production scoring and cTrader licensing remain unchanged.
+
 ## 2026-11-06 - Bind Raw Score Engine to registered account licenses
 - Added a dedicated Raw Score Engine product and admin download with existing per-account issue/rotate token controls.
 - Reused hashed license tokens, approval/payment/expiry checks and registered cTrader trading account matching. Removed operator-token use from this package.
