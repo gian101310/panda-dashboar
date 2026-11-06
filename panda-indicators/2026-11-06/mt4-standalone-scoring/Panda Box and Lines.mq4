@@ -1,7 +1,7 @@
 #property strict
 #property indicator_chart_window
-#property version "1.30"
-#property description "Standalone ADV v1 scoring, bias, Panda boxes and previous-period levels."
+#property version "1.31"
+#property description "Panda Box and Lines: standalone scores, bias, boxes and previous-period levels."
 
 input int    RefreshSeconds = 5;
 input bool   PanelDefaultBottomRight = true;
@@ -63,7 +63,7 @@ int OnInit()
    Prefix = "PandaStandalonePanel_" + instance;
    BoxPrefix = "PandaStandaloneBox_" + instance;
    LevelPrefix = "PandaStandaloneLevel_" + instance;
-   IndicatorShortName("Panda Standalone Raw Score MT4");
+   IndicatorShortName("Panda Box and Lines");
    InitPanelPosition();
    EventSetTimer(MathMax(1, RefreshSeconds));
    RefreshScoring();
@@ -411,7 +411,7 @@ void DrawPanel()
    int advQuoteH1 = CurrencyScore(quote, 2, true);
 
    CreatePanelBackground(x, y);
-   CreateLabel(Prefix + "title", x + 12, y + 12, "PANDA RAW  |  " + pair, C'0,180,255', FontSize + 1, "Consolas");
+   CreateLabel(Prefix + "title", x + 12, y + 12, "PANDA BOX AND LINES  |  " + pair, C'0,180,255', FontSize + 1, "Consolas");
    CreateLabel(Prefix + "current", x + 12, y + 33, "CURRENT SCORE", TextColor, FontSize, "Consolas");
    CreateLabel(Prefix + "base", x + 12, y + 49, FormatScoreLine(base, baseD1, baseH4, baseH1), TextColor, FontSize, "Consolas");
    CreateLabel(Prefix + "quote", x + 12, y + 65, FormatScoreLine(quote, quoteD1, quoteH4, quoteH1), TextColor, FontSize, "Consolas");

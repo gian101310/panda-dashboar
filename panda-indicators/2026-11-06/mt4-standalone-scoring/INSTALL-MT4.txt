@@ -1,6 +1,6 @@
-PANDA STANDALONE RAW SCORE - MT4 (v1.30)
+PANDA BOX AND LINES - MT4 (v1.31)
 
-Copy PandaStandaloneScoringMT4.ex4 into MT4's Data Folder > MQL4 > Indicators.
+Copy Panda Box and Lines.ex4 into MT4's Data Folder > MQL4 > Indicators.
 Refresh Navigator and attach it to a supported currency-pair chart.
 
 The panel shows current and ADV D1/H4/H1 net scores, gap, and bias.

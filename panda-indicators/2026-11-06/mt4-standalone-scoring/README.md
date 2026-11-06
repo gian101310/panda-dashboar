@@ -1,4 +1,4 @@
-# Panda Standalone Raw Score MT4
+# Panda Box and Lines MT4
 
 This indicator calculates its own scores directly from MT4 broker prices and history. It does not read or write export files, call the Panda engine, use an EA, or access the web.
 
@@ -10,4 +10,4 @@ This indicator calculates its own scores directly from MT4 broker prices and his
 
 The panel, boxes, and levels can be toggled with indicator inputs. Boxes and levels default on. The panel strip can be dragged. All chart objects belong to this indicator instance and are removed when it is detached.
 
-Source: `PandaStandaloneScoringMT4.mq4`. Compiled EX4 and installation ZIP: `dist/`. MetaEditor 4 compiled with 0 errors and 0 warnings; `check_dupes.py` and the Next.js build passed. A live side-by-side MT4 chart comparison remains pending.
+Source: `Panda Box and Lines.mq4`. Compiled EX4 and installation ZIP: `dist/`. MetaEditor 4 compiled with 0 errors and 0 warnings; `check_dupes.py` and the Next.js build passed. A live side-by-side MT4 chart comparison remains pending.

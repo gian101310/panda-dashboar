@@ -1,3 +1,6 @@
+## 2026-11-07 - Rename MT4 indicator to Panda Box and Lines
+- Renamed the indicator source, MT4 display name, EX4 and installation ZIP. Scoring, bias, boxes and levels are unchanged.
+
 ## 2026-11-07 - Add bias, boxes and Panda Levels to standalone MT4 scoring
 - Restored Scoring with Adv v1 current/ADV gap and bias and its three current-chart WagBoxes without changing the score votes or windows.
 - Added previous day/week/month/year highs and lows as display-only Panda Levels, based on the Panda Levels source.
