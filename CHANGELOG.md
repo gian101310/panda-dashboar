@@ -1,3 +1,8 @@
+## 2026-11-07 - Add bias, boxes and Panda Levels to standalone MT4 scoring
+- Restored Scoring with Adv v1 current/ADV gap and bias and its three current-chart WagBoxes without changing the score votes or windows.
+- Added previous day/week/month/year highs and lows as display-only Panda Levels, based on the Panda Levels source.
+- Kept panel, box and level chart objects separate so refreshes preserve each drawing group.
+
 ## 2026-11-07 - Correct standalone MT4 raw scores against ADV v1
 - Rebuilt the standalone panel from the installed Scoring with Adv v1 MT4 source instead of the separate engine-scoring reconstruction.
 - Restored ADV v1 net votes and calendar-day box windows; display current and ADV D1/H4/H1 values only, without file export or chart drawings.

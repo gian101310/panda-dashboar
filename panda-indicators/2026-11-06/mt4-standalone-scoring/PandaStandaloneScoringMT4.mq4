@@ -1,7 +1,7 @@
 #property strict
 #property indicator_chart_window
-#property version "1.20"
-#property description "Raw scoring from Scoring with Adv v1 MT4. Broker data only; no export files."
+#property version "1.30"
+#property description "Standalone ADV v1 scoring, bias, Panda boxes and previous-period levels."
 
 input int    RefreshSeconds = 5;
 input bool   PanelDefaultBottomRight = true;
@@ -10,6 +10,14 @@ input int    PanelY         = 30;
 input int    FontSize       = 10;
 input color  TextColor      = clrMagenta;
 input color  AlertColor     = clrRed;
+input int    GapThreshold   = 5;
+input bool   ShowBoxes      = true;
+input color  WagBox2Color   = C'70,120,255';
+input color  WagBox1Color   = C'0,200,120';
+input color  WagBox3Color   = C'255,160,50';
+input int    BoxLineWidth   = 1;
+input bool   ShowPandaLevels = true;
+input bool   ShowLevelLabels = true;
 input int    BoxCalcTF      = PERIOD_H1;
 input int    WagBox3Days    = 2;
 input int    WagBox3Offset  = 1;
@@ -18,13 +26,15 @@ input int    WagBox1Offset  = 1;
 input int    WagBox2Months  = 2;
 input int    WagBox2Offset  = 1;
 
-string Prefix = "ScoringV1_";
+string Prefix = "";
+string BoxPrefix = "";
+string LevelPrefix = "";
 datetime LastRefresh = 0;
 int PanelPosX = 0;
 int PanelPosY = 0;
 bool PanelWasMoved = false;
 int PanelWidth = 500;
-int PanelHeight = 126;
+int PanelHeight = 158;
 
 string Pairs[21] =
 {
@@ -42,9 +52,17 @@ int AdvD1[7];
 int AdvH4[7];
 int AdvH1[7];
 string CurrentPair = "";
+int MainGap = 0;
+int AdvGap = 0;
+string MainBias = "WAIT";
+string AdvBias = "WAIT";
 
 int OnInit()
 {
+   string instance = IntegerToString(ChartID()) + "_" + IntegerToString((int)GetTickCount()) + "_";
+   Prefix = "PandaStandalonePanel_" + instance;
+   BoxPrefix = "PandaStandaloneBox_" + instance;
+   LevelPrefix = "PandaStandaloneLevel_" + instance;
    IndicatorShortName("Panda Standalone Raw Score MT4");
    InitPanelPosition();
    EventSetTimer(MathMax(1, RefreshSeconds));
@@ -56,6 +74,8 @@ void OnDeinit(const int reason)
 {
    EventKillTimer();
    RemoveObjectsByPrefix(Prefix);
+   RemoveObjectsByPrefix(BoxPrefix);
+   RemoveObjectsByPrefix(LevelPrefix);
 }
 
 int OnCalculate(const int rates_total,
@@ -114,9 +134,77 @@ void RefreshScoring()
 
 
    CurrentPair = NormalizeSymbol(Symbol());
+   CalculateCurrentGaps();
+   DrawCurrentChartBoxes();
+   DrawPandaLevels();
 
    LastRefresh = TimeCurrent();
    DrawPanel();
+}
+
+void CalculateCurrentGaps()
+{
+   MainGap = 0;
+   AdvGap = 0;
+   MainBias = "WAIT";
+   AdvBias = "WAIT";
+
+   string pair = CurrentPair;
+   if(StringLen(pair) < 6)
+      pair = NormalizeSymbol(Symbol());
+
+   string base = StringSubstr(pair, 0, 3);
+   string quote = StringSubstr(pair, 3, 3);
+
+   int baseStrong = StrongestScore(CurrencyScore(base, 0, false),
+                                   CurrencyScore(base, 1, false),
+                                   CurrencyScore(base, 2, false));
+   int quoteStrong = StrongestScore(CurrencyScore(quote, 0, false),
+                                    CurrencyScore(quote, 1, false),
+                                    CurrencyScore(quote, 2, false));
+   MainGap = baseStrong - quoteStrong;
+   MainBias = GapBias(MainGap);
+
+   int advBaseStrong = StrongestScore(CurrencyScore(base, 0, true),
+                                      CurrencyScore(base, 1, true),
+                                      CurrencyScore(base, 2, true));
+   int advQuoteStrong = StrongestScore(CurrencyScore(quote, 0, true),
+                                       CurrencyScore(quote, 1, true),
+                                       CurrencyScore(quote, 2, true));
+   AdvGap = advBaseStrong - advQuoteStrong;
+   AdvBias = GapBias(AdvGap);
+}
+
+int StrongestScore(const int d1, const int h4, const int h1)
+{
+   int strongestPos = 0;
+   int strongestNeg = 0;
+
+   RegisterStrongest(d1, strongestPos, strongestNeg);
+   RegisterStrongest(h4, strongestPos, strongestNeg);
+   RegisterStrongest(h1, strongestPos, strongestNeg);
+
+   int absPos = MathAbs(strongestPos);
+   int absNeg = MathAbs(strongestNeg);
+   if(absPos == absNeg)
+      return(0);
+
+   return(absNeg > absPos ? strongestNeg : strongestPos);
+}
+
+void RegisterStrongest(const int value, int &strongestPos, int &strongestNeg)
+{
+   if(value > strongestPos)
+      strongestPos = value;
+   if(value < strongestNeg)
+      strongestNeg = value;
+}
+
+string GapBias(const int gap)
+{
+   if(MathAbs(gap) < GapThreshold)
+      return("INVALID");
+   return(gap > 0 ? "BUY" : "SELL");
 }
 
 void ScorePairWindow(const string pair, const int timeframe, const bool advance)
@@ -329,8 +417,172 @@ void DrawPanel()
    CreateLabel(Prefix + "quote", x + 12, y + 65, FormatScoreLine(quote, quoteD1, quoteH4, quoteH1), TextColor, FontSize, "Consolas");
    CreateLabel(Prefix + "adv_base", x + 12, y + 86, FormatScoreLine("ADV " + base, advBaseD1, advBaseH4, advBaseH1), TextColor, FontSize, "Consolas");
    CreateLabel(Prefix + "adv_quote", x + 12, y + 102, FormatScoreLine("ADV " + quote, advQuoteD1, advQuoteH4, advQuoteH1), TextColor, FontSize, "Consolas");
+   CreateLabel(Prefix + "bias", x + 12, y + 124, "GAP " + SignedInt(MainGap) + "  BIAS " + MainBias, BiasColor(MainBias), FontSize, "Consolas");
+   CreateLabel(Prefix + "adv_bias", x + 240, y + 124, "ADV GAP " + SignedInt(AdvGap) + "  BIAS " + AdvBias, BiasColor(AdvBias), FontSize, "Consolas");
 
    ChartRedraw();
+}
+
+void DrawCurrentChartBoxes()
+{
+   RemoveObjectsByPrefix(BoxPrefix);
+   if(!ShowBoxes)
+      return;
+
+   string cleanPair = NormalizeSymbol(Symbol());
+   string symbol = ResolveBrokerSymbol(cleanPair);
+   if(symbol == "")
+      symbol = Symbol();
+
+   DrawOneBox(symbol, 0, "WagBox2", WagBox2Color);
+   DrawOneBox(symbol, 1, "WagBox1", WagBox1Color);
+   DrawOneBox(symbol, 2, "WagBox3", WagBox3Color);
+}
+
+void DrawOneBox(const string symbol, const int timeframe, const string label, const color clr)
+{
+   datetime startTime = 0;
+   datetime endTime = 0;
+   GetBoxWindow(timeframe, false, startTime, endTime);
+   if(startTime <= 0 || endTime <= startTime)
+      return;
+
+   double boxLow = 0;
+   double boxHigh = 0;
+   if(!CalculateBoxBounds(symbol, startTime, endTime, boxLow, boxHigh))
+      return;
+
+   string rectName = BoxPrefix + label;
+   ObjectCreate(0, rectName, OBJ_RECTANGLE, 0, startTime, boxHigh, endTime, boxLow);
+   ObjectSetInteger(0, rectName, OBJPROP_COLOR, clr);
+   ObjectSetInteger(0, rectName, OBJPROP_WIDTH, BoxLineWidth);
+   ObjectSetInteger(0, rectName, OBJPROP_STYLE, STYLE_SOLID);
+   ObjectSetInteger(0, rectName, OBJPROP_BACK, true);
+   ObjectSetInteger(0, rectName, OBJPROP_SELECTABLE, false);
+   ObjectSetInteger(0, rectName, OBJPROP_HIDDEN, true);
+
+   string labelName = BoxPrefix + label + "_txt";
+   ObjectCreate(0, labelName, OBJ_TEXT, 0, endTime, boxHigh);
+   ObjectSetText(labelName, label + "  " + DoubleToString(boxHigh, Digits) + " / " + DoubleToString(boxLow, Digits),
+                 MathMax(7, FontSize - 2), "Arial", clr);
+   ObjectSetInteger(0, labelName, OBJPROP_SELECTABLE, false);
+   ObjectSetInteger(0, labelName, OBJPROP_HIDDEN, true);
+}
+
+int LevelPeriodKey(const datetime barTime, const int kind)
+{
+   if(kind == 0)
+      return(TimeYear(barTime) * 10000 + TimeMonth(barTime) * 100 + TimeDay(barTime));
+   if(kind == 1)
+   {
+      datetime monday = StartOfWeek(barTime);
+      return(TimeYear(monday) * 10000 + TimeMonth(monday) * 100 + TimeDay(monday));
+   }
+   return(TimeYear(barTime) * 12 + TimeMonth(barTime));
+}
+
+bool PreviousLevelBounds(const string symbol, const int kind, double &low, double &high)
+{
+   int bars = iBars(symbol, PERIOD_H1);
+   if(bars < 2) return(false);
+   int currentKey = LevelPeriodKey(iTime(symbol, PERIOD_H1, 0), kind);
+   int previousKey = -1;
+   low = DBL_MAX;
+   high = -DBL_MAX;
+   bool found = false;
+   for(int i = 0; i < bars; i++)
+   {
+      datetime barTime = iTime(symbol, PERIOD_H1, i);
+      if(barTime <= 0) break;
+      int key = LevelPeriodKey(barTime, kind);
+      if(key == currentKey) continue;
+      if(previousKey < 0) previousKey = key;
+      if(key != previousKey) break;
+      double hi = iHigh(symbol, PERIOD_H1, i);
+      double lo = iLow(symbol, PERIOD_H1, i);
+      if(hi <= 0 || lo <= 0) continue;
+      high = MathMax(high, hi);
+      low = MathMin(low, lo);
+      found = true;
+   }
+   return(found);
+}
+
+bool PreviousYearBounds(const string symbol, double &low, double &high)
+{
+   int year = TimeYear(TimeCurrent()) - 1;
+   low = DBL_MAX;
+   high = -DBL_MAX;
+   bool found = false;
+   int bars = MathMin(25, iBars(symbol, PERIOD_MN1));
+   for(int i = 0; i < bars; i++)
+   {
+      datetime barTime = iTime(symbol, PERIOD_MN1, i);
+      if(barTime <= 0) break;
+      if(TimeYear(barTime) != year) continue;
+      double hi = iHigh(symbol, PERIOD_MN1, i);
+      double lo = iLow(symbol, PERIOD_MN1, i);
+      if(hi <= 0 || lo <= 0) continue;
+      high = MathMax(high, hi);
+      low = MathMin(low, lo);
+      found = true;
+   }
+   return(found);
+}
+
+void DrawPandaLevel(const string label, const double price, const color lineColor)
+{
+   if(price <= 0) return;
+   string lineName = LevelPrefix + label + "_line";
+   ObjectCreate(0, lineName, OBJ_HLINE, 0, 0, price);
+   ObjectSetInteger(0, lineName, OBJPROP_COLOR, lineColor);
+   ObjectSetInteger(0, lineName, OBJPROP_STYLE, STYLE_DOT);
+   ObjectSetInteger(0, lineName, OBJPROP_WIDTH, 1);
+   ObjectSetInteger(0, lineName, OBJPROP_SELECTABLE, false);
+   ObjectSetInteger(0, lineName, OBJPROP_HIDDEN, true);
+   if(!ShowLevelLabels) return;
+   string textName = LevelPrefix + label + "_text";
+   datetime at = iTime(Symbol(), Period(), 0);
+   if(at <= 0) at = TimeCurrent();
+   ObjectCreate(0, textName, OBJ_TEXT, 0, at, price);
+   ObjectSetText(textName, label + "  " + DoubleToString(price, Digits), 8, "Arial", lineColor);
+   ObjectSetInteger(0, textName, OBJPROP_SELECTABLE, false);
+   ObjectSetInteger(0, textName, OBJPROP_HIDDEN, true);
+}
+
+void DrawPandaLevels()
+{
+   RemoveObjectsByPrefix(LevelPrefix);
+   if(!ShowPandaLevels) return;
+   string symbol = Symbol();
+   double low = 0, high = 0;
+   if(PreviousLevelBounds(symbol, 0, low, high))
+   {
+      DrawPandaLevel("PDH", high, clrOrange);
+      DrawPandaLevel("PDL", low, clrOrange);
+   }
+   if(PreviousLevelBounds(symbol, 1, low, high))
+   {
+      DrawPandaLevel("PWH", high, clrDodgerBlue);
+      DrawPandaLevel("PWL", low, clrDodgerBlue);
+   }
+   if(PreviousLevelBounds(symbol, 2, low, high))
+   {
+      DrawPandaLevel("PMH", high, clrDarkViolet);
+      DrawPandaLevel("PML", low, clrDarkViolet);
+   }
+   if(PreviousYearBounds(symbol, low, high))
+   {
+      DrawPandaLevel("PYH", high, clrCrimson);
+      DrawPandaLevel("PYL", low, clrCrimson);
+   }
+}
+
+color BiasColor(const string bias)
+{
+   if(bias == "BUY") return(C'0,200,120');
+   if(bias == "SELL") return(AlertColor);
+   return(TextColor);
 }
 
 string SignedInt(const int value)
