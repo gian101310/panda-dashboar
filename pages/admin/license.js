@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Head from 'next/head';
-import { CTRADER_OVERLAY_PRODUCT_CODE, CTRADER_PANDA_LEVELS_PRODUCT_CODE, CTRADER_TRADE_PLAN_V13_PRODUCT_CODE, CTRADER_TREND_CONFLUENCE_PRODUCT_CODE, INDICATOR_PRODUCTS, isMt5OfflineLevelsProduct, isTrendConfluenceProduct, MT4_OVERLAY_PRODUCT_CODE, MT5_OVERLAY_PRODUCT_CODE, MT5_PANDA_LEVELS_PRODUCT_CODE, MT5_PANDA_LEVELS_VIP_PRODUCT_CODE, MT5_TREND_CONFLUENCE_PRODUCT_CODE } from '../../lib/indicatorProducts.mjs';
+import { CTRADER_RAW_SCORE_PRODUCT_CODE, CTRADER_OVERLAY_PRODUCT_CODE, CTRADER_PANDA_LEVELS_PRODUCT_CODE, CTRADER_TRADE_PLAN_V13_PRODUCT_CODE, CTRADER_TREND_CONFLUENCE_PRODUCT_CODE, INDICATOR_PRODUCTS, isMt5OfflineLevelsProduct, isTokenLicensedProduct, MT4_OVERLAY_PRODUCT_CODE, MT5_OVERLAY_PRODUCT_CODE, MT5_PANDA_LEVELS_PRODUCT_CODE, MT5_PANDA_LEVELS_VIP_PRODUCT_CODE, MT5_TREND_CONFLUENCE_PRODUCT_CODE } from '../../lib/indicatorProducts.mjs';
 import { generateIndicatorToken } from '../../lib/indicatorTokenGenerator.mjs';
 
 const mono = "'Share Tech Mono', monospace";
@@ -22,6 +22,7 @@ const downloadGroups = [
     platform: 'cTRADER',
     color: '#00b4ff',
     items: [
+      { code: CTRADER_RAW_SCORE_PRODUCT_CODE, title: 'PANDA RAW SCORE ENGINE', file: 'panda-raw-score-engine-ctrader.algo', kind: '.ALGO', href: `/api/indicator-download?product=${CTRADER_RAW_SCORE_PRODUCT_CODE}`, description: 'Mac and Windows. Register and approve the trading account, issue its token, then send the .algo and token to the client.' },
       { code: CTRADER_TREND_CONFLUENCE_PRODUCT_CODE, title: 'PANDA TREND CONFLUENCE v1', file: 'panda-trend-confluence-v1-ctrader.algo', kind: '.ALGO', href: `/api/indicator-download?product=${CTRADER_TREND_CONFLUENCE_PRODUCT_CODE}`, description: 'Licensed cTrader V5 strategy edition. Approve the account, issue its individual token below, then give the client the .algo and token.' },
       { code: CTRADER_OVERLAY_PRODUCT_CODE, title: 'PANDA SCORING DASHBOARD', file: 'panda-scoring-dashboard-ctrader-licensed.algo', kind: '.ALGO', href: `/api/indicator-download?product=${CTRADER_OVERLAY_PRODUCT_CODE}`, description: 'Licensed chart-pair scoring panel. Approve the cTrader account; no manual license key is needed.' },
       { code: CTRADER_PANDA_LEVELS_PRODUCT_CODE, title: 'PANDA LEVELS V2', file: 'Panda Levels V2 cTrader Licensed.algo', kind: '.ALGO', href: '/api/admin/panda-levels-download?platform=ctrader', description: 'Admin download. Create and approve the trading account license; disable or set an expiry here when needed.' },
@@ -595,8 +596,8 @@ export default function LicenseAdminPage() {
                             {license.status === 'DISABLED' ? 'ENABLE' : 'DISABLE'}
                           </button>
                           {isMt5OfflineLevelsProduct(license.product_code) && <button type="button" onClick={() => downloadMt5PandaLevelsLicense(license)} style={smallBtn('#00b4ff')}>DOWNLOAD LICENSE FILE</button>}
-                          {isTrendConfluenceProduct(license.product_code) && <button type="button" onClick={() => issueConfluenceToken(license)} style={smallBtn('#00b4ff')}>ISSUE / ROTATE TOKEN</button>}
-                          {isTrendConfluenceProduct(license.product_code) && <Badge label={license.confluence_token_issued_at ? `TOKEN ${formatDate(license.confluence_token_issued_at)}` : 'TOKEN NOT ISSUED'} color={license.confluence_token_issued_at ? '#00ff9f' : '#ffd166'} />}
+                          {isTokenLicensedProduct(license.product_code) && <button type="button" onClick={() => issueConfluenceToken(license)} style={smallBtn('#00b4ff')}>ISSUE / ROTATE TOKEN</button>}
+                          {isTokenLicensedProduct(license.product_code) && <Badge label={license.confluence_token_issued_at ? `TOKEN ${formatDate(license.confluence_token_issued_at)}` : 'TOKEN NOT ISSUED'} color={license.confluence_token_issued_at ? '#00ff9f' : '#ffd166'} />}
                           <button onClick={() => deleteLicense(license.id, license.customer_name)} style={smallBtn('#ff9944')}>DELETE</button>
                         </div>
                       </td>
@@ -610,7 +611,7 @@ export default function LicenseAdminPage() {
           {confluenceToken && (
             <div role="dialog" aria-modal="true" aria-label="Trend Confluence license token" style={{ position: 'fixed', inset: 0, background: 'rgba(2,5,12,0.88)', zIndex: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
               <div style={{ width: 'min(640px,100%)', background: '#0e1525', border: '1px solid #00b4ff66', borderRadius: 10, padding: 20 }}>
-                <div style={{ fontFamily: orb, fontSize: 12, color: '#00b4ff' }}>PANDA TREND CONFLUENCE v1 TOKEN</div>
+                <div style={{ fontFamily: orb, fontSize: 12, color: '#00b4ff' }}>PANDA ACCOUNT LICENSE TOKEN</div>
                 <p style={{ fontFamily: raj, color: '#c8d5e7' }}>For {confluenceToken.customer} · {confluenceToken.platform} account {confluenceToken.account}. Copy this token now; Panda stores only its hash and cannot reveal it later.</p>
                 <textarea readOnly value={confluenceToken.token} onFocus={(e) => e.target.select()} style={{ ...input, width: '100%', minHeight: 65, fontFamily: mono, overflowWrap: 'anywhere' }} />
                 <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>

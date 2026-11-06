@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Text.Json;
 using System.Linq;
 using cAlgo.API;
+using cAlgo.API.Internals;
 
 namespace cAlgo
 {
@@ -22,8 +23,8 @@ namespace cAlgo
         private static readonly Color Muted = Color.FromHex("#8b9aa8");
         private static readonly Color Buy = Color.FromHex("#00ff9f");
         private static readonly Color Sell = Color.FromHex("#ff4d6d");
-        [Parameter("Operator Token", DefaultValue = "", Group = "Panda Feed")]
-        public string OperatorToken { get; set; }
+        [Parameter("License Token", DefaultValue = "", Group = "Panda Feed")]
+        public string LicenseToken { get; set; }
 
         [Parameter("Refresh (seconds)", DefaultValue = 30, MinValue = 15, MaxValue = 120)]
         public int RefreshSeconds { get; set; }
@@ -41,8 +42,10 @@ namespace cAlgo
         private string _pair;
         private DateTime _nextRequest = DateTime.MinValue;
         private bool _requestInFlight, _destroyed;
+        private string _activeAccount;
+        private int _accountGeneration;
         private DateTime _expiresAt = DateTime.MinValue;
-        private const string Endpoint = "https://pandaengine.app/api/ctrader-overlay";
+        private const string Endpoint = "https://pandaengine.app/api/trend-confluence-feed";
 
         protected override void Initialize()
         {
@@ -76,6 +79,8 @@ namespace cAlgo
                 _overlay.AddChild(line);
             Chart.AddControl(_overlay);
 
+            Account.Switched += OnAccountSwitched;
+            ResetAccount();
             Timer.TimerTick += OnTimerTick;
             Timer.Start(2);
             Refresh();
@@ -85,6 +90,7 @@ namespace cAlgo
         {
             VisibilitySentinel[index] = double.NaN;
             UpdateVisibility();
+            CheckAccount();
         }
 
         private static TextBlock Line(string value, Color color, double size = 11, bool bold = false)
@@ -121,32 +127,62 @@ namespace cAlgo
             _overlay.IsVisible = visible;
         }
 
+        private void OnAccountSwitched(AccountSwitchedEventArgs args)
+        {
+            ResetAccount();
+            Refresh();
+        }
+        private void CheckAccount()
+        {
+            if (_activeAccount != Account.Number.ToString(CultureInfo.InvariantCulture)) ResetAccount();
+        }
+        private void ResetAccount()
+        {
+            _activeAccount = Account.Number.ToString(CultureInfo.InvariantCulture);
+            _accountGeneration++;
+            _requestInFlight = false;
+            _expiresAt = DateTime.MinValue;
+            _nextRequest = DateTime.MinValue;
+            if (_status != null) Clear("Checking registered account " + _activeAccount);
+        }
+
         private void Refresh()
         {
+            CheckAccount();
             _spread.Text = SpreadText();
             if (_pair == null) { Clear("Unsupported or ambiguous chart symbol"); return; }
             if (DateTime.UtcNow >= _expiresAt) Clear("Waiting for fresh Panda engine data");
             if (_requestInFlight || DateTime.UtcNow < _nextRequest) return;
-            var token = (OperatorToken ?? "").Trim();
-            if (token.Length < 32) { Clear("Enter your Panda Operator Token"); return; }
+            var token = (LicenseToken ?? "").Trim();
+            if (token.Length != 64 || token.Any(c => !Uri.IsHexDigit(c))) { Clear("Enter your Panda License Token"); return; }
             _requestInFlight = true;
             _nextRequest = DateTime.UtcNow.AddSeconds(RefreshSeconds);
             var request = new HttpRequest(new Uri(Endpoint));
             request.Method = HttpMethod.Get;
             request.Timeout = TimeSpan.FromSeconds(12);
-            request.Headers.Add("x-panda-operator-token", token);
-            try { Http.SendAsync(request, response => BeginInvokeOnMainThread(() => Complete(response))); }
+            request.Headers.Add("x-panda-confluence-token", token);
+            request.Headers.Add("x-panda-account-number", _activeAccount);
+            request.Headers.Add("x-panda-product-code", "ctrader_raw_score_engine");
+            int generation = _accountGeneration;
+            try { Http.SendAsync(request, response => BeginInvokeOnMainThread(() => Complete(response, generation))); }
             catch { _requestInFlight = false; _expiresAt = DateTime.MinValue; Clear("Panda feed unavailable"); }
         }
 
-        private void Complete(HttpResponse response)
+        private void Complete(HttpResponse response, int generation)
         {
+            if (_destroyed || generation != _accountGeneration || _activeAccount != Account.Number.ToString(CultureInfo.InvariantCulture)) return;
             _requestInFlight = false;
-            if (_destroyed) return;
             try
             {
                 if (response == null || !response.IsSuccessful)
-                    throw new InvalidOperationException("Feed request failed");
+                {
+                    string status = "Feed unavailable";
+                    if (response != null && !string.IsNullOrWhiteSpace(response.Body))
+                        using (var error = JsonDocument.Parse(response.Body)) status = TextValue(error.RootElement, "status");
+                    _expiresAt = DateTime.MinValue;
+                    Clear("ACCOUNT " + _activeAccount + "  |  " + status);
+                    return;
+                }
                 using (var doc = JsonDocument.Parse(response.Body))
                 {
                     var envelope = doc.RootElement;
@@ -218,6 +254,7 @@ namespace cAlgo
         protected override void OnDestroy()
         {
             _destroyed = true;
+            Account.Switched -= OnAccountSwitched;
             Timer.Stop();
             if (_overlay != null) Chart.RemoveControl(_overlay);
         }

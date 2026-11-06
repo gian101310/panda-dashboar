@@ -1,3 +1,8 @@
+## 2026-11-06 - Bind Raw Score Engine to registered account licenses
+- Added a dedicated Raw Score Engine product and admin download with existing per-account issue/rotate token controls.
+- Reused hashed license tokens, approval/payment/expiry checks and registered cTrader trading account matching. Removed operator-token use from this package.
+- Clear scores on account switch and ignore old-account responses; added feed authorization tests. Existing scoring remains unchanged.
+
 ## 2026-11-06 - Add Mac and Windows engine-fed raw score panel
 - Extended the authenticated cTrader feed with current/ADV scores, execution, confidence and ATR; scoring unchanged.
 - Added Panda Raw Score Engine with timestamp expiry and live cTrader spread; no local MT4 files required.

@@ -18,7 +18,7 @@ export default async function handler(req, res) {
       .eq('id', licenseId).maybeSingle();
     if (lookupError) throw lookupError;
     if (!license || !confluencePlatform(license.product_code) || confluencePlatform(license.product_code) !== license.platform)
-      return res.status(404).json({ error: 'Trend Confluence license not found' });
+      return res.status(404).json({ error: 'Account token license not found' });
     if (req.method === 'DELETE') {
       const { error } = await supabase.from('indicator_confluence_tokens').delete().eq('license_id', licenseId);
       if (error) throw error;
