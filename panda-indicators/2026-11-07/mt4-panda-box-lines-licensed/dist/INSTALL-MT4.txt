@@ -1,4 +1,4 @@
-PANDA BOX AND LINES LICENSED - MT4 (v1.40)
+PANDA BOX AND LINES LICENSED - MT4 (v1.41)
 
 1. In MT4, open File > Open Data Folder.
 2. Copy MQL4/Indicators/Panda Box and Lines Licensed.ex4 into MQL4/Indicators.
@@ -14,6 +14,11 @@ PANDA BOX AND LINES LICENSED - MT4 (v1.40)
 The EA checks immediately and every 5 minutes. The indicator updates every 5
 seconds. If the account is not approved or the check is unavailable/stale, the
 indicator hides its scores and chart drawings and shows a license status.
+
+The indicator Inputs tab has one setting: PanelPosition (upper left or upper
+right). The panel starts in the upper right. Box drawing settings are internal.
+The three boxes are yellow and all panel text is blue. The narrow top strip
+can still be dragged to move the panel temporarily.
 
 Scores and ADV forecast are calculated locally from MT4 broker history across
 21 Panda pairs. H1 history for those pairs must be loaded. The license EA only

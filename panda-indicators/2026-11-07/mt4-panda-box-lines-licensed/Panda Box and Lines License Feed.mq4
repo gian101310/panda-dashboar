@@ -1,8 +1,8 @@
 #property strict
-#property version "1.00"
+#property version "1.01"
 #property description "Read-only license checker for Panda Box and Lines Licensed. Does not place trades."
 
-input int CheckEverySeconds = 300;
+int CheckEverySeconds = 300;
 
 string LicenseUrl = "https://pandaengine.app/api/panda-box-lines-license";
 

@@ -1,30 +1,31 @@
 #property strict
 #property indicator_chart_window
-#property version "1.40"
+#property version "1.41"
 #property description "Panda Box and Lines Licensed: standalone scores, bias, boxes and previous-period levels."
 
-input int    RefreshSeconds = 5;
-input bool   PanelDefaultBottomRight = true;
-input int    PanelX         = 20;
-input int    PanelY         = 30;
-input int    FontSize       = 10;
-input color  TextColor      = clrMagenta;
-input color  AlertColor     = clrRed;
-input int    GapThreshold   = 5;
-input bool   ShowBoxes      = true;
-input color  WagBox2Color   = C'70,120,255';
-input color  WagBox1Color   = C'0,200,120';
-input color  WagBox3Color   = C'255,160,50';
-input int    BoxLineWidth   = 1;
-input bool   ShowPandaLevels = true;
-input bool   ShowLevelLabels = true;
-input int    BoxCalcTF      = PERIOD_H1;
-input int    WagBox3Days    = 2;
-input int    WagBox3Offset  = 1;
-input int    WagBox1Weeks   = 2;
-input int    WagBox1Offset  = 1;
-input int    WagBox2Months  = 2;
-input int    WagBox2Offset  = 1;
+enum ENUM_PANDA_PANEL_POSITION { PANEL_UPPER_LEFT, PANEL_UPPER_RIGHT };
+input ENUM_PANDA_PANEL_POSITION PanelPosition = PANEL_UPPER_RIGHT;
+
+int    RefreshSeconds = 5;
+int    PanelX         = 20;
+int    PanelY         = 30;
+int    FontSize       = 10;
+color  TextColor      = clrBlue;
+int    GapThreshold   = 5;
+bool   ShowBoxes      = true;
+color  WagBox2Color   = clrYellow;
+color  WagBox1Color   = clrYellow;
+color  WagBox3Color   = clrYellow;
+int    BoxLineWidth   = 1;
+bool   ShowPandaLevels = true;
+bool   ShowLevelLabels = true;
+int    BoxCalcTF      = PERIOD_H1;
+int    WagBox3Days    = 2;
+int    WagBox3Offset  = 1;
+int    WagBox1Weeks   = 2;
+int    WagBox1Offset  = 1;
+int    WagBox2Months  = 2;
+int    WagBox2Offset  = 1;
 
 string Prefix = "";
 string BoxPrefix = "";
@@ -491,10 +492,10 @@ void DrawPanel()
    int advQuoteH1 = CurrencyScore(quote, 2, true);
 
    CreatePanelBackground(x, y);
-   CreateLabel(Prefix + "title", x + 12, y + 12, "PANDA BOX AND LINES LICENSED  |  " + pair, C'0,180,255', FontSize + 1, "Consolas");
+   CreateLabel(Prefix + "title", x + 12, y + 12, "PANDA BOX AND LINES LICENSED  |  " + pair, TextColor, FontSize + 1, "Consolas");
    if(!LicenseApproved)
    {
-      CreateLabel(Prefix + "license", x + 12, y + 49, LicenseStatus, AlertColor, FontSize, "Consolas");
+      CreateLabel(Prefix + "license", x + 12, y + 49, LicenseStatus, TextColor, FontSize, "Consolas");
       ChartRedraw();
       return;
    }
@@ -503,11 +504,11 @@ void DrawPanel()
    CreateLabel(Prefix + "quote", x + 12, y + 65, FormatScoreLine(quote, quoteD1, quoteH4, quoteH1), TextColor, FontSize, "Consolas");
    CreateLabel(Prefix + "adv_base", x + 12, y + 86, FormatScoreLine("ADV " + base, advBaseD1, advBaseH4, advBaseH1), TextColor, FontSize, "Consolas");
    CreateLabel(Prefix + "adv_quote", x + 12, y + 102, FormatScoreLine("ADV " + quote, advQuoteD1, advQuoteH4, advQuoteH1), TextColor, FontSize, "Consolas");
-   CreateLabel(Prefix + "bias", x + 12, y + 124, "GAP " + SignedInt(MainGap) + "  BIAS " + MainBias, BiasColor(MainBias), FontSize, "Consolas");
+   CreateLabel(Prefix + "bias", x + 12, y + 124, "GAP " + SignedInt(MainGap) + "  BIAS " + MainBias, TextColor, FontSize, "Consolas");
    string forecast = "ADV " + AdvHorizon + " FORECAST ";
    if(AdvInvalid) forecast += "INVALID";
    else forecast += SignedInt(AdvGap) + "  " + AdvBias;
-   CreateLabel(Prefix + "adv_bias", x + 210, y + 124, forecast, BiasColor(AdvBias), FontSize, "Consolas");
+   CreateLabel(Prefix + "adv_bias", x + 210, y + 124, forecast, TextColor, FontSize, "Consolas");
 
    ChartRedraw();
 }
@@ -553,7 +554,7 @@ void DrawOneBox(const string symbol, const int timeframe, const string label, co
    string labelName = BoxPrefix + label + "_txt";
    ObjectCreate(0, labelName, OBJ_TEXT, 0, endTime, boxHigh);
    ObjectSetText(labelName, label + "  " + DoubleToString(boxHigh, Digits) + " / " + DoubleToString(boxLow, Digits),
-                 MathMax(7, FontSize - 2), "Arial", clr);
+                 MathMax(7, FontSize - 2), "Arial", TextColor);
    ObjectSetInteger(0, labelName, OBJPROP_SELECTABLE, false);
    ObjectSetInteger(0, labelName, OBJPROP_HIDDEN, true);
 }
@@ -634,7 +635,7 @@ void DrawPandaLevel(const string label, const double price, const color lineColo
    datetime at = iTime(Symbol(), Period(), 0);
    if(at <= 0) at = TimeCurrent();
    ObjectCreate(0, textName, OBJ_TEXT, 0, at, price);
-   ObjectSetText(textName, label + "  " + DoubleToString(price, Digits), 8, "Arial", lineColor);
+   ObjectSetText(textName, label + "  " + DoubleToString(price, Digits), 8, "Arial", TextColor);
    ObjectSetInteger(0, textName, OBJPROP_SELECTABLE, false);
    ObjectSetInteger(0, textName, OBJPROP_HIDDEN, true);
 }
@@ -665,13 +666,6 @@ void DrawPandaLevels()
       DrawPandaLevel("PYH", high, clrCrimson);
       DrawPandaLevel("PYL", low, clrCrimson);
    }
-}
-
-color BiasColor(const string bias)
-{
-   if(bias == "BUY") return(C'0,200,120');
-   if(bias == "SELL") return(AlertColor);
-   return(TextColor);
 }
 
 string SignedInt(const int value)
@@ -792,7 +786,7 @@ string TrimCopy(string text)
 
 void InitPanelPosition()
 {
-   if(!PanelDefaultBottomRight)
+   if(PanelPosition == PANEL_UPPER_LEFT)
    {
       PanelPosX = PanelX;
       PanelPosY = PanelY;
@@ -800,9 +794,8 @@ void InitPanelPosition()
    }
 
    int chartWidth = (int)ChartGetInteger(0, CHART_WIDTH_IN_PIXELS, 0);
-   int chartHeight = (int)ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS, 0);
    PanelPosX = chartWidth - PanelWidth - PanelX;
-   PanelPosY = chartHeight - PanelHeight - PanelY;
+   PanelPosY = PanelY;
    if(PanelPosX < 0) PanelPosX = 0;
    if(PanelPosY < 0) PanelPosY = 0;
 }

@@ -1,3 +1,8 @@
+## 2026-11-07 - Simplify licensed MT4 Box and Lines inputs
+- Exposed only upper-left or upper-right panel placement; kept box calculation and license EA settings internal.
+- Changed the three box outlines to yellow and all indicator text to blue; positioned the panel at the top of the chart.
+- Left the original personal indicator unchanged.
+
 ## 2026-11-07 - Add separate licensed Panda Box and Lines MT4
 - Kept the original personal indicator unchanged and created a separately named licensed indicator plus read-only license-check EA.
 - Registered an MT4 account approval product, a tokenless Panda Engine check endpoint, License Admin download, and a compiled installation package.

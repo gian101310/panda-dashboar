@@ -8,4 +8,6 @@ The EA calls `POST https://pandaengine.app/api/panda-box-lines-license` with `ac
 
 Install and activation steps are in `INSTALL-MT4.txt`. The package in `dist` contains both compiled EX4 files.
 
+The licensed indicator exposes only upper-left/upper-right panel placement. Box calculation parameters are internal. Boxes default to yellow and panel text to blue. The license EA has no customer inputs.
+
 Account-number-only approval is a convenience control, not cryptographic proof of terminal identity. A modified local client could bypass it. This version is intended for account-approved distribution, while the original remains the owner's personal build.
