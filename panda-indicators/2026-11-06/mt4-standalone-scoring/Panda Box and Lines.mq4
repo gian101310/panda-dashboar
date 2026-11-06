@@ -1,6 +1,6 @@
 #property strict
 #property indicator_chart_window
-#property version "1.31"
+#property version "1.32"
 #property description "Panda Box and Lines: standalone scores, bias, boxes and previous-period levels."
 
 input int    RefreshSeconds = 5;
@@ -56,6 +56,8 @@ int MainGap = 0;
 int AdvGap = 0;
 string MainBias = "WAIT";
 string AdvBias = "WAIT";
+string AdvHorizon = "TMRW";
+bool AdvInvalid = false;
 
 int OnInit()
 {
@@ -148,6 +150,7 @@ void CalculateCurrentGaps()
    AdvGap = 0;
    MainBias = "WAIT";
    AdvBias = "WAIT";
+   AdvInvalid = false;
 
    string pair = CurrentPair;
    if(StringLen(pair) < 6)
@@ -165,14 +168,44 @@ void CalculateCurrentGaps()
    MainGap = baseStrong - quoteStrong;
    MainBias = GapBias(MainGap);
 
-   int advBaseStrong = StrongestScore(CurrencyScore(base, 0, true),
-                                      CurrencyScore(base, 1, true),
-                                      CurrencyScore(base, 2, true));
-   int advQuoteStrong = StrongestScore(CurrencyScore(quote, 0, true),
-                                       CurrencyScore(quote, 1, true),
-                                       CurrencyScore(quote, 2, true));
-   AdvGap = advBaseStrong - advQuoteStrong;
-   AdvBias = GapBias(AdvGap);
+   CalculateAdvForecast(base, quote);
+}
+
+bool ForecastCurrencyConflict(const int d1, const int h4, const int h1)
+{
+   return((d1 >= 4 || h4 >= 4 || h1 >= 4) &&
+          (d1 <= -4 || h4 <= -4 || h1 <= -4));
+}
+
+void CalculateAdvForecast(const string base, const string quote)
+{
+   // Match the Pair Card and snapshot forecast: only advancing horizons are
+   // substituted, and the next trading session is chosen in Dubai time.
+   datetime dubaiNow = TimeGMT() + 4 * 3600;
+   int day = TimeDayOfWeek(dubaiNow); // Sunday=0, Friday=5, Saturday=6
+   int daysToSession = day == 5 ? 3 : day == 6 ? 2 : 1;
+   datetime nextSession = dubaiNow + daysToSession * 86400;
+   bool newMonth = TimeMonth(nextSession) != TimeMonth(dubaiNow) ||
+                   TimeYear(nextSession) != TimeYear(dubaiNow);
+   AdvHorizon = newMonth ? "MTH" : (day >= 1 && day <= 4 ? "TMRW" : "WK");
+
+   int baseD1 = CurrencyScore(base, 0, AdvHorizon == "MTH");
+   int quoteD1 = CurrencyScore(quote, 0, AdvHorizon == "MTH");
+   int baseH4 = CurrencyScore(base, 1, AdvHorizon != "TMRW");
+   int quoteH4 = CurrencyScore(quote, 1, AdvHorizon != "TMRW");
+   int baseH1 = CurrencyScore(base, 2, true);
+   int quoteH1 = CurrencyScore(quote, 2, true);
+
+   AdvInvalid = ForecastCurrencyConflict(baseD1, baseH4, baseH1) ||
+                ForecastCurrencyConflict(quoteD1, quoteH4, quoteH1);
+   if(AdvInvalid)
+   {
+      AdvBias = "INVALID";
+      return;
+   }
+   AdvGap = StrongestScore(baseD1, baseH4, baseH1) -
+            StrongestScore(quoteD1, quoteH4, quoteH1);
+   AdvBias = AdvGap >= 5 ? "BUY" : AdvGap <= -5 ? "SELL" : "WAIT";
 }
 
 int StrongestScore(const int d1, const int h4, const int h1)
@@ -418,7 +451,10 @@ void DrawPanel()
    CreateLabel(Prefix + "adv_base", x + 12, y + 86, FormatScoreLine("ADV " + base, advBaseD1, advBaseH4, advBaseH1), TextColor, FontSize, "Consolas");
    CreateLabel(Prefix + "adv_quote", x + 12, y + 102, FormatScoreLine("ADV " + quote, advQuoteD1, advQuoteH4, advQuoteH1), TextColor, FontSize, "Consolas");
    CreateLabel(Prefix + "bias", x + 12, y + 124, "GAP " + SignedInt(MainGap) + "  BIAS " + MainBias, BiasColor(MainBias), FontSize, "Consolas");
-   CreateLabel(Prefix + "adv_bias", x + 240, y + 124, "ADV GAP " + SignedInt(AdvGap) + "  BIAS " + AdvBias, BiasColor(AdvBias), FontSize, "Consolas");
+   string forecast = "ADV " + AdvHorizon + " FORECAST ";
+   if(AdvInvalid) forecast += "INVALID";
+   else forecast += SignedInt(AdvGap) + "  " + AdvBias;
+   CreateLabel(Prefix + "adv_bias", x + 210, y + 124, forecast, BiasColor(AdvBias), FontSize, "Consolas");
 
    ChartRedraw();
 }

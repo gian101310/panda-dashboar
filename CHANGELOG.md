@@ -1,3 +1,7 @@
+## 2026-11-07 - Correct MT4 ADV forecast bias
+- Replaced the all-ADV gap with Dubai-session TMRW/WK/MTH horizon substitutions used by the Pair Card and engine snapshot forecast.
+- Added opposing-extreme invalidation and projected BUY/SELL/WAIT classification at gap 5; current scores and bias remain unchanged.
+
 ## 2026-11-07 - Rename MT4 indicator to Panda Box and Lines
 - Renamed the indicator source, MT4 display name, EX4 and installation ZIP. Scoring, bias, boxes and levels are unchanged.
 

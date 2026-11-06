@@ -1,9 +1,11 @@
-PANDA BOX AND LINES - MT4 (v1.31)
+PANDA BOX AND LINES - MT4 (v1.32)
 
 Copy Panda Box and Lines.ex4 into MT4's Data Folder > MQL4 > Indicators.
 Refresh Navigator and attach it to a supported currency-pair chart.
 
-The panel shows current and ADV D1/H4/H1 net scores, gap, and bias.
+The panel shows current and ADV D1/H4/H1 net scores, current gap/bias,
+and a TMRW, WK, or MTH projected ADV gap/bias chosen by Dubai session.
+ADV is a forecast; confirm it against the next live score.
 The chart draws the three scoring boxes and Panda Levels (PD/PW/PM/PY high/low).
 Use ShowBoxes, ShowPandaLevels, and ShowLevelLabels to control the drawings.
 Drag the narrow strip at the top of the score panel to move it.
