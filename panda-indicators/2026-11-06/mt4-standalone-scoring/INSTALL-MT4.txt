@@ -1,19 +1,16 @@
-PANDA RAW SCORE — MT4 (v1.10)
+PANDA STANDALONE RAW SCORE - MT4 (v1.20)
 
-Copy PandaStandaloneScoringMT4.ex4 to MT4's Data Folder > MQL4 > Indicators.
-Refresh Navigator and attach it to a forex chart.
+Copy PandaStandaloneScoringMT4.ex4 into MT4's Data Folder > MQL4 > Indicators.
+Refresh Navigator and attach it to a chart for one of Panda's 21 currency pairs.
 
-The panel shows only:
-- BASE and QUOTE raw D1 / H4 / H1 scores
-- ADV scores for both currencies
-- BIAS
+The panel shows current and ADV net D1, H4, and H1 currency scores.
+It calculates directly from MT4 broker prices and H1 history, using the same
+box windows and vote totals as Scoring with Adv v1 MT4.
 
-Hold the left mouse button on the title row marked [drag] and drag the whole panel. Its position stays in place during score refreshes. PanelX and PanelY set its initial location after reattaching/changing settings.
+No MT4 export files, Panda engine, other indicator, EA, token, or web access.
+It does not draw boxes or show gap, bias, ATR, or spread.
 
-No EA, engine connection, token, source indicator, ATR, spread, gap, execution/confidence display, or chart boxes.
-
-Scoring uses all 21 pairs and the existing box rules. Main boxes span two months/weeks/trading days with a one-period offset; ADV uses the same spans without that offset. H1 prices build all ranges. Above a box votes +1 for base/-1 for quote, below reverses, and inside votes zero. Positive/negative components stay separate, e.g. +3/-1. Bias uses the existing Panda gap and invalidation rules internally.
-
-MT4 may need H1 history for all 21 pairs; load at least 3+ months when a history message appears. Symbols are added to Market Watch as needed. Prices are the broker's latest available quotes, like a regular indicator. Compare on the same broker and at the same time as the original.
-
-Compiled with 0 errors and 0 warnings. Scoring matched 2,000 locked-engine test cases. Live mouse-drag/chart comparison remains unverified.
+The narrow strip at the top of the panel can be dragged. PanelX and PanelY
+set its initial position; by default it starts near the bottom right.
+Ensure the broker has H1 history for all 21 pairs. Compare with the original
+Scoring with Adv v1 MT4 on the same broker and at the same time.

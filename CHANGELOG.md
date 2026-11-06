@@ -1,3 +1,8 @@
+## 2026-11-07 - Correct standalone MT4 raw scores against ADV v1
+- Rebuilt the standalone panel from the installed Scoring with Adv v1 MT4 source instead of the separate engine-scoring reconstruction.
+- Restored ADV v1 net votes and calendar-day box windows; display current and ADV D1/H4/H1 values only, without file export or chart drawings.
+- Recompiled the corrected indicator in MetaEditor 4 with zero errors and warnings. Live broker comparison remains pending.
+
 ## 2026-11-06 - Simplify standalone MT4 panel and add dragging
 - Show only raw BASE/QUOTE timeframe scores, ADV scores and bias.
 - Drag the title row to move the entire panel; retain position on refresh and restore chart scrolling after dragging.

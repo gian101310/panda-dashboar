@@ -1,17 +1,9 @@
-# Panda Standalone Scoring for MT4
+# Panda Standalone Raw Score MT4
 
-A plain movable panel showing BASE/QUOTE raw timeframe scores, ADV scores and bias. Drag its title row to move the whole panel; score refreshes retain the current position. No EA, external indicator, engine feed, token, files or web calls. No additional chart drawings or trading metrics. See INSTALL-MT4.txt.
+This indicator is derived from the installed `Scoring with Adv v1 MT4.mq4` source (SHA-256 `145f2384e2740fe2a8277c48c4a05add7eec1a7dbcfb135e8c824d59fc4f2f7c`). Its six 21-pair scoring passes, box windows, bounds, broker-symbol resolution, net currency votes, and score formatting are retained. It does not read or write export files and does not use the Panda engine, an EA, a token, or network access.
 
-Private sources are the four `.mq4`/`.mqh` files. Distribute only the compiled `.ex4` or ZIP in `dist`.
+The panel shows current and ADV D1/H4/H1 **net** scores for the chart pair's base and quote currencies. It omits the source indicator's boxes, ATR, spread, gaps, bias, and file export. Source file: `PandaStandaloneScoringMT4.mq4`; compiled file and ZIP: `dist/`.
 
-Calculation verification:
+With the original default inputs, monthly and weekly main windows end one period before the current period; ADV ends at the current period boundary. Daily windows use **calendar days**, exactly as ADV v1 does, and H1 bars build all three ranges. Each pair votes +1/-1 outside its box and zero inside. Votes are summed into one signed number per currency and timeframe. Missing symbols, prices, or bounds are skipped, matching ADV v1.
 
-```sh
-python3 panda-indicators/2026-11-06/mt4-standalone-scoring/tests/engine_parity.py
-clang++ -std=c++17 panda-indicators/2026-11-06/mt4-standalone-scoring/tests/score_math.cpp -o /tmp/panda-score-math-test
-/tmp/panda-score-math-test
-clang++ -std=c++17 panda-indicators/2026-11-06/mt4-standalone-scoring/tests/score_windows.cpp -o /tmp/panda-score-window-test
-/tmp/panda-score-window-test
-```
-
-The parity test extracts only the locked scoring function ASTs from app.py; it never imports or starts the engine. Both native test programs compile the actual MQL-compatible math/window headers. MetaEditor 4 compile evidence is in dist/compile.log. Live broker/chart comparison remains pending.
+MetaEditor 4 compilation: `dist/compile.log` reports 0 errors, 0 warnings. A live side-by-side comparison against ADV v1 on the same broker remains to be done. The previous package and its engine-parity claim applied to a different calculation and are superseded.
