@@ -1,6 +1,6 @@
 # Panda Standalone Scoring for MT4
 
-One self-contained indicator with local 21-pair scoring, current/ADV raw components, gap/bias/execution/confidence, H1/D1 ATR, spread and current-chart boxes. No EA, external indicator, engine feed, license token, HTTP calls, file imports or exports. See INSTALL-MT4.txt for installation and broker time settings.
+A plain movable panel showing BASE/QUOTE raw timeframe scores, ADV scores and bias. Drag its title row to move the whole panel; score refreshes retain the current position. No EA, external indicator, engine feed, token, files or web calls. No additional chart drawings or trading metrics. See INSTALL-MT4.txt.
 
 Private sources are the four `.mq4`/`.mqh` files. Distribute only the compiled `.ex4` or ZIP in `dist`.
 

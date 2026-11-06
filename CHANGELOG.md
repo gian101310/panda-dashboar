@@ -1,3 +1,8 @@
+## 2026-11-06 - Simplify standalone MT4 panel and add dragging
+- Show only raw BASE/QUOTE timeframe scores, ADV scores and bias.
+- Drag the title row to move the entire panel; retain position on refresh and restore chart scrolling after dragging.
+- Removed visible gap, execution, confidence, ATR, spread, chart boxes and broker-offset settings. Box scoring remains unchanged.
+
 ## 2026-11-06 - Add independent standalone MT4 scoring panel
 - Added a single MT4 indicator calculating all 21 pair box votes, current/ADV scores, gap/bias/execution/confidence, ATR and spread without an EA, source indicator, license token or Panda engine feed.
 - Fail closed on incomplete history, missing symbols and stale quotes; include optional current-chart boxes and broker UTC-offset freshness checks.

@@ -4,4 +4,4 @@ C:\panda_standalone_build\PandaStandaloneScoringMT4.mq4 : information: compiling
 C:\panda_standalone_build\PandaScoreMath.mqh : information: including 'PandaScoreMath.mqh'
 C:\panda_standalone_build\PandaScoreWindows.mqh : information: including 'PandaScoreWindows.mqh'
 C:\panda_standalone_build\PandaRawScorePanel.mqh : information: including 'PandaRawScorePanel.mqh'
-Result: 0 errors, 0 warnings, 107 msec elapsed
+Result: 0 errors, 0 warnings, 115 msec elapsed

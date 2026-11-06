@@ -1,5 +1,5 @@
 #property strict
-#property version "1.00"
+#property version "1.10"
 #property indicator_chart_window
 #property indicator_buffers 0
 #property description "Independent 21-pair Panda box scoring. No EA, files, API or external indicator."
@@ -7,12 +7,14 @@
 #include "PandaScoreWindows.mqh"
 #include "PandaRawScorePanel.mqh"
 input int RefreshSeconds=5;
-input int BrokerUtcOffsetHours=3; // Used only to check quote age; boxes use broker timestamps.
-input int MaximumQuoteAgeSeconds=300;
-input bool ShowBoxes=true;
 input int PanelX=16;
 input int PanelY=24;
 string objectPrefix;
+int panelLeft=16,panelTop=24;
+bool panelDragging=false,scrollBeforeDrag=true,mouseMoveBefore=false,leftPreviouslyDown=false;
+int dragOffsetX=0,dragOffsetY=0;
+const int PANEL_WIDTH=440;
+const int PANEL_HEIGHT=166;
 string currencies[7]={"AUD","CAD","EUR","GBP","JPY","NZD","USD"};
 string pairs[21]={"AUDCAD","AUDJPY","AUDNZD","AUDUSD","CADJPY","EURAUD","EURCAD","EURGBP","EURJPY","EURNZD","EURUSD","GBPAUD","GBPCAD","GBPJPY","GBPNZD","GBPUSD","NZDCAD","NZDJPY","NZDUSD","USDCAD","USDJPY"};
 string brokerSymbols[21];
@@ -50,10 +52,9 @@ void ResetVotes(){ArrayInitialize(positive,0);ArrayInitialize(negative,0);ArrayI
 void AddVote(int currency,int tf,int vote,bool advance){if(advance){if(vote>0)advPositive[currency][tf]++;if(vote<0)advNegative[currency][tf]--;}else{if(vote>0)positive[currency][tf]++;if(vote<0)negative[currency][tf]--;}}
 bool ComputeScores(){
  ResetVotes();if(!IsConnected()){dataStatus="BROKER DISCONNECTED";return false;}if(!BuildBoxes())return false;
- datetime brokerNow=TimeGMT()+BrokerUtcOffsetHours*3600;
  for(int p=0;p<21;p++){
- double bid=MarketInfo(brokerSymbols[p],MODE_BID);datetime tick=(datetime)MarketInfo(brokerSymbols[p],MODE_TIME);long age=(long)brokerNow-(long)tick;
- if(bid<=0 || tick<=0 || age< -60 || age>MaximumQuoteAgeSeconds){dataStatus="STALE QUOTE: "+pairs[p]+" / CHECK UTC OFFSET";return false;}
+ double bid=MarketInfo(brokerSymbols[p],MODE_BID);
+ if(bid<=0){dataStatus="WAITING FOR PRICE: "+pairs[p];return false;}
  int base=CurrencyIndex(StringSubstr(pairs[p],0,3)),quote=CurrencyIndex(StringSubstr(pairs[p],3,3));
  for(int w=0;w<6;w++){int vote=PandaVote(bid,boxLow[p][w],boxHigh[p][w]);AddVote(base,w%3,vote,w>=3);AddVote(quote,w%3,-vote,w>=3);}
  }
@@ -63,24 +64,70 @@ string Cell(int pos,int neg){if(pos>0 && neg<0)return RawSigned(pos)+"/"+RawSign
 string CurrencyLine(int c,bool advance){string line=currencies[c]+"  ";string labels[3]={"D1:"," H4:"," H1:"};for(int t=0;t<3;t++)line+=labels[t]+(advance?Cell(advPositive[c][t],advNegative[c][t]):Cell(positive[c][t],negative[c][t]));return line;}
 int Strongest(int c){return PandaStrongest(positive[c][0],negative[c][0],positive[c][1],negative[c][1],positive[c][2],negative[c][2]);}
 bool Conflict(int c){return PandaConflict(positive[c][0],negative[c][0],positive[c][1],negative[c][1],positive[c][2],negative[c][2]);}
-void DrawBoxes(int pairIndex){if(!ShowBoxes)return;color colors[3]={clrDodgerBlue,clrMediumSeaGreen,clrOrange};string names[3]={"D1 / LONG","H4 / MEDIUM","H1 / SHORT"};for(int w=0;w<3;w++){
- string id=objectPrefix+"Box"+IntegerToString(w);ObjectCreate(0,id,OBJ_RECTANGLE,0,windowStart[w],boxHigh[pairIndex][w],windowEnd[w],boxLow[pairIndex][w]);ObjectSetInteger(0,id,OBJPROP_COLOR,colors[w]);ObjectSetInteger(0,id,OBJPROP_BACK,true);ObjectSetInteger(0,id,OBJPROP_FILL,false);ObjectSetInteger(0,id,OBJPROP_SELECTABLE,false);ObjectSetString(0,id,OBJPROP_TOOLTIP,names[w]);}}
-string AtrText(){double point=MarketInfo(Symbol(),MODE_POINT);if(point<=0 || iBars(Symbol(),PERIOD_H1)<16 || iBars(Symbol(),PERIOD_D1)<16)return "ATR: -- (history loading)";return "ATR H1/D1: "+IntegerToString((int)MathRound(iATR(Symbol(),PERIOD_H1,14,1)/point))+" : "+IntegerToString((int)MathRound(iATR(Symbol(),PERIOD_D1,14,1)/point))+" points";}
-void Render(){
- RawRemove(objectPrefix);string pair=RawPair(Symbol());RawLabel(objectPrefix,0,"PANDA STANDALONE | "+pair,clrSkyBlue,PanelX,PanelY,12);RawLabel(objectPrefix,12,RawSpread(),clrSilver,PanelX,PanelY);
- if(pair=="" || !ComputeScores()){if(pair=="")dataStatus="UNSUPPORTED CHART PAIR";RawLabel(objectPrefix,2,"SCORES: --",clrSilver,PanelX,PanelY);RawLabel(objectPrefix,4,dataStatus,clrGold,PanelX,PanelY,9);ChartRedraw();return;}
- int base=CurrencyIndex(StringSubstr(pair,0,3)),quote=CurrencyIndex(StringSubstr(pair,3,3));
- PandaDecision d=PandaDecide(Strongest(base),Strongest(quote),Conflict(base)||Conflict(quote));
- string bias=d.invalid?"HARD_INVALID":d.bias>0?"BUY":d.bias<0?"SELL":"INVALID";color clr=d.bias>0?clrSpringGreen:d.bias<0?clrTomato:clrGold;
- string execution=d.execution==2?"MARKET":d.execution==1?"PULLBACK":"NONE";string confidence=d.confidence==3?"HIGH":d.confidence==2?"MEDIUM":d.confidence==1?"LOW":"INVALID";
- RawLabel(objectPrefix,2,CurrencyLine(base,false),clrWhiteSmoke,PanelX,PanelY);RawLabel(objectPrefix,3,CurrencyLine(quote,false),clrWhiteSmoke,PanelX,PanelY);
- RawLabel(objectPrefix,4,"BASE: "+RawSigned(Strongest(base))+"  QUOTE: "+RawSigned(Strongest(quote)),clrSilver,PanelX,PanelY);
- RawLabel(objectPrefix,5,"GAP: "+RawSigned(d.gap)+" | "+bias,clr,PanelX,PanelY,12);RawLabel(objectPrefix,6,execution+" | "+confidence,clrSilver,PanelX,PanelY);
- RawLabel(objectPrefix,8,"ADV FORECAST",clrSkyBlue,PanelX,PanelY);RawLabel(objectPrefix,9,CurrencyLine(base,true),clrWhiteSmoke,PanelX,PanelY);RawLabel(objectPrefix,10,CurrencyLine(quote,true),clrWhiteSmoke,PanelX,PanelY);
- RawLabel(objectPrefix,11,AtrText(),clrSilver,PanelX,PanelY);RawLabel(objectPrefix,14,dataStatus,clrSilver,PanelX,PanelY,8);
- for(int p=0;p<21;p++)if(pairs[p]==pair){DrawBoxes(p);break;}ChartRedraw();
+void MovePanel(){
+ for(int row=0;row<8;row++){
+ string name=objectPrefix+IntegerToString(row);
+ if(ObjectFind(0,name)<0)continue;
+ ObjectSetInteger(0,name,OBJPROP_XDISTANCE,panelLeft);
+ ObjectSetInteger(0,name,OBJPROP_YDISTANCE,panelTop+row*19);
+ }
+ ChartRedraw();
 }
-int OnInit(){if(BrokerUtcOffsetHours< -12 || BrokerUtcOffsetHours>14 || MaximumQuoteAgeSeconds<30 || MaximumQuoteAgeSeconds>3600)return INIT_PARAMETERS_INCORRECT;objectPrefix="PandaStandalone_"+IntegerToString(ChartID())+"_"+IntegerToString((int)GetTickCount())+"_";EventSetTimer(MathMax(2,RefreshSeconds));Render();return INIT_SUCCEEDED;}
+void Render(){
+ for(int row=0;row<8;row++)RawLabel(objectPrefix,row,"",clrSilver,panelLeft,panelTop);
+ string pair=RawPair(Symbol());
+ RawLabel(objectPrefix,0,"PANDA RAW | "+pair+"              [drag]",clrSkyBlue,panelLeft,panelTop,11);
+ if(pair=="" || !ComputeScores()){
+ if(pair=="")dataStatus="UNSUPPORTED CHART PAIR";
+ RawLabel(objectPrefix,2,dataStatus,clrGold,panelLeft,panelTop,9);
+ ChartRedraw();return;
+ }
+ int base=CurrencyIndex(StringSubstr(pair,0,3)),quote=CurrencyIndex(StringSubstr(pair,3,3));
+ PandaDecision decision=PandaDecide(Strongest(base),Strongest(quote),Conflict(base)||Conflict(quote));
+ string bias=decision.invalid?"HARD_INVALID":decision.bias>0?"BUY":decision.bias<0?"SELL":"WAIT";
+ color direction=decision.bias>0?clrSpringGreen:decision.bias<0?clrTomato:clrGold;
+ RawLabel(objectPrefix,1,"CURRENT SCORE",clrSkyBlue,panelLeft,panelTop);
+ RawLabel(objectPrefix,2,CurrencyLine(base,false),clrWhiteSmoke,panelLeft,panelTop);
+ RawLabel(objectPrefix,3,CurrencyLine(quote,false),clrWhiteSmoke,panelLeft,panelTop);
+ RawLabel(objectPrefix,5,"ADV FORECAST",clrSkyBlue,panelLeft,panelTop);
+ RawLabel(objectPrefix,6,CurrencyLine(base,true),clrWhiteSmoke,panelLeft,panelTop);
+ RawLabel(objectPrefix,7,CurrencyLine(quote,true),clrWhiteSmoke,panelLeft,panelTop);
+ RawLabel(objectPrefix,4,"BIAS: "+bias,direction,panelLeft,panelTop,11);
+ ChartRedraw();
+}
+void OnChartEvent(const int id,const long &lparam,const double &dparam,const string &sparam){
+ if(id!=CHARTEVENT_MOUSE_MOVE)return;
+ int mouseX=(int)lparam,mouseY=(int)dparam;
+ bool pressed=((int)StringToInteger(sparam)&1)!=0;
+ bool newPress=pressed && !leftPreviouslyDown;leftPreviouslyDown=pressed;
+ if(!pressed){
+ if(panelDragging){panelDragging=false;ChartSetInteger(0,CHART_MOUSE_SCROLL,scrollBeforeDrag);}
+ return;
+ }
+ if(!panelDragging){
+ if(!newPress)return;
+ if(mouseX<panelLeft-8 || mouseX>panelLeft-8+PANEL_WIDTH || mouseY<panelTop-5 || mouseY>panelTop+18)return;
+ panelDragging=true;dragOffsetX=mouseX-panelLeft;dragOffsetY=mouseY-panelTop;
+ scrollBeforeDrag=(bool)ChartGetInteger(0,CHART_MOUSE_SCROLL);
+ ChartSetInteger(0,CHART_MOUSE_SCROLL,false);
+ }
+ int width=(int)ChartGetInteger(0,CHART_WIDTH_IN_PIXELS),height=(int)ChartGetInteger(0,CHART_HEIGHT_IN_PIXELS);
+ panelLeft=MathMax(8,MathMin(mouseX-dragOffsetX,MathMax(8,width-PANEL_WIDTH+8)));
+ panelTop=MathMax(5,MathMin(mouseY-dragOffsetY,MathMax(5,height-PANEL_HEIGHT+5)));
+ MovePanel();
+}
+int OnInit(){
+ panelLeft=MathMax(8,PanelX);panelTop=MathMax(5,PanelY);
+ objectPrefix="PandaStandalone_"+IntegerToString(ChartID())+"_"+IntegerToString((int)GetTickCount())+"_";
+ mouseMoveBefore=(bool)ChartGetInteger(0,CHART_EVENT_MOUSE_MOVE);
+ ChartSetInteger(0,CHART_EVENT_MOUSE_MOVE,true);
+ EventSetTimer(MathMax(2,RefreshSeconds));Render();return INIT_SUCCEEDED;
+}
 void OnTimer(){Render();}
-void OnDeinit(const int reason){EventKillTimer();RawRemove(objectPrefix);}
+void OnDeinit(const int reason){
+ EventKillTimer();
+ if(panelDragging)ChartSetInteger(0,CHART_MOUSE_SCROLL,scrollBeforeDrag);
+ ChartSetInteger(0,CHART_EVENT_MOUSE_MOVE,mouseMoveBefore);
+ RawRemove(objectPrefix);
+}
 int OnCalculate(const int rates_total,const int prev_calculated,const datetime &time[],const double &open[],const double &high[],const double &low[],const double &close[],const long &tick_volume[],const long &volume[],const int &spread[]){return rates_total;}

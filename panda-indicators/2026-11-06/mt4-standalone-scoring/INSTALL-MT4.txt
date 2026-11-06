@@ -1,29 +1,19 @@
-PANDA STANDALONE SCORING — MT4
+PANDA RAW SCORE — MT4 (v1.10)
 
-INSTALL
-1. In MT4 choose File > Open Data Folder.
-2. Copy PandaStandaloneScoringMT4.ex4 into MQL4/Indicators.
-3. Refresh Navigator (or restart MT4), then attach PandaStandaloneScoringMT4 to a supported forex chart.
-4. Allow time for MT4 to download H1 history for all 21 pairs. If prompted, open the named pair's H1 chart and load at least 3+ months of history (Home key or History Center). D1 history is also needed for ATR.
+Copy PandaStandaloneScoringMT4.ex4 to MT4's Data Folder > MQL4 > Indicators.
+Refresh Navigator and attach it to a forex chart.
 
-No EA, DLL, WebRequest permission, API key, license token, Panda Engine, MT4 exporter or other indicator is needed. This is your standalone personal edition. It does not trade, send alerts, write exports or connect to Panda's website.
+The panel shows only:
+- BASE and QUOTE raw D1 / H4 / H1 scores
+- ADV scores for both currencies
+- BIAS
 
-SETTINGS
-- BrokerUtcOffsetHours: broker server UTC offset (default +3). Used for quote freshness. Set +2 if your broker is on winter UTC+2. Wrong offsets clear scores with a CHECK UTC OFFSET message.
-- MaximumQuoteAgeSeconds: default 300 seconds. All 21 pairs must have fresh quotes; stale/offline markets clear scores.
-- RefreshSeconds: default 5 seconds.
-- ShowBoxes: current chart long/medium/short boxes on/off.
-- PanelX/PanelY: distance from the chart's top-right corner.
+Hold the left mouse button on the title row marked [drag] and drag the whole panel. Its position stays in place during score refreshes. PanelX and PanelY set its initial location after reattaching/changing settings.
 
-DISPLAY
-Current BASE/QUOTE D1/H4/H1 positive/negative components; strongest BASE/QUOTE values; GAP, BIAS, EXECUTION and CONFIDENCE; ADV values; completed-bar H1/D1 ATR(14) in broker points; live chart spread in pips and points.
+No EA, engine connection, token, source indicator, ATR, spread, gap, execution/confidence display, or chart boxes.
 
-METHOD
-Each of 21 pairs votes +1 for base and -1 for quote above its box, reverses below, and contributes zero inside/on the boundary. Votes aggregate over seven currencies. D1/H4/H1 refer to long/medium/short box scores, not the chart period: all bounds use H1 highs/lows. Long: two calendar months offset one month; medium: two Monday-based weeks offset one week; short: two trading days offset one trading day. ADV uses the same spans with zero offset. Window starts are included, ends excluded. Broker/server timestamps define the windows.
+Scoring uses all 21 pairs and the existing box rules. Main boxes span two months/weeks/trading days with a one-period offset; ADV uses the same spans without that offset. H1 prices build all ranges. Above a box votes +1 for base/-1 for quote, below reverses, and inside votes zero. Positive/negative components stay separate, e.g. +3/-1. Bias uses the existing Panda gap and invalidation rules internally.
 
-Split values are preserved (+3/-1 is not +2). The strongest signed component is selected across timeframes, equal opposites yield zero, and opposing significant values (+4 or above and -4 or below) invalidate the currency. Neutral-vs-neutral is blocked. Gap, bias, execution and confidence match the existing Panda engine rules.
+MT4 may need H1 history for all 21 pairs; load at least 3+ months when a history message appears. Symbols are added to Market Watch as needed. Prices are the broker's latest available quotes, like a regular indicator. Compare on the same broker and at the same time as the original.
 
-Incomplete symbol/history/quote data blocks the entire score calculation rather than silently computing from fewer than 21 pairs. Indicator may select the required symbols in Market Watch. Weekends and disconnected brokers normally show unavailable/stale data. Different brokers can have different highs/lows/bids and therefore different scores.
-
-VERIFIED
-MetaEditor 4 compile: 0 errors, 0 warnings. Actual arithmetic header tested against 2,000 locked-engine cases; main/ADV box windows tested for weekends and month/year rollover. Live chart appearance and broker-data parity have not yet been verified.
+Compiled with 0 errors and 0 warnings. Scoring matched 2,000 locked-engine test cases. Live mouse-drag/chart comparison remains unverified.
