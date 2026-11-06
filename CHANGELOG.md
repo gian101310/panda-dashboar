@@ -1,3 +1,8 @@
+## 2026-11-07 - Add separate licensed Panda Box and Lines MT4
+- Kept the original personal indicator unchanged and created a separately named licensed indicator plus read-only license-check EA.
+- Registered an MT4 account approval product, a tokenless Panda Engine check endpoint, License Admin download, and a compiled installation package.
+- The licensed indicator hides scores, bias, boxes, and levels when approval is missing, denied, or stale.
+
 ## 2026-11-07 - Correct MT4 ADV forecast bias
 - Replaced the all-ADV gap with Dubai-session TMRW/WK/MTH horizon substitutions used by the Pair Card and engine snapshot forecast.
 - Added opposing-extreme invalidation and projected BUY/SELL/WAIT classification at gap 5; current scores and bias remain unchanged.

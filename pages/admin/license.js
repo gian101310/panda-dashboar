@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Head from 'next/head';
-import { CTRADER_RAW_SCORE_PRODUCT_CODE, CTRADER_OVERLAY_PRODUCT_CODE, CTRADER_PANDA_LEVELS_PRODUCT_CODE, CTRADER_TRADE_PLAN_V13_PRODUCT_CODE, CTRADER_TREND_CONFLUENCE_PRODUCT_CODE, INDICATOR_PRODUCTS, isMt5OfflineLevelsProduct, isTokenLicensedProduct, MT4_OVERLAY_PRODUCT_CODE, MT5_OVERLAY_PRODUCT_CODE, MT5_PANDA_LEVELS_PRODUCT_CODE, MT5_PANDA_LEVELS_VIP_PRODUCT_CODE, MT5_TREND_CONFLUENCE_PRODUCT_CODE } from '../../lib/indicatorProducts.mjs';
+import { CTRADER_RAW_SCORE_PRODUCT_CODE, CTRADER_OVERLAY_PRODUCT_CODE, CTRADER_PANDA_LEVELS_PRODUCT_CODE, CTRADER_TRADE_PLAN_V13_PRODUCT_CODE, CTRADER_TREND_CONFLUENCE_PRODUCT_CODE, INDICATOR_PRODUCTS, isMt5OfflineLevelsProduct, isTokenLicensedProduct, MT4_OVERLAY_PRODUCT_CODE, MT4_PANDA_BOX_LINES_PRODUCT_CODE, MT5_OVERLAY_PRODUCT_CODE, MT5_PANDA_LEVELS_PRODUCT_CODE, MT5_PANDA_LEVELS_VIP_PRODUCT_CODE, MT5_TREND_CONFLUENCE_PRODUCT_CODE } from '../../lib/indicatorProducts.mjs';
 import { generateIndicatorToken } from '../../lib/indicatorTokenGenerator.mjs';
 
 const mono = "'Share Tech Mono', monospace";
@@ -33,13 +33,14 @@ const downloadGroups = [
     platform: 'MT4',
     color: '#ff9944',
     items: [
+      { code: MT4_PANDA_BOX_LINES_PRODUCT_CODE, title: 'PANDA BOX AND LINES LICENSED', file: 'panda-box-and-lines-mt4-licensed.zip', kind: '.ZIP', href: `/api/indicator-download?product=${MT4_PANDA_BOX_LINES_PRODUCT_CODE}`, description: 'Approve the client MT4 account. Install the indicator and license EA; no token is needed.' },
       { code: MT4_OVERLAY_PRODUCT_CODE, title: 'PANDA DASHBOARD OVERLAY', file: 'panda-dashboard-overlay-mt4-licensed.zip', kind: '.ZIP', href: `/api/indicator-download?product=${MT4_OVERLAY_PRODUCT_CODE}`, description: 'Licensed MT4 chart-pair panel and feed EA. Approve the client’s MT4 account before installation.' },
     ],
   },
 ];
 
 function usesTradingAccount(platform, productCode) {
-  return platform === 'CTRADER' || platform === 'MT5' || String(productCode || '').endsWith('_dashboard_overlay');
+  return platform === 'CTRADER' || platform === 'MT5' || String(productCode || '').endsWith('_dashboard_overlay') || productCode === MT4_PANDA_BOX_LINES_PRODUCT_CODE;
 }
 
 function Badge({ label, color }) {
@@ -505,7 +506,7 @@ export default function LicenseAdminPage() {
                   <input value={form.telegram_username} onChange={(e) => setForm({ ...form, telegram_username: e.target.value })} placeholder="@username" style={{ ...input, width: '100%' }} />
                 </div>}
                 <div>
-                  <label style={{ fontFamily: mono, fontSize: 8, color: '#445566', letterSpacing: 1, display: 'block', marginBottom: 4 }}>{form.platform === 'CTRADER' ? 'CTRADER ACCOUNT NUMBER *' : form.platform === 'MT5' ? 'MT5 ACCOUNT NUMBER *' : form.product_code === 'mt4_dashboard_overlay' ? 'MT4 ACCOUNT NUMBER *' : 'MT4 ACCOUNT ID *'}</label>
+                  <label style={{ fontFamily: mono, fontSize: 8, color: '#445566', letterSpacing: 1, display: 'block', marginBottom: 4 }}>{form.platform === 'CTRADER' ? 'CTRADER ACCOUNT NUMBER *' : form.platform === 'MT5' ? 'MT5 ACCOUNT NUMBER *' : usesTradingAccount(form.platform, form.product_code) ? 'MT4 ACCOUNT NUMBER *' : 'MT4 ACCOUNT ID *'}</label>
                   <input value={usesTradingAccount(form.platform, form.product_code) ? form.trading_account_number : form.mt4_account_id} onChange={(e) => setForm(usesTradingAccount(form.platform, form.product_code) ? { ...form, trading_account_number: e.target.value } : { ...form, mt4_account_id: e.target.value })} placeholder="e.g. 3242354235" style={{ ...input, width: '100%' }} required />
                 </div>
                 <div>

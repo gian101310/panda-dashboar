@@ -1,0 +1,20 @@
+PANDA BOX AND LINES LICENSED - MT4 (v1.40)
+
+1. In MT4, open File > Open Data Folder.
+2. Copy MQL4/Indicators/Panda Box and Lines Licensed.ex4 into MQL4/Indicators.
+3. Copy MQL4/Experts/Panda Box and Lines License Feed.ex4 into MQL4/Experts.
+4. In Tools > Options > Expert Advisors, enable WebRequest for listed URL and add:
+   https://pandaengine.app
+5. Refresh Navigator. Attach Panda Box and Lines License Feed to one chart. It does
+   not open or manage trades. Attach Panda Box and Lines Licensed to the chart(s)
+   where you want the scoring panel, boxes, and levels.
+6. In Panda Engine License Admin, create a Panda Box and Lines Licensed for MT4 license using
+   the MT4 trading account number, then press Approve. No token is needed.
+
+The EA checks immediately and every 5 minutes. The indicator updates every 5
+seconds. If the account is not approved or the check is unavailable/stale, the
+indicator hides its scores and chart drawings and shows a license status.
+
+Scores and ADV forecast are calculated locally from MT4 broker history across
+21 Panda pairs. H1 history for those pairs must be loaded. The license EA only
+checks account approval and requires an internet connection to Panda Engine.

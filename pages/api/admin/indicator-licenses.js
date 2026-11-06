@@ -1,6 +1,6 @@
 import { supabase } from '../../../lib/supabase';
 import { requireAdmin } from '../../../lib/auth';
-import { getIndicatorProduct, isMt5OfflineLevelsProduct } from '../../../lib/indicatorProducts.mjs';
+import { getIndicatorProduct, isMt5OfflineLevelsProduct, MT4_PANDA_BOX_LINES_PRODUCT_CODE } from '../../../lib/indicatorProducts.mjs';
 import { normalizeIndicatorPlatform, normalizeMt4AccountId, normalizeProductCode, normalizeTradingAccountNumber } from '../../../lib/indicatorLicense.mjs';
 import { expiryAtEndOfDubaiDay } from '../../../lib/mt5PandaLevelsOfflineLicense.mjs';
 
@@ -74,7 +74,7 @@ export default async function handler(req, res) {
     const product = getIndicatorProduct(productCode);
     if (!product) return res.status(400).json({ error: 'invalid product' });
     const platform = product.platform || normalizeIndicatorPlatform(req.body?.platform);
-    const account = product.platform === 'CTRADER' || product.platform === 'MT5' || productCode.endsWith('_dashboard_overlay')
+    const account = product.platform === 'CTRADER' || product.platform === 'MT5' || productCode.endsWith('_dashboard_overlay') || productCode === MT4_PANDA_BOX_LINES_PRODUCT_CODE
       ? normalizeTradingAccountNumber(trading_account_number || mt4_account_id)
       : normalizeMt4AccountId(mt4_account_id);
     if (!customer_name || !account) return res.status(400).json({ error: 'name, account_id, product required' });
