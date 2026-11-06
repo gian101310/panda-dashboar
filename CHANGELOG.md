@@ -1,3 +1,7 @@
+## 2026-11-06 - Add Mac and Windows engine-fed raw score panel
+- Extended the authenticated cTrader feed with current/ADV scores, execution, confidence and ATR; scoring unchanged.
+- Added Panda Raw Score Engine with timestamp expiry and live cTrader spread; no local MT4 files required.
+
 ## 2026-11-06 - Lighten cTrader raw score display
 - Replaced the dark draggable panel with transparent right-aligned chart text and separated current score, ADV forecast, and ATR/spread sections.
 

@@ -45,6 +45,9 @@ test('sanitizes dashboard rows to the cTrader allowlist and fails closed on inva
     'symbol', 'gap', 'bias', 'hard_invalid', 'box_h4_trend', 'box_h1_trend',
     'pl_zone', 'pl_bias', 'pl_g1_valid', 'base_currency', 'base_score_tf',
     'quote_currency', 'quote_score_tf', 'updated_at',
+    'base_d1', 'base_h4', 'base_h1', 'quote_d1', 'quote_h4', 'quote_h1',
+    'adv_base_d1', 'adv_base_h4', 'adv_base_h1', 'adv_quote_d1', 'adv_quote_h4', 'adv_quote_h1',
+    'execution', 'confidence', 'atr', 'atr_reference',
   ]);
   assert.equal(row.secret, undefined);
   assert.equal(row.bias, 'BUY');
