@@ -13,6 +13,16 @@ The chart draws the three scoring boxes and Panda Levels (PD/PW/PM/PY high/low).
 Use ShowBoxes, ShowPandaLevels, and ShowLevelLabels to control the drawings.
 Drag the narrow strip at the top of the score panel to move it.
 
+If an older score panel or extra boxes appear on the same chart, open the
+chart's Indicators List and remove "Scoring with Adv v1 MT4". That older
+indicator draws the second panel and its own three boxes. The v2 BOS exporter
+does not read this indicator's ScoringV1 objects. Keep WagBox attached on
+exporter charts because the exporter reads its WagBox1/2/3 objects; set its
+Box_Color to None in MT4 to hide those legacy rectangles. Keep the A1Adv
+objects/source indicator and the exporter on the chart. Do not open a second
+chart for the same pair solely to show this indicator: the exporter scans open
+charts and can overwrite that pair's file from the second chart.
+
 The indicator calculates from MT4 broker data across all 21 Panda pairs.
 It needs H1 history for those pairs and does not read MT4 export files.
 Panda Levels are price references only; they do not affect the score or bias.
