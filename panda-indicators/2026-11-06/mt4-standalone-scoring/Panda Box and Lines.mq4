@@ -1,6 +1,6 @@
 #property strict
 #property indicator_chart_window
-#property version "1.34"
+#property version "1.35"
 #property description "Panda Box and Lines: standalone scores, bias, boxes and previous-period levels."
 
 input int    RefreshSeconds = 5;
@@ -34,7 +34,7 @@ int PanelPosX = 0;
 int PanelPosY = 0;
 bool PanelWasMoved = false;
 int PanelWidth = 500;
-int PanelHeight = 158;
+int PanelHeight = 178;
 
 string Pairs[21] =
 {
@@ -51,6 +51,8 @@ int ScoresH1[7];
 int AdvD1[7];
 int AdvH4[7];
 int AdvH1[7];
+int RawPositive[7][3][2];
+int RawNegative[7][3][2];
 string CurrentPair = "";
 int MainGap = 0;
 int AdvGap = 0;
@@ -127,6 +129,8 @@ void RefreshScoring()
    ArrayInitialize(AdvD1, 0);
    ArrayInitialize(AdvH4, 0);
    ArrayInitialize(AdvH1, 0);
+   ArrayInitialize(RawPositive, 0);
+   ArrayInitialize(RawNegative, 0);
 
    for(int i = 0; i < ArraySize(Pairs); i++)
    {
@@ -365,6 +369,12 @@ void AddCurrencyScore(const string currency, const int vote, const int timeframe
    {
       if(Currencies[i] == currency)
       {
+         int advanceIndex = advance ? 1 : 0;
+         if(vote > 0)
+            RawPositive[i][timeframe][advanceIndex] += vote;
+         else if(vote < 0)
+            RawNegative[i][timeframe][advanceIndex] -= vote;
+
          if(advance)
          {
             if(timeframe == 0)
@@ -428,31 +438,19 @@ void DrawPanel()
 
    string base = StringSubstr(pair, 0, 3);
    string quote = StringSubstr(pair, 3, 3);
-   int baseD1 = CurrencyScore(base, 0, false);
-   int baseH4 = CurrencyScore(base, 1, false);
-   int baseH1 = CurrencyScore(base, 2, false);
-   int quoteD1 = CurrencyScore(quote, 0, false);
-   int quoteH4 = CurrencyScore(quote, 1, false);
-   int quoteH1 = CurrencyScore(quote, 2, false);
-   int advBaseD1 = CurrencyScore(base, 0, true);
-   int advBaseH4 = CurrencyScore(base, 1, true);
-   int advBaseH1 = CurrencyScore(base, 2, true);
-   int advQuoteD1 = CurrencyScore(quote, 0, true);
-   int advQuoteH4 = CurrencyScore(quote, 1, true);
-   int advQuoteH1 = CurrencyScore(quote, 2, true);
-
    CreatePanelBackground(x, y);
    CreateLabel(Prefix + "title", x + 12, y + 12, "PANDA BOX AND LINES  |  " + pair, C'0,180,255', FontSize + 1, "Consolas");
    CreateLabel(Prefix + "current", x + 12, y + 33, "CURRENT SCORE", TextColor, FontSize, "Consolas");
-   CreateLabel(Prefix + "base", x + 12, y + 49, FormatScoreLine(base, baseD1, baseH4, baseH1), TextColor, FontSize, "Consolas");
-   CreateLabel(Prefix + "quote", x + 12, y + 65, FormatScoreLine(quote, quoteD1, quoteH4, quoteH1), TextColor, FontSize, "Consolas");
-   CreateLabel(Prefix + "adv_base", x + 12, y + 86, FormatScoreLine("ADV " + base, advBaseD1, advBaseH4, advBaseH1), TextColor, FontSize, "Consolas");
-   CreateLabel(Prefix + "adv_quote", x + 12, y + 102, FormatScoreLine("ADV " + quote, advQuoteD1, advQuoteH4, advQuoteH1), TextColor, FontSize, "Consolas");
+   CreateLabel(Prefix + "base", x + 12, y + 49, FormatScoreLine(base, base, false), TextColor, FontSize, "Consolas");
+   CreateLabel(Prefix + "quote", x + 12, y + 65, FormatScoreLine(quote, quote, false), TextColor, FontSize, "Consolas");
+   CreateLabel(Prefix + "adv_base", x + 12, y + 86, FormatScoreLine("ADV " + base, base, true), TextColor, FontSize, "Consolas");
+   CreateLabel(Prefix + "adv_quote", x + 12, y + 102, FormatScoreLine("ADV " + quote, quote, true), TextColor, FontSize, "Consolas");
    CreateLabel(Prefix + "bias", x + 12, y + 124, "GAP " + SignedInt(MainGap) + "  BIAS " + MainBias, BiasColor(MainBias), FontSize, "Consolas");
    string forecast = "ADV " + AdvHorizon + " FORECAST ";
    if(AdvInvalid) forecast += "INVALID";
    else forecast += SignedInt(AdvGap) + "  " + AdvBias;
    CreateLabel(Prefix + "adv_bias", x + 210, y + 124, forecast, BiasColor(AdvBias), FontSize, "Consolas");
+   CreateLabel(Prefix + "atr", x + 12, y + 146, FormatAtrLine(pair), AlertColor, FontSize, "Consolas");
 
    ChartRedraw();
 }
@@ -626,25 +624,54 @@ string SignedInt(const int value)
    return(IntegerToString(value));
 }
 
-string FormatTfValue(const int value)
+string RawTfValue(const string currency, const int timeframe, const bool advance)
 {
-   string text = SignedInt(value);
-   if(value == 0)
-      text = "0";
-   while(StringLen(text) < 3)
-      text = " " + text;
-   return(text);
+   for(int i = 0; i < ArraySize(Currencies); i++)
+   {
+      if(Currencies[i] != currency)
+         continue;
+      int index = advance ? 1 : 0;
+      int positive = RawPositive[i][timeframe][index];
+      int negative = RawNegative[i][timeframe][index];
+      if(positive > 0 && negative > 0)
+         return("+" + IntegerToString(positive) + "/-" + IntegerToString(negative));
+      if(positive > 0)
+         return("+" + IntegerToString(positive));
+      if(negative > 0)
+         return("-" + IntegerToString(negative));
+      return("0");
+   }
+   return("0");
 }
 
-string FormatScoreLine(const string label, const int d1, const int h4, const int h1)
+string FormatScoreLine(const string label, const string currency, const bool advance)
 {
    string left = label;
    while(StringLen(left) < 9)
       left = left + " ";
 
-   return(left + " : D1 : " + FormatTfValue(d1) +
-          "    | H4 : " + FormatTfValue(h4) +
-          "    | H1 : " + FormatTfValue(h1));
+   return(left + " : D1 : " + RawTfValue(currency, 0, advance) +
+          "    | H4 : " + RawTfValue(currency, 1, advance) +
+          "    | H1 : " + RawTfValue(currency, 2, advance));
+}
+
+string FormatAtrLine(const string pair)
+{
+   string symbol = ResolveBrokerSymbol(pair);
+   if(symbol == "")
+      return("ATR H1 / D1 : -- / -- points");
+
+   double point = MarketInfo(symbol, MODE_POINT);
+   if(point <= 0)
+      return("ATR H1 / D1 : -- / -- points");
+
+   double h1 = iATR(symbol, PERIOD_H1, 14, 1);
+   double d1 = iATR(symbol, PERIOD_D1, 14, 1);
+   if(h1 <= 0 || d1 <= 0)
+      return("ATR H1 / D1 : -- / -- points");
+
+   return("ATR H1 / D1 : " + IntegerToString((int)MathRound(h1 / point)) +
+          " / " + IntegerToString((int)MathRound(d1 / point)) + " points");
 }
 
 string NormalizeSymbol(string symbol)

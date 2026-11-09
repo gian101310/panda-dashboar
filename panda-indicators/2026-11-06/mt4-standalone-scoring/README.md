@@ -11,4 +11,6 @@ This indicator calculates its own scores directly from MT4 broker prices and his
 
 The panel, boxes, and levels can be toggled with indicator inputs. Boxes and levels default on. The panel strip can be dragged. Chart objects use stable names per chart; startup clears old copies saved into MT4 templates, and detaching removes the active objects.
 
+Version 1.35 displays separate positive and negative vote counts for each timeframe (`+3/-1` stays `+3/-1`). The existing net values still drive gap and bias. The panel also displays H1/D1 ATR(14) in broker points; unavailable history shows `--`.
+
 Source: `Panda Box and Lines.mq4`. Compiled EX4 and installation ZIP: `dist/`. MetaEditor 4 compiled with 0 errors and 0 warnings; `check_dupes.py` and the Next.js build passed. A live side-by-side MT4 chart comparison remains pending.
