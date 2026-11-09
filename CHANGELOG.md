@@ -1,3 +1,7 @@
+## 2026-11-09 - Match MT4 short-box rollover to cTrader Panda Levels V2
+- Rolled the personal and licensed MT4 short boxes across trading days rather than calendar days, skipping weekends for both current and ADV scoring.
+- Kept weekly/monthly box windows, pair voting, bias thresholds, exporter files, and Panda Engine scoring functions unchanged.
+
 ## 2026-11-07 - Fix duplicate MT4 Box and Lines panels after refresh
 - Reused chart-local object names in the personal and licensed indicators and cleared objects restored from saved templates on startup.
 - Rebuilt both MT4 packages without changing scoring, ADV bias, or exporter files.

@@ -1,4 +1,4 @@
-PANDA BOX AND LINES - MT4 (v1.33)
+PANDA BOX AND LINES - MT4 (v1.34)
 
 Copy Panda Box and Lines.ex4 into MT4's Data Folder > MQL4 > Indicators.
 Refresh Navigator and attach it to a supported currency-pair chart.
@@ -16,4 +16,5 @@ Drag the narrow strip at the top of the score panel to move it.
 The indicator calculates from MT4 broker data across all 21 Panda pairs.
 It needs H1 history for those pairs and does not read MT4 export files.
 Panda Levels are price references only; they do not affect the score or bias.
-Compare live values with Scoring with Adv v1 MT4 on the same broker.
+The short scoring box follows Panda Levels V2 trading-day rollover and skips
+Saturday and Sunday. Weekly and monthly windows retain their existing rules.

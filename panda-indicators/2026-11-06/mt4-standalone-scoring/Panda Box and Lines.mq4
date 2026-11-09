@@ -1,6 +1,6 @@
 #property strict
 #property indicator_chart_window
-#property version "1.33"
+#property version "1.34"
 #property description "Panda Box and Lines: standalone scores, bias, boxes and previous-period levels."
 
 input int    RefreshSeconds = 5;
@@ -321,17 +321,11 @@ void GetBoxWindow(const int timeframe, const bool advance, datetime &startTime, 
       return;
    }
 
-   datetime currentDay = StartOfDay(now);
-   if(advance)
-   {
-      endTime = currentDay - MathMax(0, WagBox3Offset - 1) * 86400;
-      startTime = endTime - MathMax(1, WagBox3Days) * 86400;
-   }
-   else
-   {
-      endTime = currentDay - MathMax(0, WagBox3Offset) * 86400;
-      startTime = endTime - MathMax(1, WagBox3Days) * 86400;
-   }
+   // Panda Levels V2 rolls the short box through trading days, skipping weekends.
+   datetime tradingDay = LatestTradingDayStart(StartOfDay(now));
+   int offset = advance ? MathMax(0, WagBox3Offset - 1) : MathMax(0, WagBox3Offset);
+   endTime = StepTradingDaysBack(tradingDay, offset);
+   startTime = StepTradingDaysBack(endTime, MathMax(1, WagBox3Days));
 }
 
 bool CalculateBoxBounds(const string symbol, const datetime startTime, const datetime endTime, double &boxLow, double &boxHigh)
@@ -697,6 +691,25 @@ datetime StartOfDay(const datetime value)
                                  TimeYear(value),
                                  TimeMonth(value),
                                  TimeDay(value))));
+}
+
+datetime LatestTradingDayStart(datetime day)
+{
+   while(TimeDayOfWeek(day) == 0 || TimeDayOfWeek(day) == 6)
+      day -= 86400;
+   return(day);
+}
+
+datetime StepTradingDaysBack(datetime day, int count)
+{
+   while(count > 0)
+   {
+      day -= 86400;
+      int dow = TimeDayOfWeek(day);
+      if(dow != 0 && dow != 6)
+         count--;
+   }
+   return(day);
 }
 
 datetime StartOfWeek(const datetime value)

@@ -1,4 +1,4 @@
-PANDA BOX AND LINES LICENSED - MT4 (v1.42)
+PANDA BOX AND LINES LICENSED - MT4 (v1.43)
 
 1. In MT4, open File > Open Data Folder.
 2. Copy MQL4/Indicators/Panda Box and Lines Licensed.ex4 into MQL4/Indicators.
@@ -25,3 +25,5 @@ can still be dragged to move the panel temporarily.
 Scores and ADV forecast are calculated locally from MT4 broker history across
 21 Panda pairs. H1 history for those pairs must be loaded. The license EA only
 checks account approval and requires an internet connection to Panda Engine.
+The short scoring box follows Panda Levels V2 trading-day rollover, skipping
+Saturday and Sunday. Weekly and monthly box windows keep their existing rules.
