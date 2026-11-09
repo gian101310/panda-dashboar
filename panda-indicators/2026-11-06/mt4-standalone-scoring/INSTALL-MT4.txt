@@ -2,6 +2,11 @@ PANDA BOX AND LINES - MT4 (v1.34)
 
 Copy Panda Box and Lines.ex4 into MT4's Data Folder > MQL4 > Indicators.
 Refresh Navigator and attach it to a supported currency-pair chart.
+For a chart with only this panel and its boxes, open a separate chart and apply
+Panda Box and Lines Clean.tpl from MT4's Templates menu. Copy that template
+into the terminal's Templates folder first. Keep existing exporter charts as
+they are; their Scoring with Adv v1 and WagBox indicators draw extra panels
+and boxes and may supply separate export data.
 If replacing an earlier version, reattach the indicator or reload the chart
 template once. The new version removes panel, box, and level objects saved by
 older versions so only one panel remains after refresh.

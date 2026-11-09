@@ -12,3 +12,5 @@ This indicator calculates its own scores directly from MT4 broker prices and his
 The panel, boxes, and levels can be toggled with indicator inputs. Boxes and levels default on. The panel strip can be dragged. Chart objects use stable names per chart; startup clears old copies saved into MT4 templates, and detaching removes the active objects.
 
 Source: `Panda Box and Lines.mq4`. Compiled EX4 and installation ZIP: `dist/`. MetaEditor 4 compiled with 0 errors and 0 warnings; `check_dupes.py` and the Next.js build passed. A live side-by-side MT4 chart comparison remains pending.
+
+`Panda Box and Lines Clean.tpl` is a single-indicator chart template. It omits saved chart objects and the legacy Scoring with Adv v1, WagBox, WagLines, and Dashboard Overlay indicators. Apply it to a separate chart so the existing exporter charts retain their inputs and box objects.

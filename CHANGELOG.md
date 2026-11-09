@@ -1,3 +1,7 @@
+## 2026-11-09 - Add clean MT4 Box and Lines chart template
+- Found Scoring with Adv v1, WagBox, and Panda Box and Lines attached together on the affected MT4 chart; each legacy drawing caused extra visible panels or boxes.
+- Packaged a clean single-indicator template for separate personal charts while leaving exporter chart indicators and files unchanged.
+
 ## 2026-11-09 - Match MT4 short-box rollover to cTrader Panda Levels V2
 - Rolled the personal and licensed MT4 short boxes across trading days rather than calendar days, skipping weekends for both current and ADV scoring.
 - Kept weekly/monthly box windows, pair voting, bias thresholds, exporter files, and Panda Engine scoring functions unchanged.
