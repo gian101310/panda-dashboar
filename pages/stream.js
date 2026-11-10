@@ -109,7 +109,7 @@ export default function StreamPage(){
     }catch(e){console.error(e);setDataError('Live data is temporarily unavailable.');}
   },[]);
 
-  useEffect(()=>{fetchData();const i=setInterval(fetchData,30000);return()=>clearInterval(i)},[fetchData]);
+  useEffect(()=>{fetchData();const i=setInterval(fetchData,60000);return()=>clearInterval(i)},[fetchData]);
 
   /* hero rotation — 5s interval */
   useEffect(()=>{

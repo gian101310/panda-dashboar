@@ -2,9 +2,9 @@ import { supabase } from '../../lib/supabase';
 import { validateSession } from '../../lib/auth';
 
 // Module-level cache — warm container reuses across invocations
-// Cuts Vercel Fluid CPU by ~90% for dashboards that poll every 30s
+// Cuts repeated Supabase reads across dashboard refreshes
 let _cache = { rows: null, ts: 0 };
-const CACHE_TTL_MS = 10_000; // 10s — data is same for all users
+const CACHE_TTL_MS = 60_000; // Engine scores every 5 minutes; share reads across dashboard polls
 
 export default async function handler(req, res) {
   const token = req.cookies?.panda_session;

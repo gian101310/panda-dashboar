@@ -1,9 +1,9 @@
 import { supabase } from '../../lib/supabase';
 import { validateSession } from '../../lib/auth';
 
-// Module-level cache — trends are same for all users, refresh only every 20s
+// Module-level cache — trends are same for all users and update with engine cycles
 let _cache = { trends: null, ts: 0 };
-const CACHE_TTL_MS = 20_000;
+const CACHE_TTL_MS = 60_000;
 
 export default async function handler(req, res) {
   const token = req.cookies?.panda_session;

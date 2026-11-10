@@ -3808,7 +3808,7 @@ export default function Dashboard({ accessUser }) {
   // Polling — paused when tab hidden to save Vercel Fluid CPU
   useEffect(()=>{
     const tick=()=>{ if(typeof document!=='undefined' && document.visibilityState==='hidden') return; fetchData(true); };
-    const t=setInterval(tick,30000);
+    const t=setInterval(tick,60000);
     return()=>clearInterval(t);
   },[fetchData]);
   useEffect(()=>{
