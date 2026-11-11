@@ -756,9 +756,7 @@ namespace cAlgo
             else if (_follow[i] < previousFollow) followTrend = -1.0;
             _followTrend[i] = followTrend;
 
-            var supported = _chartPair != "";
-            var showLines = ShowPandaLines && supported;
-            if (!showLines)
+            if (!ShowPandaLines)
             {
                 SuperTrendUp[i] = double.NaN;
                 SuperTrendDown[i] = double.NaN;

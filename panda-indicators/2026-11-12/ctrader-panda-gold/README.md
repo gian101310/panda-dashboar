@@ -7,6 +7,7 @@ The indicator runs from broker chart data. It draws SuperTrend and confirmed
 historical LONG/SHORT flip labels. New closed-bar flips can open a visual risk
 plan: entry at the signal bar close, stop at the SuperTrend band, and targets at
 1R, 2R, and 3R. The displayed stop moves to entry after TP1 when enabled.
+The Panda Lines visibility switches apply to gold charts as well as forex charts.
 The active plan labels ENTRY, SL, and TP1–TP3 beside their chart lines.
 It never places, changes, or closes an order.
 
