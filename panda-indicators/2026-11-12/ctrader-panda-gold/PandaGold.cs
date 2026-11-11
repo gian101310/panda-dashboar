@@ -168,10 +168,14 @@ namespace cAlgo
 
         private int _lastClosedProcessed = -1;
         private int _goldLastClosed = -1;
+        private int _lastHistoricalFlip = -1;
+        private bool _goldReference;
         private int _goldDirection;
         private double _goldEntry, _goldStop, _goldRisk, _goldTp1, _goldTp2, _goldTp3;
         private bool _goldHit1, _goldHit2, _goldHit3, _goldBreakeven;
         private DateTime _goldStart;
+        private StackPanel _goldOverlay;
+        private TextBlock _goldOverlayText;
 
         [Parameter("Use USD filter", DefaultValue = true, Group = "Gold")]
         public bool GoldUsdFilter { get; set; }
@@ -247,6 +251,24 @@ namespace cAlgo
                 if (pair == _chartPair) _activeSlot = slot;
             }
 
+            _goldOverlay = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                Width = 320,
+                Margin = 12,
+                BackgroundColor = Color.FromArgb(225, 17, 23, 34),
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Top
+            };
+            _goldOverlayText = new TextBlock
+            {
+                Text = "PANDA GOLD | LOADING",
+                ForegroundColor = PandaBuy,
+                FontSize = 12,
+                Margin = 8
+            };
+            _goldOverlay.AddChild(_goldOverlayText);
+            Chart.AddControl(_goldOverlay);
             Timer.TimerTick += OnTimerTick;
             Timer.Start(1);
             RefreshFeedState();
@@ -525,6 +547,8 @@ namespace cAlgo
                 var first = liveGoldBar ? _goldLastClosed + 1 : Math.Max(0, index - 801);
                 for (int closed = first; closed <= index - 1; closed++) ProcessGoldBar(closed, liveGoldBar);
                 _goldLastClosed = Math.Max(_goldLastClosed, index - 1);
+                if (!liveGoldBar && _lastHistoricalFlip >= 0)
+                    OpenGoldPlan(_lastHistoricalFlip, (int)_stTrend[_lastHistoricalFlip], true);
                 DrawGoldPanel();
             }
         }
@@ -551,14 +575,20 @@ namespace cAlgo
                 Chart.DrawText("PandaGold.Flip." + bar, direction == 1 ? "LONG" : "SHORT",
                     Bars.OpenTimes[bar], price, direction == 1 ? PandaBuy : PandaSell);
             }
-            if (!live) return;
+            if (!live) { _lastHistoricalFlip = bar; return; }
             if (GoldUsdFilter && _readyPairs != PandaPairs.Length) return;
             var usd = GoldUsdScore();
             if (GoldUsdFilter && ((direction == 1 && usd >= GoldUsdThreshold) ||
                                   (direction == -1 && usd <= -GoldUsdThreshold))) return;
+            OpenGoldPlan(bar, direction, false);
+        }
+
+        private void OpenGoldPlan(int bar, int direction, bool reference)
+        {
             var entry = Bars.ClosePrices[bar];
             var stop = direction == 1 ? _lowBand[bar] : _upBand[bar];
             if (double.IsNaN(stop) || stop <= 0 || Math.Abs(entry - stop) < Symbol.TickSize) return;
+            _goldReference = reference;
             _goldDirection = direction;
             _goldEntry = entry;
             _goldStop = stop;
@@ -569,12 +599,13 @@ namespace cAlgo
             _goldHit1 = _goldHit2 = _goldHit3 = _goldBreakeven = false;
             _goldStart = Bars.OpenTimes[bar];
             DrawGoldLevels();
-            if (GoldSound) Notifications.PlaySound(direction == 1 ? SoundType.PositiveNotification : SoundType.NegativeNotification);
+            if (!reference && GoldSound)
+                Notifications.PlaySound(direction == 1 ? SoundType.PositiveNotification : SoundType.NegativeNotification);
         }
 
         private void ManageGoldBar(int bar)
         {
-            if (_goldDirection == 0) return;
+            if (_goldDirection == 0 || _goldReference) return;
             var hi = Bars.HighPrices[bar];
             var lo = Bars.LowPrices[bar];
             if (_goldDirection == 1)
@@ -603,12 +634,14 @@ namespace cAlgo
             }
             if (!GoldShowLevels || _goldDirection == 0) return;
             var duration = Bars.Count > 1 ? Bars.OpenTimes[Bars.Count - 1] - Bars.OpenTimes[Bars.Count - 2] : TimeSpan.FromHours(1);
-            var end = _goldStart.AddTicks(duration.Ticks * GoldLevelBars);
-            GoldLine("ENTRY", _goldEntry, Color.Silver, end, "ENTRY");
-            GoldLine("SL", _goldStop, PandaSell, end, _goldBreakeven ? "SL BE" : "SL");
-            GoldLine("TP1", _goldTp1, PandaBuy, end, _goldHit1 ? "TP1 OK" : "TP1 (1R)");
-            GoldLine("TP2", _goldTp2, PandaBuy, end, _goldHit2 ? "TP2 OK" : "TP2 (2R)");
-            GoldLine("TP3", _goldTp3, PandaBuy, end, _goldHit3 ? "TP3 OK" : "TP3 (3R)");
+            var end = _goldReference ? Bars.OpenTimes[Bars.Count - 1].AddTicks(duration.Ticks * 5)
+                                     : _goldStart.AddTicks(duration.Ticks * GoldLevelBars);
+            var prefix = _goldReference ? "LAST " : "";
+            GoldLine("ENTRY", _goldEntry, Color.Silver, end, prefix + "ENTRY");
+            GoldLine("SL", _goldStop, PandaSell, end, prefix + (_goldBreakeven ? "SL BE" : "SL"));
+            GoldLine("TP1", _goldTp1, PandaBuy, end, prefix + (_goldHit1 ? "TP1 OK" : "TP1 (1R)"));
+            GoldLine("TP2", _goldTp2, PandaBuy, end, prefix + (_goldHit2 ? "TP2 OK" : "TP2 (2R)"));
+            GoldLine("TP3", _goldTp3, PandaBuy, end, prefix + (_goldHit3 ? "TP3 OK" : "TP3 (3R)"));
         }
 
         private void GoldLine(string name, double price, Color color, DateTime end, string label)
@@ -624,6 +657,7 @@ namespace cAlgo
         {
             var usd = _readyPairs == PandaPairs.Length ? GoldUsdScore().ToString("+0;-0;0") : "LOADING";
             var signal = _goldDirection == 1 ? "LONG" : _goldDirection == -1 ? "SHORT" : "FLAT";
+            if (_goldReference) signal += " | LAST FLIP (UNFILTERED)";
             var filter = !GoldUsdFilter ? "OFF" : _readyPairs != PandaPairs.Length ? "LOADING" :
                 GoldUsdScore() >= GoldUsdThreshold ? "NO LONGS" : GoldUsdScore() <= -GoldUsdThreshold ? "NO SHORTS" : "CLEAR";
             var text = "PANDA GOLD | " + SymbolName + "\nSIGNAL  " + signal + "\nUSD  " + usd +
@@ -632,8 +666,11 @@ namespace cAlgo
                 "\nTP1  " + GoldValue(_goldTp1) + (_goldHit1 ? " OK" : "") +
                 "\nTP2  " + GoldValue(_goldTp2) + (_goldHit2 ? " OK" : "") +
                 "\nTP3  " + GoldValue(_goldTp3) + (_goldHit3 ? " OK" : "");
-            Chart.DrawStaticText("PandaGold.Panel", text, VerticalAlignment.Bottom,
-                HorizontalAlignment.Left, _goldDirection == -1 ? PandaSell : PandaBuy);
+            if (_goldOverlayText != null)
+            {
+                _goldOverlayText.Text = text;
+                _goldOverlayText.ForegroundColor = _goldDirection == -1 ? PandaSell : PandaBuy;
+            }
         }
 
         private string GoldValue(double value) => _goldDirection == 0 ? "—" : value.ToString("F" + Symbol.Digits);

@@ -16,9 +16,11 @@ pair feeds are ready. An extreme positive USD score vetoes LONG; an extreme
 negative USD score vetoes SHORT. Historical flip labels are unfiltered because
 the current USD score cannot be reconstructed for old bars.
 
-The Gold status panel appears as soon as the indicator starts. A visual entry
-plan is created on the next qualifying closed-bar flip; loading the indicator
-does not invent a trade from an older unfiltered marker. This build includes
+The Gold status panel appears as soon as the indicator starts. On attachment,
+the most recent historical flip shows a **LAST FLIP (UNFILTERED)** reference
+plan with labelled entry, stop, and targets. It is a visual reconstruction,
+not a claim that the old signal passed the USD veto or remains open. A live
+visual plan replaces it on the next qualifying closed-bar flip. This build includes
 a local sound on a new signal. MT4 mobile push, popup, and sound-file settings
 are not ported. Gold signals use the SuperTrend flip and USD veto.
 
