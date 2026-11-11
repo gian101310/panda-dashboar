@@ -4,6 +4,12 @@
 
 ---
 
+## Nov 12, 2026 — MT4 Gold engine bridge
+
+- Panda Gold MT4 now exports its live confirmed signal and entry/stop/targets to Common Files.
+- The engine prefers that H1 export for Gold snapshots and Signal-bot alerts once present, with source-aware freshness and duplicate protection.
+- Gold snapshot cards now display entry and SL in the LEVEL row.
+
 ## Oct 29, 2026 — Clearer Spike/Signal Telegram alerts
 
 - Immediate pair alerts now show Panda Lines validity against the displayed BUY/SELL bias: `VALID`, `INVALID`, `NEAR`, or `UNVERIFIED` when the exporter file is not fresh.

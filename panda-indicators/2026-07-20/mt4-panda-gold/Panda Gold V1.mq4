@@ -77,6 +77,7 @@ input bool   GoldAlerts      = true;    // master switch for gold signal alerts
 input bool   GoldPush        = true;    // mobile push (SendNotification)
 input bool   GoldPopup       = true;    // terminal popup alert
 input bool   GoldSound       = true;    // play sound on a new signal
+input bool   GoldEngineExport = true;   // mirror confirmed Gold state to Panda Engine
 
 // ===== PANEL INPUTS =====
 input bool         Panel_Show   = true;
@@ -172,6 +173,8 @@ int      GTradeDir = 0;                 // 0 flat, 1 long, -1 short
 double   GEntry = 0, GSL = 0, GR = 0, GTP1 = 0, GTP2 = 0, GTP3 = 0;
 bool     GTp1 = false, GTp2 = false, GTp3 = false, GBE = false;
 datetime GStart = 0;
+datetime GoldEventUtc = 0, GoldExportLastWrite = 0;
+int      GoldLastSignalDir = 0;
 int      GoldLastDir = 0, GoldSeed = 0;
 bool     _goldBackfilled = false;
 int    _pLeft = 0;
@@ -1087,6 +1090,30 @@ void DrawPanelXTF()
 //+------------------------------------------------------------------+
 //| PANDA GOLD: USD read, trade state machine, drawing, alerts        |
 //+------------------------------------------------------------------+
+void GoldWriteEngineState()
+{
+   if(!GoldEngineExport || StringFind(Symbol(), "XAUUSD") != 0) return;
+   int nowUtc = (int)TimeGMT();
+   if(nowUtc <= 0) return;
+   string name = "panda_gold_mt4_" + Symbol() + "_" + IntegerToString(Period()) + ".txt";
+   int file = FileOpen(name, FILE_WRITE|FILE_CSV|FILE_ANSI|FILE_COMMON|FILE_SHARE_READ, 124);
+   if(file == INVALID_HANDLE)
+   {
+      Print("[PANDA GOLD] engine export failed: ", GetLastError());
+      return;
+   }
+   FileWrite(file, "PANDA_GOLD_MT4_V1", IntegerToString(nowUtc),
+             IntegerToString(AccountNumber()), Symbol(), IntegerToString(Period()),
+             IntegerToString((int)GStart), IntegerToString((int)GoldEventUtc),
+             IntegerToString(GoldLastSignalDir), IntegerToString(GTradeDir != 0 ? 1 : 0),
+             DoubleToString(GEntry, Digits), DoubleToString(GSL, Digits),
+             DoubleToString(GTP1, Digits), DoubleToString(GTP2, Digits),
+             DoubleToString(GTP3, Digits), IntegerToString(StrongestUSD()),
+             IntegerToString(!UseUsdFilter || LastRefresh > 0 ? 1 : 0));
+   FileClose(file);
+   GoldExportLastWrite = TimeGMT();
+}
+
 int StrongestUSD()
 {
    int idx = CurrencyIndex("USD");
@@ -1126,9 +1153,12 @@ void GoldOpen(const int dir)
    GTP3 = entry + dir * 3.0 * r;
    GTp1 = false; GTp2 = false; GTp3 = false;
    GStart = Time[1];
+   GoldEventUtc = TimeGMT();
+   GoldLastSignalDir = dir;
    if(dir == 1) { DrawArrowMark("gsig", Time[1], Low[1],  233, clrLime, false, 3); DrawSigText("gsig", Time[1], Low[1],  "LONG",  clrLime, false); }
    else         { DrawArrowMark("gsig", Time[1], High[1], 234, clrRed,  true,  3); DrawSigText("gsig", Time[1], High[1], "SHORT", clrRed,  true); }
    GoldNotify(dir);
+   GoldWriteEngineState();
 }
 
 void GoldManage()
@@ -1328,6 +1358,8 @@ int OnCalculate(const int rates_total,
    ProcessBars(rates_total);
 
    DrawPanel();
+   if(GoldEngineExport && (GoldExportLastWrite == 0 || TimeGMT() - GoldExportLastWrite >= 60))
+      GoldWriteEngineState();
    return(rates_total);
 }
 

@@ -41,6 +41,7 @@ from lib.signal_alert_outbox import enqueue_alert, dispatch_pending
 from lib.signal_price_levels import assess_price_levels, related_h4_breadth, summarize_nearby_levels
 from lib.panda_hedge_bias_export import export_hedge_bias_snapshot
 from lib.panda_signal_lifecycle import export_lifecycle_snapshot
+from lib.panda_gold_mt4 import read_gold_state
 
 load_dotenv()
 
@@ -106,6 +107,7 @@ GOLD_USD_THRESHOLD    = _env_int("PANDA_GOLD_USD_THRESHOLD", 4)
 GOLD_USD_QUORUM       = _env_int("PANDA_GOLD_USD_QUORUM", 18)
 GOLD_BLOCK_OFFLINE    = os.environ.get("PANDA_GOLD_BLOCK_OFFLINE", "0").lower() in ("1", "true", "yes", "on")
 GOLD_SIGNAL_MARK_FILE = os.environ.get("PANDA_GOLD_SIGNAL_MARK_FILE", os.path.join(MT4_PATH, "panda_gold_signal_mark.txt"))
+GOLD_MT4_PERIOD = _env_int("PANDA_GOLD_MT4_PERIOD", 60)
 
 # ---- OpenAI (AI Insights) ----
 OPENAI_API_KEY        = os.environ.get("OPENAI_API_KEY", "")
@@ -990,6 +992,11 @@ def build_gold_signal(parsed_map):
         "price": latest["close"], "st": latest["st"],
     }
 
+def current_gold_signal(parsed_map):
+    """Prefer the MT4 indicator once its export exists; avoid mixed Gold sources."""
+    mt4 = read_gold_state(MT4_PATH, GOLD_MT4_PERIOD)
+    return mt4 if mt4 is not None else build_gold_signal(parsed_map)
+
 def gold_signal_to_snapshot_card(gold):
     if not gold:
         return None
@@ -1015,11 +1022,12 @@ def gold_signal_to_snapshot_card(gold):
         "symbol": GOLD_SYMBOL,
         "gap": gold.get("gap") or 0,
         "bias": (gold.get("bias") or "WAIT") if status != "OFFLINE" else "OFFLINE",
-        "box_badge": f"ST {GOLD_INTERVAL}",
+        "box_badge": f"ST {gold.get('source') or 'TD'} {gold.get('timeframe') or GOLD_INTERVAL}",
         "pl_zone": filter_label,
         "pdr": f"USD {gold.get('usd_strength', 0):+d}",
         "action": "GOLD" if status in ("LONG", "SHORT") else "WAIT",
         "score": score_text.replace(" | ", " "),
+        "level": score_text,
         "category": "BUY" if status == "LONG" else "SELL" if status == "SHORT" else "YELLOW" if status == "OFFLINE" else "WHITE",
         "xtf": tp_text,
     }
@@ -2085,7 +2093,7 @@ def run_gap_once():
 
     # ---- Panda Gold add-on: SuperTrend flip + USD strength filter (separate from locked gap scorer) ----
     try:
-        gold_signal = build_gold_signal(all_parsed_map)
+        gold_signal = current_gold_signal(all_parsed_map)
         if gold_signal.get("status") != "OFFLINE":
             print(f"[GOLD] {gold_signal.get('status')} {GOLD_SYMBOL} | USD {gold_signal.get('usd_strength', 0):+d} | {gold_signal.get('filter')}")
         else:
@@ -3623,7 +3631,7 @@ def send_snapshot():
         # One extra snapshot slot for Panda Gold. This is intentionally appended
         # outside the locked 21-pair gap engine and does not affect forex scoring.
         try:
-            gold_card = gold_signal_to_snapshot_card(build_gold_signal(_load_current_parsed_map_for_gold()))
+            gold_card = gold_signal_to_snapshot_card(current_gold_signal(_load_current_parsed_map_for_gold()))
             if gold_card:
                 pair_data.append(gold_card)
         except Exception as gold_snapshot_err:
@@ -3790,7 +3798,7 @@ def dispatch_signal_candidates(cycle_at, structure, gaps, early, spikes, gold,
                 value = gold.get(key)
                 if isinstance(value, (int, float)):
                     levels.append(f"{label} {value:.2f}")
-            detail = "SuperTrend flip; " + " | ".join(levels)
+            detail = ("MT4 Gold flip; " if gold.get("source") == "MT4" else "SuperTrend flip; ") + " | ".join(levels)
             detail += f"; USD strength {int(gold.get('usd_strength') or 0):+d}; filter {gold.get('filter') or 'CLEAR'}"
             candidates.append({"symbol": GOLD_SYMBOL, "alert_type": "gold",
                                "cycle_at": cycle_at, "event_id": gold_mark,
@@ -3890,7 +3898,7 @@ def signal_outbox_relevant(row):
         return True
     if kind == "gold":
         parsed = {symbol: value for symbol in PAIRS if (value := parse_mt4_file(symbol)) is not None}
-        latest = build_gold_signal(parsed)
+        latest = current_gold_signal(parsed)
         current_mark = f"{latest.get('status')}|{latest.get('signal_time') or ''}"
         return None if latest.get("status") == "OFFLINE" else bool(latest.get("new_signal") and current_mark == payload.get("event_id"))
     current = (supabase.table("dashboard")
