@@ -16,10 +16,11 @@ pair feeds are ready. An extreme positive USD score vetoes LONG; an extreme
 negative USD score vetoes SHORT. Historical flip labels are unfiltered because
 the current USD score cannot be reconstructed for old bars.
 
-This build includes a local sound on a new signal. MT4 mobile push, popup,
-and sound-file settings are not ported. The additional XTF/BOS controls come
-from the shared cTrader calculation base and are hidden by default. Gold signals
-are driven by the SuperTrend flip and USD veto, independent of XTF/BOS triggers.
+The Gold status panel appears as soon as the indicator starts. A visual entry
+plan is created on the next qualifying closed-bar flip; loading the indicator
+does not invent a trade from an older unfiltered marker. This build includes
+a local sound on a new signal. MT4 mobile push, popup, and sound-file settings
+are not ported. Gold signals use the SuperTrend flip and USD veto.
 
 Build: `dotnet build PandaGold.csproj -c Release` (cTrader.Automate 1.0.17).
 The `.algo` builds with zero errors and warnings. Live chart appearance and

@@ -199,7 +199,7 @@ namespace cAlgo
         private int _triggerBarIndex = -1;
         private string _triggerDirection = "";
 
-        private ChartDraggable _draggable;
+        private ChartDraggable _draggable = null;
         private bool _minimized;
         private DateTime _lastPanelRefreshUtc = DateTime.MinValue;
 
@@ -247,15 +247,10 @@ namespace cAlgo
                 if (pair == _chartPair) _activeSlot = slot;
             }
 
-            _minimized = LocalStorage.GetString("PandaXtf Minimized") == "1";
-            _draggable = Chart.Draggables.Add();
-            _draggable.ShowGrip = true;
-            _draggable.Child = BuildPanel();
-            RestoreLocation();
-            _draggable.LocationChanged += OnLocationChanged;
             Timer.TimerTick += OnTimerTick;
             Timer.Start(1);
             RefreshFeedState();
+            DrawGoldPanel();
         }
 
         private static string Compact(string value)
@@ -394,13 +389,7 @@ namespace cAlgo
                 }
             }
             RefreshFeedState();
-            if (IsLastBar || (DateTime.UtcNow - _lastPanelRefreshUtc).TotalSeconds >= 1)
-            {
-                DrawBoxes();
-                DrawPreviousLevels();
-                DrawSwingLines();
-                UpdatePanel();
-            }
+            DrawGoldPanel();
         }
 
         private static int Vote(double price, double boxHigh, double boxLow)
@@ -530,21 +519,13 @@ namespace cAlgo
         public override void Calculate(int index)
         {
             ComputeChartBar(index);
-            for (int closed = _lastClosedProcessed + 1; closed <= index - 1; closed++) ProcessClosedBar(closed);
-            if (index - 1 > _lastClosedProcessed) _lastClosedProcessed = index - 1;
             if (IsLastBar)
             {
                 var liveGoldBar = _goldLastClosed >= 0;
-                for (int closed = _goldLastClosed + 1; closed <= index - 1; closed++) ProcessGoldBar(closed, liveGoldBar);
+                var first = liveGoldBar ? _goldLastClosed + 1 : Math.Max(0, index - 801);
+                for (int closed = first; closed <= index - 1; closed++) ProcessGoldBar(closed, liveGoldBar);
                 _goldLastClosed = Math.Max(_goldLastClosed, index - 1);
                 DrawGoldPanel();
-            }
-            if (IsLastBar)
-            {
-                DrawBoxes();
-                DrawPreviousLevels();
-                DrawSwingLines();
-                UpdatePanel();
             }
         }
 
