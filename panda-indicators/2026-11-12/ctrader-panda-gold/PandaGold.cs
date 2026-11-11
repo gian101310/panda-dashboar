@@ -616,20 +616,27 @@ namespace cAlgo
         private void DrawGoldLevels()
         {
             foreach (var name in new[] { "ENTRY", "SL", "TP1", "TP2", "TP3" })
+            {
                 Chart.RemoveObject("PandaGold." + name);
+                Chart.RemoveObject("PandaGold." + name + ".Label");
+            }
             if (!GoldShowLevels || _goldDirection == 0) return;
             var duration = Bars.Count > 1 ? Bars.OpenTimes[Bars.Count - 1] - Bars.OpenTimes[Bars.Count - 2] : TimeSpan.FromHours(1);
             var end = _goldStart.AddTicks(duration.Ticks * GoldLevelBars);
-            GoldLine("ENTRY", _goldEntry, Color.Silver, end);
-            GoldLine("SL", _goldStop, PandaSell, end);
-            GoldLine("TP1", _goldTp1, PandaBuy, end);
-            GoldLine("TP2", _goldTp2, PandaBuy, end);
-            GoldLine("TP3", _goldTp3, PandaBuy, end);
+            GoldLine("ENTRY", _goldEntry, Color.Silver, end, "ENTRY");
+            GoldLine("SL", _goldStop, PandaSell, end, _goldBreakeven ? "SL BE" : "SL");
+            GoldLine("TP1", _goldTp1, PandaBuy, end, _goldHit1 ? "TP1 OK" : "TP1 (1R)");
+            GoldLine("TP2", _goldTp2, PandaBuy, end, _goldHit2 ? "TP2 OK" : "TP2 (2R)");
+            GoldLine("TP3", _goldTp3, PandaBuy, end, _goldHit3 ? "TP3 OK" : "TP3 (3R)");
         }
 
-        private void GoldLine(string name, double price, Color color, DateTime end)
+        private void GoldLine(string name, double price, Color color, DateTime end, string label)
         {
             Chart.DrawTrendLine("PandaGold." + name, _goldStart, price, end, price, color);
+            var caption = Chart.DrawText("PandaGold." + name + ".Label",
+                label + "  " + price.ToString("F" + Symbol.Digits), Bars.OpenTimes[Bars.Count - 1], price, color);
+            caption.HorizontalAlignment = HorizontalAlignment.Left;
+            caption.VerticalAlignment = VerticalAlignment.Center;
         }
 
         private void DrawGoldPanel()
