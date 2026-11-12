@@ -3,14 +3,22 @@ Panda WagBox Staggered Refresher
 Compile Panda_WagBox_Staggered_Refresher.mq4 in MT4 MetaEditor and attach the
 resulting EA to one controller chart, such as XAUUSD. Remove the old
 AllChartsTimeframeRefresher or AllChartsTimeframeRefresher_v2 EA first.
+If upgrading an attached staggered refresher, replace its EX4 and reattach
+the EA on the controller chart so MT4 loads the new hourly schedule.
 Keep Panda_Exporter_v2_BOS on USDCAD and WagBox on the pair charts.
 
 Default behavior:
-- Wait 60 seconds after attachment, then process only charts with WagBox.
+- Start one pass at :30 each hour on the Dubai PC clock, ahead of the hourly
+  Telegram snapshot (normally sent after :01 of the following hour).
+- If attached after :30, wait until the next hour's :30; do not start a catch-up
+  pass immediately.
 - On one chart at a time, switch D1 -> H4 -> H1 with 4 seconds between steps.
-- Restore the original timeframe if it was not H1 (for example M30 or D1).
+- Finish on H1, including charts previously left on H4 by the old refresher.
+  If a switch fails or the EA is removed mid-sequence, restore that chart's
+  starting timeframe as a safety measure.
 - Wait 15 seconds before starting the next chart.
-- Start another pass 60 minutes after the previous pass finishes.
+- Never overlap passes. If a pass is still running at the next :30, finish it
+  first and wait for the following hour.
 
 The EA does not place trades. It does not change chart templates or the Panda
 exporter. Check the MT4 Experts log for "cycle complete" and confirm the

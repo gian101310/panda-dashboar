@@ -1,11 +1,10 @@
 // Refresh WagBox charts in the same D1 -> H4 -> H1 order used manually.
 // One chart is processed at a time so indicators are not reloaded together.
 #property strict
-#property version "1.00"
+#property version "1.02"
 #property description "Staggered D1/H4/H1 refresh for charts with WagBox. Attach to one controller chart."
 
-input int RefreshEveryMinutes = 60;
-input int FirstRefreshDelaySeconds = 60;
+input int StartMinute = 30; // Dubai PC clock minute, before the :01 snapshot
 input int StepDelaySeconds = 4;
 input int BetweenChartsSeconds = 15;
 
@@ -23,16 +22,28 @@ datetime g_nextCycle = 0;
 int OnInit()
 {
    EventSetTimer(1);
-   g_nextCycle = TimeLocal() + MathMax(1, FirstRefreshDelaySeconds);
-   Print("Panda WagBox staggered refresher ready; interval=", RefreshEveryMinutes,
-         " minutes, first run in ", FirstRefreshDelaySeconds, " seconds");
+   g_nextCycle = NextHourlyRun(TimeLocal());
+   Print("Panda WagBox staggered refresher ready; next pass at ",
+         TimeToString(g_nextCycle, TIME_DATE|TIME_MINUTES));
    return(INIT_SUCCEEDED);
+}
+
+datetime NextHourlyRun(const datetime now)
+{
+   MqlDateTime clock;
+   TimeToStruct(now, clock);
+   clock.min = MathMax(0, MathMin(59, StartMinute));
+   clock.sec = 0;
+   datetime scheduled = StructToTime(clock);
+   if(scheduled <= now)
+      scheduled += 3600;
+   return(scheduled);
 }
 
 void OnDeinit(const int reason)
 {
    EventKillTimer();
-   // Do not leave a chart on D1 or H4 if the controller is removed mid-cycle.
+   // Do not strand a chart mid-sequence if the controller is removed.
    if(g_activeChart >= 0 && g_originalPeriod > 0 &&
       ChartSymbol(g_activeChart) == g_activeSymbol &&
       ChartPeriod(g_activeChart) != g_originalPeriod)
@@ -61,7 +72,8 @@ void OnTimer()
       Print("Panda WagBox refresher: starting ", ArraySize(g_charts), " charts");
       if(ArraySize(g_charts) == 0)
       {
-         g_nextCycle = now + MathMax(1, RefreshEveryMinutes) * 60;
+         g_nextCycle = NextHourlyRun(now);
+         g_nextAction = g_nextCycle;
          return;
       }
    }
@@ -123,7 +135,7 @@ void StartNextChart(const datetime now)
       return;
    }
 
-   g_nextCycle = now + MathMax(1, RefreshEveryMinutes) * 60;
+   g_nextCycle = NextHourlyRun(now);
    g_nextAction = g_nextCycle;
    Print("Panda WagBox refresher: cycle complete");
 }
@@ -153,8 +165,6 @@ void AdvanceChart(const datetime now)
    int nextPeriod = 0;
    if(g_step == 1) nextPeriod = PERIOD_H4;
    if(g_step == 2) nextPeriod = PERIOD_H1;
-   if(g_step == 3 && g_originalPeriod != PERIOD_H1)
-      nextPeriod = g_originalPeriod;
 
    if(nextPeriod > 0)
    {
@@ -174,7 +184,7 @@ void AdvanceChart(const datetime now)
    }
 
    Print("Panda WagBox refresher: refreshed ", g_activeSymbol,
-         " and restored period ", g_originalPeriod);
+         " and finished on H1");
    FinishChart(now);
 }
 
@@ -198,7 +208,7 @@ void FinishChart(const datetime now)
    g_expectedPeriod = 0;
    if(g_chartIndex >= ArraySize(g_charts))
    {
-      g_nextCycle = now + MathMax(1, RefreshEveryMinutes) * 60;
+      g_nextCycle = NextHourlyRun(now);
       g_nextAction = g_nextCycle;
       Print("Panda WagBox refresher: cycle complete");
    }
