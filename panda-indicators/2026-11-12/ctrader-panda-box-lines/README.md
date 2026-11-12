@@ -8,6 +8,7 @@ Standalone, read-only cTrader port of the MT4 `Panda Box and Lines.mq4` v1.35 in
 - ADV raw votes for the same six currency/timeframe cells.
 - Current strongest-score gap and BUY/SELL/INVALID bias. ADV next-session gap and BUY/SELL/WAIT/INVALID bias, with the TMRW/WK/MTH horizon.
 - WagBox2 (monthly), WagBox1 (weekly), WagBox3 (trading-day) rectangles using the MT4 default 2-period windows and offset 1. Window sizes and offsets are inputs.
+- The boxes draw without WagBox text labels on the chart.
 - Box appearance parameters include fill on/off, fill opacity (30% by default), outline width, and a separate color for each box.
 - PDH/PDL, PWH/PWL, PMH/PML and PYH/PYL previous-period lines.
 

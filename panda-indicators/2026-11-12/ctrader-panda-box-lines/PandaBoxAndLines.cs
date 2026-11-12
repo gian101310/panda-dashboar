@@ -308,6 +308,7 @@ namespace cAlgo
                 }
                 DateTime start, end;
                 Window(tf, false, now, out start, out end);
+                Chart.RemoveObject(name + ".label");
                 if (FillBoxes && BoxFillOpacity > 0)
                 {
                     int alpha = (int)Math.Round(BoxFillOpacity * 255.0 / 100.0);
@@ -319,7 +320,6 @@ namespace cAlgo
                 var rectangle = Chart.DrawRectangle(name, start, slot.High[tf, 0], end, slot.Low[tf, 0], colors[tf]);
                 rectangle.IsFilled = false;
                 rectangle.Thickness = BoxOutlineWidth;
-                Chart.DrawText(name + ".label", labels[tf] + "  " + slot.High[tf, 0].ToString("F" + Symbol.Digits, CultureInfo.InvariantCulture) + " / " + slot.Low[tf, 0].ToString("F" + Symbol.Digits, CultureInfo.InvariantCulture), end, slot.High[tf, 0], colors[tf]);
             }
         }
 
