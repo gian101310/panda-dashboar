@@ -29,6 +29,18 @@ namespace cAlgo
         public int GapThreshold { get; set; }
         [Parameter("Show boxes", DefaultValue = true)]
         public bool ShowBoxes { get; set; }
+        [Parameter("Fill boxes", DefaultValue = true, Group = "Box appearance")]
+        public bool FillBoxes { get; set; }
+        [Parameter("Fill opacity %", DefaultValue = 30, MinValue = 0, MaxValue = 100, Group = "Box appearance")]
+        public int BoxFillOpacity { get; set; }
+        [Parameter("Outline width", DefaultValue = 1, MinValue = 1, MaxValue = 5, Group = "Box appearance")]
+        public int BoxOutlineWidth { get; set; }
+        [Parameter("WagBox2 color", DefaultValue = "#4678FF", Group = "Box appearance")]
+        public Color LongBoxColor { get; set; }
+        [Parameter("WagBox1 color", DefaultValue = "#00C878", Group = "Box appearance")]
+        public Color MediumBoxColor { get; set; }
+        [Parameter("WagBox3 color", DefaultValue = "#FFA032", Group = "Box appearance")]
+        public Color ShortBoxColor { get; set; }
         [Parameter("Show previous levels", DefaultValue = true)]
         public bool ShowLevels { get; set; }
         [Parameter("Show level labels", DefaultValue = true)]
@@ -283,19 +295,30 @@ namespace cAlgo
         {
             var slot = _slots.FirstOrDefault(s => s.Pair == _pair);
             string[] labels = { "WagBox2", "WagBox1", "WagBox3" };
-            Color[] colors = { Color.FromArgb(255, 70, 120, 255), Buy, Color.FromArgb(255, 255, 160, 50) };
+            Color[] colors = { LongBoxColor, MediumBoxColor, ShortBoxColor };
             for (int tf = 0; tf < 3; tf++)
             {
                 string name = "PandaBoxLines." + labels[tf];
                 if (!ShowBoxes || slot == null || !slot.Ready)
                 {
-                    Chart.RemoveObject(name); Chart.RemoveObject(name + ".label"); continue;
+                    Chart.RemoveObject(name);
+                    Chart.RemoveObject(name + ".fill");
+                    Chart.RemoveObject(name + ".label");
+                    continue;
                 }
                 DateTime start, end;
                 Window(tf, false, now, out start, out end);
+                if (FillBoxes && BoxFillOpacity > 0)
+                {
+                    int alpha = (int)Math.Round(BoxFillOpacity * 255.0 / 100.0);
+                    var fill = Chart.DrawRectangle(name + ".fill", start, slot.High[tf, 0], end, slot.Low[tf, 0],
+                        Color.FromArgb(alpha, colors[tf].R, colors[tf].G, colors[tf].B));
+                    fill.IsFilled = true;
+                }
+                else Chart.RemoveObject(name + ".fill");
                 var rectangle = Chart.DrawRectangle(name, start, slot.High[tf, 0], end, slot.Low[tf, 0], colors[tf]);
                 rectangle.IsFilled = false;
-                rectangle.Thickness = 1;
+                rectangle.Thickness = BoxOutlineWidth;
                 Chart.DrawText(name + ".label", labels[tf] + "  " + slot.High[tf, 0].ToString("F" + Symbol.Digits, CultureInfo.InvariantCulture) + " / " + slot.Low[tf, 0].ToString("F" + Symbol.Digits, CultureInfo.InvariantCulture), end, slot.High[tf, 0], colors[tf]);
             }
         }
