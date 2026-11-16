@@ -13,6 +13,23 @@ function ageLabel(value) {
   return { text: minutes < 1 ? 'Just updated' : `${minutes} min ago`, stale: minutes > 15 };
 }
 
+function detail(label, value) {
+  const line = document.createElement('div');
+  line.className = 'detail';
+  const heading = document.createElement('span');
+  heading.className = 'detail-label';
+  heading.textContent = label;
+  const content = document.createElement('span');
+  content.className = 'detail-value';
+  content.textContent = value;
+  line.append(heading, content);
+  return line;
+}
+
+function shortBox(value) {
+  return { UPTREND: 'UP', DOWNTREND: 'DOWN', RANGING: 'RANGE', UNKNOWN: '—' }[value] || '—';
+}
+
 function showMessage(message, login = false) {
   pairs.replaceChildren();
   count.textContent = '—';
@@ -98,7 +115,14 @@ async function loadPairs() {
       timestamp.className = 'age';
       timestamp.textContent = age.stale ? `STALE · ${age.text}` : age.text;
       bottom.append(direction, timestamp);
-      card.append(top, bottom);
+      const details = document.createElement('div');
+      details.className = 'details';
+      details.append(
+        detail('BOX', `H1 ${shortBox(pair.box_h1)} · H4 ${shortBox(pair.box_h4)}`),
+        detail('XTF', pair.xtf || 'NONE'),
+        detail('PL', `${pair.pl_status || 'UNVERIFIED'} · ${pair.pl_verdict || 'N/A'}`),
+      );
+      card.append(top, bottom, details);
       pairs.append(card);
     }
   } catch (error) {

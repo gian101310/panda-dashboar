@@ -1,6 +1,6 @@
 # Panda Engine Valid Pairs for Chrome
 
-Read-only Chrome side panel showing the current valid pairs from Panda Engine, ordered by absolute gap. It includes all pairs with `|gap| >= 5` and `hard_invalid = false`; gaps 5–6 are highlighted yellow, matching the Telegram snapshot display. It does not place trades or change scoring.
+Read-only Chrome side panel showing the current valid pairs from Panda Engine, ordered by absolute gap. It includes all pairs with `|gap| >= 5` and `hard_invalid = false`; gaps 5–6 are highlighted yellow, matching the Telegram snapshot display. Each card also shows H1/H4 BOX trends, XTF extreme timeframe scores, and Panda Lines status/verdict. It does not place trades or change scoring.
 
 ## Install privately
 
