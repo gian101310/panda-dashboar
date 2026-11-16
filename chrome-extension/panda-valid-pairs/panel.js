@@ -98,11 +98,8 @@ async function loadPairs() {
       card.className = `pair${age.stale ? ' stale' : ''}`;
       const watch = Math.abs(gap) < 7;
       card.style.setProperty('--tone', watch ? '#ffd166' : bias === 'BUY' ? '#00ff9f' : '#ff4d6d');
-      card.style.setProperty('--fill', watch
-        ? 'linear-gradient(110deg, rgba(255,209,102,.25), #101b2c 78%)'
-        : bias === 'BUY'
-          ? 'linear-gradient(110deg, rgba(0,255,159,.24), #101b2c 78%)'
-          : 'linear-gradient(110deg, rgba(255,77,109,.25), #101b2c 78%)');
+      card.style.background = watch ? '#493b20' : bias === 'BUY' ? '#123d32' : '#43212e';
+      card.style.borderColor = watch ? '#a88a3f' : bias === 'BUY' ? '#188665' : '#a04459';
       const top = document.createElement('div');
       top.className = 'pair-top';
       const symbol = document.createElement('span');
