@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Panda Valid Pairs</title>
+  <link rel="stylesheet" href="panel.css">
+</head>
+<body>
+  <header>
+    <div class="brand"><span class="mark">P</span><div><strong>PANDA ENGINE</strong><small>VALID PAIRS</small></div></div>
+    <button id="refresh" type="button" title="Refresh pairs" aria-label="Refresh pairs">↻</button>
+  </header>
+  <main>
+    <div class="summary"><span id="count">—</span><span id="status">Loading live pairs…</span></div>
+    <div id="pairs" class="pairs" aria-live="polite"></div>
+    <div id="empty" class="empty" hidden></div>
+  </main>
+  <footer><a id="dashboard" href="https://pandaengine.app/dashboard" target="_blank" rel="noopener noreferrer">Open full dashboard ↗</a><span>Read only</span></footer>
+  <script src="panel.js"></script>
+</body>
+</html>

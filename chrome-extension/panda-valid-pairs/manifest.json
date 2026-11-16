@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Panda Engine Valid Pairs",
+  "description": "A compact read-only view of your live Panda Engine valid pairs.",
+  "version": "1.0.0",
+  "minimum_chrome_version": "114",
+  "permissions": ["sidePanel", "cookies"],
+  "host_permissions": ["https://pandaengine.app/*", "https://www.pandaengine.app/*"],
+  "action": { "default_title": "Open Panda valid pairs" },
+  "background": { "service_worker": "background.js" },
+  "side_panel": { "default_path": "panel.html" }
+}
