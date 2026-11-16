@@ -41,11 +41,13 @@ async function findSessions() {
 async function loadPairs() {
   refresh.disabled = true;
   status.textContent = 'Refreshing…';
+  let stage = 'reading Chrome session';
   try {
     const sessions = await findSessions();
     if (!sessions.length) return showMessage('Sign in to Panda Engine in Chrome, then press refresh.', true);
     let response;
     for (const session of sessions) {
+      stage = `requesting pairs from ${new URL(session.site).hostname}`;
       response = await fetch(`${session.site}/api/extension-valid-pairs`, {
         headers: { Authorization: `Bearer ${session.token}` },
         cache: 'no-store',
@@ -58,6 +60,7 @@ async function loadPairs() {
     }
     if (response.status === 401) return showMessage('Your Panda session has expired. Sign in again, then refresh.', true);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    stage = 'reading pair response';
     const result = await response.json();
     if (!Array.isArray(result.pairs)) throw new Error('Invalid pair response');
 
@@ -99,7 +102,7 @@ async function loadPairs() {
       pairs.append(card);
     }
   } catch (error) {
-    showMessage('Could not load Panda pairs. Check your connection and try again.');
+    showMessage(`Load failed while ${stage}: ${error?.message || 'Unknown error'}`);
   } finally {
     refresh.disabled = false;
   }

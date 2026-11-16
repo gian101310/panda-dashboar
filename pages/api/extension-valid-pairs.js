@@ -1,17 +1,14 @@
 import { supabase } from '../../lib/supabase';
 import { validateSession } from '../../lib/auth';
 
-const EXTENSION_ORIGIN = /^chrome-extension:\/\/[a-p]{32}$/;
 let cache = { rows: null, ts: 0 };
 
 export default async function handler(req, res) {
-  const origin = req.headers.origin || '';
-  if (!EXTENSION_ORIGIN.test(origin)) return res.status(403).json({ error: 'Extension origin required' });
-
-  res.setHeader('Access-Control-Allow-Origin', origin);
+  // Chrome may omit Origin on extension requests with host permission. The
+  // bearer session is required; credentials are never sent automatically.
+  res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Authorization');
-  res.setHeader('Vary', 'Origin');
   res.setHeader('Cache-Control', 'private, no-store');
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'GET') return res.status(405).json({ error: 'GET only' });
