@@ -35,7 +35,10 @@ export default async function handler(req, res) {
         symbol: row.symbol,
         gap: Number(row.gap),
         bias: Number(row.gap) >= 5 ? 'BUY' : 'SELL',
-        updated_at: row.updated_at,
+        // The engine stores UTC as timezone-less text; make that explicit for browsers.
+        updated_at: /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(row.updated_at || '')
+          ? `${row.updated_at.replace(' ', 'T')}Z`
+          : row.updated_at,
       }))
       .sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap) || a.symbol.localeCompare(b.symbol));
 
