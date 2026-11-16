@@ -96,7 +96,13 @@ async function loadPairs() {
       const age = ageLabel(pair.updated_at);
       const card = document.createElement('article');
       card.className = `pair${age.stale ? ' stale' : ''}`;
-      card.style.setProperty('--tone', Math.abs(gap) < 7 ? '#ffd166' : bias === 'BUY' ? '#00ff9f' : '#ff4d6d');
+      const watch = Math.abs(gap) < 7;
+      card.style.setProperty('--tone', watch ? '#ffd166' : bias === 'BUY' ? '#00ff9f' : '#ff4d6d');
+      card.style.setProperty('--fill', watch
+        ? 'linear-gradient(110deg, rgba(255,209,102,.25), #101b2c 78%)'
+        : bias === 'BUY'
+          ? 'linear-gradient(110deg, rgba(0,255,159,.24), #101b2c 78%)'
+          : 'linear-gradient(110deg, rgba(255,77,109,.25), #101b2c 78%)');
       const top = document.createElement('div');
       top.className = 'pair-top';
       const symbol = document.createElement('span');
