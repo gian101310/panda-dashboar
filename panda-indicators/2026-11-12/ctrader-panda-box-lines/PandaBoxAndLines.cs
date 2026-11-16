@@ -58,6 +58,15 @@ namespace cAlgo
         public double FlBbDeviations { get; set; }
         [Parameter("FL ATR period", DefaultValue = 5, MinValue = 1, Group = "Panda Lines")]
         public int FlAtrPeriod { get; set; }
+
+        [Output("ST Bullish", LineColor = "Lime", PlotType = PlotType.DiscontinuousLine, Thickness = 2)]
+        public IndicatorDataSeries StBullish { get; set; }
+        [Output("ST Bearish", LineColor = "Red", PlotType = PlotType.DiscontinuousLine, Thickness = 2)]
+        public IndicatorDataSeries StBearish { get; set; }
+        [Output("FL Bullish", LineColor = "DodgerBlue", PlotType = PlotType.DiscontinuousLine, Thickness = 2)]
+        public IndicatorDataSeries FlBullish { get; set; }
+        [Output("FL Bearish", LineColor = "Red", PlotType = PlotType.DiscontinuousLine, Thickness = 2)]
+        public IndicatorDataSeries FlBearish { get; set; }
         [Parameter("Short box days", DefaultValue = 2, MinValue = 1, MaxValue = 20, Group = "Box windows")]
         public int ShortDays { get; set; }
         [Parameter("Short box offset", DefaultValue = 1, MinValue = 1, MaxValue = 20, Group = "Box windows")]
@@ -94,6 +103,7 @@ namespace cAlgo
         private Bars _hour, _month;
         private AverageTrueRange _stAtr, _flAtr;
         private BollingerBands _flBands;
+        private IndicatorDataSeries _stUp, _stDown, _stTrend, _flLine, _flTrend;
         private DateTime _lastCalculation = DateTime.MinValue;
 
         protected override void Initialize()
@@ -123,11 +133,20 @@ namespace cAlgo
             {
                 _hour = MarketData.GetBars(TimeFrame.Hour);
                 _month = MarketData.GetBars(TimeFrame.Monthly);
-                _stAtr = Indicators.AverageTrueRange(_hour, StPeriod, MovingAverageType.WilderSmoothing);
-                _flAtr = Indicators.AverageTrueRange(_hour, FlAtrPeriod, MovingAverageType.WilderSmoothing);
-                _flBands = Indicators.BollingerBands(_hour.ClosePrices, FlBbPeriod, FlBbDeviations, MovingAverageType.Simple);
+                _stAtr = Indicators.AverageTrueRange(StPeriod, MovingAverageType.WilderSmoothing);
+                _flAtr = Indicators.AverageTrueRange(FlAtrPeriod, MovingAverageType.WilderSmoothing);
+                _flBands = Indicators.BollingerBands(Bars.ClosePrices, FlBbPeriod, FlBbDeviations, MovingAverageType.Simple);
             }
             catch (Exception ex) { Print("Panda Box: chart history: {0}", ex.Message); }
+            _stUp = CreateDataSeries();
+            _stDown = CreateDataSeries();
+            _stTrend = CreateDataSeries();
+            _flLine = CreateDataSeries();
+            _flTrend = CreateDataSeries();
+            Chart.RemoveObject("PandaBoxLines.Level.ST");
+            Chart.RemoveObject("PandaBoxLines.Level.ST.label");
+            Chart.RemoveObject("PandaBoxLines.Level.FL");
+            Chart.RemoveObject("PandaBoxLines.Level.FL.label");
             _panel = Chart.Draggables.Add();
             _panel.ShowGrip = true;
             _panel.X = 20;
@@ -138,7 +157,67 @@ namespace cAlgo
             Refresh();
         }
 
-        public override void Calculate(int index) { }
+        public override void Calculate(int index)
+        {
+            StBullish[index] = StBearish[index] = FlBullish[index] = FlBearish[index] = double.NaN;
+            if (!ShowPandaLines || _stAtr == null || _flAtr == null || _flBands == null ||
+                index < Math.Max(StPeriod, Math.Max(FlBbPeriod, FlAtrPeriod)) + 2) return;
+
+            double atr = _stAtr.Result[index];
+            double flAtr = _flAtr.Result[index];
+            if (double.IsNaN(atr) || atr <= 0 || double.IsNaN(flAtr) || flAtr <= 0) return;
+
+            double high = Bars.HighPrices[index], low = Bars.LowPrices[index];
+            double close = Bars.ClosePrices[index], previousClose = Bars.ClosePrices[index - 1];
+            double middle = (high + low) / 2.0;
+            double currentUp = middle - StMultiplier * atr;
+            double currentDown = middle + StMultiplier * atr;
+            double previousUp = Valid(_stUp[index - 1]) ? _stUp[index - 1] : currentUp;
+            double previousDown = Valid(_stDown[index - 1]) ? _stDown[index - 1] : currentDown;
+            if (previousClose > previousUp) currentUp = Math.Max(currentUp, previousUp);
+            if (previousClose < previousDown) currentDown = Math.Min(currentDown, previousDown);
+            _stUp[index] = currentUp;
+            _stDown[index] = currentDown;
+
+            double previousTrend = Math.Abs(_stTrend[index - 1]) == 1 ? _stTrend[index - 1] : 1;
+            double trend = previousTrend == -1 && previousClose > previousDown ? 1
+                : previousTrend == 1 && previousClose < previousUp ? -1 : previousTrend;
+            _stTrend[index] = trend;
+            double st = trend == 1 ? currentUp : currentDown;
+            if (trend == 1)
+            {
+                StBullish[index] = st;
+                if (previousTrend == -1) StBullish[index - 1] = previousDown;
+            }
+            else
+            {
+                StBearish[index] = st;
+                if (previousTrend == 1) StBearish[index - 1] = previousUp;
+            }
+
+            double previousFl = Valid(_flLine[index - 1]) ? _flLine[index - 1] : close;
+            double fl = previousFl;
+            if (previousClose > _flBands.Top[index - 1])
+                fl = Math.Max(low - flAtr, previousFl);
+            else if (previousClose < _flBands.Bottom[index - 1])
+                fl = Math.Min(high + flAtr, previousFl);
+            _flLine[index] = fl;
+            double previousFlTrend = Math.Abs(_flTrend[index - 1]) == 1 ? _flTrend[index - 1] : 0;
+            double flTrend = fl > previousFl ? 1 : fl < previousFl ? -1 : previousFlTrend;
+            _flTrend[index] = flTrend;
+            if (flTrend > 0)
+            {
+                FlBullish[index] = fl;
+                if (previousFlTrend <= 0 && index > 0) FlBullish[index - 1] = previousFl;
+            }
+            else
+            {
+                FlBearish[index] = fl;
+                if (previousFlTrend > 0) FlBearish[index - 1] = previousFl;
+            }
+        }
+
+        private static bool Valid(double value) => !double.IsNaN(value) && value > 0;
 
         private void OnTimerTick()
         {
@@ -265,7 +344,6 @@ namespace cAlgo
             CalculateBias();
             DrawBoxes(now);
             DrawLevels();
-            DrawPandaLines();
             _panel.Child = BuildPanel();
         }
 
@@ -401,72 +479,6 @@ namespace cAlgo
                 DrawLevel(names[kind] + "H", high, colors[kind]);
                 DrawLevel(names[kind] + "L", low, colors[kind]);
             }
-        }
-
-        private void DrawPandaLines()
-        {
-            if (!ShowPandaLines || _hour == null || _stAtr == null || _flAtr == null || _flBands == null)
-            {
-                DrawLevel("ST", 0, Buy);
-                DrawLevel("FL", 0, Accent);
-                return;
-            }
-            // The MT4 exporter runs its ST/FL state machine over 300 H1 bars.
-            // Keep enough earlier bars for the 21-period BB and ATR warm-up.
-            if (_hour.Count < 320)
-            {
-                try { _hour.LoadMoreHistory(); }
-                catch (Exception ex) { Print("Panda Box: Panda Lines history: {0}", ex.Message); }
-            }
-            if (_hour.Count < 320)
-            {
-                DrawLevel("ST", 0, Buy);
-                DrawLevel("FL", 0, Accent);
-                return;
-            }
-
-            const int lookback = 300;
-            int start = _hour.Count - lookback;
-            var up = new double[lookback];
-            var down = new double[lookback];
-            var trend = new int[lookback];
-            var follow = new double[lookback];
-            for (int i = 0; i < lookback; i++) trend[i] = 1;
-
-            for (int i = 2; i < lookback; i++)
-            {
-                int bar = start + i;
-                double atr = _stAtr.Result[bar];
-                if (atr <= 0 || double.IsNaN(atr)) continue;
-                double high = _hour.HighPrices[bar], low = _hour.LowPrices[bar];
-                double close = _hour.ClosePrices[bar], previousClose = _hour.ClosePrices[bar - 1];
-                double source = (high + low) / 2.0;
-                double currentUp = source - StMultiplier * atr;
-                double currentDown = source + StMultiplier * atr;
-                double previousUp = up[i - 1] == 0 ? currentUp : up[i - 1];
-                double previousDown = down[i - 1] == 0 ? currentDown : down[i - 1];
-                if (previousClose > previousUp) currentUp = Math.Max(currentUp, previousUp);
-                if (previousClose < previousDown) currentDown = Math.Min(currentDown, previousDown);
-                up[i] = currentUp;
-                down[i] = currentDown;
-                trend[i] = trend[i - 1] == -1 && previousClose > previousDown ? 1
-                    : trend[i - 1] == 1 && previousClose < previousUp ? -1 : trend[i - 1];
-
-                double previousFollow = follow[i - 1] == 0 ? close : follow[i - 1];
-                double currentFollow = previousFollow;
-                double previousBbUp = _flBands.Top[bar - 1];
-                double previousBbDown = _flBands.Bottom[bar - 1];
-                double flAtr = _flAtr.Result[bar];
-                if (previousClose > previousBbUp)
-                    currentFollow = Math.Max(low - flAtr, previousFollow);
-                else if (previousClose < previousBbDown)
-                    currentFollow = Math.Min(high + flAtr, previousFollow);
-                follow[i] = currentFollow;
-            }
-
-            int last = lookback - 1;
-            DrawLevel("ST", trend[last] == 1 ? up[last] : down[last], trend[last] == 1 ? Buy : Sell);
-            DrawLevel("FL", follow[last], Accent);
         }
 
         private void DrawLevel(string label, double value, Color color)
