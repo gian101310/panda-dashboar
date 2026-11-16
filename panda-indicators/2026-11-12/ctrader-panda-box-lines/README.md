@@ -11,6 +11,7 @@ Standalone, read-only cTrader port of the MT4 `Panda Box and Lines.mq4` v1.35 in
 - The boxes draw without WagBox text labels on the chart.
 - Box appearance parameters include fill on/off, fill opacity (30% by default), outline width, and a separate color for each box.
 - PDH/PDL, PWH/PWL, PMH/PML and PYH/PYL previous-period lines.
+- Current H1 Panda Lines ST (SuperTrend) and FL (FollowLine), calculated from cTrader H1 bars with the MT4 exporter's default periods. They appear as labeled horizontal lines and refresh with the indicator. The Panda Lines inputs can be adjusted to match a customized MT4 exporter.
 
 PYH/PYL load monthly history back through the start of the previous year before drawing. If the broker has no complete previous-year history, those two lines remain hidden rather than showing partial-year levels. The values are calculated from cTrader broker candles and can differ from MT4 exports.
 
