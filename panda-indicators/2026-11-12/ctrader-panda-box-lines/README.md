@@ -12,6 +12,8 @@ Standalone, read-only cTrader port of the MT4 `Panda Box and Lines.mq4` v1.35 in
 - Box appearance parameters include fill on/off, fill opacity (30% by default), outline width, and a separate color for each box.
 - PDH/PDL, PWH/PWL, PMH/PML and PYH/PYL previous-period lines.
 
+PYH/PYL load monthly history back through the start of the previous year before drawing. If the broker has no complete previous-year history, those two lines remain hidden rather than showing partial-year levels. The values are calculated from cTrader broker candles and can differ from MT4 exports.
+
 The panel shows `DATA UNAVAILABLE` until all 21 pairs and their required H1 history are available. It loads more history every 10 seconds while waiting, then refreshes every 60 seconds by default. The box and level calendar is based on UTC H1 bars; broker session cuts can differ from the MT4 terminal, so live side-by-side value parity remains to be checked.
 
 ## Install

@@ -348,6 +348,14 @@ namespace cAlgo
             low = double.MaxValue; high = 0;
             if (_month == null) return false;
             int year = Server.TimeInUtc.Year - 1;
+            var start = new DateTime(year, 1, 1);
+            if (_month.Count == 0 || _month.OpenTimes[0] > start)
+            {
+                try { _month.LoadMoreHistory(); }
+                catch (Exception ex) { Print("Panda Box: yearly level history: {0}", ex.Message); }
+            }
+            // A partial year could produce a plausible but incorrect PYH/PYL.
+            if (_month.Count == 0 || _month.OpenTimes[0] > start) return false;
             for (int i = _month.Count - 1; i >= 0; --i)
             {
                 if (_month.OpenTimes[i].Year < year) break;
