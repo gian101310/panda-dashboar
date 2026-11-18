@@ -1,3 +1,7 @@
+## 2026-11-18 - Correct cTrader Box and Lines raw-score gap
+- Selected the strongest positive and negative currency votes separately across D1, H4, and H1 instead of netting each timeframe first.
+- Applied the same raw-vote rule to the ADV forecast and marked opposing current extremes invalid. Rebuilt the cTrader package; Panda Engine scoring and chart drawings are unchanged.
+
 ## 2026-11-09 - Match MT4 short-box rollover to cTrader Panda Levels V2
 - Rolled the personal and licensed MT4 short boxes across trading days rather than calendar days, skipping weekends for both current and ADV scoring.
 - Kept weekly/monthly box windows, pair voting, bias thresholds, exporter files, and Panda Engine scoring functions unchanged.

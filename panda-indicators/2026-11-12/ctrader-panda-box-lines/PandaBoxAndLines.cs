@@ -93,7 +93,6 @@ namespace cAlgo
         private readonly List<Slot> _slots = new List<Slot>();
         private readonly int[,,] _positive = new int[7, 3, 2];
         private readonly int[,,] _negative = new int[7, 3, 2];
-        private readonly int[,,] _net = new int[7, 3, 2];
         private string _pair = "";
         private int _base = -1, _quote = -1, _ready;
         private int _gap, _advGap;
@@ -298,7 +297,6 @@ namespace cAlgo
             _lastCalculation = DateTime.UtcNow;
             Array.Clear(_positive, 0, _positive.Length);
             Array.Clear(_negative, 0, _negative.Length);
-            Array.Clear(_net, 0, _net.Length);
             _ready = 0;
             var now = Server.TimeInUtc;
             foreach (var slot in _slots)
@@ -351,20 +349,20 @@ namespace cAlgo
         {
             int index = Array.IndexOf(Currencies, currency);
             if (index < 0) return;
-            _net[index, timeframe, advance] += vote;
             if (vote > 0) _positive[index, timeframe, advance]++;
             if (vote < 0) _negative[index, timeframe, advance]++;
         }
 
-        private static int Strongest(int d1, int h4, int h1)
+        private int StrongestRaw(int currency, int d1, int h4, int h1)
         {
-            int pos = Math.Max(0, Math.Max(d1, Math.Max(h4, h1)));
-            int neg = Math.Min(0, Math.Min(d1, Math.Min(h4, h1)));
-            return pos == -neg ? 0 : -neg > pos ? neg : pos;
+            int pos = Math.Max(_positive[currency, 0, d1], Math.Max(_positive[currency, 1, h4], _positive[currency, 2, h1]));
+            int neg = Math.Max(_negative[currency, 0, d1], Math.Max(_negative[currency, 1, h4], _negative[currency, 2, h1]));
+            return pos == neg ? 0 : neg > pos ? -neg : pos;
         }
 
-        private static bool Conflict(int d1, int h4, int h1) =>
-            (d1 >= 4 || h4 >= 4 || h1 >= 4) && (d1 <= -4 || h4 <= -4 || h1 <= -4);
+        private bool ConflictRaw(int currency, int d1, int h4, int h1) =>
+            (_positive[currency, 0, d1] >= 4 || _positive[currency, 1, h4] >= 4 || _positive[currency, 2, h1] >= 4) &&
+            (_negative[currency, 0, d1] >= 4 || _negative[currency, 1, h4] >= 4 || _negative[currency, 2, h1] >= 4);
 
         private void CalculateBias()
         {
@@ -372,10 +370,10 @@ namespace cAlgo
             _gap = _advGap = 0;
             _advConflict = false;
             if (_pair == "" || _ready != Pairs.Length) return;
-            int bD = _net[_base, 0, 0], bH = _net[_base, 1, 0], b1 = _net[_base, 2, 0];
-            int qD = _net[_quote, 0, 0], qH = _net[_quote, 1, 0], q1 = _net[_quote, 2, 0];
-            _gap = Strongest(bD, bH, b1) - Strongest(qD, qH, q1);
-            _bias = Math.Abs(_gap) < GapThreshold ? "INVALID" : _gap > 0 ? "BUY" : "SELL";
+            bool currentConflict = ConflictRaw(_base, 0, 0, 0) || ConflictRaw(_quote, 0, 0, 0);
+            if (!currentConflict)
+                _gap = StrongestRaw(_base, 0, 0, 0) - StrongestRaw(_quote, 0, 0, 0);
+            _bias = currentConflict ? "HARD_INVALID" : Math.Abs(_gap) < GapThreshold ? "INVALID" : _gap > 0 ? "BUY" : "SELL";
 
             var dubai = Server.TimeInUtc.AddHours(4);
             int days = dubai.DayOfWeek == DayOfWeek.Friday ? 3 : dubai.DayOfWeek == DayOfWeek.Saturday ? 2 : 1;
@@ -384,11 +382,9 @@ namespace cAlgo
             _horizon = month ? "MTH" : dubai.DayOfWeek >= DayOfWeek.Monday && dubai.DayOfWeek <= DayOfWeek.Thursday ? "TMRW" : "WK";
             int d = _horizon == "MTH" ? 1 : 0;
             int h = _horizon == "TMRW" ? 0 : 1;
-            bD = _net[_base, 0, d]; bH = _net[_base, 1, h]; b1 = _net[_base, 2, 1];
-            qD = _net[_quote, 0, d]; qH = _net[_quote, 1, h]; q1 = _net[_quote, 2, 1];
-            _advConflict = Conflict(bD, bH, b1) || Conflict(qD, qH, q1);
+            _advConflict = ConflictRaw(_base, d, h, 1) || ConflictRaw(_quote, d, h, 1);
             if (_advConflict) { _advBias = "INVALID"; return; }
-            _advGap = Strongest(bD, bH, b1) - Strongest(qD, qH, q1);
+            _advGap = StrongestRaw(_base, d, h, 1) - StrongestRaw(_quote, d, h, 1);
             _advBias = _advGap >= GapThreshold ? "BUY" : _advGap <= -GapThreshold ? "SELL" : "WAIT";
         }
 
