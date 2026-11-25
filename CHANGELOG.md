@@ -1,3 +1,8 @@
+## 2026-11-25 - Add local Panda process office
+- Added a loopback-only, read-only 3D operations viewer under tools/panda-office with rigged animated characters and live source labels.
+- Connected engine scoring health, snapshot and Telegram delivery records, Signal outbox, licensing status, Panda Lines exports, and previous-day export fields without changing engine or trading logic.
+- Left pre-send review visibly uninstrumented because Panda does not emit a separate check event.
+
 ## 2026-11-18 - Correct cTrader Box and Lines raw-score gap
 - Selected the strongest positive and negative currency votes separately across D1, H4, and H1 instead of netting each timeframe first.
 - Applied the same raw-vote rule to the ADV forecast and marked opposing current extremes invalid. Rebuilt the cTrader package; Panda Engine scoring and chart drawings are unchanged.
