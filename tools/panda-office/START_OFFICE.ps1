@@ -1,7 +1,22 @@
 $ErrorActionPreference = 'Stop'
 $officeDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $distFile = Join-Path $officeDir 'dist\index.html'
-if (-not (Test-Path -LiteralPath $distFile)) {
+$sourcePaths = @(
+    (Join-Path $officeDir 'src'),
+    (Join-Path $officeDir 'public'),
+    (Join-Path $officeDir 'index.html'),
+    (Join-Path $officeDir 'package.json'),
+    (Join-Path $officeDir 'package-lock.json')
+)
+$needsBuild = -not (Test-Path -LiteralPath $distFile)
+if (-not $needsBuild) {
+    $builtAt = (Get-Item -LiteralPath $distFile).LastWriteTimeUtc
+    foreach ($sourcePath in $sourcePaths) {
+        $latest = Get-ChildItem -LiteralPath $sourcePath -File -Recurse | Where-Object { $_.LastWriteTimeUtc -gt $builtAt } | Select-Object -First 1
+        if ($latest) { $needsBuild = $true; break }
+    }
+}
+if ($needsBuild) {
     Write-Host 'Building Panda Office...'
     Push-Location $officeDir
     try {

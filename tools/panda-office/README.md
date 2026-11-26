@@ -1,6 +1,6 @@
 # Panda Engine Office
 
-Local read-only 3D view of Panda Engine processes. The office does not send Telegram messages, change scoring, approve licenses, or place trades. Characters represent observed software processes, not separate AI models.
+Local read-only pixel-art view of Panda Engine processes. The Stone Age cave map has nine named characters: Mr. Slate as the visual CEO, Fred, Wilma, Betty, Barney, Pebbles, Bamm-Bamm, Gazoo, and Dino. Eight characters represent observed Panda processes. Mr. Slate summarizes the connected feeds; he is not an autonomous CEO agent. The cave does not send Telegram messages, change scoring, approve licenses, or place trades.
 
 ## Start
 
@@ -18,4 +18,4 @@ The observer reads the existing project `.env` on the server side for **read-onl
 - **Send Check:** no distinct pre-send review event exists yet, so the character shows `No live feed`; the office does not gate delivery.
 - **Previous day:** counts fresh local `tbg_*.txt` exports containing PDH and PDL fields. This confirms exported data, not visible chart drawing.
 
-The office polls every 15 seconds and shows `No live feed` or `Unavailable` when a source cannot be verified. It has no simulated activity in live mode. Status history is kept only in memory while this viewer runs.
+The office polls every 15 seconds and shows `No live feed` or `Unavailable` when a source cannot be verified. Walking, standing, and idle gestures are ambient visual animation; they do not claim that a live task was performed. Status and event text come from real Panda observations. Status history is kept only in memory while this viewer runs.

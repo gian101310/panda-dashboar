@@ -1,11 +1,5 @@
-# Character assets
+# Pixel art assets
 
-The four GLB characters in `public/models/` were generated locally with [Ara 3D Gen](https://github.com/olatunde85/3d-gen) version 0.18.0. Its code is MIT licensed; its exported character base assets and animation source are CC0, as documented by the project. The office uses its Female Executive, Corporate High-Flier, Cyberpunk Hacker, and Businesswoman presets. No GTA characters, art, or game files are used.
+`public/stone-age-hq.png` is a generated Stone Age cave headquarters background created with the built-in image generation tool on 2026-11-27. It shows eight cave work rooms around a central atrium, with stone desks, slate computers, torches, and plants. No text or characters are baked into the image. The generation prompt requested a polished top-down 16-bit pixel-art Stone Age technology headquarters, a three-top/two-middle/three-bottom room layout, and a purple sandstone palette.
 
-Generation command:
-
-```powershell
-npx --yes ara3d export --preset 'The Female Executive' --preset 'The Corporate High-Flier' --preset 'The Cyberpunk Hacker' --preset 'Businesswoman' --detail low --animations walk,idle,sit_idle,look_around,texting,wave --out public/models
-```
-
-The downloaded generator data remains in Ara's normal local cache; it is not part of this project. The four generated GLBs are bundled locally so the office can render without contacting a third-party model host.
+Characters and their walking animation are drawn in `src/pixelOffice.js` using canvas pixels. Names reference the Flintstones cast, but no official character sprites or game assets are bundled. The removed GLB models are retained in Git history if the prior 3D view is ever needed.

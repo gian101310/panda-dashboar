@@ -1,3 +1,8 @@
+## 2026-11-27 - Restyle local office as Stone Age pixel cave
+- Replaced the local 3D office scene with an animated pixel-art cave map and nine named characters, including a visual CEO.
+- Kept the eight live Panda feeds read-only and labeled character walking as ambient animation.
+- Removed unused 3D models and the Three.js dependency from the local viewer.
+
 ## 2026-11-25 - Add local Panda process office
 - Added a loopback-only, read-only 3D operations viewer under tools/panda-office with rigged animated characters and live source labels.
 - Connected engine scoring health, snapshot and Telegram delivery records, Signal outbox, licensing status, Panda Lines exports, and previous-day export fields without changing engine or trading logic.

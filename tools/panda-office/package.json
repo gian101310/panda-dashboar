@@ -7,10 +7,7 @@
     "build": "vite build",
     "dev": "vite --host 127.0.0.1",
     "start": "node server.mjs",
-    "check": "node --check server.mjs && node --check src/main.js"
-  },
-  "dependencies": {
-    "three": "^0.181.0"
+    "check": "node --check server.mjs && node --check src/main.js && node --check src/pixelOffice.js"
   },
   "devDependencies": {
     "vite": "^7.2.0"
